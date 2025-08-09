@@ -22,7 +22,7 @@ export default function AllStoresVerify() {
 
   // debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 500)
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 700)
     return () => clearTimeout(t)
   }, [search])
 

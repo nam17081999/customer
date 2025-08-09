@@ -22,7 +22,7 @@ export default function StoreList() {
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search.trim());
-    }, 500);
+    }, 700);
     return () => clearTimeout(handler);
   }, [search]);
 
