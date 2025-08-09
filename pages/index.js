@@ -15,6 +15,7 @@ export default function StoreList() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
+  const [deletingId, setDeletingId] = useState(null);
 
   // Debounce 500ms
   useEffect(() => {
@@ -49,6 +50,44 @@ export default function StoreList() {
       return;
     }
     setStores(data || []);
+  }
+
+  function getFileNameFromUrl(url) {
+    try {
+      const marker = '/object/public/stores/';
+      const idx = url.indexOf(marker);
+      if (idx !== -1) return url.substring(idx + marker.length);
+      const u = new URL(url);
+      const parts = u.pathname.split('/');
+      return parts[parts.length - 1];
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleDelete(store) {
+    if (!user) {
+      alert('Vui lòng đăng nhập để xóa cửa hàng');
+      return;
+    }
+    const ok = window.confirm(`Bạn có chắc muốn xóa cửa hàng "${store.name}"?`);
+    if (!ok) return;
+    try {
+      setDeletingId(store.id);
+      const { error: delErr } = await supabase.from('stores').delete().eq('id', store.id);
+      if (delErr) throw delErr;
+      // best-effort remove image
+      if (store.image_url) {
+        const file = getFileNameFromUrl(store.image_url);
+        if (file) await supabase.storage.from('stores').remove([file]);
+      }
+      setStores((prev) => prev.filter((s) => s.id !== store.id));
+    } catch (err) {
+      console.error(err);
+      alert('Xóa thất bại');
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   return (
@@ -142,9 +181,20 @@ export default function StoreList() {
                             </Button>
                           )}
                           {user && (
-                            <Button asChild size="sm" variant="outline">
-                              <Link href={`/store/${store.id}`}>Chỉnh sửa</Link>
-                            </Button>
+                            <>
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={`/store/${store.id}`}>Chỉnh sửa</Link>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950"
+                                disabled={deletingId === store.id}
+                                onClick={() => handleDelete(store)}
+                              >
+                                {deletingId === store.id ? 'Đang xóa…' : 'Xóa'}
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
