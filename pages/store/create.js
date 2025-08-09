@@ -5,8 +5,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/components/auth-context'
 
 export default function AddStore() {
+  const { user } = useAuth()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
@@ -16,6 +18,10 @@ export default function AddStore() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!user) {
+      alert('Vui lòng đăng nhập để tạo cửa hàng')
+      return
+    }
 
     if (!name || !address || !imageFile) {
       alert('Tên, địa chỉ và ảnh là bắt buộc')
@@ -39,10 +45,10 @@ export default function AddStore() {
 
     try {
       setLoading(true)
-      const fileExt = imageFile.name.split('.').pop()
+      const fileExt = (fileToUpload.name || imageFile.name).split('.').pop()
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from('stores').upload(fileName, imageFile)
+      const { error: uploadError } = await supabase.storage.from('stores').upload(fileName, fileToUpload)
       if (uploadError) {
         console.error(uploadError)
         alert('Lỗi khi upload ảnh')
@@ -70,7 +76,7 @@ export default function AddStore() {
 
       if (insertError) {
         console.error(insertError)
-        await supabase.storage.from('store').remove([fileName])
+        await supabase.storage.from('stores').remove([fileName])
         alert('Lỗi khi lưu dữ liệu')
         setLoading(false)
         return
@@ -89,6 +95,20 @@ export default function AddStore() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-black">
+        <div className="mx-auto max-w-2xl">
+          <Card>
+            <CardContent className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">
+              Vui lòng <a href="/login" className="text-blue-600 underline">đăng nhập</a> để tạo cửa hàng.
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -122,7 +142,7 @@ export default function AddStore() {
 
               <div className="grid gap-1.5">
                 <Label htmlFor="image">Ảnh đại diện</Label>
-                <Input id="image" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+                <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
               </div>
 
               <div className="pt-2">

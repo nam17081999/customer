@@ -6,12 +6,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog';
+import Link from 'next/link';
+import { useAuth } from '@/components/auth-context';
 
 export default function StoreList() {
   const [stores, setStores] = useState([]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   // Debounce 500ms
   useEffect(() => {
@@ -116,7 +119,7 @@ export default function StoreList() {
                       )}
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                          Tên cửa hàng: {store.name}
+                          <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
                         </h3>
                         <p className="truncate text-sm text-gray-600 dark:text-gray-400">
                           Địa chỉ: {store.address}
@@ -126,8 +129,8 @@ export default function StoreList() {
                             Số điện thoại: {store.phone}
                           </p>
                         )}
-                        {store.latitude && store.longitude && (
-                          <div className="mt-2">
+                        <div className="mt-2 flex items-center gap-2">
+                          {store.latitude && store.longitude && (
                             <Button asChild variant="secondary" size="sm">
                               <a
                                 href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
@@ -137,8 +140,13 @@ export default function StoreList() {
                                 Đi tới Google Maps
                               </a>
                             </Button>
-                          </div>
-                        )}
+                          )}
+                          {user && (
+                            <Button asChild size="sm" variant="outline">
+                              <Link href={`/store/${store.id}`}>Chỉnh sửa</Link>
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
