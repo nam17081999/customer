@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog';
 import Link from 'next/link';
 import { useAuth } from '@/components/auth-context';
+import Image from 'next/image';
 
 export default function StoreList() {
   const [stores, setStores] = useState([]);
@@ -133,17 +134,21 @@ export default function StoreList() {
                       {store.image_url ? (
                         <Dialog>
                           <DialogTrigger asChild>
-                            <img
+                            <Image
                               src={store.image_url}
                               alt={store.name}
+                              width={64}
+                              height={64}
                               className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
                             />
                           </DialogTrigger>
                           <DialogContent className="overflow-hidden p-0">
                             <DialogClose asChild>
-                              <img
+                              <Image
                                 src={store.image_url}
                                 alt={store.name}
+                                width={800}
+                                height={800}
                                 title="Bấm vào ảnh để đóng"
                                 draggable={false}
                                 className="max-h-[80vh] w-auto cursor-zoom-out object-contain"

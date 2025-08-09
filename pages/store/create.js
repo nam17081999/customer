@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-context'
+import Link from 'next/link'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -103,7 +104,7 @@ export default function AddStore() {
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">
-              Vui lòng <a href="/login" className="text-blue-600 underline">đăng nhập</a> để tạo cửa hàng.
+              Vui lòng <Link href="/login" className="text-blue-600 underline">đăng nhập</Link> để tạo cửa hàng.
             </CardContent>
           </Card>
         </div>

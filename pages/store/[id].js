@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
+import Image from 'next/image'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -122,10 +123,10 @@ export default function StoreDetail() {
           {store?.image_url && (
             <Dialog>
               <DialogTrigger asChild>
-                <img src={store.image_url} alt={store.name} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
+                <Image src={store.image_url} alt={store.name} width={96} height={96} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
               </DialogTrigger>
               <DialogContent className="overflow-hidden p-0">
-                <img src={store.image_url} alt={store.name} className="max-h-[80vh] w-auto object-contain" />
+                <Image src={store.image_url} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
               </DialogContent>
             </Dialog>
           )}
