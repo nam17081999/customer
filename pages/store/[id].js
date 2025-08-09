@@ -11,7 +11,7 @@ import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 export default function StoreDetail() {
   const router = useRouter()
   const { id } = router.query
-  const { user, role, loading } = useAuth()
+  const { user, loading } = useAuth()
 
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
@@ -56,8 +56,8 @@ export default function StoreDetail() {
 
   async function onSave(e) {
     e.preventDefault()
-    if (role !== 'admin') {
-      alert('Chỉ admin mới được sửa cửa hàng')
+    if (!user) {
+      alert('Vui lòng đăng nhập để sửa cửa hàng')
       return
     }
 
@@ -132,29 +132,29 @@ export default function StoreDetail() {
           <form onSubmit={onSave} className="space-y-4">
             <div className="grid gap-1.5">
               <Label>Tên</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={role !== 'admin'} />
+              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!user} />
             </div>
             <div className="grid gap-1.5">
               <Label>Địa chỉ</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={role !== 'admin'} />
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} />
             </div>
             <div className="grid gap-1.5">
               <Label>Số điện thoại</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={role !== 'admin'} />
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!user} />
             </div>
             <div className="grid gap-1.5">
               <Label>Ghi chú</Label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={role !== 'admin'} />
+              <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!user} />
             </div>
-            {role === 'admin' && (
+            {user && (
               <div className="grid gap-1.5">
                 <Label>Đổi ảnh (tùy chọn)</Label>
                 <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
               </div>
             )}
             <div className="pt-2">
-              <Button type="submit" disabled={saving || role !== 'admin'} className="w-full">
-                {role !== 'admin' ? 'Chỉ admin được sửa' : saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              <Button type="submit" disabled={!user || saving} className="w-full">
+                {!user ? 'Vui lòng đăng nhập' : saving ? 'Đang lưu...' : 'Lưu thay đổi'}
               </Button>
             </div>
           </form>

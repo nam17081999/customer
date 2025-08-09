@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-context";
 
 export default function Navbar() {
-  const { user, role, signOut, loading } = useAuth();
+  const { user, signOut, loading } = useAuth();
   
   return (
     <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:border-gray-800 dark:bg-black/60">
@@ -22,7 +22,7 @@ export default function Navbar() {
           )}
           {!loading && user ? (
             <>
-              <span className="hidden text-xs text-gray-600 dark:text-gray-400 sm:inline">{user.email} {role ? `(${role})` : ''}</span>
+              <span className="hidden text-xs text-gray-600 dark:text-gray-400 sm:inline">{user.email}</span>
               <Button size="sm" variant="outline" onClick={signOut}>Đăng xuất</Button>
             </>
           ) : (

@@ -45,10 +45,10 @@ export default function AddStore() {
 
     try {
       setLoading(true)
-      const fileExt = (fileToUpload.name || imageFile.name).split('.').pop()
+      const fileExt = (imageFile.name).split('.').pop()
       const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from('stores').upload(fileName, fileToUpload)
+      const { error: uploadError } = await supabase.storage.from('stores').upload(fileName, imageFile)
       if (uploadError) {
         console.error(uploadError)
         alert('Lỗi khi upload ảnh')
