@@ -64,6 +64,19 @@ export default function StoreDetail() {
 
     setSaving(true)
 
+    // Get current location at submit time (fallback to old values if denied)
+    let latitude = store?.latitude ?? null
+    let longitude = store?.longitude ?? null
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject)
+      )
+      latitude = pos.coords.latitude
+      longitude = pos.coords.longitude
+    } catch (geoErr) {
+      console.warn('Không lấy được tọa độ khi cập nhật:', geoErr)
+    }
+
     let image_url = store?.image_url || null
     let newUploadedFile = null
 
@@ -80,7 +93,7 @@ export default function StoreDetail() {
 
       const { error: updateErr } = await supabase
         .from('stores')
-        .update({ name, address, phone, note, image_url })
+        .update({ name, address, phone, note, image_url, latitude, longitude })
         .eq('id', id)
       if (updateErr) throw updateErr
 
