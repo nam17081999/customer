@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-context'
 import Link from 'next/link'
+import imageCompression from 'browser-image-compression'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -46,10 +47,29 @@ export default function AddStore() {
 
     try {
       setLoading(true)
-      const fileExt = (imageFile.name).split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from('stores').upload(fileName, imageFile)
+      // Aggressive client-side compression
+      const options = {
+        maxSizeMB: 0.35,
+        maxWidthOrHeight: 1024,
+        useWebWorker: true,
+        initialQuality: 0.65,
+        fileType: 'image/jpeg',
+      }
+      let fileToUpload = imageFile
+      try {
+        const compressed = await imageCompression(imageFile, options)
+        fileToUpload = compressed
+      } catch (cmpErr) {
+        console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
+      }
+
+      const ext = fileToUpload.type.includes('jpeg') ? 'jpg' : (imageFile.name.split('.').pop() || 'jpg')
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('stores')
+        .upload(fileName, fileToUpload, { contentType: fileToUpload.type })
       if (uploadError) {
         console.error(uploadError)
         alert('Lỗi khi upload ảnh')

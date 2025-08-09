@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import Image from 'next/image'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import imageCompression from 'browser-image-compression'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -83,9 +84,25 @@ export default function StoreDetail() {
 
     try {
       if (imageFile) {
-        const ext = imageFile.name.split('.').pop()
+        // compress before upload
+        const options = {
+          maxSizeMB: 0.35,
+          maxWidthOrHeight: 1024,
+          useWebWorker: true,
+          initialQuality: 0.65,
+          fileType: 'image/jpeg',
+        }
+        let fileToUpload = imageFile
+        try {
+          const compressed = await imageCompression(imageFile, options)
+          fileToUpload = compressed
+        } catch (cmpErr) {
+          console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
+        }
+
+        const ext = fileToUpload.type.includes('jpeg') ? 'jpg' : (imageFile.name.split('.').pop() || 'jpg')
         const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`
-        const { error: upErr } = await supabase.storage.from('stores').upload(fileName, imageFile)
+        const { error: upErr } = await supabase.storage.from('stores').upload(fileName, fileToUpload, { contentType: fileToUpload.type })
         if (upErr) throw upErr
         const { data } = supabase.storage.from('stores').getPublicUrl(fileName)
         image_url = data.publicUrl
