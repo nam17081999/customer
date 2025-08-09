@@ -43,6 +43,7 @@ export default function StoreList() {
       .from('stores')
       .select('*')
       .ilike('name_search', `%${searchValue}%`)
+      .order('status', { ascending: false })
       .order('id', { ascending: false });
 
     setLoading(false);
@@ -162,16 +163,24 @@ export default function StoreList() {
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                          <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                            <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
+                          </h3>
+                          <span
+                            className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                          >
+                            {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
+                          </span>
+                        </div>
                         <p className="truncate text-sm text-gray-600 dark:text-gray-400">
                           Địa chỉ: {store.address}
                         </p>
                         {store.phone && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Số điện thoại: {store.phone}
-                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {store.phone}</p>
+                        )}
+                        {store.note && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>
                         )}
                         <div className="mt-2 flex items-center gap-2">
                           {store.latitude && store.longitude && (

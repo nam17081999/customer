@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import Image from 'next/image'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -91,9 +92,12 @@ export default function StoreDetail() {
         newUploadedFile = fileName
       }
 
+      // compute normalized search name when updating
+      const name_search = removeVietnameseTones(name)
+
       const { error: updateErr } = await supabase
         .from('stores')
-        .update({ name, address, phone, note, image_url, latitude, longitude })
+        .update({ name, name_search, address, phone, note, image_url, latitude, longitude })
         .eq('id', id)
       if (updateErr) throw updateErr
 
