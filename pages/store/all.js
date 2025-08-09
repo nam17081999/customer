@@ -258,7 +258,7 @@ export default function AllStoresVerify() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                Đi tới Google Maps
+                                GG Maps
                               </a>
                             </Button>
                           )}

@@ -190,7 +190,7 @@ export default function StoreList() {
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                Đi tới Google Maps
+                                GG Maps
                               </a>
                             </Button>
                           )}
