@@ -42,7 +42,9 @@ export default function AddStore() {
       latitude = coords.latitude
       longitude = coords.longitude
     } catch (geoErr) {
-      console.warn('Không lấy được tọa độ:', geoErr)
+      console.error('Không lấy được tọa độ:', geoErr)
+      alert('Ứng dụng cần quyền truy cập vị trí để tiếp tục. Vui lòng cấp quyền định vị cho trang này trong trình duyệt (bấm vào biểu tượng ổ khóa cạnh thanh địa chỉ → cho phép Vị trí), sau đó thử lại.')
+      return
     }
 
     try {
@@ -153,7 +155,15 @@ export default function AddStore() {
 
               <div className="grid gap-1.5">
                 <Label htmlFor="phone">Số điện thoại</Label>
-                <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="090x xxx xxx" />
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9+ ]*"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="VD: 0901234567"
+                />
               </div>
 
               <div className="grid gap-1.5">

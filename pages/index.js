@@ -177,7 +177,15 @@ export default function StoreList() {
                           Địa chỉ: {store.address}
                         </p>
                         {store.phone && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {store.phone}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Số điện thoại:{' '}
+                            <a
+                              href={`tel:${(store.phone || '').replace(/[^+\d]/g, '')}`}
+                              className="inline-flex items-center rounded-sm font-medium text-emerald-600 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            >
+                              {store.phone}
+                            </a>
+                          </p>
                         )}
                         {store.note && (
                           <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>

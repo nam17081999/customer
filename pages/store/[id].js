@@ -76,7 +76,10 @@ export default function StoreDetail() {
       latitude = pos.coords.latitude
       longitude = pos.coords.longitude
     } catch (geoErr) {
-      console.warn('Không lấy được tọa độ khi cập nhật:', geoErr)
+      console.error('Không lấy được tọa độ khi cập nhật:', geoErr)
+      alert('Ứng dụng cần quyền truy cập vị trí để lưu thay đổi. Vui lòng cấp quyền định vị cho trang này trong trình duyệt, rồi thử lại.')
+      setSaving(false)
+      return
     }
 
     let image_url = store?.image_url || null
@@ -175,7 +178,14 @@ export default function StoreDetail() {
             </div>
             <div className="grid gap-1.5">
               <Label>Số điện thoại</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={!user} />
+              <Input
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9+ ]*"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                disabled={!user}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>Ghi chú</Label>
