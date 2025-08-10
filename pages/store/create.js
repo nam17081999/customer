@@ -28,6 +28,15 @@ export default function AddStore() {
     if (qName) setName(toTitleCaseVI(qName))
   }, [user, router.query.name])
 
+  // Auto-fill address on mount (no manual typing needed)
+  useEffect(() => {
+    if (!user) return
+    if (!address && !resolvingAddr) {
+      handleFillAddress()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
+
   function cleanNominatimDisplayName(name) {
     if (!name) return ''
     const parts = name.split(',').map((p) => p.trim())
@@ -203,9 +212,15 @@ export default function AddStore() {
               <div className="grid gap-1.5">
                 <Label htmlFor="address">Địa chỉ</Label>
                 <div className="flex items-center gap-2">
-                  <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã, quận/huyện" className="flex-1" />
+                  <Input
+                    id="address"
+                    value={address}
+                    readOnly
+                    placeholder={resolvingAddr ? 'Đang tự động lấy địa chỉ…' : 'Địa chỉ sẽ được tự động điền'}
+                    className="flex-1"
+                  />
                   <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
-                    {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
+                    {resolvingAddr ? 'Đang lấy…' : 'Lấy lại'}
                   </Button>
                 </div>
               </div>
