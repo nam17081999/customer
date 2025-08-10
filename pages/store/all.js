@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
+import { PAGE_SIZE, MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, SCROLL_BOTTOM_OFFSET } from '@/lib/constants'
 
 export default function AllStoresVerify() {
   const { user } = useAuth()
@@ -23,17 +24,15 @@ export default function AllStoresVerify() {
   // Added: cache, race-guard, and constants
   const cacheRef = useRef(new Map())
   const lastKeyRef = useRef('')
-  const MIN_SEARCH_LEN = 2
 
   // Pagination controls
-  const PAGE_SIZE = 7
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // debounce search (900ms)
+  // debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 900)
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(t)
   }, [search])
 
@@ -97,7 +96,7 @@ export default function AllStoresVerify() {
   useEffect(() => {
     function onScroll() {
       if (!hasMore || loading || loadingMore) return
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_BOTTOM_OFFSET) {
         if (!debouncedSearch || debouncedSearch.length >= MIN_SEARCH_LEN) {
           fetchPage(debouncedSearch || '', page + 1, true)
         }
@@ -271,15 +270,15 @@ export default function AllStoresVerify() {
                         )}
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                              <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
-                            </h3>
+                          <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
                             <span
                               className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                             >
                               {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
                             </span>
+                            <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
+                              <Link href={`/store/${store.id}`} className="block hover:underline">Cửa hàng: {store.name}</Link>
+                            </h3>
                           </div>
                           <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {store.address}</p>
                           {store.phone && (
