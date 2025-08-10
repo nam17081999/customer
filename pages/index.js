@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import removeVietnameseTones from '@/helper/removeVietnameseTones';
 import { Input } from '@/components/ui/input';
@@ -18,41 +18,87 @@ export default function StoreList() {
   const { user } = useAuth();
   const [deletingId, setDeletingId] = useState(null);
 
-  // Debounce 500ms
+  // Pagination & control
+  const PAGE_SIZE = 7;
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Debounce 900ms
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search.trim());
-    }, 700);
+    }, 900);
     return () => clearTimeout(handler);
   }, [search]);
 
-  // Fetch khi có search text
+  // Reset and fetch first page when keyword changes (min length = 2)
+  const MIN_SEARCH_LEN = 2;
   useEffect(() => {
-    if (debouncedSearch) {
-      fetchStores(debouncedSearch);
-    } else {
-      setStores([]); // clear list
+    const keyword = debouncedSearch;
+    if (keyword && keyword.length < MIN_SEARCH_LEN) {
+      // show prompt in UI, do not fetch
       setLoading(false);
+      setHasMore(false);
+      setPage(1);
+      setStores([]);
+      return;
+    }
+    if (keyword && keyword.length >= MIN_SEARCH_LEN) {
+      // valid search -> fresh fetch
+      setPage(1);
+      setHasMore(true);
+      setStores([]);
+      fetchPage(keyword, 1, false);
+    } else {
+      // empty search -> clear list
+      setStores([]);
+      setHasMore(false);
+      setLoading(false);
+      setPage(1);
     }
   }, [debouncedSearch]);
 
-  async function fetchStores(keyword) {
-    setLoading(true);
-    const searchValue = removeVietnameseTones(keyword).toLowerCase();
+  async function fetchPage(keyword, pageNum = 1, append = false) {
+    const raw = (keyword || '').trim();
+    const searchValue = removeVietnameseTones(raw).toLowerCase();
+    const from = (pageNum - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    if (pageNum === 1) setLoading(true); else setLoadingMore(true);
+
     const { data, error } = await supabase
       .from('stores')
-      .select('*')
+      .select('id,name,address,phone,status,image_url,latitude,longitude,note')
       .ilike('name_search', `%${searchValue}%`)
       .order('status', { ascending: false })
-      .order('id', { ascending: false });
+      .order('id', { ascending: false })
+      .range(from, to);
 
-    setLoading(false);
+    if (pageNum === 1) setLoading(false); else setLoadingMore(false);
     if (error) {
       console.error(error);
       return;
     }
-    setStores(data || []);
+    const items = data || [];
+    setStores((prev) => (append ? [...prev, ...items] : items));
+    setHasMore(items.length === PAGE_SIZE);
+    setPage(pageNum);
   }
+
+  // Load more on scroll
+  useEffect(() => {
+    function onScroll() {
+      if (!hasMore || loading || loadingMore) return;
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+        if (debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN) {
+          fetchPage(debouncedSearch, page + 1, true);
+        }
+      }
+    }
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [hasMore, loading, loadingMore, page, debouncedSearch]);
 
   function getFileNameFromUrl(url) {
     try {
@@ -126,109 +172,127 @@ export default function StoreList() {
                 </CardContent>
               </Card>
             ))
+          ) : debouncedSearch && debouncedSearch.length === 1 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                Nhập tối thiểu 2 ký tự để tìm
+              </CardContent>
+            </Card>
           ) : stores.length > 0 ? (
-            <ul className="space-y-3">
-              {stores.map((store) => (
-                <li key={store.id}>
-                  <Card>
-                    <CardContent className="flex items-center gap-4 p-4">
-                      {store.image_url ? (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Image
-                              src={store.image_url}
-                              alt={store.name}
-                              width={64}
-                              height={64}
-                              className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
-                            />
-                          </DialogTrigger>
-                          <DialogContent className="overflow-hidden p-0">
-                            <DialogClose asChild>
+            <>
+              <ul className="space-y-3">
+                {stores.map((store) => (
+                  <li key={store.id}>
+                    <Card>
+                      <CardContent className="flex items-center gap-4 p-4">
+                        {store.image_url ? (
+                          <Dialog>
+                            <DialogTrigger asChild>
                               <Image
                                 src={store.image_url}
                                 alt={store.name}
-                                width={800}
-                                height={800}
-                                title="Bấm vào ảnh để đóng"
-                                draggable={false}
-                                className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                width={64}
+                                height={64}
+                                sizes="64px"
+                                quality={70}
+                                className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
                               />
-                            </DialogClose>
-                          </DialogContent>
-                        </Dialog>
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
-                          🏬
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                            <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
-                          </h3>
-                          <span
-                            className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                          >
-                            {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
-                          </span>
-                        </div>
-                        <p className="truncate text-sm text-gray-600 dark:text-gray-400">
-                          Địa chỉ: {store.address}
-                        </p>
-                        {store.phone && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Số điện thoại:{' '}
-                            <a
-                              href={`tel:${(store.phone || '').replace(/[^+\d]/g, '')}`}
-                              className="inline-flex items-center rounded-sm font-medium text-emerald-600 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            </DialogTrigger>
+                            <DialogContent className="overflow-hidden p-0">
+                              <DialogClose asChild>
+                                <Image
+                                  src={store.image_url}
+                                  alt={store.name}
+                                  width={800}
+                                  height={800}
+                                  title="Bấm vào ảnh để đóng"
+                                  draggable={false}
+                                  className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                />
+                              </DialogClose>
+                            </DialogContent>
+                          </Dialog>
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
+                            🏬
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                              <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
+                            </h3>
+                            <span
+                              className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                             >
-                              {store.phone}
-                            </a>
+                              {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
+                            </span>
+                          </div>
+                          <p className="truncate text-sm text-gray-600 dark:text-gray-400">
+                            Địa chỉ: {store.address}
                           </p>
-                        )}
-                        {store.note && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>
-                        )}
-                        <div className="mt-2 flex items-center gap-2">
-                          {store.latitude && store.longitude && (
-                            <Button asChild variant="secondary" size="sm">
+                          {store.phone && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Số điện thoại:{' '}
                               <a
-                                href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                href={`tel:${(store.phone || '').replace(/[^+\d]/g, '')}`}
+                                className="inline-flex items-center rounded-sm font-medium text-emerald-600 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-emerald-400 dark:hover:text-emerald-300"
                               >
-                                GG Maps
+                                {store.phone}
                               </a>
-                            </Button>
+                            </p>
                           )}
-                          {user && (
-                            <>
-                              <Button asChild size="sm" variant="outline">
-                                <Link href={`/store/${store.id}`}>Chỉnh sửa</Link>
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950"
-                                disabled={deletingId === store.id}
-                                onClick={() => handleDelete(store)}
-                              >
-                                {deletingId === store.id ? 'Đang xóa…' : 'Xóa'}
-                              </Button>
-                            </>
+                          {store.note && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>
                           )}
+                          <div className="mt-2 flex items-center gap-2">
+                            {store.latitude && store.longitude && (
+                              <Button asChild variant="secondary" size="sm">
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  GG Maps
+                                </a>
+                              </Button>
+                            )}
+                            {user && (
+                              <>
+                                <Button asChild size="sm" variant="outline">
+                                  <Link href={`/store/${store.id}`}>Chỉnh sửa</Link>
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950"
+                                  disabled={deletingId === store.id}
+                                  onClick={() => handleDelete(store)}
+                                >
+                                  {deletingId === store.id ? 'Đang xóa…' : 'Xóa'}
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
+                      </CardContent>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+              <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
+              </div>
+            </>
           ) : debouncedSearch && stores.length === 0 ? (
             <Card>
-              <CardContent className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                ❌ Không tìm thấy cửa hàng nào
+              <CardContent className="flex flex-col items-center gap-3 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div>❌ Không tìm thấy cửa hàng nào</div>
+                <Button asChild>
+                  <Link href={{ pathname: '/store/create', query: { name: debouncedSearch } }}>
+                    Thêm cửa hàng mới
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           ) : (

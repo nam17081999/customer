@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabaseClient'
@@ -20,25 +20,53 @@ export default function AllStoresVerify() {
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkLoading, setBulkLoading] = useState(false)
 
-  // debounce search
+  // Added: cache, race-guard, and constants
+  const cacheRef = useRef(new Map())
+  const lastKeyRef = useRef('')
+  const MIN_SEARCH_LEN = 2
+
+  // Pagination controls
+  const PAGE_SIZE = 7
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  // debounce search (900ms)
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 700)
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 900)
     return () => clearTimeout(t)
   }, [search])
 
   // fetch stores when searching (default: all unverified)
   useEffect(() => {
-    fetchStores(debouncedSearch)
+    const keyword = debouncedSearch
+    if (keyword && keyword.length < MIN_SEARCH_LEN) {
+      setStores([])
+      setSelectedIds([])
+      setHasMore(false)
+      setLoading(false)
+      setPage(1)
+      return
+    }
+    fetchPage(keyword || '', 1, false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch])
 
-  async function fetchStores(keyword) {
-    setLoading(true)
-    const searchValue = removeVietnameseTones(keyword || '').toLowerCase()
+  async function fetchPage(keyword, pageNum = 1, append = false) {
+    const raw = (keyword || '').trim()
+    const searchValue = removeVietnameseTones(raw).toLowerCase()
+    const key = searchValue
+
+    const from = (pageNum - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+
+    if (pageNum === 1) setLoading(true); else setLoadingMore(true)
+
+    lastKeyRef.current = `${key}|${pageNum}`
 
     let query = supabase
       .from('stores')
-      .select('*')
+      .select('id,name,address,phone,status,image_url,latitude,longitude,note')
       .eq('status', false)
 
     if (searchValue) {
@@ -47,15 +75,37 @@ export default function AllStoresVerify() {
 
     const { data, error } = await query
       .order('id', { ascending: false })
+      .range(from, to)
 
-    setLoading(false)
+    if (pageNum === 1) setLoading(false); else setLoadingMore(false)
+
+    // ignore stale
+    if (lastKeyRef.current !== `${key}|${pageNum}`) return
+
     if (error) {
       console.error(error)
       return
     }
-    setStores(data || [])
-    setSelectedIds((prev) => prev.filter((id) => (data || []).some((s) => s.id === id)))
+    const result = data || []
+    setStores((prev) => (append ? [...prev, ...result] : result))
+    setSelectedIds((prev) => prev.filter((id) => (append ? [...prev, ...result] : result).some((s) => s.id === id)))
+    setHasMore(result.length === PAGE_SIZE)
+    setPage(pageNum)
   }
+
+  // Load more on scroll
+  useEffect(() => {
+    function onScroll() {
+      if (!hasMore || loading || loadingMore) return
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
+        if (!debouncedSearch || debouncedSearch.length >= MIN_SEARCH_LEN) {
+          fetchPage(debouncedSearch || '', page + 1, true)
+        }
+      }
+    }
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasMore, loading, loadingMore, page, debouncedSearch])
 
   function toggleSelect(id) {
     setSelectedIds((prev) =>
@@ -174,105 +224,118 @@ export default function AllStoresVerify() {
                 </CardContent>
               </Card>
             ))
+          ) : debouncedSearch && debouncedSearch.length === 1 ? (
+            <Card>
+              <CardContent className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                Nhập tối thiểu 2 ký tự để tìm
+              </CardContent>
+            </Card>
           ) : stores.length > 0 ? (
-            <ul className="space-y-3">
-              {stores.map((store) => (
-                <li key={store.id}>
-                  <Card>
-                    <CardContent className="flex items-center gap-4 p-4">
-                      {store.image_url ? (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Image
-                              src={store.image_url}
-                              alt={store.name}
-                              width={64}
-                              height={64}
-                              className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
-                            />
-                          </DialogTrigger>
-                          <DialogContent className="overflow-hidden p-0">
-                            <DialogClose asChild>
+            <>
+              <ul className="space-y-3">
+                {stores.map((store) => (
+                  <li key={store.id}>
+                    <Card>
+                      <CardContent className="flex items-center gap-4 p-4">
+                        {store.image_url ? (
+                          <Dialog>
+                            <DialogTrigger asChild>
                               <Image
                                 src={store.image_url}
                                 alt={store.name}
-                                width={800}
-                                height={800}
-                                title="Bấm vào ảnh để đóng"
-                                draggable={false}
-                                className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                width={64}
+                                height={64}
+                                sizes="64px"
+                                quality={70}
+                                className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
                               />
-                            </DialogClose>
-                          </DialogContent>
-                        </Dialog>
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
-                          🏬
-                        </div>
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                            <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
-                          </h3>
-                          <span
-                            className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                          >
-                            {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
-                          </span>
-                        </div>
-                        <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {store.address}</p>
-                        {store.phone && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {store.phone}</p>
-                        )}
-                        {store.note && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>
-                        )}
-                        <div className="mt-2 flex items-center gap-3">
-                          {user && !store.status && (
-                            <>
-                              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-700"
-                                  checked={selectedIds.includes(store.id)}
-                                  onChange={() => toggleSelect(store.id)}
-                                  disabled={bulkLoading}
+                            </DialogTrigger>
+                            <DialogContent className="overflow-hidden p-0">
+                              <DialogClose asChild>
+                                <Image
+                                  src={store.image_url}
+                                  alt={store.name}
+                                  width={800}
+                                  height={800}
+                                  title="Bấm vào ảnh để đóng"
+                                  draggable={false}
+                                  className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
                                 />
-                                Chọn
-                              </label>
-                              <Button
-                                size="sm"
-                                onClick={() => verifyOne(store)}
-                                disabled={verifyingId === store.id || bulkLoading}
-                              >
-                                {verifyingId === store.id ? 'Đang xác thực…' : 'Xác thực'}
+                              </DialogClose>
+                            </DialogContent>
+                          </Dialog>
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
+                            🏬
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                              <Link href={`/store/${store.id}`} className="hover:underline">Tên cửa hàng: {store.name}</Link>
+                            </h3>
+                            <span
+                              className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
+                            >
+                              {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
+                            </span>
+                          </div>
+                          <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {store.address}</p>
+                          {store.phone && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {store.phone}</p>
+                          )}
+                          {store.note && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>
+                          )}
+                          <div className="mt-2 flex items-center gap-3">
+                            {user && !store.status && (
+                              <>
+                                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-700"
+                                    checked={selectedIds.includes(store.id)}
+                                    onChange={() => toggleSelect(store.id)}
+                                    disabled={bulkLoading}
+                                  />
+                                  Chọn
+                                </label>
+                                <Button
+                                  size="sm"
+                                  onClick={() => verifyOne(store)}
+                                  disabled={verifyingId === store.id || bulkLoading}
+                                >
+                                  {verifyingId === store.id ? 'Đang xác thực…' : 'Xác thực'}
+                                </Button>
+                              </>
+                            )}
+                            {store.latitude && store.longitude && (
+                              <Button asChild variant="secondary" size="sm">
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  GG Maps
+                                </a>
                               </Button>
-                            </>
-                          )}
-                          {store.latitude && store.longitude && (
-                            <Button asChild variant="secondary" size="sm">
-                              <a
-                                href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                GG Maps
-                              </a>
-                            </Button>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
+                      </CardContent>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+              <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
+              </div>
+            </>
           ) : (
             <Card>
               <CardContent className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                Không có cửa hàng chưa xác thực
+                {!debouncedSearch ? 'Nhập từ khóa để tìm cửa hàng' : 'Không có cửa hàng chưa xác thực'}
               </CardContent>
             </Card>
           )}

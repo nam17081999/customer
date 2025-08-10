@@ -29,7 +29,7 @@ export default function StoreDetail() {
     if (!id) return
     supabase
       .from('stores')
-      .select('*')
+      .select('id,name,address,phone,note,image_url,latitude,longitude')
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => {
@@ -167,14 +167,25 @@ export default function StoreDetail() {
           (err) => reject(err)
         )
       })
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+      // Cache by rounded coordinates in sessionStorage to cut repeat hits
+      const lat = Number(coords.latitude.toFixed(5))
+      const lon = Number(coords.longitude.toFixed(5))
+      const cacheKey = `revgeo:${lat},${lon}`
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
+      if (cached) {
+        setAddress(cached)
+        return
+      }
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=vi`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Reverse geocoding failed')
       const data = await res.json()
       const text = data?.display_name || ''
       const cleaned = cleanNominatimDisplayName(text)
-      if (cleaned) setAddress(cleaned)
-      else alert('Không lấy được địa chỉ từ Nominatim')
+      if (cleaned) {
+        setAddress(cleaned)
+        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
+      } else alert('Không lấy được địa chỉ từ Nominatim')
     } catch (err) {
       console.error('Auto fill address error:', err)
       alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
@@ -200,7 +211,7 @@ export default function StoreDetail() {
           {store?.image_url && (
             <Dialog>
               <DialogTrigger asChild>
-                <Image src={store.image_url} alt={store.name} width={96} height={96} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
+                <Image src={store.image_url} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
               </DialogTrigger>
               <DialogContent className="overflow-hidden p-0">
                 <Image src={store.image_url} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />

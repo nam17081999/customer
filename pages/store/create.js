@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import imageCompression from 'browser-image-compression'
 
 export default function AddStore() {
   const { user } = useAuth()
+  const router = useRouter()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
@@ -18,6 +20,12 @@ export default function AddStore() {
   const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
+    if (qName) setName(qName)
+  }, [user, router.query.name])
 
   function cleanNominatimDisplayName(name) {
     if (!name) return ''
