@@ -1,19 +1,24 @@
 import { supabase } from '@/lib/supabaseClient'
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleLogin = async () => {
+  const handleGoogleLogin = async () => {
     setLoading(true)
-    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined } })
-    setLoading(false)
-    if (error) console.error(error)
-    else alert('Kiểm tra email để đăng nhập!')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      },
+    })
+    if (error) {
+      console.error(error)
+      alert('Đăng nhập Google thất bại')
+      setLoading(false)
+    }
   }
 
   return (
@@ -22,8 +27,9 @@ export default function Login() {
         <Card>
           <CardContent className="space-y-4 p-6">
             <h1 className="text-lg font-semibold">Đăng nhập</h1>
-            <Input type="email" placeholder="Nhập email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <Button onClick={handleLogin} disabled={!email || loading}>{loading ? 'Đang gửi...' : 'Gửi link đăng nhập'}</Button>
+            <Button onClick={handleGoogleLogin} disabled={loading} className="w-full">
+              {loading ? 'Đang chuyển tới Google…' : 'Đăng nhập với Google'}
+            </Button>
           </CardContent>
         </Card>
       </div>
