@@ -289,38 +289,48 @@ export default function ArrangeStores() {
             </Button>
           </div>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setListCollapsed((v) => !v)}>
-                {listCollapsed ? 'Hiện danh sách' : 'Ẩn danh sách'}
-              </Button>
+            <button
+              type="button"
+              onClick={() => setListCollapsed((v) => !v)}
+              className="group inline-flex items-center gap-2 cursor-pointer"
+              aria-expanded={!listCollapsed}
+              aria-controls="visit-list"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
+              <span className="text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300">
+                {listCollapsed ? '▶' : '▼'}
+              </span>
+            </button>
+            {!listCollapsed && (
               <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
                 {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
               </Button>
-            </div>
+            )}
           </div>
 
-          {selected.length === 0 ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có cửa hàng nào trong danh sách</CardContent></Card>
-          ) : listCollapsed ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Danh sách đang ẩn</CardContent></Card>
-          ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={selected.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                <ul className="space-y-2">
-                  {selected.map((s) => (
-                    <SortableItem
-                      key={s.id}
-                      item={s}
-                      render={({ attributes, listeners }) => (
-                        <SelectedStoreItem item={s} dragAttributes={attributes} dragListeners={listeners} onRemove={removeFromSelected} />
-                      )}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
-          )}
+          <div id="visit-list">
+            {selected.length === 0 ? (
+              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có cửa hàng nào trong danh sách</CardContent></Card>
+            ) : listCollapsed ? (
+              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Danh sách đang ẩn</CardContent></Card>
+            ) : (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={selected.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                  <ul className="space-y-2">
+                    {selected.map((s) => (
+                      <SortableItem
+                        key={s.id}
+                        item={s}
+                        render={({ attributes, listeners }) => (
+                          <SelectedStoreItem item={s} dragAttributes={attributes} dragListeners={listeners} onRemove={removeFromSelected} />
+                        )}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
         </div>
 
         {/* Search (moved to bottom) */}
