@@ -248,7 +248,7 @@ export default function StoreList() {
                             {store.latitude && store.longitude && (
                               <Button asChild variant="secondary" size="sm">
                                 <a
-                                  href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}`}
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}&travelmode=driving`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
