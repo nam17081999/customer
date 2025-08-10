@@ -10,6 +10,7 @@ import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import Image from 'next/image'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import imageCompression from 'browser-image-compression'
+import { toTitleCaseVI } from '@/lib/utils'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -35,7 +36,7 @@ export default function StoreDetail() {
       .then(({ data }) => {
         setStore(data)
         if (data) {
-          setName(data.name || '')
+          setName(toTitleCaseVI(data.name || ''))
           setAddress(data.address || '')
           setPhone(data.phone || '')
           setNote(data.note || '')
@@ -66,6 +67,9 @@ export default function StoreDetail() {
     }
 
     setSaving(true)
+
+    // Normalize name to Title Case before saving
+    const normalizedName = toTitleCaseVI(name.trim())
 
     // Get current location at submit time (fallback to old values if denied)
     let latitude = store?.latitude ?? null
@@ -114,11 +118,11 @@ export default function StoreDetail() {
       }
 
       // compute normalized search name when updating
-      const name_search = removeVietnameseTones(name)
+      const name_search = removeVietnameseTones(normalizedName)
 
       const { error: updateErr } = await supabase
         .from('stores')
-        .update({ name, name_search, address, phone, note, image_url, latitude, longitude })
+        .update({ name: normalizedName, name_search, address, phone, note, image_url, latitude, longitude })
         .eq('id', id)
       if (updateErr) throw updateErr
 

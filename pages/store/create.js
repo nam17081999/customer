@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-context'
 import Link from 'next/link'
 import imageCompression from 'browser-image-compression'
+import { toTitleCaseVI } from '@/lib/utils'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -24,7 +25,7 @@ export default function AddStore() {
   useEffect(() => {
     if (!user) return
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
-    if (qName) setName(qName)
+    if (qName) setName(toTitleCaseVI(qName))
   }, [user, router.query.name])
 
   function cleanNominatimDisplayName(name) {
@@ -78,6 +79,9 @@ export default function AddStore() {
       return
     }
 
+    // Normalize name to Title Case before saving
+    const normalizedName = toTitleCaseVI(name.trim())
+
     let latitude = null
     let longitude = null
     try {
@@ -130,11 +134,11 @@ export default function AddStore() {
       const { data: publicUrlData } = supabase.storage.from('stores').getPublicUrl(fileName)
       const imageUrl = publicUrlData.publicUrl
 
-      const nameSearch = removeVietnameseTones(name)
+      const nameSearch = removeVietnameseTones(normalizedName)
 
       const { error: insertError } = await supabase.from('stores').insert([
         {
-          name,
+          name: normalizedName,
           name_search: nameSearch,
           address,
           note,

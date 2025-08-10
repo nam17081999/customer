@@ -17,7 +17,7 @@ export default function Navbar() {
           </Button>
           {user && (
             <Button asChild size="sm">
-              <Link href="/store/create">Thêm cửa hàng</Link>
+              <Link href="/store/create">Thêm</Link>
             </Button>
           )}
           {!loading && user ? (
