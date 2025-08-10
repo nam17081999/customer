@@ -11,6 +11,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 
+const STORAGE_KEY = 'arrange:selectedStores:v1'
+const ORIGIN = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
+
 export default function ArrangeStores() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -19,6 +22,36 @@ export default function ArrangeStores() {
 
   const [selected, setSelected] = useState([]) // [{id, name, address, latitude, longitude, distance?}]
   const [sorting, setSorting] = useState(false)
+
+  // Load persisted selected list on mount
+  useEffect(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) setSelected(parsed)
+      }
+    } catch (e) {
+      console.warn('Cannot load saved route list:', e)
+    }
+  }, [])
+
+  // Persist selected list whenever it changes (exclude volatile fields)
+  useEffect(() => {
+    try {
+      const toSave = selected.map(({ distance, ...rest }) => rest)
+      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+    } catch (e) {
+      console.warn('Cannot save route list:', e)
+    }
+  }, [selected])
+
+  function handleNewRoute() {
+    const ok = window.confirm('Bắt đầu lộ trình mới? Danh sách ghé thăm hiện tại sẽ bị xóa.')
+    if (!ok) return
+    setSelected([])
+    try { if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY) } catch {}
+  }
 
   // Debounce search input
   useEffect(() => {
@@ -76,22 +109,10 @@ export default function ArrangeStores() {
 
   async function sortByDistance() {
     if (!selected.length) return
-    // Must have geolocation
-    let coords
-    try {
-      coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos.coords),
-          (err) => reject(err)
-        )
-      })
-    } catch (err) {
-      console.error('Geo error:', err)
-      alert('Ứng dụng cần quyền vị trí để tính khoảng cách. Vui lòng cấp quyền định vị rồi thử lại.')
-      return
-    }
 
-    const { latitude: myLat, longitude: myLon } = coords
+    const myLat = ORIGIN.latitude
+    const myLon = ORIGIN.longitude
+
     setSorting(true)
     try {
       const withDistance = selected.map((s) => {
@@ -102,13 +123,13 @@ export default function ArrangeStores() {
         return { ...s, distance: null }
       })
 
-      // Sort: valid distances ascending, then those without coords at the end
+      // Sort: unknown distance first, then valid distances ascending
       withDistance.sort((a, b) => {
         const da = a.distance
         const db = b.distance
         if (da == null && db == null) return 0
-        if (da == null) return 1
-        if (db == null) return -1
+        if (da == null) return -1
+        if (db == null) return 1
         return da - db
       })
 
@@ -234,6 +255,11 @@ export default function ArrangeStores() {
 
         {/* Selected list */}
         <div className="mt-8">
+          <div className="mb-2">
+            <Button variant="outline" size="sm" onClick={handleNewRoute}>
+              Thêm lộ trình mới
+            </Button>
+          </div>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
             <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
@@ -255,7 +281,7 @@ export default function ArrangeStores() {
                         {typeof s.distance === 'number' ? (
                           <div className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</div>
                         ) : s.distance === null ? (
-                          <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">Thiếu tọa độ để tính khoảng cách</div>
+                          <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">Khoảng cách: Không xác định</div>
                         ) : null}
                       </div>
                       <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950" onClick={() => removeFromSelected(s.id)}>
