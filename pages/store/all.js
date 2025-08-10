@@ -270,7 +270,7 @@ export default function AllStoresVerify() {
                         )}
 
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
+                          <div className="flex flex-col items-start gap-1">
                             <span
                               className={`shrink-0 rounded px-2 py-0.5 text-xs ${store.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                             >
