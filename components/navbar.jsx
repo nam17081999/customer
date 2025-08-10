@@ -20,9 +20,6 @@ export default function Navbar() {
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/store/arrange">Xếp đơn</Link>
                     </Button>
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href="/">Danh sách</Link>
-                    </Button>
                     {user && (
                         <Button asChild size="sm">
                             <Link href="/store/create">Thêm CH</Link>

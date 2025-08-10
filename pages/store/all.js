@@ -316,7 +316,7 @@ export default function AllStoresVerify() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
-                                  GG Maps
+                                  Maps
                                 </a>
                               </Button>
                             )}

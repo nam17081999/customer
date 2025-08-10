@@ -1,27 +1,70 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
+import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE, SCROLL_BOTTOM_OFFSET } from '@/lib/constants'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import Image from 'next/image'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
+import { useAuth } from '@/components/auth-context'
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 const STORAGE_KEY = 'arrange:selectedStores:v1'
 const ORIGIN = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
 
+function getFileNameFromUrl(url) {
+  try {
+    const marker = '/object/public/stores/'
+    const idx = url.indexOf(marker)
+    if (idx !== -1) return url.substring(idx + marker.length)
+    const u = new URL(url)
+    const parts = u.pathname.split('/')
+    return parts[parts.length - 1]
+  } catch {
+    return null
+  }
+}
+
+function SortableItem({ item, children }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  return (
+    <li ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </li>
+  )
+}
+
 export default function ArrangeStores() {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
-  const [selected, setSelected] = useState([]) // [{id, name, address, latitude, longitude, distance?}]
+  const [selected, setSelected] = useState([])
   const [sorting, setSorting] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const lastKeyRef = useRef('')
+  const dragIndexRef = useRef(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  )
 
   // Load persisted selected list on mount
   useEffect(() => {
@@ -59,42 +102,75 @@ export default function ArrangeStores() {
     return () => clearTimeout(t)
   }, [search])
 
-  // Fetch search results
+  // Fetch page helper
+  async function fetchResultsPage(keyword, pageNum = 1, append = false) {
+    const raw = (keyword || '').trim()
+    const q = removeVietnameseTones(raw).toLowerCase()
+    const from = (pageNum - 1) * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+
+    if (pageNum === 1) setLoading(true); else setLoadingMore(true)
+
+    lastKeyRef.current = `${q}|${pageNum}`
+
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id,name,address,phone,status,image_url,latitude,longitude,note')
+      .ilike('name_search', `%${q}%`)
+      .order('status', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to)
+
+    if (pageNum === 1) setLoading(false); else setLoadingMore(false)
+
+    if (lastKeyRef.current !== `${q}|${pageNum}`) return
+
+    if (error) {
+      console.error('Search error:', error)
+      return
+    }
+    const rows = data || []
+    setResults((prev) => (append ? [...prev, ...rows] : rows))
+    setHasMore(rows.length === PAGE_SIZE)
+    setPage(pageNum)
+  }
+
+  // Reset and fetch first page when keyword changes
   useEffect(() => {
     const keyword = debouncedSearch
     if (!keyword) {
       setResults([])
+      setHasMore(false)
       setLoading(false)
+      setPage(1)
       return
     }
     if (keyword.length < MIN_SEARCH_LEN) {
       setResults([])
+      setHasMore(false)
       setLoading(false)
+      setPage(1)
       return
     }
+    setResults([])
+    setHasMore(true)
+    fetchResultsPage(keyword, 1, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch])
 
-    async function run() {
-      try {
-        setLoading(true)
-        const q = removeVietnameseTones(keyword).toLowerCase()
-        const { data, error } = await supabase
-          .from('stores')
-          .select('id,name,address,phone,status,image_url,latitude,longitude,note')
-          .ilike('name_search', `%${q}%`)
-          .order('status', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(PAGE_SIZE)
-        if (error) throw error
-        setResults(data || [])
-      } catch (err) {
-        console.error('Search error:', err)
-      } finally {
-        setLoading(false)
+  // Load more on scroll (for search results at bottom)
+  useEffect(() => {
+    function onScroll() {
+      if (!hasMore || loading || loadingMore) return
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_BOTTOM_OFFSET) {
+        if (debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN) {
+          fetchResultsPage(debouncedSearch, page + 1, true)
+        }
       }
     }
-
-    run()
-  }, [debouncedSearch])
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [hasMore, loading, loadingMore, page, debouncedSearch])
 
   function addToSelected(store) {
     setSelected((prev) => {
@@ -107,8 +183,37 @@ export default function ArrangeStores() {
     setSelected((prev) => prev.filter((s) => s.id !== id))
   }
 
+  async function deleteStore(store) {
+    if (!user) {
+      alert('Vui lòng đăng nhập để xóa cửa hàng')
+      return
+    }
+    const ok = window.confirm(`Bạn có chắc muốn xóa cửa hàng "${store.name}"?`)
+    if (!ok) return
+    try {
+      setDeletingId(store.id)
+      const { error: delErr } = await supabase.from('stores').delete().eq('id', store.id)
+      if (delErr) throw delErr
+      if (store.image_url) {
+        const file = getFileNameFromUrl(store.image_url)
+        if (file) await supabase.storage.from('stores').remove([file])
+      }
+      setResults((prev) => prev.filter((s) => s.id !== store.id))
+      setSelected((prev) => prev.filter((s) => s.id !== store.id))
+    } catch (err) {
+      console.error(err)
+      alert('Xóa thất bại')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   async function sortByDistance() {
     if (!selected.length) return
+
+    // Ask for user confirmation before proceeding
+    const ok = window.confirm('Bạn có chắc muốn tính khoảng cách và sắp xếp lại danh sách? Thứ tự hiện tại sẽ thay đổi.')
+    if (!ok) return
 
     const myLat = ORIGIN.latitude
     const myLon = ORIGIN.longitude
@@ -123,7 +228,6 @@ export default function ArrangeStores() {
         return { ...s, distance: null }
       })
 
-      // Sort: unknown distance first, then valid distances ascending
       withDistance.sort((a, b) => {
         const da = a.distance
         const db = b.distance
@@ -139,16 +243,127 @@ export default function ArrangeStores() {
     }
   }
 
+  function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = selected.findIndex((s) => s.id === active.id)
+    const newIndex = selected.findIndex((s) => s.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    setSelected((items) => arrayMove(items, oldIndex, newIndex))
+  }
+
+  // Drag and drop handlers for selected list
+  function onDragStart(e, index) {
+    dragIndexRef.current = index
+  }
+  function onDragOver(e) {
+    e.preventDefault()
+  }
+  function onDrop(e, dropIndex) {
+    e.preventDefault()
+    const from = dragIndexRef.current
+    if (from == null || from === dropIndex) return
+    setSelected((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(dropIndex, 0, moved)
+      return next
+    })
+    dragIndexRef.current = null
+  }
+
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="mx-auto max-w-3xl px-4 py-8">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Sắp xếp lộ trình giao hàng</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Tìm và thêm các cửa hàng vào danh sách, sau đó tính khoảng cách từ vị trí của bạn để sắp xếp từ gần đến xa.</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Thêm các cửa hàng vào danh sách, sắp xếp theo khoảng cách hoặc kéo-thả để đổi thứ tự.</p>
 
-        {/* Search */}
-        <div className="mt-6 flex items-center gap-3">
+        {/* Selected list */}
+        <div className="mt-6">
+          <div className="mb-2">
+            <Button variant="outline" size="sm" onClick={handleNewRoute}>
+              Thêm lộ trình mới
+            </Button>
+          </div>
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
+            <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
+              {sorting ? 'Đang sắp xếp...' : 'Tính khoảng cách & sắp xếp'}
+            </Button>
+          </div>
+
+          {selected.length === 0 ? (
+            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có cửa hàng nào trong danh sách</CardContent></Card>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={selected.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                <ul className="space-y-2">
+                  {selected.map((s) => (
+                    <SortableItem key={s.id} item={s}>
+                      <Card>
+                        <CardContent className="flex items-center justify-between gap-3 p-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                              {s.image_url ? (
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <button type="button" className="hover:underline">{s.name}</button>
+                                  </DialogTrigger>
+                                  <DialogContent className="overflow-hidden p-0">
+                                    <DialogClose asChild>
+                                      <Image
+                                        src={s.image_url}
+                                        alt={s.name}
+                                        width={800}
+                                        height={800}
+                                        title="Bấm vào ảnh để đóng"
+                                        draggable={false}
+                                        className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                      />
+                                    </DialogClose>
+                                  </DialogContent>
+                                </Dialog>
+                              ) : (
+                                s.name
+                              )}
+                            </div>
+                            <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
+                            {typeof s.distance === 'number' ? (
+                              <div className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</div>
+                            ) : s.distance === null ? (
+                              <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">Khoảng cách: Không xác định</div>
+                            ) : null}
+                          </div>
+                          <div className="ml-auto flex items-center gap-2">
+                            {typeof s.latitude === 'number' && typeof s.longitude === 'number' && (
+                              <Button asChild size="sm" variant="secondary">
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Maps
+                                </a>
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => removeFromSelected(s.id)}>
+                              Bỏ
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </SortableItem>
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
+          )}
+        </div>
+
+        {/* Search (moved to bottom) */}
+        <div className="mt-8 flex items-center gap-3">
           <Input
             type="text"
             placeholder="Tìm theo tên cửa hàng..."
@@ -170,128 +385,109 @@ export default function ArrangeStores() {
           ) : debouncedSearch.length < MIN_SEARCH_LEN ? (
             <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập tối thiểu {MIN_SEARCH_LEN} ký tự để tìm</CardContent></Card>
           ) : results.length === 0 ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Không tìm thấy cửa hàng nào</CardContent></Card>
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div>❌ Không tìm thấy cửa hàng nào</div>
+                <Button asChild>
+                  <Link href={{ pathname: '/store/create', query: { name: debouncedSearch } }}>
+                    Thêm cửa hàng mới
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
-            <ul className="space-y-2">
-              {results.map((s) => (
-                <li key={s.id}>
-                  <Card>
-                    <CardContent className="flex items-center gap-4 p-3">
-                      {s.image_url ? (
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Image
-                              src={s.image_url}
-                              alt={s.name}
-                              width={64}
-                              height={64}
-                              sizes="64px"
-                              quality={70}
-                              className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
-                            />
-                          </DialogTrigger>
-                          <DialogContent className="overflow-hidden p-0">
-                            <DialogClose asChild>
+            <>
+              <ul className="space-y-2">
+                {results.map((s) => (
+                  <li key={s.id}>
+                    <Card>
+                      <CardContent className="flex items-center gap-4 p-3">
+                        {s.image_url ? (
+                          <Dialog>
+                            <DialogTrigger asChild>
                               <Image
                                 src={s.image_url}
                                 alt={s.name}
-                                width={800}
-                                height={800}
-                                title="Bấm vào ảnh để đóng"
-                                draggable={false}
-                                className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                width={64}
+                                height={64}
+                                sizes="64px"
+                                quality={70}
+                                className="h-16 w-16 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 transition hover:opacity-90 dark:ring-gray-800"
                               />
-                            </DialogClose>
-                          </DialogContent>
-                        </Dialog>
-                      ) : (
-                        <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
-                          🏬
-                        </div>
-                      )}
+                            </DialogTrigger>
+                            <DialogContent className="overflow-hidden p-0">
+                              <DialogClose asChild>
+                                <Image
+                                  src={s.image_url}
+                                  alt={s.name}
+                                  width={800}
+                                  height={800}
+                                  title="Bấm vào ảnh để đóng"
+                                  draggable={false}
+                                  className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                />
+                              </DialogClose>
+                            </DialogContent>
+                          </Dialog>
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-gray-400 ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-800">
+                            🏬
+                          </div>
+                        )}
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-col items-start gap-1">
-                          <span
-                            className={`shrink-0 rounded px-2 py-0.5 text-xs ${s.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
-                          >
-                            {s.status ? 'Đã xác thực' : 'Chưa xác thực'}
-                          </span>
-                          <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
-                            <Link href={`/store/${s.id}`} className="block hover:underline">Cửa hàng: {s.name}</Link>
-                          </h3>
-                        </div>
-                        <p className="truncate text-sm text-gray-600 dark:text-gray-400">
-                          Địa chỉ: {s.address}
-                        </p>
-                        {s.phone && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Số điện thoại:{' '}
-                            <a
-                              href={`tel:${(s.phone || '').replace(/[^+\d]/g, '')}`}
-                              className="inline-flex items-center rounded-sm font-medium text-emerald-600 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 dark:text-emerald-400 dark:hover:text-emerald-300"
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-col items-start gap-1">
+                            <span
+                              className={`shrink-0 rounded px-2 py-0.5 text-xs ${s.status ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'}`}
                             >
-                              {s.phone}
-                            </a>
-                          </p>
-                        )}
-                        {s.note && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>
-                        )}
-                      </div>
-
-                      {selectedIds.has(s.id) ? (
-                        <Button size="sm" variant="secondary" disabled className="ml-auto">Đã thêm</Button>
-                      ) : (
-                        <Button size="sm" onClick={() => addToSelected(s)} className="ml-auto">Thêm</Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Selected list */}
-        <div className="mt-8">
-          <div className="mb-2">
-            <Button variant="outline" size="sm" onClick={handleNewRoute}>
-              Thêm lộ trình mới
-            </Button>
-          </div>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
-            <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
-              {sorting ? 'Đang sắp xếp...' : 'Tính khoảng cách & sắp xếp'}
-            </Button>
-          </div>
-
-          {selected.length === 0 ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có cửa hàng nào trong danh sách</CardContent></Card>
-          ) : (
-            <ul className="space-y-2">
-              {selected.map((s) => (
-                <li key={s.id}>
-                  <Card>
-                    <CardContent className="flex items-center justify-between gap-3 p-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
-                        <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
-                        {typeof s.distance === 'number' ? (
-                          <div className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</div>
-                        ) : s.distance === null ? (
-                          <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">Khoảng cách: Không xác định</div>
-                        ) : null}
-                      </div>
-                      <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950" onClick={() => removeFromSelected(s.id)}>
-                        Xóa
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
+                              {s.status ? 'Đã xác thực' : 'Chưa xác thực'}
+                            </span>
+                            <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
+                              <Link href={`/store/${s.id}`} className="block hover:underline">Cửa hàng: {s.name}</Link>
+                            </h3>
+                          </div>
+                          <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {s.address}</p>
+                          {s.phone && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {s.phone}</p>
+                          )}
+                          {s.note && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>
+                          )}
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            {typeof s.latitude === 'number' && typeof s.longitude === 'number' && (
+                              <Button asChild variant="secondary" size="sm">
+                                <a
+                                  href={`https://www.google.com/maps/dir/?api=1&destination=${s.latitude},${s.longitude}&travelmode=driving`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Maps
+                                </a>
+                              </Button>
+                            )}
+                            {/* Removed Edit and Delete buttons as requested */}
+                            <span className="ml-auto">
+                              {selectedIds.has(s.id) ? (
+                                <Button size="sm" variant="secondary" disabled>
+                                  Đã thêm
+                                </Button>
+                              ) : (
+                                <Button size="sm" onClick={() => addToSelected(s)}>
+                                  Thêm
+                                </Button>
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+              <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
+              </div>
+            </>
           )}
         </div>
       </div>

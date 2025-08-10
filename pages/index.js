@@ -224,7 +224,28 @@ export default function StoreList() {
                               {store.status ? 'Đã xác thực' : 'Chưa xác thực'}
                             </span>
                             <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
-                              <Link href={`/store/${store.id}`} className="block hover:underline">Cửa hàng: {store.name}</Link>
+                              {store.image_url ? (
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <button type="button" className="block text-left hover:underline">Cửa hàng: {store.name}</button>
+                                  </DialogTrigger>
+                                  <DialogContent className="overflow-hidden p-0">
+                                    <DialogClose asChild>
+                                      <Image
+                                        src={store.image_url}
+                                        alt={store.name}
+                                        width={800}
+                                        height={800}
+                                        title="Bấm vào ảnh để đóng"
+                                        draggable={false}
+                                        className="max-h-[80vh] w-auto cursor-zoom-out object-contain"
+                                      />
+                                    </DialogClose>
+                                  </DialogContent>
+                                </Dialog>
+                              ) : (
+                                <Link href={`/store/${store.id}`} className="block hover:underline">Cửa hàng: {store.name}</Link>
+                              )}
                             </h3>
                           </div>
                           <p className="truncate text-sm text-gray-600 dark:text-gray-400">
@@ -252,7 +273,7 @@ export default function StoreList() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 >
-                                  GG Maps
+                                  Maps
                                 </a>
                               </Button>
                             )}
