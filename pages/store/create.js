@@ -17,6 +17,46 @@ export default function AddStore() {
   const [note, setNote] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [resolvingAddr, setResolvingAddr] = useState(false)
+
+  function cleanNominatimDisplayName(name) {
+    if (!name) return ''
+    const parts = name.split(',').map((p) => p.trim())
+    while (parts.length > 0) {
+      const last = parts[parts.length - 1]
+      if (last.toLowerCase() === 'việt nam' || /^[0-9]{4,6}$/.test(last)) {
+        parts.pop()
+        continue
+      }
+      break
+    }
+    return parts.join(', ')
+  }
+
+  async function handleFillAddress() {
+    try {
+      setResolvingAddr(true)
+      const coords = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos.coords),
+          (err) => reject(err)
+        )
+      })
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Reverse geocoding failed')
+      const data = await res.json()
+      const text = data?.display_name || ''
+      const cleaned = cleanNominatimDisplayName(text)
+      if (cleaned) setAddress(cleaned)
+      else alert('Không lấy được địa chỉ từ Nominatim')
+    } catch (err) {
+      console.error('Auto fill address error:', err)
+      alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+    } finally {
+      setResolvingAddr(false)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -150,7 +190,12 @@ export default function AddStore() {
 
               <div className="grid gap-1.5">
                 <Label htmlFor="address">Địa chỉ</Label>
-                <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã, quận/huyện" />
+                <div className="flex items-center gap-2">
+                  <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Số nhà, đường, phường/xã, quận/huyện" className="flex-1" />
+                  <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
+                    {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
+                  </Button>
+                </div>
               </div>
 
               <div className="grid gap-1.5">

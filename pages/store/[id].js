@@ -23,6 +23,7 @@ export default function StoreDetail() {
   const [note, setNote] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [resolvingAddr, setResolvingAddr] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -143,6 +144,45 @@ export default function StoreDetail() {
     }
   }
 
+  function cleanNominatimDisplayName(name) {
+    if (!name) return ''
+    const parts = name.split(',').map((p) => p.trim())
+    while (parts.length > 0) {
+      const last = parts[parts.length - 1]
+      if (last.toLowerCase() === 'việt nam' || /^[0-9]{4,6}$/.test(last)) {
+        parts.pop()
+        continue
+      }
+      break
+    }
+    return parts.join(', ')
+  }
+
+  async function handleFillAddress() {
+    try {
+      setResolvingAddr(true)
+      const coords = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve(pos.coords),
+          (err) => reject(err)
+        )
+      })
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Reverse geocoding failed')
+      const data = await res.json()
+      const text = data?.display_name || ''
+      const cleaned = cleanNominatimDisplayName(text)
+      if (cleaned) setAddress(cleaned)
+      else alert('Không lấy được địa chỉ từ Nominatim')
+    } catch (err) {
+      console.error('Auto fill address error:', err)
+      alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+    } finally {
+      setResolvingAddr(false)
+    }
+  }
+
   if (!store) {
     return (
       <div className="mx-auto max-w-2xl p-6">Đang tải...</div>
@@ -174,7 +214,14 @@ export default function StoreDetail() {
             </div>
             <div className="grid gap-1.5">
               <Label>Địa chỉ</Label>
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} />
+              <div className="flex items-center gap-2">
+                <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="flex-1" />
+                {user && (
+                  <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
+                    {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="grid gap-1.5">
               <Label>Số điện thoại</Label>
