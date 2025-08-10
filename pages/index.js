@@ -14,7 +14,7 @@ import { useAuth } from '@/components/auth-context'
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import useSWRInfinite from 'swr/infinite'
+
 import StoreResultCard from '@/components/store-result-card'
 import SelectedStoreItem from '@/components/selected-store-item'
 
@@ -63,6 +63,13 @@ export default function ArrangeStores() {
   const [sorting, setSorting] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [listCollapsed, setListCollapsed] = useState(false)
+
+  // Add manual search states (like /store/index.js)
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -176,19 +183,14 @@ export default function ArrangeStores() {
     return () => clearTimeout(t)
   }, [search])
 
-  // SWR Infinite: key builder and fetcher
-  const getKey = useCallback((pageIndex, previousPageData) => {
-    const keyword = (debouncedSearch || '').trim()
-    if (!keyword || keyword.length < MIN_SEARCH_LEN) return null
-    // stop if reached the end
-    if (previousPageData && previousPageData.length < PAGE_SIZE) return null
-    return ['stores', keyword, pageIndex]
-  }, [debouncedSearch])
-
-  const fetcher = useCallback(async (_key, keyword, pageIndex) => {
-    const q = removeVietnameseTones(keyword).toLowerCase()
-    const from = pageIndex * PAGE_SIZE
+  // Fetch one page
+  async function fetchResultsPage(keyword, pageNum = 1, append = false) {
+    const raw = (keyword || '').trim()
+    const q = removeVietnameseTones(raw).toLowerCase()
+    const from = (pageNum - 1) * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
+
+    if (pageNum === 1) setLoading(true); else setLoadingMore(true)
 
     const { data, error } = await supabase
       .from('stores')
@@ -198,55 +200,63 @@ export default function ArrangeStores() {
       .order('id', { ascending: false })
       .range(from, to)
 
-    if (error) throw error
+    if (pageNum === 1) setLoading(false); else setLoadingMore(false)
 
+    if (error) {
+      console.error('Search error:', error)
+      return
+    }
+
+    const rows = data || []
     const myLat = ORIGIN.latitude
     const myLon = ORIGIN.longitude
-    const withDistance = (data || []).map((s) =>
+    const withDistance = rows.map((s) =>
       (typeof s.latitude === 'number' && typeof s.longitude === 'number')
         ? { ...s, distance: haversineKm(myLat, myLon, s.latitude, s.longitude) }
         : { ...s, distance: null }
     )
-    return withDistance
-  }, [])
 
-  const {
-    data: swrPages,
-    error: swrError,
-    size,
-    setSize,
-    isLoading: swrLoading,
-    isValidating,
-    mutate: swrMutate,
-  } = useSWRInfinite(getKey, fetcher, {
-    revalidateOnFocus: false,
-    revalidateFirstPage: false,
-    keepPreviousData: true,
-    parallel: true,
-  })
+    setResults((prev) => (append ? [...prev, ...withDistance] : withDistance))
+    setHasMore(rows.length === PAGE_SIZE)
+    setPage(pageNum)
+  }
 
-  const resultsMemo = useMemo(() => (swrPages ? swrPages.flat() : []), [swrPages])
-  const hasMoreMemo = useMemo(() => {
-    if (!swrPages || swrPages.length === 0) return false
-    const last = swrPages[swrPages.length - 1]
-    return Array.isArray(last) && last.length === PAGE_SIZE
-  }, [swrPages])
-
-  // Replace old manual pagination states with SWR-derived ones
-  const loadingInitial = swrLoading && !!debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN
-  const loadingMore = isValidating && size > 0 && !!debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN
+  // Reset and fetch first page when keyword changes (same as /store/index.js)
+  useEffect(() => {
+    const keyword = debouncedSearch
+    if (keyword && keyword.length < MIN_SEARCH_LEN) {
+      setLoading(false)
+      setHasMore(false)
+      setPage(1)
+      setResults([])
+      return
+    }
+    if (keyword && keyword.length >= MIN_SEARCH_LEN) {
+      setPage(1)
+      setHasMore(true)
+      setResults([])
+      fetchResultsPage(keyword, 1, false)
+    } else {
+      setResults([])
+      setHasMore(false)
+      setLoading(false)
+      setPage(1)
+    }
+  }, [debouncedSearch])
 
   // Load more on scroll
   useEffect(() => {
     function onScroll() {
-      if (!hasMoreMemo || loadingMore) return
+      if (!hasMore || loading || loadingMore) return
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_BOTTOM_OFFSET) {
-        setSize((s) => s + 1)
+        if (debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN) {
+          fetchResultsPage(debouncedSearch, page + 1, true)
+        }
       }
     }
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
-  }, [hasMoreMemo, loadingMore, setSize])
+  }, [hasMore, loading, loadingMore, page, debouncedSearch])
 
   // Ensure every selected item has a distance value (number or null)
   useEffect(() => {
@@ -327,17 +337,15 @@ export default function ArrangeStores() {
 
         {/* Search results */}
         <div className="mt-4 space-y-2">
-          {(!debouncedSearch || debouncedSearch.length < MIN_SEARCH_LEN) ? (
-            !debouncedSearch ? (
-              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập từ khóa để tìm cửa hàng</CardContent></Card>
-            ) : (
-              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập tối thiểu {MIN_SEARCH_LEN} ký tự để tìm</CardContent></Card>
-            )
-          ) : loadingInitial ? (
+          {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <Card key={i}><CardContent className="flex items-center justify-between gap-3 p-3"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-8 w-20" /></CardContent></Card>
             ))
-          ) : (resultsMemo.length === 0 ? (
+          ) : !debouncedSearch ? (
+            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập từ khóa để tìm cửa hàng</CardContent></Card>
+          ) : debouncedSearch.length < MIN_SEARCH_LEN ? (
+            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập tối thiểu {MIN_SEARCH_LEN} ký tự để tìm</CardContent></Card>
+          ) : results.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center gap-3 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
                 <div>❌ Không tìm thấy cửa hàng nào</div>
@@ -351,17 +359,17 @@ export default function ArrangeStores() {
           ) : (
             <>
               <ul className="space-y-2">
-                {resultsMemo.map((s) => (
+                {results.map((s) => (
                   <li key={s.id}>
                     <StoreResultCard store={s} isSelected={selectedIds.has(s.id)} onAdd={addToSelected} />
                   </li>
                 ))}
               </ul>
               <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                {loadingMore ? 'Đang tải thêm…' : (!hasMoreMemo ? 'Đã hết' : null)}
+                {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
               </div>
             </>
-          ))}
+          )}
         </div>
       </div>
     </div>
