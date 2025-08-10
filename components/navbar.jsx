@@ -18,7 +18,7 @@ export default function Navbar() {
 
                 <div className="ml-auto flex items-center gap-2">
                     <Button asChild variant="ghost" size="sm">
-                        <Link href="/store/arrange">Xếp đơn</Link>
+                        <Link href="/">Xếp đơn</Link>
                     </Button>
                     {user && (
                         <Button asChild size="sm">
