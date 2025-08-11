@@ -235,7 +235,15 @@ export default function ArrangeStores() {
       return
     }
 
-    // Get current position for route planning
+    // Show loading state
+    const loadingAlert = () => {
+      if (window.confirm('Đang lấy vị trí hiện tại...\nBấm OK để tiếp tục hoặc Cancel để hủy')) {
+        return true
+      }
+      return false
+    }
+
+    // Get current position for route planning with mobile-friendly options
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const myCurrentPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
@@ -289,11 +297,42 @@ export default function ArrangeStores() {
         )
         
         if (confirmed) {
-          window.open(url, '_blank')
+          // For mobile, try to open in app first, then fallback to web
+          if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            // Try Google Maps app first
+            const appUrl = url.replace('https://www.google.com/maps/dir/', 'googlemaps://maps.google.com/maps/dir/')
+            window.location.href = appUrl
+            
+            // Fallback to web version after a short delay
+            setTimeout(() => {
+              window.open(url, '_blank')
+            }, 1000)
+          } else {
+            window.open(url, '_blank')
+          }
         }
       },
-      () => {
-        alert('Không lấy được vị trí hiện tại')
+      (error) => {
+        let errorMessage = 'Không lấy được vị trí hiện tại'
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Bạn đã từ chối quyền truy cập vị trí. Vui lòng bật GPS và cho phép truy cập vị trí trong cài đặt trình duyệt.'
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Không thể xác định vị trí. Vui lòng kiểm tra kết nối mạng và GPS.'
+            break
+          case error.TIMEOUT:
+            errorMessage = 'Hết thời gian chờ. Vui lòng thử lại.'
+            break
+        }
+        
+        alert(errorMessage)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000, // 15 seconds timeout
+        maximumAge: 60000 // Accept cached position up to 1 minute old
       }
     )
   }, [selected])
@@ -493,7 +532,7 @@ export default function ArrangeStores() {
                   {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
                 </Button>
                 <Button variant="default" size="sm" onClick={handleOpenRoute} disabled={selected.length === 0}>
-                  Mở lộ trình
+                  Mở lộ trình thông minh
                 </Button>
               </div>
             </div>
