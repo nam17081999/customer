@@ -180,7 +180,11 @@ export default function ArrangeStores() {
     const ok = window.confirm('Bắt đầu lộ trình mới? Danh sách ghé thăm hiện tại sẽ bị xóa.')
     if (!ok) return
     setSelected([])
-    try { if (typeof window !== 'undefined') localStorage.removeItem(STORAGE_KEY) } catch {}
+    try { 
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY)
+      }
+    } catch {}
   }, [])
 
   // Add back missing sort and drag handlers
@@ -217,6 +221,82 @@ export default function ArrangeStores() {
       return arrayMove(items, oldIndex, newIndex)
     })
   }, [])
+
+  // Find closest store to current position and create route with next 9 stores
+  const handleOpenRoute = useCallback(() => {
+    if (selected.length === 0) {
+      alert('Chưa có cửa hàng nào trong danh sách')
+      return
+    }
+
+    // Always get current position for route planning
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      alert('Trình duyệt không hỗ trợ vị trí')
+      return
+    }
+
+    // Get current position for route planning
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const myCurrentPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+        
+        const validStores = selected.filter(s => 
+          typeof s.latitude === 'number' && 
+          typeof s.longitude === 'number'
+        )
+
+        if (validStores.length === 0) {
+          alert('Không có cửa hàng nào có tọa độ để tạo lộ trình')
+          return
+        }
+
+        // Find closest store to current position
+        const storesWithDistance = validStores.map(store => ({
+          ...store,
+          distanceToMe: haversineKm(myCurrentPos.latitude, myCurrentPos.longitude, store.latitude, store.longitude)
+        }))
+
+        // Sort by distance to current position
+        storesWithDistance.sort((a, b) => a.distanceToMe - b.distanceToMe)
+
+        // Take closest store as starting point + next 9 stores (total 10)
+        const routeStores = storesWithDistance.slice(0, 10)
+        const startStore = routeStores[0]
+        const remainingStores = routeStores.slice(1)
+
+        let url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving'
+        
+        // Set origin to closest store
+        url += `&origin=${startStore.latitude},${startStore.longitude}`
+
+        // Set destination (last store)
+        if (remainingStores.length > 0) {
+          const lastStore = remainingStores[remainingStores.length - 1]
+          url += `&destination=${lastStore.latitude},${lastStore.longitude}`
+          
+          // Add waypoints (intermediate stores) - max 9 waypoints
+          const waypoints = remainingStores.slice(0, -1) // All except last
+          if (waypoints.length > 0) {
+            const waypointStr = waypoints.map(s => `${s.latitude},${s.longitude}`).join('|')
+            url += `&waypoints=${waypointStr}`
+          }
+        }
+
+        const distanceM = Math.round(startStore.distanceToMe * 1000)
+        const confirmed = window.confirm(
+          `Mở lộ trình với ${routeStores.length} cửa hàng?\n\n` +
+          `Bắt đầu từ: ${startStore.name} (${distanceM}m từ bạn)`
+        )
+        
+        if (confirmed) {
+          window.open(url, '_blank')
+        }
+      },
+      () => {
+        alert('Không lấy được vị trí hiện tại')
+      }
+    )
+  }, [selected])
 
   // Debounce search input
   useEffect(() => {
@@ -403,12 +483,19 @@ export default function ArrangeStores() {
           {/* New route and sort buttons */}
           {!listCollapsed && (
             <div className="mb-2 flex items-center justify-between gap-2">
-              <Button variant="outline" size="sm" onClick={handleNewRoute}>
-                Thêm lộ trình mới
-              </Button>
-              <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
-                {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleNewRoute}>
+                  Thêm lộ trình mới
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
+                  {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
+                </Button>
+                <Button variant="default" size="sm" onClick={handleOpenRoute} disabled={selected.length === 0}>
+                  Mở lộ trình
+                </Button>
+              </div>
             </div>
           )}
 

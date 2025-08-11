@@ -26,7 +26,9 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
                 </svg>
               </button>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
+                <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {s.name}
+                </div>
                 <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
                 {/* Added clickable phone */}
                 {s.phone && (
@@ -35,7 +37,7 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
                     <a
                       href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`}
                       onClick={(e) => e.stopPropagation()}
-                      className="text-blue-600 hover:underline dark:text-blue-400"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       {s.phone}
                     </a>
@@ -98,7 +100,9 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
           </svg>
         </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
+          <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+            {s.name}
+          </div>
           <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
           {/* Added clickable phone */}
           {s.phone && (
@@ -106,7 +110,7 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
               SĐT:{' '}
               <a
                 href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`}
-                className="text-blue-600 hover:underline dark:text-blue-400"
+                className="text-blue-600 dark:text-blue-400 hover:underline"
               >
                 {s.phone}
               </a>
