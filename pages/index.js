@@ -282,18 +282,26 @@ export default function ArrangeStores() {
     }
   }, [debouncedSearch])
 
-  // Load more on scroll
+  // Load more using IntersectionObserver
   useEffect(() => {
-    function onScroll() {
-      if (!hasMore || loading || loadingMore) return
-      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - SCROLL_BOTTOM_OFFSET) {
-        if (debouncedSearch && debouncedSearch.length >= MIN_SEARCH_LEN) {
+    if (!hasMore || loading || loadingMore) return
+    if (!debouncedSearch || debouncedSearch.length < MIN_SEARCH_LEN) return
+
+    const loadMoreTrigger = document.getElementById('load-more-trigger')
+    if (!loadMoreTrigger) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry.isIntersecting) {
           fetchResultsPage(debouncedSearch, page + 1, true)
         }
-      }
-    }
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    )
+
+    observer.observe(loadMoreTrigger)
+    return () => observer.disconnect()
   }, [hasMore, loading, loadingMore, page, debouncedSearch])
 
   // Ensure selected items update distance when origin changes
@@ -314,6 +322,30 @@ export default function ArrangeStores() {
   }, [selected])
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected])
+
+  // Helper to highlight search matches
+  const highlightText = useCallback((text, searchTerm) => {
+    if (!searchTerm || !text) return text
+    const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
+    const normalizedText = removeVietnameseTones(text.toLowerCase())
+    
+    const index = normalizedText.indexOf(normalizedSearch)
+    if (index === -1) return text
+    
+    const beforeMatch = text.slice(0, index)
+    const match = text.slice(index, index + searchTerm.length)
+    const afterMatch = text.slice(index + searchTerm.length)
+    
+    return (
+      <>
+        {beforeMatch}
+        <span className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-yellow-100 px-0.5 rounded">
+          {match}
+        </span>
+        {afterMatch}
+      </>
+    )
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -443,10 +475,18 @@ export default function ArrangeStores() {
               <ul className="space-y-2">
                 {results.map((s) => (
                   <li key={s.id}>
-                    <StoreResultCard store={s} isSelected={selectedIds.has(s.id)} onAdd={addToSelected} />
+                    <StoreResultCard 
+                      store={s} 
+                      isSelected={selectedIds.has(s.id)} 
+                      onAdd={addToSelected}
+                      searchTerm={debouncedSearch}
+                      highlightText={highlightText}
+                    />
                   </li>
                 ))}
               </ul>
+              {/* Load more trigger for IntersectionObserver */}
+              {hasMore && <div id="load-more-trigger" className="h-1" />}
               <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
                 {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
               </div>
