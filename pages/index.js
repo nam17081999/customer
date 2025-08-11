@@ -64,6 +64,12 @@ export default function ArrangeStores() {
   const [deletingId, setDeletingId] = useState(null)
   const [listCollapsed, setListCollapsed] = useState(false)
 
+  // Distance origin controls
+  const [originMode, setOriginMode] = useState('npp') // 'npp' | 'current'
+  const [currentPos, setCurrentPos] = useState(null) // { latitude, longitude } | null
+  const [locLoading, setLocLoading] = useState(false)
+  const [locError, setLocError] = useState(null)
+
   // Add manual search states (like /store/index.js)
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -86,6 +92,8 @@ export default function ArrangeStores() {
       }
       const collapsed = typeof window !== 'undefined' ? localStorage.getItem('arrange:listCollapsed') : null
       if (collapsed === '1') setListCollapsed(true)
+      const savedOrigin = typeof window !== 'undefined' ? localStorage.getItem('arrange:originMode') : null
+      if (savedOrigin === 'current' || savedOrigin === 'npp') setOriginMode(savedOrigin)
     } catch (e) {
       console.warn('Cannot load saved route list:', e)
     }
@@ -111,19 +119,58 @@ export default function ArrangeStores() {
     } catch {}
   }, [listCollapsed])
 
+  // Persist origin mode
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') localStorage.setItem('arrange:originMode', originMode)
+    } catch {}
+  }, [originMode])
+
+  // Resolve origin coordinates
+  const originCoords = useMemo(() => {
+    if (originMode === 'npp') return ORIGIN
+    if (currentPos && typeof currentPos.latitude === 'number' && typeof currentPos.longitude === 'number') return currentPos
+    return null
+  }, [originMode, currentPos])
+
+  // Acquire current position when needed
+  useEffect(() => {
+    if (originMode !== 'current') return
+    if (currentPos) return
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocError('Trình duyệt không hỗ trợ vị trí')
+      return
+    }
+    setLocError(null)
+    setLocLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCurrentPos({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+        setLocLoading(false)
+      },
+      () => {
+        setLocError('Không lấy được vị trí')
+        setLocLoading(false)
+      }
+    )
+  }, [originMode, currentPos])
+
+  // Helper to compute distance to current origin
+  function distanceFromOrigin(store) {
+    if (!originCoords) return null
+    if (typeof store?.latitude !== 'number' || typeof store?.longitude !== 'number') return null
+    return haversineKm(originCoords.latitude, originCoords.longitude, store.latitude, store.longitude)
+  }
+
   const addToSelected = useCallback((store) => {
     setSelected((prev) => {
       if (prev.some((s) => s.id === store.id)) return prev
-      const myLat = ORIGIN.latitude
-      const myLon = ORIGIN.longitude
       const withDistance = (store.distance !== undefined)
-        ? store
-        : (typeof store.latitude === 'number' && typeof store.longitude === 'number')
-          ? { ...store, distance: haversineKm(myLat, myLon, store.latitude, store.longitude) }
-          : { ...store, distance: null }
+        ? { ...store, distance: distanceFromOrigin(store) }
+        : { ...store, distance: distanceFromOrigin(store) }
       return [...prev, withDistance]
     })
-  }, [])
+  }, [originCoords])
 
   const removeFromSelected = useCallback((id) => {
     setSelected((prev) => prev.filter((s) => s.id !== id))
@@ -141,16 +188,10 @@ export default function ArrangeStores() {
     if (!selected.length) return
     const ok = window.confirm('Bạn có chắc muốn tính khoảng cách và sắp xếp lại danh sách? Thứ tự hiện tại sẽ thay đổi.')
     if (!ok) return
-    const myLat = ORIGIN.latitude
-    const myLon = ORIGIN.longitude
     setSorting(true)
     try {
       setSelected((prev) => {
-        const withDistance = prev.map((s) => (
-          (typeof s.latitude === 'number' && typeof s.longitude === 'number')
-            ? { ...s, distance: haversineKm(myLat, myLon, s.latitude, s.longitude) }
-            : { ...s, distance: null }
-        ))
+        const withDistance = prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) }))
         withDistance.sort((a, b) => {
           const da = a.distance
           const db = b.distance
@@ -164,7 +205,7 @@ export default function ArrangeStores() {
     } finally {
       setSorting(false)
     }
-  }, [selected.length])
+  }, [selected.length, originCoords])
 
   const handleDragEnd = useCallback((event) => {
     const { active, over } = event
@@ -208,13 +249,10 @@ export default function ArrangeStores() {
     }
 
     const rows = data || []
-    const myLat = ORIGIN.latitude
-    const myLon = ORIGIN.longitude
-    const withDistance = rows.map((s) =>
-      (typeof s.latitude === 'number' && typeof s.longitude === 'number')
-        ? { ...s, distance: haversineKm(myLat, myLon, s.latitude, s.longitude) }
-        : { ...s, distance: null }
-    )
+    const withDistance = rows.map((s) => ({
+      ...s,
+      distance: distanceFromOrigin(s),
+    }))
 
     setResults((prev) => (append ? [...prev, ...withDistance] : withDistance))
     setHasMore(rows.length === PAGE_SIZE)
@@ -258,19 +296,21 @@ export default function ArrangeStores() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [hasMore, loading, loadingMore, page, debouncedSearch])
 
-  // Ensure every selected item has a distance value (number or null)
+  // Ensure selected items update distance when origin changes
+  useEffect(() => {
+    setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
+  }, [originCoords])
+
+  // Recompute result distances when origin changes
+  useEffect(() => {
+    setResults((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
+  }, [originCoords])
+
+  // Ensure every selected item has a distance value (legacy fill-in)
   useEffect(() => {
     if (!selected.length) return
     if (!selected.some((s) => s.distance === undefined)) return
-    const myLat = ORIGIN.latitude
-    const myLon = ORIGIN.longitude
-    setSelected((prev) => prev.map((s) => {
-      if (s.distance !== undefined) return s
-      if (typeof s.latitude === 'number' && typeof s.longitude === 'number') {
-        return { ...s, distance: haversineKm(myLat, myLon, s.latitude, s.longitude) }
-      }
-      return { ...s, distance: null }
-    }))
+    setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
   }, [selected])
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected])
@@ -283,11 +323,7 @@ export default function ArrangeStores() {
 
         {/* Selected list */}
         <div className="mt-6">
-          <div className="mb-2">
-            <Button variant="outline" size="sm" onClick={handleNewRoute}>
-              Thêm lộ trình mới
-            </Button>
-          </div>
+          {/* Header row: title + origin switch + sort */}
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
@@ -301,11 +337,42 @@ export default function ArrangeStores() {
                 {listCollapsed ? '▶' : '▼'}
               </span>
             </button>
-            {!listCollapsed && (
-              <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
-                {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
-              </Button>
-            )}
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="hidden text-xs text-gray-500 dark:text-gray-400 sm:inline">Từ vị trí tôi</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={originMode === 'current'}
+                  aria-label="Bật tắt dùng vị trí của tôi để tính khoảng cách"
+                  onClick={() => setOriginMode(originMode === 'current' ? 'npp' : 'current')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${originMode === 'current' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${originMode === 'current' ? 'translate-x-5' : 'translate-x-1'}`}></span>
+                </button>
+                {originMode === 'current' && (
+                  locLoading ? (
+                    <span className="text-[11px] text-gray-500">Đang lấy…</span>
+                  ) : locError ? (
+                    <span className="text-[11px] text-red-500">{locError}</span>
+                  ) : null
+                )}
+              </div>
+
+              {!listCollapsed && (
+                <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
+                  {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* New route button */}
+          <div className="mb-2">
+            <Button variant="outline" size="sm" onClick={handleNewRoute}>
+              Thêm lộ trình mới
+            </Button>
           </div>
 
           <div id="visit-list">
