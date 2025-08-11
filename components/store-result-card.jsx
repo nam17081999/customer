@@ -53,7 +53,12 @@ function StoreResultCardBase({ store: s, isSelected, onAdd }) {
             </div>
             <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {s.address}</p>
             {s.phone && (
-              <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {s.phone}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Số điện thoại:{' '}
+                <a href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                  {s.phone}
+                </a>
+              </p>
             )}
             {s.note && (
               <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>
@@ -112,7 +117,12 @@ function StoreResultCardBase({ store: s, isSelected, onAdd }) {
           </div>
           <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {s.address}</p>
           {s.phone && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {s.phone}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Số điện thoại:{' '}
+              <a href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                {s.phone}
+              </a>
+            </p>
           )}
           {s.note && (
             <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>

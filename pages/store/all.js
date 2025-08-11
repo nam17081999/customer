@@ -282,7 +282,15 @@ export default function AllStoresVerify() {
                           </div>
                           <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {store.address}</p>
                           {store.phone && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Số điện thoại: {store.phone}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Số điện thoại:{' '}
+                              <a
+                                href={`tel:${String(store.phone).replace(/[^0-9+]/g, '')}`}
+                                className="text-blue-600 hover:underline dark:text-blue-400"
+                              >
+                                {store.phone}
+                              </a>
+                            </p>
                           )}
                           {store.note && (
                             <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {store.note}</p>

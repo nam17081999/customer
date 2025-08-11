@@ -318,11 +318,8 @@ export default function ArrangeStores() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Sắp xếp lộ trình giao hàng</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Thêm các cửa hàng vào danh sách, sắp xếp theo khoảng cách hoặc kéo-thả để đổi thứ tự.</p>
-
         {/* Selected list */}
-        <div className="mt-6">
+        <div>
           {/* Header row: title + origin switch */}
           <div className="mb-2 flex items-center justify-between">
             <button
@@ -332,33 +329,41 @@ export default function ArrangeStores() {
               aria-expanded={!listCollapsed}
               aria-controls="visit-list"
             >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Danh sách ghé thăm ({selected.length})</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">DS ghé thăm ({selected.length})</h2>
               <span className="text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300">
                 {listCollapsed ? '▶' : '▼'}
               </span>
             </button>
 
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className={`${originMode === 'npp' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-500 dark:text-gray-400'} text-xs`}>Vị trí NPP</span>
+              <div
+                role="group"
+                aria-label="Nguồn vị trí"
+                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 p-0.5 text-xs dark:border-gray-800 dark:bg-gray-900"
+              >
                 <button
                   type="button"
-                  role="switch"
-                  aria-checked={originMode === 'current'}
-                  aria-label="Chuyển nguồn vị trí"
-                  onClick={() => setOriginMode(originMode === 'current' ? 'npp' : 'current')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${originMode === 'current' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                  aria-pressed={originMode === 'npp'}
+                  onClick={() => setOriginMode('npp')}
+                  className={`${originMode === 'npp' ? 'bg-white text-emerald-600 shadow dark:bg-gray-800' : 'text-gray-600 dark:text-gray-300'} px-3 py-1 rounded-full`}
                 >
-                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${originMode === 'current' ? 'translate-x-5' : 'translate-x-1'}`}></span>
+                  NPP
                 </button>
-                <span className={`${originMode === 'current' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-500 dark:text-gray-400'} text-xs`}>Vị trí của tôi</span>
-                {originMode === 'current' && (
-                  locLoading ? (
-                    <span className="text-[11px] text-gray-500">Đang lấy…</span>
-                  ) : locError ? (
-                    <span className="text-[11px] text-red-500">{locError}</span>
-                  ) : null
-                )}
+                <button
+                  type="button"
+                  aria-pressed={originMode === 'current'}
+                  onClick={() => setOriginMode('current')}
+                  className={`${originMode === 'current' ? 'bg-white text-emerald-600 shadow dark:bg-gray-800' : 'text-gray-600 dark:text-gray-300'} relative px-3 py-1 rounded-full`}
+                >
+                  Tôi
+                  {originMode === 'current' && (
+                    locLoading ? (
+                      <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-gray-400 align-middle animate-pulse" />
+                    ) : locError ? (
+                      <span title={locError} className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" />
+                    ) : null
+                  )}
+                </button>
               </div>
             </div>
           </div>

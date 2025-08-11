@@ -28,6 +28,19 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
                 <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
+                {/* Added clickable phone */}
+                {s.phone && (
+                  <div className="truncate text-xs text-gray-600 dark:text-gray-400">
+                    SĐT:{' '}
+                    <a
+                      href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {s.phone}
+                    </a>
+                  </div>
+                )}
                 {typeof s.distance === 'number' ? (
                   <div className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</div>
                 ) : s.distance === null ? (
@@ -87,6 +100,18 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
           <div className="truncate text-xs text-gray-600 dark:text-gray-400">{s.address}</div>
+          {/* Added clickable phone */}
+          {s.phone && (
+            <div className="truncate text-xs text-gray-600 dark:text-gray-400">
+              SĐT:{' '}
+              <a
+                href={`tel:${String(s.phone).replace(/[^0-9+]/g, '')}`}
+                className="text-blue-600 hover:underline dark:text-blue-400"
+              >
+                {s.phone}
+              </a>
+            </div>
+          )}
           {typeof s.distance === 'number' ? (
             <div className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</div>
           ) : s.distance === null ? (
