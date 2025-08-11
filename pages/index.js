@@ -155,12 +155,12 @@ export default function ArrangeStores() {
     )
   }, [originMode, currentPos])
 
-  // Helper to compute distance to current origin
-  function distanceFromOrigin(store) {
+  // Helper to compute distance to current origin (memoized)
+  const distanceFromOrigin = useCallback((store) => {
     if (!originCoords) return null
     if (typeof store?.latitude !== 'number' || typeof store?.longitude !== 'number') return null
     return haversineKm(originCoords.latitude, originCoords.longitude, store.latitude, store.longitude)
-  }
+  }, [originCoords])
 
   const addToSelected = useCallback((store) => {
     setSelected((prev) => {
@@ -222,129 +222,14 @@ export default function ArrangeStores() {
     })
   }, [])
 
-  // Find closest store to current position and create route with next 9 stores
-  const handleOpenRoute = useCallback(() => {
-    if (selected.length === 0) {
-      alert('Chưa có cửa hàng nào trong danh sách')
-      return
-    }
-
-    // Always get current position for route planning
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      alert('Trình duyệt không hỗ trợ vị trí')
-      return
-    }
-
-    // Show loading state
-    const loadingAlert = () => {
-      if (window.confirm('Đang lấy vị trí hiện tại...\nBấm OK để tiếp tục hoặc Cancel để hủy')) {
-        return true
-      }
-      return false
-    }
-
-    // Get current position for route planning with mobile-friendly options
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const myCurrentPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
-        
-        const validStores = selected.filter(s => 
-          typeof s.latitude === 'number' && 
-          typeof s.longitude === 'number'
-        )
-
-        if (validStores.length === 0) {
-          alert('Không có cửa hàng nào có tọa độ để tạo lộ trình')
-          return
-        }
-
-        // Find closest store to current position
-        const storesWithDistance = validStores.map(store => ({
-          ...store,
-          distanceToMe: haversineKm(myCurrentPos.latitude, myCurrentPos.longitude, store.latitude, store.longitude)
-        }))
-
-        // Sort by distance to current position
-        storesWithDistance.sort((a, b) => a.distanceToMe - b.distanceToMe)
-
-        // Take closest store as starting point + next 9 stores (total 10)
-        const routeStores = storesWithDistance.slice(0, 10)
-        const startStore = routeStores[0]
-        const remainingStores = routeStores.slice(1)
-
-        let url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving'
-        
-        // Set origin to closest store
-        url += `&origin=${startStore.latitude},${startStore.longitude}`
-
-        // Set destination (last store)
-        if (remainingStores.length > 0) {
-          const lastStore = remainingStores[remainingStores.length - 1]
-          url += `&destination=${lastStore.latitude},${lastStore.longitude}`
-          
-          // Add waypoints (intermediate stores) - max 9 waypoints
-          const waypoints = remainingStores.slice(0, -1) // All except last
-          if (waypoints.length > 0) {
-            const waypointStr = waypoints.map(s => `${s.latitude},${s.longitude}`).join('|')
-            url += `&waypoints=${waypointStr}`
-          }
-        }
-
-        const distanceM = Math.round(startStore.distanceToMe * 1000)
-        const confirmed = window.confirm(
-          `Mở lộ trình với ${routeStores.length} cửa hàng?\n\n` +
-          `Bắt đầu từ: ${startStore.name} (${distanceM}m từ bạn)`
-        )
-        
-        if (confirmed) {
-          // For mobile, try to open in app first, then fallback to web
-          if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-            // Try Google Maps app first
-            const appUrl = url.replace('https://www.google.com/maps/dir/', 'googlemaps://maps.google.com/maps/dir/')
-            window.location.href = appUrl
-            
-            // Fallback to web version after a short delay
-            setTimeout(() => {
-              window.open(url, '_blank')
-            }, 1000)
-          } else {
-            window.open(url, '_blank')
-          }
-        }
-      },
-      (error) => {
-        let errorMessage = 'Không lấy được vị trí hiện tại'
-        
-        switch(error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Bạn đã từ chối quyền truy cập vị trí. Vui lòng bật GPS và cho phép truy cập vị trí trong cài đặt trình duyệt.'
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Không thể xác định vị trí. Vui lòng kiểm tra kết nối mạng và GPS.'
-            break
-          case error.TIMEOUT:
-            errorMessage = 'Hết thời gian chờ. Vui lòng thử lại.'
-            break
-        }
-        
-        alert(errorMessage)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000, // 15 seconds timeout
-        maximumAge: 60000 // Accept cached position up to 1 minute old
-      }
-    )
-  }, [selected])
-
   // Debounce search input
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(t)
   }, [search])
 
-  // Fetch one page
-  async function fetchResultsPage(keyword, pageNum = 1, append = false) {
+  // Fetch one page (memoized)
+  const fetchResultsPage = useCallback(async (keyword, pageNum = 1, append = false) => {
     const raw = (keyword || '').trim()
     const q = removeVietnameseTones(raw).toLowerCase()
     const from = (pageNum - 1) * PAGE_SIZE
@@ -376,7 +261,7 @@ export default function ArrangeStores() {
     setResults((prev) => (append ? [...prev, ...withDistance] : withDistance))
     setHasMore(rows.length === PAGE_SIZE)
     setPage(pageNum)
-  }
+  }, [distanceFromOrigin])
 
   // Reset and fetch first page when keyword changes (same as /store/index.js)
   useEffect(() => {
@@ -531,9 +416,6 @@ export default function ArrangeStores() {
                 <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
                   {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
                 </Button>
-                <Button variant="default" size="sm" onClick={handleOpenRoute} disabled={selected.length === 0}>
-                  Mở lộ trình thông minh
-                </Button>
               </div>
             </div>
           )}
@@ -552,7 +434,12 @@ export default function ArrangeStores() {
                         key={s.id}
                         item={s}
                         render={({ attributes, listeners }) => (
-                          <SelectedStoreItem item={s} dragAttributes={attributes} dragListeners={listeners} onRemove={removeFromSelected} />
+                          <SelectedStoreItem 
+                            item={s} 
+                            dragAttributes={attributes} 
+                            dragListeners={listeners} 
+                            onRemove={removeFromSelected}
+                          />
                         )}
                       />
                     ))}
