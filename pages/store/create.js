@@ -109,6 +109,75 @@ export default function AddStore() {
     }
   }
 
+  function extractSearchTextFromGoogleMapsUrl(input) {
+    if (!input) return null
+    let urlStr = input.trim()
+    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+    try {
+      const u = new URL(urlStr)
+      const qParams = ['q', 'query']
+      for (const k of qParams) {
+        const v = u.searchParams.get(k)
+        if (v) return decodeURIComponent(v.replace(/\+/g, ' '))
+      }
+      // /place/<name>/... → take the segment after /place/
+      const parts = u.pathname.split('/').filter(Boolean)
+      const idx = parts.findIndex((p) => p.toLowerCase() === 'place')
+      if (idx !== -1 && parts[idx + 1]) {
+        return decodeURIComponent(parts[idx + 1].replace(/\+/g, ' '))
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  async function geocodeTextToLatLngAddress(text) {
+    if (!text) return null
+    try {
+      const q = encodeURIComponent(text)
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const arr = await res.json()
+      if (!Array.isArray(arr) || arr.length === 0) return null
+      const item = arr[0]
+      const lat = parseFloat(item.lat)
+      const lon = parseFloat(item.lon)
+      if (!isFinite(lat) || !isFinite(lon)) return null
+      const cleaned = cleanNominatimDisplayName(item.display_name || '')
+      return { lat, lng: lon, address: cleaned }
+    } catch {
+      return null
+    }
+  }
+
+  async function resolveLatLngFromAnyLink(input) {
+    // Try direct parse first
+    const direct = parseLatLngFromGoogleMapsUrl(input)
+    if (direct) return direct
+
+    // Try following redirect to expand short link and parse final URL (via API)
+    try {
+      let urlStr = input.trim()
+      if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+      const finalUrl = await expandShortLink(urlStr)
+      if (finalUrl) {
+        const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+        if (parsed) return parsed
+      }
+    } catch {}
+
+    // Fallback: extract search text and geocode
+    const text = extractSearchTextFromGoogleMapsUrl(input)
+    if (text) {
+      const geo = await geocodeTextToLatLngAddress(text)
+      if (geo) return { lat: geo.lat, lng: geo.lng }
+    }
+
+    return null
+  }
+
   async function reverseGeocodeFromLatLng(lat, lon) {
     try {
       setGmapResolving(true)
@@ -139,14 +208,40 @@ export default function AddStore() {
 
   useEffect(() => {
     if (!gmapLink || !gmapLink.trim()) return
-    const t = setTimeout(() => {
-      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
-      if (parsed) {
-        const last = lastParsedRef.current
-        if (!last || Math.abs(last.lat - parsed.lat) > 1e-5 || Math.abs(last.lng - parsed.lng) > 1e-5) {
-          lastParsedRef.current = parsed
-          reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+    const t = setTimeout(async () => {
+      setGmapResolving(true)
+      try {
+        // First try direct
+        const direct = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+        if (direct) {
+          const last = lastParsedRef.current
+          if (!last || Math.abs(last.lat - direct.lat) > 1e-5 || Math.abs(last.lng - direct.lng) > 1e-5) {
+            lastParsedRef.current = direct
+            await reverseGeocodeFromLatLng(direct.lat, direct.lng)
+          }
+          return
         }
+        // Try expand via API then parse
+        const finalUrl = await expandShortLink(gmapLink.trim())
+        if (finalUrl) {
+          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+          if (parsed) {
+            lastParsedRef.current = parsed
+            await reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+            return
+          }
+        }
+        // Fallback to text geocoding
+        const text = extractSearchTextFromGoogleMapsUrl(gmapLink.trim())
+        if (text) {
+          const geo = await geocodeTextToLatLngAddress(text)
+          if (geo) {
+            lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
+            if (geo.address) setAddress(geo.address)
+          }
+        }
+      } finally {
+        setGmapResolving(false)
       }
     }, 400)
     return () => clearTimeout(t)
@@ -197,16 +292,27 @@ export default function AddStore() {
     let longitude = null
 
     if (gmapLink && gmapLink.trim()) {
-      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
-      if (parsed) {
-        latitude = parsed.lat
-        longitude = parsed.lng
+      const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
+      if (!resolved) {
+        // Try expand and parse as last resort
+        const finalUrl = await expandShortLink(gmapLink.trim())
+        if (finalUrl) {
+          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+          if (parsed) {
+            latitude = parsed.lat
+            longitude = parsed.lng
+          }
+        }
       } else {
-        alert('Không đọc được tọa độ từ liên kết Google Maps. Sẽ dùng vị trí hiện tại của bạn.')
+        latitude = resolved.lat
+        longitude = resolved.lng
       }
-    }
-
-    if (latitude == null || longitude == null) {
+      if (latitude == null || longitude == null) {
+        alert('Không đọc được tọa độ từ liên kết Google Maps. Vui lòng nhập liên kết hợp lệ hoặc xóa trường này để dùng vị trí hiện tại.')
+        return
+      }
+    } else {
+      // No link → fallback to current position
       try {
         const coords = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
@@ -218,7 +324,7 @@ export default function AddStore() {
         longitude = coords.longitude
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
-        alert('Ứng dụng cần quyền truy cập vị trí hoặc liên kết Google Maps hợp lệ để tiếp tục. Vui lòng cấp quyền vị trí hoặc nhập đúng liên kết rồi thử lại.')
+        alert('Ứng dụng cần quyền truy cập vị trí để tiếp tục.')
         return
       }
     }
@@ -332,7 +438,7 @@ export default function AddStore() {
                     id="address"
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder={resolvingAddr ? 'Đang tự động lấy địa chỉ…' : 'Nhập địa chỉ hoặc bấm “Lấy lại” để tự điền'}
+                    placeholder={gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : (resolvingAddr ? 'Đang tự động lấy địa chỉ…' : 'Nhập địa chỉ hoặc bấm “Lấy lại” để tự điền')}
                     className="flex-1"
                   />
                   <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
@@ -369,7 +475,14 @@ export default function AddStore() {
                   placeholder="Dán liên kết chia sẻ vị trí từ Google Maps (có dạng chứa @lat,lng hoặc q=lat,lng)"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : 'Nếu nhập, hệ thống sẽ ưu tiên tọa độ từ liên kết và tự cập nhật địa chỉ.'}
+                  {gmapResolving ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span>Đang lấy địa chỉ từ liên kết…</span>
+                      <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+                    </span>
+                  ) : (
+                    'Nếu nhập, hệ thống sẽ ưu tiên tọa độ từ liên kết và tự cập nhật địa chỉ.'
+                  )}
                 </p>
               </div>
 
@@ -379,8 +492,8 @@ export default function AddStore() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" disabled={loading} className="w-full">
-                  {loading ? 'Đang thêm…' : 'Thêm cửa hàng'}
+                <Button type="submit" disabled={loading || gmapResolving} className="w-full">
+                  {loading || gmapResolving ? 'Đang thêm…' : 'Thêm cửa hàng'}
                 </Button>
               </div>
             </form>
@@ -389,4 +502,19 @@ export default function AddStore() {
       </div>
     </div>
   )
+}
+
+async function expandShortLink(urlStr) {
+  try {
+    const res = await fetch('/api/expand-maps-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlStr }),
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.finalUrl || null
+  } catch {
+    return null
+  }
 }

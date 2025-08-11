@@ -111,6 +111,64 @@ export default function StoreDetail() {
     }
   }
 
+  function extractSearchTextFromGoogleMapsUrl(input) {
+    if (!input) return null
+    let urlStr = input.trim()
+    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+    try {
+      const u = new URL(urlStr)
+      const qParams = ['q', 'query']
+      for (const k of qParams) {
+        const v = u.searchParams.get(k)
+        if (v) return decodeURIComponent(v.replace(/\+/g, ' '))
+      }
+      const parts = u.pathname.split('/').filter(Boolean)
+      const idx = parts.findIndex((p) => p.toLowerCase() === 'place')
+      if (idx !== -1 && parts[idx + 1]) {
+        return decodeURIComponent(parts[idx + 1].replace(/\+/g, ' '))
+      }
+      return null
+    } catch { return null }
+  }
+
+  async function geocodeTextToLatLngAddress(text) {
+    if (!text) return null
+    try {
+      const q = encodeURIComponent(text)
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const arr = await res.json()
+      if (!Array.isArray(arr) || arr.length === 0) return null
+      const item = arr[0]
+      const lat = parseFloat(item.lat)
+      const lon = parseFloat(item.lon)
+      if (!isFinite(lat) || !isFinite(lon)) return null
+      const cleaned = cleanNominatimDisplayName(item.display_name || '')
+      return { lat, lng: lon, address: cleaned }
+    } catch { return null }
+  }
+
+  async function resolveLatLngFromAnyLink(input) {
+    const direct = parseLatLngFromGoogleMapsUrl(input)
+    if (direct) return direct
+    try {
+      let urlStr = input.trim()
+      if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+      const finalUrl = await expandShortLink(urlStr)
+      if (finalUrl) {
+        const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+        if (parsed) return parsed
+      }
+    } catch {}
+    const text = extractSearchTextFromGoogleMapsUrl(input)
+    if (text) {
+      const geo = await geocodeTextToLatLngAddress(text)
+      if (geo) return { lat: geo.lat, lng: geo.lng }
+    }
+    return null
+  }
+
   async function reverseGeocodeFromLatLng(lat, lon) {
     try {
       setGmapResolving(true)
@@ -141,53 +199,78 @@ export default function StoreDetail() {
 
   useEffect(() => {
     if (!gmapLink || !gmapLink.trim()) return
-    const t = setTimeout(() => {
-      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
-      if (parsed) {
-        const last = lastParsedRef.current
-        if (!last || Math.abs(last.lat - parsed.lat) > 1e-5 || Math.abs(last.lng - parsed.lng) > 1e-5) {
-          lastParsedRef.current = parsed
-          reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+    const t = setTimeout(async () => {
+      setGmapResolving(true)
+      try {
+        const direct = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+        if (direct) {
+          const last = lastParsedRef.current
+          if (!last || Math.abs(last.lat - direct.lat) > 1e-5 || Math.abs(last.lng - direct.lng) > 1e-5) {
+            lastParsedRef.current = direct
+            await reverseGeocodeFromLatLng(direct.lat, direct.lng)
+          }
+          return
         }
-      }
+        const finalUrl = await expandShortLink(gmapLink.trim())
+        if (finalUrl) {
+          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+          if (parsed) {
+            lastParsedRef.current = parsed
+            await reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+            return
+          }
+        }
+        const text = extractSearchTextFromGoogleMapsUrl(gmapLink.trim())
+        if (text) {
+          const geo = await geocodeTextToLatLngAddress(text)
+          if (geo) {
+            lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
+            if (geo.address) setAddress(geo.address)
+          }
+        }
+      } finally { setGmapResolving(false) }
     }, 400)
     return () => clearTimeout(t)
   }, [gmapLink])
 
   async function onSave(e) {
     e.preventDefault()
-    if (!user) {
-      alert('Vui lòng đăng nhập để sửa cửa hàng')
-      return
-    }
-
+    if (!user) { alert('Vui lòng đăng nhập để sửa cửa hàng'); return }
     setSaving(true)
 
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Determine coordinates: prefer gmapLink if provided; else keep current saved coords (do NOT use current geolocation when link present)
     let latitude = store?.latitude ?? null
     let longitude = store?.longitude ?? null
 
     if (gmapLink && gmapLink.trim()) {
-      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
-      if (parsed) {
-        latitude = parsed.lat
-        longitude = parsed.lng
+      const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
+      if (!resolved) {
+        const finalUrl = await expandShortLink(gmapLink.trim())
+        if (finalUrl) {
+          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+          if (parsed) {
+            latitude = parsed.lat
+            longitude = parsed.lng
+          }
+        }
       } else {
-        alert('Không đọc được tọa độ từ liên kết Google Maps. Sẽ giữ nguyên tọa độ hiện tại trong hệ thống.')
+        latitude = resolved.lat
+        longitude = resolved.lng
+      }
+      if (latitude == null || longitude == null) {
+        alert('Không đọc được tọa độ từ liên kết Google Maps. Vui lòng nhập liên kết hợp lệ hoặc xóa trường này để dùng vị trí hiện tại.')
+        setSaving(false)
+        return
       }
     } else {
-      // if no link, fallback to geolocation like before
       try {
-        const pos = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject)
-        )
+        const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
         latitude = pos.coords.latitude
         longitude = pos.coords.longitude
       } catch (geoErr) {
         console.error('Không lấy được tọa độ khi cập nhật:', geoErr)
-        alert('Ứng dụng cần quyền truy cập vị trí hoặc liên kết Google Maps hợp lệ để lưu thay đổi.')
+        alert('Ứng dụng cần quyền truy cập vị trí để lưu thay đổi.')
         setSaving(false)
         return
       }
@@ -304,6 +387,19 @@ export default function StoreDetail() {
     }
   }
 
+  async function expandShortLink(urlStr) {
+    try {
+      const res = await fetch('/api/expand-maps-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlStr }),
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      return data?.finalUrl || null
+    } catch { return null }
+  }
+
   if (!store) {
     return (
       <div className="mx-auto max-w-2xl p-6">Đang tải...</div>
@@ -336,7 +432,7 @@ export default function StoreDetail() {
             <div className="grid gap-1.5">
               <Label>Địa chỉ</Label>
               <div className="flex items-center gap-2">
-                <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="flex-1" />
+                <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="flex-1" placeholder={gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : (resolvingAddr ? 'Đang tự động lấy địa chỉ…' : undefined)} />
                 {user && (
                   <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
                     {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
@@ -370,14 +466,19 @@ export default function StoreDetail() {
               <Input
                 value={gmapLink}
                 onChange={(e) => setGmapLink(e.target.value)}
-                placeholder="Dán liên kết chia sẻ vị trí từ Google Maps (chứa @lat,lng hoặc q=lat,lng)"
+                placeholder="Dán liên kết chia sẻ vị trí từ Google Maps"
                 disabled={!user}
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? (
+                <span className="inline-flex items-center gap-2">
+                  <span>Đang lấy địa chỉ từ liên kết…</span>
+                  <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+                </span>
+              ) : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
             </div>
             <div className="pt-2">
-              <Button type="submit" disabled={!user || saving} className="w-full">
-                {!user ? 'Vui lòng đăng nhập' : saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+              <Button type="submit" disabled={!user || saving || gmapResolving} className="w-full">
+                {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving) ? 'Đang lưu...' : 'Lưu thay đổi'}
               </Button>
             </div>
           </form>
