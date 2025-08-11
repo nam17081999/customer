@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
@@ -21,6 +21,9 @@ export default function AddStore() {
   const [imageFile, setImageFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
+  const [gmapLink, setGmapLink] = useState('')
+  const [gmapResolving, setGmapResolving] = useState(false)
+  const lastParsedRef = useRef(null)
 
   useEffect(() => {
     if (!user) return
@@ -50,6 +53,104 @@ export default function AddStore() {
     }
     return parts.join(', ')
   }
+
+  function parseLatLngFromText(text) {
+    if (!text) return null
+    try {
+      const decoded = decodeURIComponent(text)
+      // Pattern 1: @lat,lng,zoom
+      let m = decoded.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      // Pattern 2: !3dlat!4dlng (Google deep params)
+      m = decoded.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      // Pattern 3: lat,lng separated by comma or %2C
+      m = decoded.match(/(-?\d{1,2}\.\d+)\s*(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  function parseLatLngFromGoogleMapsUrl(input) {
+    if (!input) return null
+    let urlStr = input.trim()
+    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+    try {
+      const u = new URL(urlStr)
+      // Common query params
+      const candParams = ['destination', 'q', 'query', 'll']
+      for (const key of candParams) {
+        const val = u.searchParams.get(key)
+        if (val) {
+          const got = parseLatLngFromText(val)
+          if (got) return got
+        }
+      }
+      // Try full href and path
+      const fromHref = parseLatLngFromText(u.href)
+      if (fromHref) return fromHref
+      const fromPath = parseLatLngFromText(u.pathname)
+      if (fromPath) return fromPath
+      return null
+    } catch {
+      // Last resort: try raw text regex
+      return parseLatLngFromText(input)
+    }
+  }
+
+  async function reverseGeocodeFromLatLng(lat, lon) {
+    try {
+      setGmapResolving(true)
+      const latR = Number(lat.toFixed(5))
+      const lonR = Number(lon.toFixed(5))
+      const cacheKey = `revgeo:${latR},${lonR}`
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
+      if (cached) {
+        setAddress(cached)
+        return
+      }
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latR}&lon=${lonR}&zoom=18&addressdetails=1&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Reverse geocoding failed')
+      const data = await res.json()
+      const text = data?.display_name || ''
+      const cleaned = cleanNominatimDisplayName(text)
+      if (cleaned) {
+        setAddress(cleaned)
+        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
+      }
+    } catch (e) {
+      console.error('Reverse geocode (from link) error:', e)
+    } finally {
+      setGmapResolving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!gmapLink || !gmapLink.trim()) return
+    const t = setTimeout(() => {
+      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+      if (parsed) {
+        const last = lastParsedRef.current
+        if (!last || Math.abs(last.lat - parsed.lat) > 1e-5 || Math.abs(last.lng - parsed.lng) > 1e-5) {
+          lastParsedRef.current = parsed
+          reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+        }
+      }
+    }, 400)
+    return () => clearTimeout(t)
+  }, [gmapLink])
 
   async function handleFillAddress() {
     try {
@@ -91,21 +192,35 @@ export default function AddStore() {
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
 
+    // Determine coordinates: prefer link if provided; else geolocation
     let latitude = null
     let longitude = null
-    try {
-      const coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos.coords),
-          (err) => reject(err)
-        )
-      })
-      latitude = coords.latitude
-      longitude = coords.longitude
-    } catch (geoErr) {
-      console.error('Không lấy được tọa độ:', geoErr)
-      alert('Ứng dụng cần quyền truy cập vị trí để tiếp tục. Vui lòng cấp quyền định vị cho trang này trong trình duyệt (bấm vào biểu tượng ổ khóa cạnh thanh địa chỉ → cho phép Vị trí), sau đó thử lại.')
-      return
+
+    if (gmapLink && gmapLink.trim()) {
+      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+      if (parsed) {
+        latitude = parsed.lat
+        longitude = parsed.lng
+      } else {
+        alert('Không đọc được tọa độ từ liên kết Google Maps. Sẽ dùng vị trí hiện tại của bạn.')
+      }
+    }
+
+    if (latitude == null || longitude == null) {
+      try {
+        const coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(pos.coords),
+            (err) => reject(err)
+          )
+        })
+        latitude = coords.latitude
+        longitude = coords.longitude
+      } catch (geoErr) {
+        console.error('Không lấy được tọa độ:', geoErr)
+        alert('Ứng dụng cần quyền truy cập vị trí hoặc liên kết Google Maps hợp lệ để tiếp tục. Vui lòng cấp quyền vị trí hoặc nhập đúng liên kết rồi thử lại.')
+        return
+      }
     }
 
     try {
@@ -173,6 +288,7 @@ export default function AddStore() {
       setPhone('')
       setNote('')
       setImageFile(null)
+      setGmapLink('')
     } catch (err) {
       console.error(err)
       alert('Đã xảy ra lỗi')
@@ -242,6 +358,19 @@ export default function AddStore() {
               <div className="grid gap-1.5">
                 <Label htmlFor="note">Ghi chú</Label>
                 <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm (không bắt buộc)" />
+              </div>
+
+              <div className="grid gap-1.5">
+                <Label htmlFor="gmap">Link Google Maps (không bắt buộc)</Label>
+                <Input
+                  id="gmap"
+                  value={gmapLink}
+                  onChange={(e) => setGmapLink(e.target.value)}
+                  placeholder="Dán liên kết chia sẻ vị trí từ Google Maps (có dạng chứa @lat,lng hoặc q=lat,lng)"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : 'Nếu nhập, hệ thống sẽ ưu tiên tọa độ từ liên kết và tự cập nhật địa chỉ.'}
+                </p>
               </div>
 
               <div className="grid gap-1.5">

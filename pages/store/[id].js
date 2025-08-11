@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/components/auth-context'
@@ -25,6 +25,9 @@ export default function StoreDetail() {
   const [imageFile, setImageFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
+  const [gmapLink, setGmapLink] = useState('')
+  const [gmapResolving, setGmapResolving] = useState(false)
+  const lastParsedRef = useRef(null)
 
   useEffect(() => {
     if (!id) return
@@ -59,6 +62,98 @@ export default function StoreDetail() {
     }
   }
 
+  function parseLatLngFromText(text) {
+    if (!text) return null
+    try {
+      const decoded = decodeURIComponent(text)
+      let m = decoded.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      m = decoded.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      m = decoded.match(/(-?\d{1,2}\.\d+)\s*(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
+  function parseLatLngFromGoogleMapsUrl(input) {
+    if (!input) return null
+    let urlStr = input.trim()
+    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+    try {
+      const u = new URL(urlStr)
+      const candParams = ['destination', 'q', 'query', 'll']
+      for (const key of candParams) {
+        const val = u.searchParams.get(key)
+        if (val) {
+          const got = parseLatLngFromText(val)
+          if (got) return got
+        }
+      }
+      const fromHref = parseLatLngFromText(u.href)
+      if (fromHref) return fromHref
+      const fromPath = parseLatLngFromText(u.pathname)
+      if (fromPath) return fromPath
+      return null
+    } catch {
+      return parseLatLngFromText(input)
+    }
+  }
+
+  async function reverseGeocodeFromLatLng(lat, lon) {
+    try {
+      setGmapResolving(true)
+      const latR = Number(lat.toFixed(5))
+      const lonR = Number(lon.toFixed(5))
+      const cacheKey = `revgeo:${latR},${lonR}`
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
+      if (cached) {
+        setAddress(cached)
+        return
+      }
+      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latR}&lon=${lonR}&zoom=18&addressdetails=1&accept-language=vi`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Reverse geocoding failed')
+      const data = await res.json()
+      const text = data?.display_name || ''
+      const cleaned = cleanNominatimDisplayName(text)
+      if (cleaned) {
+        setAddress(cleaned)
+        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
+      }
+    } catch (e) {
+      console.error('Reverse geocode (from link) error:', e)
+    } finally {
+      setGmapResolving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!gmapLink || !gmapLink.trim()) return
+    const t = setTimeout(() => {
+      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+      if (parsed) {
+        const last = lastParsedRef.current
+        if (!last || Math.abs(last.lat - parsed.lat) > 1e-5 || Math.abs(last.lng - parsed.lng) > 1e-5) {
+          lastParsedRef.current = parsed
+          reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
+        }
+      }
+    }, 400)
+    return () => clearTimeout(t)
+  }, [gmapLink])
+
   async function onSave(e) {
     e.preventDefault()
     if (!user) {
@@ -68,23 +163,34 @@ export default function StoreDetail() {
 
     setSaving(true)
 
-    // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Get current location at submit time (fallback to old values if denied)
+    // Determine coordinates: prefer gmapLink if provided; else keep current saved coords (do NOT use current geolocation when link present)
     let latitude = store?.latitude ?? null
     let longitude = store?.longitude ?? null
-    try {
-      const pos = await new Promise((resolve, reject) =>
-        navigator.geolocation.getCurrentPosition(resolve, reject)
-      )
-      latitude = pos.coords.latitude
-      longitude = pos.coords.longitude
-    } catch (geoErr) {
-      console.error('Không lấy được tọa độ khi cập nhật:', geoErr)
-      alert('Ứng dụng cần quyền truy cập vị trí để lưu thay đổi. Vui lòng cấp quyền định vị cho trang này trong trình duyệt, rồi thử lại.')
-      setSaving(false)
-      return
+
+    if (gmapLink && gmapLink.trim()) {
+      const parsed = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
+      if (parsed) {
+        latitude = parsed.lat
+        longitude = parsed.lng
+      } else {
+        alert('Không đọc được tọa độ từ liên kết Google Maps. Sẽ giữ nguyên tọa độ hiện tại trong hệ thống.')
+      }
+    } else {
+      // if no link, fallback to geolocation like before
+      try {
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject)
+        )
+        latitude = pos.coords.latitude
+        longitude = pos.coords.longitude
+      } catch (geoErr) {
+        console.error('Không lấy được tọa độ khi cập nhật:', geoErr)
+        alert('Ứng dụng cần quyền truy cập vị trí hoặc liên kết Google Maps hợp lệ để lưu thay đổi.')
+        setSaving(false)
+        return
+      }
     }
 
     let image_url = store?.image_url || null
@@ -259,6 +365,16 @@ export default function StoreDetail() {
                 <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
               </div>
             )}
+            <div className="grid gap-1.5">
+              <Label>Link Google Maps (không bắt buộc)</Label>
+              <Input
+                value={gmapLink}
+                onChange={(e) => setGmapLink(e.target.value)}
+                placeholder="Dán liên kết chia sẻ vị trí từ Google Maps (chứa @lat,lng hoặc q=lat,lng)"
+                disabled={!user}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
+            </div>
             <div className="pt-2">
               <Button type="submit" disabled={!user || saving} className="w-full">
                 {!user ? 'Vui lòng đăng nhập' : saving ? 'Đang lưu...' : 'Lưu thay đổi'}
