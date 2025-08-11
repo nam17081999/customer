@@ -215,14 +215,15 @@ export default function AddStore() {
                   <Input
                     id="address"
                     value={address}
-                    readOnly
-                    placeholder={resolvingAddr ? 'Đang tự động lấy địa chỉ…' : 'Địa chỉ sẽ được tự động điền'}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder={resolvingAddr ? 'Đang tự động lấy địa chỉ…' : 'Nhập địa chỉ hoặc bấm “Lấy lại” để tự điền'}
                     className="flex-1"
                   />
                   <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
                     {resolvingAddr ? 'Đang lấy…' : 'Lấy lại'}
                   </Button>
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Bạn có thể chỉnh sửa địa chỉ trước khi lưu.</p>
               </div>
 
               <div className="grid gap-1.5">
