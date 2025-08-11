@@ -170,7 +170,7 @@ export default function ArrangeStores() {
         : { ...store, distance: distanceFromOrigin(store) }
       return [...prev, withDistance]
     })
-  }, [originCoords])
+  }, [originCoords, distanceFromOrigin])
 
   const removeFromSelected = useCallback((id) => {
     setSelected((prev) => prev.filter((s) => s.id !== id))
@@ -209,7 +209,7 @@ export default function ArrangeStores() {
     } finally {
       setSorting(false)
     }
-  }, [selected.length, originCoords])
+  }, [selected.length, originCoords, distanceFromOrigin])
 
   const handleDragEnd = useCallback((event) => {
     const { active, over } = event
@@ -360,7 +360,7 @@ export default function ArrangeStores() {
       setLoading(false)
       setPage(1)
     }
-  }, [debouncedSearch])
+  }, [debouncedSearch, fetchResultsPage])
 
   // Load more using IntersectionObserver
   useEffect(() => {
@@ -382,24 +382,24 @@ export default function ArrangeStores() {
 
     observer.observe(loadMoreTrigger)
     return () => observer.disconnect()
-  }, [hasMore, loading, loadingMore, page, debouncedSearch])
+  }, [hasMore, loading, loadingMore, page, debouncedSearch, fetchResultsPage])
 
   // Ensure selected items update distance when origin changes
   useEffect(() => {
     setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [originCoords])
+  }, [originCoords, distanceFromOrigin])
 
   // Recompute result distances when origin changes
   useEffect(() => {
     setResults((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [originCoords])
+  }, [originCoords, distanceFromOrigin])
 
   // Ensure every selected item has a distance value (legacy fill-in)
   useEffect(() => {
     if (!selected.length) return
     if (!selected.some((s) => s.distance === undefined)) return
     setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [selected])
+  }, [selected, distanceFromOrigin])
 
   const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected])
 

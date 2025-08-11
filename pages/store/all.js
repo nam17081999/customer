@@ -48,7 +48,6 @@ export default function AllStoresVerify() {
       return
     }
     fetchPage(keyword || '', 1, false)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch])
 
   async function fetchPage(keyword, pageNum = 1, append = false) {
