@@ -7,17 +7,6 @@ import Image from 'next/image'
 function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highlightText }) {
   const hasCoords = typeof s.latitude === 'number' && typeof s.longitude === 'number'
 
-  // Helper to render text with highlighting
-  const renderHighlightedText = (text, prefix = '') => {
-    if (!highlightText || !searchTerm) return `${prefix}${text}`
-    return (
-      <>
-        {prefix}
-        {highlightText(text, searchTerm)}
-      </>
-    )
-  }
-
   if (s.image_url) {
     return (
       <Card>
@@ -59,10 +48,10 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
                 {s.status ? 'Đã xác thực' : 'Chưa xác thực'}
               </span>
               <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
-                <span className="block">{renderHighlightedText(s.name, 'Cửa hàng: ')}</span>
+                <span className="block">Cửa hàng: {highlightText && searchTerm ? highlightText(s.name, searchTerm) : s.name}</span>
               </h3>
             </div>
-            <p className="truncate text-sm text-gray-600 dark:text-gray-400">{renderHighlightedText(s.address, 'Địa chỉ: ')}</p>
+            <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {s.address}</p>
             {s.phone && (
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Số điện thoại:{' '}
@@ -72,7 +61,7 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
               </p>
             )}
             {s.note && (
-              <p className="text-sm text-gray-600 dark:text-gray-400">{renderHighlightedText(s.note, 'Ghi chú: ')}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>
             )}
             {typeof s.distance === 'number' ? (
               <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</p>
@@ -123,10 +112,10 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
               {s.status ? 'Đã xác thực' : 'Chưa xác thực'}
             </span>
             <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100 break-words">
-              <span className="block">{renderHighlightedText(s.name, 'Cửa hàng: ')}</span>
+              <span className="block">Cửa hàng: {highlightText && searchTerm ? highlightText(s.name, searchTerm) : s.name}</span>
             </h3>
           </div>
-          <p className="truncate text-sm text-gray-600 dark:text-gray-400">{renderHighlightedText(s.address, 'Địa chỉ: ')}</p>
+          <p className="truncate text-sm text-gray-600 dark:text-gray-400">Địa chỉ: {s.address}</p>
           {s.phone && (
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Số điện thoại:{' '}
@@ -136,7 +125,7 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
             </p>
           )}
           {s.note && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{renderHighlightedText(s.note, 'Ghi chú: ')}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Ghi chú: {s.note}</p>
           )}
           {typeof s.distance === 'number' ? (
             <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">Khoảng cách: {s.distance.toFixed(1)} km</p>
