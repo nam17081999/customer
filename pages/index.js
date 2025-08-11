@@ -323,7 +323,7 @@ export default function ArrangeStores() {
 
         {/* Selected list */}
         <div className="mt-6">
-          {/* Header row: title + origin switch + sort */}
+          {/* Header row: title + origin switch */}
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
@@ -340,17 +340,18 @@ export default function ArrangeStores() {
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="hidden text-xs text-gray-500 dark:text-gray-400 sm:inline">Từ vị trí tôi</span>
+                <span className={`${originMode === 'npp' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-500 dark:text-gray-400'} text-xs`}>Vị trí NPP</span>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={originMode === 'current'}
-                  aria-label="Bật tắt dùng vị trí của tôi để tính khoảng cách"
+                  aria-label="Chuyển nguồn vị trí"
                   onClick={() => setOriginMode(originMode === 'current' ? 'npp' : 'current')}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${originMode === 'current' ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-700'}`}
                 >
                   <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${originMode === 'current' ? 'translate-x-5' : 'translate-x-1'}`}></span>
                 </button>
+                <span className={`${originMode === 'current' ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-gray-500 dark:text-gray-400'} text-xs`}>Vị trí của tôi</span>
                 {originMode === 'current' && (
                   locLoading ? (
                     <span className="text-[11px] text-gray-500">Đang lấy…</span>
@@ -359,21 +360,20 @@ export default function ArrangeStores() {
                   ) : null
                 )}
               </div>
-
-              {!listCollapsed && (
-                <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
-                  {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
-                </Button>
-              )}
             </div>
           </div>
 
-          {/* New route button */}
-          <div className="mb-2">
-            <Button variant="outline" size="sm" onClick={handleNewRoute}>
-              Thêm lộ trình mới
-            </Button>
-          </div>
+          {/* New route and sort buttons */}
+          {!listCollapsed && (
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Button variant="outline" size="sm" onClick={handleNewRoute}>
+                Thêm lộ trình mới
+              </Button>
+              <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
+                {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
+              </Button>
+            </div>
+          )}
 
           <div id="visit-list">
             {selected.length === 0 ? (
