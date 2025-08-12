@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { useAuth } from '@/components/auth-context';
 import Image from 'next/image';
 import { PAGE_SIZE, MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, SCROLL_BOTTOM_OFFSET } from '@/lib/constants';
+import { getFullImageUrl } from '@/helper/imageUtils';
 
 export default function StoreList() {
   const [stores, setStores] = useState([]);
@@ -100,6 +101,14 @@ export default function StoreList() {
   }, [hasMore, loading, loadingMore, page, debouncedSearch]);
 
   function getFileNameFromUrl(url) {
+    if (!url) return null;
+    
+    // Since image_url is now always just filename, return as is
+    // But keep URL parsing for backward compatibility if needed
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return url;
+    }
+    
     try {
       const marker = '/object/public/stores/';
       const idx = url.indexOf(marker);
@@ -188,7 +197,7 @@ export default function StoreList() {
                           <Dialog>
                             <DialogTrigger asChild>
                               <Image
-                                src={store.image_url}
+                                src={getFullImageUrl(store.image_url)}
                                 alt={store.name}
                                 width={64}
                                 height={64}
@@ -200,7 +209,7 @@ export default function StoreList() {
                             <DialogContent className="overflow-hidden p-0">
                               <DialogClose asChild>
                                 <Image
-                                  src={store.image_url}
+                                  src={getFullImageUrl(store.image_url)}
                                   alt={store.name}
                                   width={800}
                                   height={800}
@@ -232,7 +241,7 @@ export default function StoreList() {
                                   <DialogContent className="overflow-hidden p-0">
                                     <DialogClose asChild>
                                       <Image
-                                        src={store.image_url}
+                                        src={getFullImageUrl(store.image_url)}
                                         alt={store.name}
                                         width={800}
                                         height={800}

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { PAGE_SIZE, MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, SCROLL_BOTTOM_OFFSET } from '@/lib/constants'
+import { getFullImageUrl } from '@/helper/imageUtils'
 
 export default function AllStoresVerify() {
   const { user } = useAuth()
@@ -239,7 +240,7 @@ export default function AllStoresVerify() {
                           <Dialog>
                             <DialogTrigger asChild>
                               <Image
-                                src={store.image_url}
+                                src={getFullImageUrl(store.image_url)}
                                 alt={store.name}
                                 width={64}
                                 height={64}
@@ -251,7 +252,7 @@ export default function AllStoresVerify() {
                             <DialogContent className="overflow-hidden p-0">
                               <DialogClose asChild>
                                 <Image
-                                  src={store.image_url}
+                                  src={getFullImageUrl(store.image_url)}
                                   alt={store.name}
                                   width={800}
                                   height={800}

@@ -11,6 +11,7 @@ import Image from 'next/image'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import imageCompression from 'browser-image-compression'
 import { toTitleCaseVI } from '@/lib/utils'
+import { getFullImageUrl } from '@/helper/imageUtils'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -48,7 +49,14 @@ export default function StoreDetail() {
   }, [id])
 
   function getOldFileNameFromUrl(url) {
-    // Try to parse after '/object/public/stores/'
+    if (!url) return null;
+    
+    // If it's already just a filename, return as is
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return url;
+    }
+    
+    // Extract filename from full URL (for old data that might still have full URLs)
     try {
       const marker = '/object/public/stores/'
       const idx = url.indexOf(marker)
@@ -301,8 +309,8 @@ export default function StoreDetail() {
         const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`
         const { error: upErr } = await supabase.storage.from('stores').upload(fileName, fileToUpload, { contentType: fileToUpload.type })
         if (upErr) throw upErr
-        const { data } = supabase.storage.from('stores').getPublicUrl(fileName)
-        image_url = data.publicUrl
+        // Store only the filename
+        image_url = fileName
         newUploadedFile = fileName
       }
 
@@ -417,10 +425,10 @@ export default function StoreDetail() {
           {store?.image_url && (
             <Dialog>
               <DialogTrigger asChild>
-                <Image src={store.image_url} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
+                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
               </DialogTrigger>
               <DialogContent className="overflow-hidden p-0">
-                <Image src={store.image_url} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
+                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
               </DialogContent>
             </Dialog>
           )}

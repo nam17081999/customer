@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import Image from 'next/image'
+import { getFullImageUrl } from '@/helper/imageUtils'
 
 function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highlightText }) {
   const hasCoords = typeof s.latitude === 'number' && typeof s.longitude === 'number'
@@ -15,7 +16,7 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
             <DialogTrigger asChild>
               <button type="button" aria-label="Xem ảnh lớn" className="shrink-0 cursor-zoom-in">
                 <Image
-                  src={s.image_url}
+                  src={getFullImageUrl(s.image_url)}
                   alt={s.name}
                   width={64}
                   height={64}
@@ -28,7 +29,7 @@ function StoreResultCardBase({ store: s, isSelected, onAdd, searchTerm, highligh
             <DialogContent className="overflow-hidden p-0">
               <DialogClose asChild>
                 <Image
-                  src={s.image_url}
+                  src={getFullImageUrl(s.image_url)}
                   alt={s.name}
                   width={800}
                   height={800}

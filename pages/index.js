@@ -22,6 +22,14 @@ const STORAGE_KEY = 'arrange:selectedStores:v1'
 const ORIGIN = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
 
 function getFileNameFromUrl(url) {
+  if (!url) return null;
+  
+  // Since image_url is now always just filename, return as is
+  // But keep URL parsing for backward compatibility if needed
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return url;
+  }
+  
   try {
     const marker = '/object/public/stores/'
     const idx = url.indexOf(marker)

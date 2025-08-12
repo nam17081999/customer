@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import Image from 'next/image'
+import { getFullImageUrl } from '@/helper/imageUtils'
 
 function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemove }) {
   const hasCoords = typeof s.latitude === 'number' && typeof s.longitude === 'number'
@@ -71,7 +72,7 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
         <DialogContent className="overflow-hidden p-0">
           <DialogClose asChild>
             <Image
-              src={s.image_url}
+              src={getFullImageUrl(s.image_url)}
               alt={s.name}
               width={800}
               height={800}

@@ -361,8 +361,8 @@ export default function AddStore() {
         return
       }
 
-      const { data: publicUrlData } = supabase.storage.from('stores').getPublicUrl(fileName)
-      const imageUrl = publicUrlData.publicUrl
+      // Store only the filename
+      const imageUrl = fileName
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
