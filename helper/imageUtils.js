@@ -1,6 +1,23 @@
 import { IMAGE_BASE_URL } from '@/lib/constants';
 
 /**
+ * Check if image URL contains the base URL (needs migration)
+ * @param {string} imageUrl - Image URL to check
+ * @returns {boolean} True if URL contains base URL
+ */
+export function hasImageBaseUrl(imageUrl) {
+  if (!imageUrl) return false;
+  
+  // Check if it's a full URL (starts with http/https)
+  if (!imageUrl.startsWith('http://') && !imageUrl.startsWith('https://')) {
+    return false; // Already just a filename
+  }
+  
+  // Check if it contains the base URL pattern
+  return imageUrl.includes('/object/public/stores/');
+}
+
+/**
  * Get full image URL from filename
  * @param {string} filename - Image filename from database
  * @returns {string} Full image URL
