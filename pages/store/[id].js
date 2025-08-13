@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import Image from 'next/image'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import imageCompression from 'browser-image-compression'
 import { toTitleCaseVI } from '@/lib/utils'
 import { getFullImageUrl } from '@/helper/imageUtils'
+import imageCompression from 'browser-image-compression'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -48,7 +48,7 @@ export default function StoreDetail() {
       })
   }, [id])
 
-  function getOldFileNameFromUrl(url) {
+  function getImageFilenameFromUrl(url) {
     if (!url) return null;
     
     // If it's already just a filename, return as is
@@ -56,15 +56,11 @@ export default function StoreDetail() {
       return url;
     }
     
-    // Extract filename from full URL (for old data that might still have full URLs)
+    // Extract filename from ImageKit URL
     try {
-      const marker = '/object/public/stores/'
-      const idx = url.indexOf(marker)
-      if (idx !== -1) return url.substring(idx + marker.length)
-      // fallback: last segment
-      const u = new URL(url)
-      const parts = u.pathname.split('/')
-      return parts[parts.length - 1]
+      const urlObj = new URL(url)
+      const pathname = urlObj.pathname
+      return pathname.split('/').pop().split('?')[0]
     } catch {
       return null
     }
@@ -285,16 +281,16 @@ export default function StoreDetail() {
     }
 
     let image_url = store?.image_url || null
-    let newUploadedFile = null
+    let uploadedFileId = null
 
     try {
       if (imageFile) {
-        // compress before upload
+        // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
         const options = {
-          maxSizeMB: 0.35,
-          maxWidthOrHeight: 1024,
+          maxSizeMB: 1, // Tăng từ 0.35 lên 1MB
+          maxWidthOrHeight: 1600, // Tăng từ 1024 lên 1600px
           useWebWorker: true,
-          initialQuality: 0.65,
+          initialQuality: 0.8, // Tăng từ 0.65 lên 0.8
           fileType: 'image/jpeg',
         }
         let fileToUpload = imageFile
@@ -305,13 +301,24 @@ export default function StoreDetail() {
           console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
         }
 
-        const ext = fileToUpload.type.includes('jpeg') ? 'jpg' : (imageFile.name.split('.').pop() || 'jpg')
-        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`
-        const { error: upErr } = await supabase.storage.from('stores').upload(fileName, fileToUpload, { contentType: fileToUpload.type })
-        if (upErr) throw upErr
-        // Store only the filename
-        image_url = fileName
-        newUploadedFile = fileName
+        // Upload lên ImageKit
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+        formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
+        formData.append('useUniqueFileName', 'true')
+
+        const uploadResponse = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Upload ảnh thất bại')
+        }
+
+        const uploadResult = await uploadResponse.json()
+        image_url = uploadResult.name // Store filename
+        uploadedFileId = uploadResult.fileId
       }
 
       // compute normalized search name when updating
@@ -325,9 +332,17 @@ export default function StoreDetail() {
 
       // Optional cleanup: delete old image if replaced
       if (imageFile && store?.image_url) {
-        const oldFileName = getOldFileNameFromUrl(store.image_url)
-        if (oldFileName) {
-          await supabase.storage.from('stores').remove([oldFileName])
+        const oldFilename = store.image_url
+        if (oldFilename) {
+          try {
+            await fetch('/api/upload-image', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileName: oldFilename }),
+            })
+          } catch (deleteErr) {
+            console.warn('Could not delete old image:', deleteErr)
+          }
         }
       }
 
@@ -336,8 +351,16 @@ export default function StoreDetail() {
     } catch (err) {
       console.error(err)
       // Rollback new upload if DB update failed
-      if (imageFile && newUploadedFile) {
-        await supabase.storage.from('stores').remove([newUploadedFile])
+      if (uploadedFileId) {
+        try {
+          await fetch('/api/upload-image', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: uploadedFileId }),
+          })
+        } catch (deleteErr) {
+          console.warn('Could not delete uploaded image on rollback:', deleteErr)
+        }
       }
       alert('Lưu thất bại')
     } finally {

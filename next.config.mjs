@@ -3,7 +3,12 @@
 const nextConfig = {
   images: {
     remotePatterns: [
-      new URL('https://kjhjaqbjhblflaruiwwm.supabase.co/**'),
+      {
+        protocol: 'https',
+        hostname: 'ik.imagekit.io',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };

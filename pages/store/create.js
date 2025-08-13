@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth-context'
 import Link from 'next/link'
-import imageCompression from 'browser-image-compression'
 import { toTitleCaseVI } from '@/lib/utils'
+import imageCompression from 'browser-image-compression'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -489,12 +489,12 @@ export default function AddStore() {
     try {
       setLoading(true)
 
-      // Aggressive client-side compression
+      // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
       const options = {
-        maxSizeMB: 0.35,
-        maxWidthOrHeight: 1024,
+        maxSizeMB: 1, // Tăng từ 0.35 lên 1MB
+        maxWidthOrHeight: 1600, // Tăng từ 1024 lên 1600px
         useWebWorker: true,
-        initialQuality: 0.65,
+        initialQuality: 0.8, // Tăng từ 0.65 lên 0.8
         fileType: 'image/jpeg',
       }
       let fileToUpload = imageFile
@@ -505,21 +505,25 @@ export default function AddStore() {
         console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
       }
 
-      const ext = fileToUpload.type.includes('jpeg') ? 'jpg' : (imageFile.name.split('.').pop() || 'jpg')
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${ext}`
+      // Upload lên ImageKit
+      const formData = new FormData()
+      formData.append('file', fileToUpload)
+      formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
+      formData.append('useUniqueFileName', 'true')
 
-      const { error: uploadError } = await supabase.storage
-        .from('stores')
-        .upload(fileName, fileToUpload, { contentType: fileToUpload.type })
-      if (uploadError) {
-        console.error(uploadError)
-        alert('Lỗi khi upload ảnh')
-        setLoading(false)
-        return
+      const uploadResponse = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload ảnh thất bại')
       }
 
-      // Store only the filename
-      const imageUrl = fileName
+      const uploadResult = await uploadResponse.json()
+      
+      // Lưu tên file vào database 
+      const imageFilename = uploadResult.name
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
@@ -530,7 +534,7 @@ export default function AddStore() {
           address,
           note,
           phone,
-          image_url: imageUrl,
+          image_url: imageFilename, // Store only filename
           latitude,
           longitude,
         },
@@ -538,7 +542,16 @@ export default function AddStore() {
 
       if (insertError) {
         console.error(insertError)
-        await supabase.storage.from('stores').remove([fileName])
+        // Try to delete uploaded image on error
+        try {
+          await fetch('/api/upload-image', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileId: uploadResult.fileId }),
+          })
+        } catch (deleteErr) {
+          console.warn('Could not delete uploaded image:', deleteErr)
+        }
         alert('Lỗi khi lưu dữ liệu')
         setLoading(false)
         return

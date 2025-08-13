@@ -28,7 +28,7 @@ async function migrateImages() {
     
     console.log(`📊 Found ${stores.length} stores with images`)
     
-    const IMAGE_BASE_URL = 'https://kjhjaqbjhblflaruiwwm.supabase.co/storage/v1/object/public/stores'
+    const IMAGE_BASE_URL = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://ik.imagekit.io/customer69/stores/';
     let updatedCount = 0
     let skippedCount = 0
     
