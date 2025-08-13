@@ -35,7 +35,7 @@ function SelectedStoreItemBase({ item: s, dragAttributes, dragListeners, onRemov
               <div className="truncate text-base font-medium text-gray-900 dark:text-gray-100">
                 {s.name}
               </div>
-              <div className="truncate text-sm text-gray-600 dark:text-gray-400">{s.address}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight">{s.address}</div>
               {/* Added clickable phone */}
               {s.phone && (
                 <div className="truncate text-sm text-gray-600 dark:text-gray-400">
