@@ -264,7 +264,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 max-w-screen-md mx-auto">
+      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-3 max-w-screen-md mx-auto">
         {/* Location Switch - Top Right */}
         <div className="flex justify-end">
           <LocationSwitch 
