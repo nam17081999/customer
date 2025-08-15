@@ -4,7 +4,7 @@ export default function LocationSwitch({ locationMode, onLocationModeChange }) {
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-gray-600 dark:text-gray-400">
-        So sánh với:
+        Vị trí của:
       </span>
       <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
         <button

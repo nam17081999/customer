@@ -22,7 +22,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-black">
+    <div className="min-h-screen bg-gray-50 dark:bg-black px-4 py-8">
       <div className="mx-auto max-w-md">
         <Card>
           <CardContent className="space-y-4 p-6">

@@ -156,7 +156,7 @@ export default function VisitListPage() {
   const visitListCount = selectedStores.length
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="px-4 py-6 space-y-6">
         {/* Location Switch - Top Right */}
         <div className="flex justify-end">

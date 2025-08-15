@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { Virtuoso } from 'react-virtuoso'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
@@ -9,7 +10,7 @@ import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import { useAuth } from '@/components/auth-context'
-import { StoreResultCard } from '@/components/store-card'
+import SearchStoreCard from '@/components/search-store-card'
 import LocationSwitch from '@/components/location-switch'
 
 const STORAGE_KEY = 'selectedStores'
@@ -48,6 +49,9 @@ export default function HomePage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [locationMode, setLocationMode] = useState('npp') // 'user' or 'npp'
   const [isClient, setIsClient] = useState(false)
+  const observer = useRef(null)
+  const suppressFirstAutoLoad = useRef(false)
+  const lastQueryRef = useRef('') // tránh gọi lại cùng 1 searchTerm (StrictMode) -> include locationMode
 
   // Load stores from localStorage on component mount
   useEffect(() => {
@@ -105,6 +109,7 @@ export default function HomePage() {
         setSearchResults([])
         setHasMore(true)
         setPage(1)
+        lastQueryRef.current = ''
       }
     }, SEARCH_DEBOUNCE_MS)
 
@@ -116,25 +121,32 @@ export default function HomePage() {
   const handleSearch = async () => {
     if (searchTerm.length < MIN_SEARCH_LEN) return
 
+    const queryKey = `${searchTerm}|${locationMode}`
+    if (lastQueryRef.current === queryKey) return // tránh fetch trùng (bao gồm cả mode)
+
     setLoading(true)
     setPage(1)
     setHasMore(true)
+    suppressFirstAutoLoad.current = true
 
     try {
       const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
-      
       const { data, error } = await supabase
         .from('stores')
         .select('*')
         .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .order('status', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
 
       if (error) throw error
 
+      lastQueryRef.current = queryKey
+
       const referenceLocation = getReferenceLocation()
       const resultsWithDistance = data.map(store => ({
         ...store,
-        distance: referenceLocation 
+        distance: referenceLocation
           ? haversineKm(
               referenceLocation.latitude,
               referenceLocation.longitude,
@@ -153,19 +165,37 @@ export default function HomePage() {
     }
   }
 
-  const loadMore = async () => {
-    if (!hasMore || loadingMore || searchTerm.length < MIN_SEARCH_LEN) return
+  // Recompute distances when location mode or currentLocation changes (không cần refetch)
+  useEffect(() => {
+    if (searchResults.length === 0) return
+    const referenceLocation = getReferenceLocation()
+    setSearchResults(prev => prev.map(store => ({
+      ...store,
+      distance: referenceLocation
+        ? haversineKm(
+            referenceLocation.latitude,
+            referenceLocation.longitude,
+            store.latitude,
+            store.longitude
+          )
+        : null
+    })))
+  }, [locationMode, currentLocation, getReferenceLocation])
+
+  const loadMore = useCallback(async () => {
+    if (loading || !hasMore || loadingMore || searchTerm.length < MIN_SEARCH_LEN) return
 
     setLoadingMore(true)
     const nextPage = page + 1
 
     try {
       const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
-      
       const { data, error } = await supabase
         .from('stores')
         .select('*')
         .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .order('status', { ascending: false })
+        .order('created_at', { ascending: false })
         .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1)
 
       if (error) throw error
@@ -173,7 +203,7 @@ export default function HomePage() {
       const referenceLocation = getReferenceLocation()
       const resultsWithDistance = data.map(store => ({
         ...store,
-        distance: referenceLocation 
+        distance: referenceLocation
           ? haversineKm(
               referenceLocation.latitude,
               referenceLocation.longitude,
@@ -183,7 +213,13 @@ export default function HomePage() {
           : null
       }))
 
-      setSearchResults(prev => [...prev, ...resultsWithDistance])
+      setSearchResults(prev => {
+        // tránh trùng (nếu server trả về record đã có)
+        const existingIds = new Set(prev.map(s => s.id))
+        const merged = [...prev]
+        resultsWithDistance.forEach(s => { if (!existingIds.has(s.id)) merged.push(s) })
+        return merged
+      })
       setPage(nextPage)
       setHasMore(data.length === PAGE_SIZE)
     } catch (error) {
@@ -191,7 +227,7 @@ export default function HomePage() {
     } finally {
       setLoadingMore(false)
     }
-  }
+  }, [hasMore, loadingMore, loading, searchTerm, page, getReferenceLocation])
 
   const addToList = (store) => {
     if (!stores.find(s => s.id === store.id)) {
@@ -201,8 +237,33 @@ export default function HomePage() {
 
   const visitListCount = stores.length
 
+  // Infinite scroll observer
+  const sentinelRef = useCallback(node => {
+    if (!hasMore) return
+    if (loading || loadingMore) return
+    if (searchTerm.length < MIN_SEARCH_LEN) return
+    if (observer.current) observer.current.disconnect()
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        if (suppressFirstAutoLoad.current) {
+          suppressFirstAutoLoad.current = false
+          return
+        }
+        loadMore()
+      }
+    }, { rootMargin: '400px' }) // tải trước khi chạm đáy
+    if (node) observer.current.observe(node)
+  }, [hasMore, loading, loadingMore, loadMore, searchTerm])
+
+  // Cleanup observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observer.current) observer.current.disconnect()
+    }
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="px-4 py-6 space-y-6">
         {/* Location Switch - Top Right */}
         <div className="flex justify-end">
@@ -255,37 +316,50 @@ export default function HomePage() {
           )}
 
           {searchResults.length > 0 && (
-            <>
-              <ul className="space-y-4">
-                {searchResults.map((store) => (
-                  <li key={store.id}>
-                    <StoreResultCard
+            <div className="h-[70vh]">{/* Container height for virtual list */}
+              <Virtuoso
+                data={searchResults}
+                endReached={() => {
+                  if (!loadingMore && hasMore) loadMore()
+                }}
+                overscan={300}
+                itemContent={(index, store) => (
+                  <div className="mb-4" key={store.id}>
+                    <SearchStoreCard
                       store={store}
                       onAdd={() => addToList(store)}
                       isAdded={stores.some(s => s.id === store.id)}
                     />
-                  </li>
-                ))}
-              </ul>
-              {/* Manual Load More Button */}
-              {hasMore && (
-                <div className="text-center py-4">
-                  <Button 
-                    onClick={loadMore} 
-                    disabled={loadingMore}
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                  >
-                    {loadingMore ? 'Đang tải...' : 'Tải thêm'}
-                  </Button>
-                </div>
-              )}
-              {!hasMore && searchResults.length > 0 && (
-                <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Đã hiển thị tất cả kết quả
-                </div>
-              )}
-            </>
+                  </div>
+                )}
+                components={{
+                  Footer: () => (
+                    <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                      {loadingMore && hasMore && (
+                        <div className="space-y-3">
+                          <div className="flex justify-center text-xs text-gray-500 dark:text-gray-400">Đang tải thêm...</div>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {[...Array(2)].map((_, i) => (
+                              <Card key={i} className="animate-pulse">
+                                <CardContent className="p-0">
+                                  <div className="h-40 bg-gray-200 dark:bg-gray-800" />
+                                  <div className="p-4 space-y-2">
+                                    <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {!hasMore && searchResults.length > 0 && !loadingMore && 'Đã hiển thị tất cả kết quả'}
+                    </div>
+                  )
+                }}
+              />
+            </div>
           )}
 
           {searchTerm.length < MIN_SEARCH_LEN && (
@@ -298,7 +372,11 @@ export default function HomePage() {
             </Card>
           )}
         </div>
+
+        {/* Sentinel div removed due to virtual scrolling */}
       </div>
     </div>
   )
 }
+
+/* NOTE: Virtual scrolling implemented with react-virtuoso */
