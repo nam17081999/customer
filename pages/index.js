@@ -308,9 +308,19 @@ export default function HomePage() {
           {!loading && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center">
-                <p className="text-gray-500 dark:text-gray-400">
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
                   Không tìm thấy cửa hàng nào
                 </p>
+                {user && (
+                  <Button asChild>
+                    <Link href={`/store/create?name=${encodeURIComponent(searchTerm)}`}>
+                      + Tạo cửa hàng mới
+                    </Link>
+                  </Button>
+                )}
+                {!user && (
+                  <p className="text-xs mt-4 text-gray-400">Đăng nhập để tạo cửa hàng mới</p>
+                )}
               </CardContent>
             </Card>
           )}
