@@ -659,7 +659,7 @@ export default function AddStore() {
               variant="outline"
               onClick={handleFillAddress}
               disabled={resolvingAddr}
-              className="mt-1 w-full sm:w-auto text-[12px] sm:text-sm"
+              className="mt-1 w-full sm:w-auto text-sm"
             >
               {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
             </Button>

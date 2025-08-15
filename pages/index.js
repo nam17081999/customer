@@ -14,7 +14,25 @@ import SearchStoreCard from '@/components/search-store-card'
 import LocationSwitch from '@/components/location-switch'
 
 const STORAGE_KEY = 'selectedStores'
+const LOCATION_MODE_KEY = 'locationMode'
+const USER_LOCATION_KEY = 'userLocation'
 const NPP_LOCATION = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
+
+function getInitialLocationMode() {
+  if (typeof window === 'undefined') return 'npp'
+  const saved = localStorage.getItem(LOCATION_MODE_KEY)
+  return (saved === 'user' || saved === 'npp') ? saved : 'npp'
+}
+function getInitialUserLocation() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(USER_LOCATION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') return parsed
+  } catch {}
+  return null
+}
 
 function getFileNameFromUrl(url) {
   if (!url) return null;
@@ -42,12 +60,12 @@ export default function HomePage() {
   const [searchResults, setSearchResults] = useState([])
   const [stores, setStores] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [currentLocation, setCurrentLocation] = useState(null)
+  const [currentLocation, setCurrentLocation] = useState(getInitialUserLocation())
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [locationMode, setLocationMode] = useState('npp') // 'user' or 'npp'
+  const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // 'user' or 'npp'
   const [isClient, setIsClient] = useState(false)
   const observer = useRef(null)
   const suppressFirstAutoLoad = useRef(false)
@@ -92,6 +110,40 @@ export default function HomePage() {
     }
   }, [])
 
+  // Init & sync locationMode across pages (listeners only; initial state hydrated via initializer)
+  useEffect(() => {
+    const handleModeChanged = (e) => {
+      const mode = e.detail?.mode
+      if (mode && mode !== locationMode) setLocationMode(mode)
+      if (mode === 'user' && !currentLocation) {
+        const savedLoc = localStorage.getItem(USER_LOCATION_KEY)
+        if (savedLoc) {
+          try {
+            const parsed = JSON.parse(savedLoc)
+            if (parsed && typeof parsed.latitude === 'number') setCurrentLocation(parsed)
+          } catch {}
+        }
+      }
+    }
+    const handleStorage = (e) => {
+      if (e.key === LOCATION_MODE_KEY && (e.newValue === 'user' || e.newValue === 'npp')) {
+        setLocationMode(e.newValue)
+      }
+      if (e.key === USER_LOCATION_KEY && e.newValue && !currentLocation) {
+        try {
+          const parsed = JSON.parse(e.newValue)
+          if (parsed && typeof parsed.latitude === 'number') setCurrentLocation(parsed)
+        } catch {}
+      }
+    }
+    window.addEventListener('locationModeChanged', handleModeChanged)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('locationModeChanged', handleModeChanged)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [locationMode, currentLocation])
+
   // Get reference location based on mode
   const getReferenceLocation = useCallback(() => {
     if (locationMode === 'user' && currentLocation) {
@@ -99,6 +151,13 @@ export default function HomePage() {
     }
     return NPP_LOCATION
   }, [locationMode, currentLocation])
+
+  // Helper: compute distance for a store given current reference
+  const computeDistance = useCallback((store, refLoc) => {
+    if (!refLoc) return null
+    if (store.latitude == null || store.longitude == null) return null
+    return haversineKm(refLoc.latitude, refLoc.longitude, store.latitude, store.longitude)
+  }, [])
 
   // Debounce search term (chỉ phụ thuộc searchTerm, đổi locationMode không refetch mà chỉ tính lại distance)
   useEffect(() => {
@@ -146,14 +205,7 @@ export default function HomePage() {
       const referenceLocation = getReferenceLocation()
       const resultsWithDistance = data.map(store => ({
         ...store,
-        distance: referenceLocation
-          ? haversineKm(
-              referenceLocation.latitude,
-              referenceLocation.longitude,
-              store.latitude,
-              store.longitude
-            )
-          : null
+        distance: computeDistance(store, referenceLocation)
       }))
 
       setSearchResults(resultsWithDistance)
@@ -167,20 +219,20 @@ export default function HomePage() {
 
   // Recompute distances when location mode or currentLocation changes (không cần refetch)
   useEffect(() => {
-    if (searchResults.length === 0) return
     const referenceLocation = getReferenceLocation()
-    setSearchResults(prev => prev.map(store => ({
-      ...store,
-      distance: referenceLocation
-        ? haversineKm(
-            referenceLocation.latitude,
-            referenceLocation.longitude,
-            store.latitude,
-            store.longitude
-          )
-        : null
-    })))
-  }, [locationMode, currentLocation, getReferenceLocation])
+    if (searchResults.length > 0) {
+      setSearchResults(prev => prev.map(store => {
+        const newDistance = computeDistance(store, referenceLocation)
+        return newDistance === store.distance ? store : { ...store, distance: newDistance }
+      }))
+    }
+    if (stores.length > 0) {
+      setStores(prev => prev.map(store => {
+        const newDistance = computeDistance(store, referenceLocation)
+        return newDistance === store.distance ? store : { ...store, distance: newDistance }
+      }))
+    }
+  }, [locationMode, currentLocation, getReferenceLocation, computeDistance])
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore || loadingMore || searchTerm.length < MIN_SEARCH_LEN) return
@@ -203,14 +255,7 @@ export default function HomePage() {
       const referenceLocation = getReferenceLocation()
       const resultsWithDistance = data.map(store => ({
         ...store,
-        distance: referenceLocation
-          ? haversineKm(
-              referenceLocation.latitude,
-              referenceLocation.longitude,
-              store.latitude,
-              store.longitude
-            )
-          : null
+        distance: computeDistance(store, referenceLocation)
       }))
 
       setSearchResults(prev => {
@@ -231,9 +276,50 @@ export default function HomePage() {
 
   const addToList = (store) => {
     if (!stores.find(s => s.id === store.id)) {
-      setStores(prev => [...prev, store])
+      const referenceLocation = getReferenceLocation()
+      const distance = computeDistance(store, referenceLocation)
+      setStores(prev => [...prev, { ...store, distance }])
     }
   }
+
+  // Guarded switch: only allow switching to 'user' if geolocation succeeds
+  const handleLocationModeChange = useCallback((mode) => {
+    const broadcast = (m, loc) => {
+      try {
+        localStorage.setItem(LOCATION_MODE_KEY, m)
+        if (loc) localStorage.setItem(USER_LOCATION_KEY, JSON.stringify(loc))
+      } catch {}
+      window.dispatchEvent(new CustomEvent('locationModeChanged', { detail: { mode: m } }))
+    }
+
+    if (mode === 'user') {
+      if (currentLocation) {
+        setLocationMode('user')
+        broadcast('user', currentLocation)
+        return
+      }
+      if (!navigator.geolocation) {
+        alert('Thiết bị không hỗ trợ định vị')
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+          setCurrentLocation(loc)
+            setLocationMode('user')
+          broadcast('user', loc)
+        },
+        (err) => {
+          console.error('Get location on switch error:', err)
+          alert('Không thể lấy được vị trí của bạn')
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      )
+    } else {
+      setLocationMode('npp')
+      broadcast('npp')
+    }
+  }, [currentLocation])
 
   const visitListCount = stores.length
   const isPendingSearch = searchTerm.length >= MIN_SEARCH_LEN && lastQueryRef.current !== searchTerm
@@ -271,17 +357,18 @@ export default function HomePage() {
         <div className="flex justify-end">
           <LocationSwitch 
             locationMode={locationMode}
-            onLocationModeChange={setLocationMode}
+            onLocationModeChange={handleLocationModeChange}
           />
         </div>
         {/* Search Input */}
         <div>
+          {/* Font >=16px để tránh iOS tự zoom khi focus input */}
           <Input
             type="text"
             placeholder="Tìm kiếm cửa hàng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-sm sm:text-base"
+            className="w-full text-base sm:text-base"
           />
         </div>
         {/* Search Results */}
@@ -343,14 +430,16 @@ export default function HomePage() {
             <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-250px)]">{/* Responsive container height */}
               <Virtuoso
                 data={searchResults}
+                computeItemKey={(index, item) => `${item.id}:${item.distance == null ? 'x' : item.distance.toFixed(3)}`}
                 endReached={() => {
                   if (!loadingMore && hasMore) loadMore()
                 }}
                 overscan={300}
                 itemContent={(index, store) => (
-                  <div className="mb-4" key={store.id}>
+                  <div className="mb-4" key={`${store.id}-${store.distance == null ? 'x' : store.distance.toFixed(3)}`}>
                     <SearchStoreCard
                       store={store}
+                      distance={store.distance}
                       onAdd={() => addToList(store)}
                       isAdded={stores.some(s => s.id === store.id)}
                     />

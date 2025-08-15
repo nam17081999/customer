@@ -13,6 +13,24 @@ import { haversineKm } from '@/helper/distance'
 import { NPP_LOCATION } from '@/lib/constants'
 
 const STORAGE_KEY = 'selectedStores'
+const LOCATION_MODE_KEY = 'locationMode'
+const USER_LOCATION_KEY = 'userLocation'
+
+function getInitialLocationMode() {
+  if (typeof window === 'undefined') return 'npp'
+  const saved = localStorage.getItem(LOCATION_MODE_KEY)
+  return (saved === 'user' || saved === 'npp') ? saved : 'npp'
+}
+function getInitialUserLocation() {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(USER_LOCATION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') return parsed
+  } catch {}
+  return null
+}
 
 function SortableItem({ item, children, render }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
@@ -39,8 +57,8 @@ export default function VisitListPage() {
   const [selectedStores, setSelectedStores] = useState([])
   const [isClient, setIsClient] = useState(false)
   const [sortByDistance, setSortByDistance] = useState(false)
-  const [locationMode, setLocationMode] = useState('npp') // For location comparison
-  const [userLocation, setUserLocation] = useState(null)
+  const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // For location comparison
+  const [userLocation, setUserLocation] = useState(getInitialUserLocation())
 
   // Get user location
   useEffect(() => {
@@ -109,6 +127,40 @@ export default function VisitListPage() {
     }
   }, [selectedStores, isClient])
 
+  // Init & sync locationMode across pages (listeners only)
+  useEffect(() => {
+    const handleModeChanged = (e) => {
+      const mode = e.detail?.mode
+      if (mode && mode !== locationMode) setLocationMode(mode)
+      if (mode === 'user' && !userLocation) {
+        const savedLoc = localStorage.getItem(USER_LOCATION_KEY)
+        if (savedLoc) {
+          try {
+            const parsed = JSON.parse(savedLoc)
+            if (parsed && typeof parsed.latitude === 'number') setUserLocation(parsed)
+          } catch {}
+        }
+      }
+    }
+    const handleStorage = (e) => {
+      if (e.key === LOCATION_MODE_KEY && (e.newValue === 'user' || e.newValue === 'npp')) {
+        setLocationMode(e.newValue)
+      }
+      if (e.key === USER_LOCATION_KEY && e.newValue && !userLocation) {
+        try {
+          const parsed = JSON.parse(e.newValue)
+          if (parsed && typeof parsed.latitude === 'number') setUserLocation(parsed)
+        } catch {}
+      }
+    }
+    window.addEventListener('locationModeChanged', handleModeChanged)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('locationModeChanged', handleModeChanged)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [locationMode, userLocation])
+
   const handleDragEnd = useCallback((event) => {
     const { active, over } = event
     if (active.id !== over?.id) {
@@ -153,6 +205,44 @@ export default function VisitListPage() {
     })
   }, [getReferenceLocation])
 
+  const handleLocationModeChange = useCallback((mode) => {
+    const broadcast = (m, loc) => {
+      try {
+        localStorage.setItem(LOCATION_MODE_KEY, m)
+        if (loc) localStorage.setItem(USER_LOCATION_KEY, JSON.stringify(loc))
+      } catch {}
+      window.dispatchEvent(new CustomEvent('locationModeChanged', { detail: { mode: m } }))
+    }
+
+    if (mode === 'user') {
+      if (userLocation) {
+        setLocationMode('user')
+        broadcast('user', userLocation)
+        return
+      }
+      if (!navigator.geolocation) {
+        alert('Thiết bị không hỗ trợ định vị')
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+          setUserLocation(loc)
+          setLocationMode('user')
+          broadcast('user', loc)
+        },
+        (err) => {
+          console.error('Get location on switch error:', err)
+          alert('Không thể lấy được vị trí của bạn')
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      )
+    } else {
+      setLocationMode('npp')
+      broadcast('npp')
+    }
+  }, [userLocation])
+
   const visitListCount = selectedStores.length
 
   return (
@@ -162,7 +252,7 @@ export default function VisitListPage() {
         <div className="flex justify-end">
           <LocationSwitch 
             locationMode={locationMode}
-            onLocationModeChange={setLocationMode}
+            onLocationModeChange={handleLocationModeChange}
           />
         </div>
 

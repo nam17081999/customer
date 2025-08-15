@@ -4,27 +4,21 @@ import { Button } from '@/components/ui/button'
 import Image from 'next/image'
 import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants'
 
-export default function SearchStoreCard({ store, onAdd, isAdded }) {
+export default function SearchStoreCard({ store, onAdd, isAdded, distance }) {
   const [imageError, setImageError] = useState(false)
 
   const handleImageError = () => {
     setImageError(true)
   }
 
-  const formatDistance = (distance) => {
-    if (distance === null || distance === undefined) return ''
-    return distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`
+  const formatDistance = (d) => {
+    if (d === null || d === undefined) return ''
+    return d < 1 ? `${(d * 1000).toFixed(0)}m` : `${d.toFixed(1)}km`
   }
 
   const getImageSrc = (imageUrl) => {
     if (!imageUrl) return null
-    
-    // If already a full URL, use as is
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return imageUrl
-    }
-    
-    // Otherwise, prepend IMAGEKIT_URL_ENDPOINT
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl
     return `${IMAGEKIT_URL_ENDPOINT}${imageUrl}`
   }
 
@@ -57,10 +51,10 @@ export default function SearchStoreCard({ store, onAdd, isAdded }) {
                 Đã xác thực
               </span>
             )}
-            {store.distance !== null && store.distance !== undefined && (
+            {distance !== null && distance !== undefined && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-200 shadow">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                {formatDistance(store.distance)}
+                {formatDistance(distance)}
               </span>
             )}
           </div>
