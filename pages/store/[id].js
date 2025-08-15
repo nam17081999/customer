@@ -28,6 +28,8 @@ export default function StoreDetail() {
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [gmapLink, setGmapLink] = useState('')
   const [gmapResolving, setGmapResolving] = useState(false)
+  const [gmapStatus, setGmapStatus] = useState('') // 'success', 'error', 'processing'
+  const [gmapMessage, setGmapMessage] = useState('')
   const lastParsedRef = useRef(null)
 
   useEffect(() => {
@@ -70,23 +72,42 @@ export default function StoreDetail() {
     if (!text) return null
     try {
       const decoded = decodeURIComponent(text)
+      console.log('🔍 Parsing text for coordinates:', decoded)
+      
+      // Pattern 1: @lat,lng,zoom (most common)
       let m = decoded.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
       if (m) {
         const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('✅ Found @lat,lng pattern:', { lat, lng })
+          return { lat, lng }
+        }
       }
+      
+      // Pattern 2: !3dlat!4dlng (Google deep params)
       m = decoded.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
       if (m) {
         const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('✅ Found !3d!4d pattern:', { lat, lng })
+          return { lat, lng }
+        }
       }
+      
+      // Pattern 3: lat,lng separated by comma or %2C
       m = decoded.match(/(-?\d{1,2}\.\d+)\s*(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)
       if (m) {
         const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng }
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('✅ Found lat,lng pattern:', { lat, lng })
+          return { lat, lng }
+        }
       }
+      
+      console.log('❌ No coordinate patterns found in text')
       return null
-    } catch {
+    } catch (error) {
+      console.log('❌ Text parsing error:', error)
       return null
     }
   }
@@ -95,22 +116,65 @@ export default function StoreDetail() {
     if (!input) return null
     let urlStr = input.trim()
     if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
+    
+    console.log('🔍 Parsing URL:', urlStr)
+    
     try {
       const u = new URL(urlStr)
-      const candParams = ['destination', 'q', 'query', 'll']
+      
+      // Pattern 1: @lat,lng,zoom (most common in shared links)
+      let m = urlStr.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('✅ Found coordinates via @pattern:', { lat, lng })
+          return { lat, lng }
+        }
+      }
+      
+      // Pattern 2: !3dlat!4dlng (Google deep params)
+      m = urlStr.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
+      if (m) {
+        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
+        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('✅ Found coordinates via !3d!4d pattern:', { lat, lng })
+          return { lat, lng }
+        }
+      }
+      
+      // Pattern 3: lat,lng in query params
+      const candParams = ['destination', 'q', 'query', 'll', 'saddr', 'daddr', 'center']
       for (const key of candParams) {
         const val = u.searchParams.get(key)
         if (val) {
+          console.log(`🔍 Checking param ${key}:`, val)
           const got = parseLatLngFromText(val)
-          if (got) return got
+          if (got) {
+            console.log('✅ Found coordinates in param', key, ':', got)
+            return got
+          }
         }
       }
-      const fromHref = parseLatLngFromText(u.href)
-      if (fromHref) return fromHref
+      
+      // Pattern 4: lat,lng in pathname
       const fromPath = parseLatLngFromText(u.pathname)
-      if (fromPath) return fromPath
+      if (fromPath) {
+        console.log('✅ Found coordinates in pathname:', fromPath)
+        return fromPath
+      }
+      
+      // Pattern 5: lat,lng in hash fragment
+      const fromHash = parseLatLngFromText(u.hash)
+      if (fromHash) {
+        console.log('✅ Found coordinates in hash:', fromHash)
+        return fromHash
+      }
+      
+      console.log('❌ No coordinates found in URL')
       return null
-    } catch {
+    } catch (error) {
+      console.log('❌ URL parsing error:', error)
+      // Last resort: try raw text regex
       return parseLatLngFromText(input)
     }
   }
@@ -121,18 +185,37 @@ export default function StoreDetail() {
     if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
     try {
       const u = new URL(urlStr)
-      const qParams = ['q', 'query']
+      
+      // Try query parameters first
+      const qParams = ['q', 'query', 'destination']
       for (const k of qParams) {
         const v = u.searchParams.get(k)
-        if (v) return decodeURIComponent(v.replace(/\+/g, ' '))
+        if (v) {
+          const decoded = decodeURIComponent(v.replace(/\+/g, ' '))
+          // Skip if it looks like coordinates
+          if (!/^-?\d+\.\d+/.test(decoded)) {
+            return decoded
+          }
+        }
       }
+      
+      // Try /place/<name>/... → take the segment after /place/
       const parts = u.pathname.split('/').filter(Boolean)
       const idx = parts.findIndex((p) => p.toLowerCase() === 'place')
       if (idx !== -1 && parts[idx + 1]) {
         return decodeURIComponent(parts[idx + 1].replace(/\+/g, ' '))
       }
+      
+      // Try /search/<name>/... → take the segment after /search/
+      const searchIdx = parts.findIndex((p) => p.toLowerCase() === 'search')
+      if (searchIdx !== -1 && parts[searchIdx + 1]) {
+        return decodeURIComponent(parts[searchIdx + 1].replace(/\+/g, ' '))
+      }
+      
       return null
-    } catch { return null }
+    } catch {
+      return null
+    }
   }
 
   async function geocodeTextToLatLngAddress(text) {
@@ -154,86 +237,172 @@ export default function StoreDetail() {
   }
 
   async function resolveLatLngFromAnyLink(input) {
-    const direct = parseLatLngFromGoogleMapsUrl(input)
-    if (direct) return direct
-    try {
-      let urlStr = input.trim()
-      if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
-      const finalUrl = await expandShortLink(urlStr)
-      if (finalUrl) {
-        const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-        if (parsed) return parsed
-      }
-    } catch {}
-    const text = extractSearchTextFromGoogleMapsUrl(input)
-    if (text) {
-      const geo = await geocodeTextToLatLngAddress(text)
-      if (geo) return { lat: geo.lat, lng: geo.lng }
+    if (!input || !input.trim()) return null
+    
+    const urlStr = input.trim()
+    console.log('🔍 Resolving coordinates from:', urlStr)
+    
+    // Step 1: Try direct parse first
+    const direct = parseLatLngFromGoogleMapsUrl(urlStr)
+    if (direct) {
+      console.log('✅ Direct parse success:', direct)
+      return direct
     }
+
+    // Step 2: Try following redirect to expand short link and parse final URL
+    try {
+      let fullUrl = urlStr
+      if (!/^https?:\/\//i.test(fullUrl)) fullUrl = `https://${fullUrl}`
+      
+      console.log('🔄 Expanding short link...')
+      const finalUrl = await expandShortLink(fullUrl)
+      if (finalUrl && finalUrl !== fullUrl) {
+        console.log('✅ Expanded to:', finalUrl)
+        const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+        if (parsed) {
+          console.log('✅ Parse from expanded URL success:', parsed)
+          return parsed
+        }
+      }
+    } catch (error) {
+      console.log('❌ Link expansion failed:', error)
+    }
+
+    // Step 3: Fallback: extract search text and geocode
+    console.log('🔍 Trying text extraction...')
+    const text = extractSearchTextFromGoogleMapsUrl(urlStr)
+    if (text) {
+      console.log('✅ Extracted text:', text)
+      const geo = await geocodeTextToLatLngAddress(text)
+      if (geo) {
+        console.log('✅ Geocoding success:', { lat: geo.lat, lng: geo.lng })
+        return { lat: geo.lat, lng: geo.lng }
+      }
+    }
+
+    console.log('❌ All resolution methods failed')
     return null
   }
 
   async function reverseGeocodeFromLatLng(lat, lon) {
     try {
-      setGmapResolving(true)
+      console.log('🔄 Reverse geocoding coordinates:', { lat, lon })
       const latR = Number(lat.toFixed(5))
       const lonR = Number(lon.toFixed(5))
       const cacheKey = `revgeo:${latR},${lonR}`
+      
+      // Check cache first
       const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
       if (cached) {
+        console.log('✅ Found cached address:', cached)
         setAddress(cached)
         return
       }
+      
+      // Make API call to get address
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latR}&lon=${lonR}&zoom=18&addressdetails=1&accept-language=vi`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Reverse geocoding failed')
+      
       const data = await res.json()
       const text = data?.display_name || ''
       const cleaned = cleanNominatimDisplayName(text)
+      
       if (cleaned) {
+        console.log('✅ Reverse geocoded address:', cleaned)
         setAddress(cleaned)
-        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
+        // Cache the result
+        try { 
+          sessionStorage.setItem(cacheKey, cleaned) 
+        } catch {}
+      } else {
+        console.log('⚠️ No address found from reverse geocoding')
       }
     } catch (e) {
-      console.error('Reverse geocode (from link) error:', e)
-    } finally {
-      setGmapResolving(false)
+      console.error('❌ Reverse geocode error:', e)
+      setGmapStatus('error')
+      setGmapMessage('Không lấy được địa chỉ từ tọa độ')
     }
   }
 
   useEffect(() => {
-    if (!gmapLink || !gmapLink.trim()) return
+    if (!gmapLink || !gmapLink.trim()) {
+      setGmapStatus('')
+      setGmapMessage('')
+      return
+    }
+    
     const t = setTimeout(async () => {
       setGmapResolving(true)
+      setGmapStatus('processing')
+      
       try {
+        console.log('🔍 Processing Google Maps link:', gmapLink.trim())
+        
+        // Step 1: Try to extract coordinates from the link
+        let coordinates = null
+        
+        // First try direct parse
         const direct = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
         if (direct) {
+          coordinates = direct
+          console.log('✅ Direct parse success:', coordinates)
+        } else {
+          // Try expand via API then parse
+          const finalUrl = await expandShortLink(gmapLink.trim())
+          if (finalUrl) {
+            const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
+            if (parsed) {
+              coordinates = parsed
+              console.log('✅ Parse from expanded URL success:', coordinates)
+            }
+          }
+        }
+        
+        if (coordinates) {
+          // Step 2: Got coordinates from link - now reverse geocode to get address
           const last = lastParsedRef.current
-          if (!last || Math.abs(last.lat - direct.lat) > 1e-5 || Math.abs(last.lng - direct.lng) > 1e-5) {
-            lastParsedRef.current = direct
-            await reverseGeocodeFromLatLng(direct.lat, direct.lng)
+          if (!last || Math.abs(last.lat - coordinates.lat) > 1e-5 || Math.abs(last.lng - coordinates.lng) > 1e-5) {
+            lastParsedRef.current = coordinates
+            console.log('🔄 Reverse geocoding coordinates to address...')
+            await reverseGeocodeFromLatLng(coordinates.lat, coordinates.lng)
+            setGmapStatus('success')
+            console.log('✅ Successfully updated address from coordinates')
           }
           return
         }
-        const finalUrl = await expandShortLink(gmapLink.trim())
-        if (finalUrl) {
-          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-          if (parsed) {
-            lastParsedRef.current = parsed
-            await reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
-            return
-          }
-        }
+        
+        // Step 3: Fallback - extract search text and geocode to get both coordinates and address
+        console.log('🔍 Trying text extraction fallback...')
         const text = extractSearchTextFromGoogleMapsUrl(gmapLink.trim())
         if (text) {
+          console.log('✅ Extracted text:', text)
           const geo = await geocodeTextToLatLngAddress(text)
           if (geo) {
             lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
-            if (geo.address) setAddress(geo.address)
+            console.log('✅ Geocoding success:', { lat: geo.lat, lng: geo.lng })
+            if (geo.address) {
+              setAddress(geo.address)
+              console.log('✅ Updated address:', geo.address)
+            }
+            setGmapStatus('success')
+          } else {
+            setGmapStatus('error')
+            setGmapMessage('Không tìm thấy địa điểm từ liên kết')
           }
+        } else {
+          setGmapStatus('error')
+          setGmapMessage('Không thể đọc được thông tin từ liên kết')
         }
-      } finally { setGmapResolving(false) }
+      } catch (error) {
+        console.error('❌ Google Maps link processing error:', error)
+        setGmapStatus('error')
+        setGmapMessage('Lỗi khi xử lý liên kết')
+      } finally {
+        setGmapResolving(false)
+      }
     }, 400)
+    
     return () => clearTimeout(t)
   }, [gmapLink])
 
@@ -244,41 +413,55 @@ export default function StoreDetail() {
 
     const normalizedName = toTitleCaseVI(name.trim())
 
+    // Determine coordinates: prefer link if provided; else keep current store coords or use geolocation
     let latitude = store?.latitude ?? null
     let longitude = store?.longitude ?? null
 
     if (gmapLink && gmapLink.trim()) {
-      const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
-      if (!resolved) {
-        const finalUrl = await expandShortLink(gmapLink.trim())
-        if (finalUrl) {
-          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-          if (parsed) {
-            latitude = parsed.lat
-            longitude = parsed.lng
-          }
-        }
+      // User provided Google Maps link - prioritize coordinates from this link
+      console.log('🔍 Processing Google Maps link for coordinates...')
+      
+      // Use coordinates that were already parsed and stored in lastParsedRef
+      if (lastParsedRef.current) {
+        latitude = lastParsedRef.current.lat
+        longitude = lastParsedRef.current.lng
+        console.log('✅ Using parsed coordinates from Maps link:', { latitude, longitude })
       } else {
-        latitude = resolved.lat
-        longitude = resolved.lng
+        // Fallback: try to parse again if not already parsed
+        const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
+        if (resolved) {
+          latitude = resolved.lat
+          longitude = resolved.lng
+          console.log('✅ Got coordinates from Maps link (fallback):', { latitude, longitude })
+        } else {
+          // Link processing failed
+          setSaving(false)
+          setGmapStatus('error')
+          setGmapMessage('Không đọc được tọa độ từ liên kết Maps')
+          return
+        }
       }
-      if (latitude == null || longitude == null) {
-        alert('Không đọc được tọa độ từ liên kết Google Maps. Vui lòng nhập liên kết hợp lệ hoặc xóa trường này để dùng vị trí hiện tại.')
-        setSaving(false)
-        return
-      }
-    } else {
+    } else if (!latitude || !longitude) {
+      // No Maps link and no existing coordinates → use current geolocation as fallback
       try {
-        const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject))
-        latitude = pos.coords.latitude
-        longitude = pos.coords.longitude
+        console.log('📍 No Maps link, getting current location...')
+        const coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(pos.coords),
+            (err) => reject(err)
+          )
+        })
+        latitude = coords.latitude
+        longitude = coords.longitude
+        console.log('✅ Got current location:', { latitude, longitude })
       } catch (geoErr) {
-        console.error('Không lấy được tọa độ khi cập nhật:', geoErr)
-        alert('Ứng dụng cần quyền truy cập vị trí để lưu thay đổi.')
+        console.error('❌ Cannot get current location:', geoErr)
         setSaving(false)
+        alert('Cần quyền truy cập vị trí hoặc nhập link Google Maps để cập nhật tọa độ')
         return
       }
     }
+    // If we have existing coordinates and no Maps link, keep the existing ones
 
     let image_url = store?.image_url || null
     let uploadedFileId = null
@@ -499,7 +682,13 @@ export default function StoreDetail() {
                 onChange={(e) => setGmapLink(e.target.value)}
                 placeholder="Dán liên kết chia sẻ vị trí từ Google Maps"
                 disabled={!user}
+                className={gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}
               />
+              {gmapMessage && gmapStatus === 'error' && (
+                <div className="text-xs text-red-600">
+                  {gmapMessage}
+                </div>
+              )}
               <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? (
                 <span className="inline-flex items-center gap-2">
                   <span>Đang lấy địa chỉ từ liên kết…</span>
