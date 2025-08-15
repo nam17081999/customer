@@ -264,7 +264,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 max-w-screen-md mx-auto">
         {/* Location Switch - Top Right */}
         <div className="flex justify-end">
           <LocationSwitch 
@@ -272,7 +272,6 @@ export default function HomePage() {
             onLocationModeChange={setLocationMode}
           />
         </div>
-
         {/* Search Input */}
         <div>
           <Input
@@ -280,10 +279,9 @@ export default function HomePage() {
             placeholder="Tìm kiếm cửa hàng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
+            className="w-full text-sm sm:text-base"
           />
         </div>
-
         {/* Search Results */}
         <div className="space-y-4">
           {loading && searchTerm.length >= MIN_SEARCH_LEN && (
@@ -326,7 +324,7 @@ export default function HomePage() {
           )}
 
           {searchResults.length > 0 && (
-            <div className="h-[70vh]">{/* Container height for virtual list */}
+            <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-250px)]">{/* Responsive container height */}
               <Virtuoso
                 data={searchResults}
                 endReached={() => {

@@ -157,7 +157,7 @@ export default function VisitListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-6 max-w-screen-md mx-auto">
         {/* Location Switch - Top Right */}
         <div className="flex justify-end">
           <LocationSwitch 
@@ -169,11 +169,11 @@ export default function VisitListPage() {
         {/* Header Actions */}
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
               Cửa hàng đã chọn ({visitListCount})
             </h2>
             {visitListCount > 0 && (
-              <Button onClick={clearAll} variant="destructive" size="sm">
+              <Button onClick={clearAll} variant="destructive" size="sm" className="text-xs sm:text-sm">
                 Xóa tất cả
               </Button>
             )}
@@ -185,6 +185,7 @@ export default function VisitListPage() {
                 size="sm" 
                 variant={sortByDistance ? 'default' : 'outline'}
                 onClick={toggleSortByDistance}
+                className="text-xs sm:text-sm"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -200,7 +201,7 @@ export default function VisitListPage() {
         <div className="space-y-4">
           {selectedStores.length === 0 ? (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <CardContent className="flex flex-col items-center justify-center py-10 sm:py-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />

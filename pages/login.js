@@ -22,12 +22,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black px-4 py-8">
-      <div className="mx-auto max-w-md">
+    <div className="min-h-screen bg-gray-50 dark:bg-black px-3 sm:px-4 py-8">
+      <div className="mx-auto max-w-sm w-full">
         <Card>
           <CardContent className="space-y-4 p-6">
-            <h1 className="text-lg font-semibold">Đăng nhập</h1>
-            <Button onClick={handleGoogleLogin} disabled={loading} className="w-full">
+            <h1 className="text-base sm:text-lg font-semibold">Đăng nhập</h1>
+            <Button onClick={handleGoogleLogin} disabled={loading} className="w-full text-sm sm:text-base">
               {loading ? 'Đang chuyển tới Google…' : 'Đăng nhập với Google'}
             </Button>
           </CardContent>

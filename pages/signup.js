@@ -48,18 +48,18 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black px-4 py-8">
-      <div className="mx-auto max-w-md">
+    <div className="min-h-screen bg-gray-50 dark:bg-black px-3 sm:px-4 py-8">
+      <div className="mx-auto max-w-sm w-full">
         <Card>
           <CardContent className="space-y-4 p-6">
-            <h1 className="text-lg font-semibold">Đăng ký</h1>
+            <h1 className="text-base sm:text-lg font-semibold">Đăng ký</h1>
             <Input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
             <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <Input type="password" placeholder="Mật khẩu" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <Button onClick={handleSignup} disabled={!email || !username || !password || loading}>
+            <Button onClick={handleSignup} disabled={!email || !username || !password || loading} className="text-sm sm:text-base">
               {loading ? 'Đang đăng ký...' : 'Đăng ký'}
             </Button>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
               Đã có tài khoản? <Link className="text-blue-600 underline" href="/login">Đăng nhập</Link>
             </p>
           </CardContent>

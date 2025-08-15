@@ -612,8 +612,8 @@ export default function AddStore() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-black">
-        <div className="mx-auto max-w-2xl">
+      <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-8 dark:bg-black">
+        <div className="mx-auto max-w-screen-md w-full">
           <Card>
             <CardContent className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">
               Vui lòng <Link href="/login" className="text-blue-600 underline">đăng nhập</Link> để tạo cửa hàng.
@@ -625,13 +625,12 @@ export default function AddStore() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8 dark:bg-black">
-      <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Nhập thông tin cửa hàng và tải ảnh đại diện.</p>
-
-        <Card className="mt-6">
-          <CardContent className="p-6">
+    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-8 dark:bg-black">
+      <div className="mx-auto max-w-screen-md w-full">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
+        <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Nhập thông tin cửa hàng và tải ảnh đại diện.</p>
+        <Card className="mt-5 sm:mt-6">
+          <CardContent className="p-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="grid gap-1.5">
                 <Label htmlFor="name">Tên cửa hàng</Label>
@@ -695,7 +694,7 @@ export default function AddStore() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" disabled={loading || gmapResolving} className="w-full">
+                <Button type="submit" disabled={loading || gmapResolving} className="w-full text-sm sm:text-base">
                   {loading || gmapResolving ? 'Đang thêm…' : 'Thêm cửa hàng'}
                 </Button>
               </div>
