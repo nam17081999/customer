@@ -51,7 +51,7 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false)
   const observer = useRef(null)
   const suppressFirstAutoLoad = useRef(false)
-  const lastQueryRef = useRef('') // tránh gọi lại cùng 1 searchTerm (StrictMode) -> include locationMode
+  const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
 
   // Load stores from localStorage on component mount
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function HomePage() {
     return NPP_LOCATION
   }, [locationMode, currentLocation])
 
-  // Debounce search term
+  // Debounce search term (chỉ phụ thuộc searchTerm, đổi locationMode không refetch mà chỉ tính lại distance)
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm.length >= MIN_SEARCH_LEN) {
@@ -114,15 +114,15 @@ export default function HomePage() {
     }, SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [searchTerm, locationMode]) // Re-search when location mode changes
+  }, [searchTerm])
 
   // Remove infinite scroll - no auto load more on scroll
 
   const handleSearch = async () => {
     if (searchTerm.length < MIN_SEARCH_LEN) return
 
-    const queryKey = `${searchTerm}|${locationMode}`
-    if (lastQueryRef.current === queryKey) return // tránh fetch trùng (bao gồm cả mode)
+    const queryKey = searchTerm // chỉ dựa trên searchTerm
+    if (lastQueryRef.current === queryKey) return // tránh fetch trùng
 
     setLoading(true)
     setPage(1)
