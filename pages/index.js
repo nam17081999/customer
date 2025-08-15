@@ -5,21 +5,15 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE, SCROLL_BOTTOM_OFFSET } from '@/lib/constants'
-import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
-import Image from 'next/image'
+import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import { useAuth } from '@/components/auth-context'
-import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { StoreResultCard } from '@/components/store-card'
+import LocationSwitch from '@/components/location-switch'
 
-import StoreResultCard from '@/components/store-result-card'
-import SelectedStoreItem from '@/components/selected-store-item'
-
-const STORAGE_KEY = 'arrange:selectedStores:v1'
-const ORIGIN = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
+const STORAGE_KEY = 'selectedStores'
+const NPP_LOCATION = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
 
 function getFileNameFromUrl(url) {
   if (!url) return null;
@@ -42,476 +36,266 @@ function getFileNameFromUrl(url) {
   }
 }
 
-function SortableItem({ item, children, render }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-  if (render) {
-    return (
-      <li ref={setNodeRef} style={style} data-dragging={isDragging ? 'true' : 'false'}>
-        {render({ attributes, listeners, isDragging })}
-      </li>
-    )
-  }
-  return (
-    <li ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      {children}
-    </li>
-  )
-}
-
-export default function ArrangeStores() {
+export default function HomePage() {
   const { user } = useAuth()
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  const [selected, setSelected] = useState([])
-  const [sorting, setSorting] = useState(false)
-  const [deletingId, setDeletingId] = useState(null)
-  const [listCollapsed, setListCollapsed] = useState(false)
-
-  // Distance origin controls
-  const [originMode, setOriginMode] = useState('npp') // 'npp' | 'current'
-  const [currentPos, setCurrentPos] = useState(null) // { latitude, longitude } | null
-  const [locLoading, setLocLoading] = useState(false)
-  const [locError, setLocError] = useState(null)
-
-  // Add manual search states (like /store/index.js)
-  const [results, setResults] = useState([])
+  const [searchResults, setSearchResults] = useState([])
+  const [stores, setStores] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [locationMode, setLocationMode] = useState('npp') // 'user' or 'npp'
+  const [isClient, setIsClient] = useState(false)
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 0, tolerance: 8 } })
-  )
-
-  // Load persisted selected list on mount
+  // Load stores from localStorage on component mount
   useEffect(() => {
-    try {
-      const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) setSelected(parsed)
+    setIsClient(true)
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        const parsedStores = JSON.parse(saved)
+        setStores(parsedStores)
+      } catch (error) {
+        console.error('Error parsing saved stores:', error)
+        setStores([])
       }
-      const collapsed = typeof window !== 'undefined' ? localStorage.getItem('arrange:listCollapsed') : null
-      if (collapsed === '1') setListCollapsed(true)
-      const savedOrigin = typeof window !== 'undefined' ? localStorage.getItem('arrange:originMode') : null
-      if (savedOrigin === 'current' || savedOrigin === 'npp') setOriginMode(savedOrigin)
-    } catch (e) {
-      console.warn('Cannot load saved route list:', e)
     }
   }, [])
 
-  // Persist selected list whenever it changes (exclude volatile fields)
+  // Save to localStorage whenever stores changes and notify navbar
   useEffect(() => {
-    try {
-      const toSave = selected.map(({ distance, ...rest }) => rest)
-      if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-    } catch (e) {
-      console.warn('Cannot save route list:', e)
+    if (isClient) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stores))
+      // Dispatch custom event to notify navbar
+      window.dispatchEvent(new CustomEvent('selectedStoresUpdated'))
     }
-  }, [selected])
-
-  // Persist collapsed state
+  }, [stores, isClient])  // Get current location
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        if (listCollapsed) localStorage.setItem('arrange:listCollapsed', '1')
-        else localStorage.removeItem('arrange:listCollapsed')
-      }
-    } catch {}
-  }, [listCollapsed])
-
-  // Persist origin mode
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') localStorage.setItem('arrange:originMode', originMode)
-    } catch {}
-  }, [originMode])
-
-  // Resolve origin coordinates
-  const originCoords = useMemo(() => {
-    if (originMode === 'npp') return ORIGIN
-    if (currentPos && typeof currentPos.latitude === 'number' && typeof currentPos.longitude === 'number') return currentPos
-    return null
-  }, [originMode, currentPos])
-
-  // Acquire current position when needed
-  useEffect(() => {
-    if (originMode !== 'current') return
-    if (currentPos) return
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setLocError('Trình duyệt không hỗ trợ vị trí')
-      return
-    }
-    setLocError(null)
-    setLocLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCurrentPos({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-        setLocLoading(false)
-      },
-      () => {
-        setLocError('Không lấy được vị trí')
-        setLocLoading(false)
-      }
-    )
-  }, [originMode, currentPos])
-
-  // Helper to compute distance to current origin (memoized)
-  const distanceFromOrigin = useCallback((store) => {
-    if (!originCoords) return null
-    if (typeof store?.latitude !== 'number' || typeof store?.longitude !== 'number') return null
-    return haversineKm(originCoords.latitude, originCoords.longitude, store.latitude, store.longitude)
-  }, [originCoords])
-
-  const addToSelected = useCallback((store) => {
-    setSelected((prev) => {
-      if (prev.some((s) => s.id === store.id)) return prev
-      const withDistance = (store.distance !== undefined)
-        ? { ...store, distance: distanceFromOrigin(store) }
-        : { ...store, distance: distanceFromOrigin(store) }
-      return [...prev, withDistance]
-    })
-  }, [originCoords, distanceFromOrigin])
-
-  const removeFromSelected = useCallback((id) => {
-    setSelected((prev) => prev.filter((s) => s.id !== id))
-  }, [])
-
-  const handleNewRoute = useCallback(() => {
-    const ok = window.confirm('Bắt đầu lộ trình mới? Danh sách ghé thăm hiện tại sẽ bị xóa.')
-    if (!ok) return
-    setSelected([])
-    try { 
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY)
-      }
-    } catch {}
-  }, [])
-
-  // Add back missing sort and drag handlers
-  const sortByDistance = useCallback(() => {
-    if (!selected.length) return
-    const ok = window.confirm('Bạn có chắc muốn tính khoảng cách và sắp xếp lại danh sách? Thứ tự hiện tại sẽ thay đổi.')
-    if (!ok) return
-    setSorting(true)
-    try {
-      setSelected((prev) => {
-        const withDistance = prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) }))
-        withDistance.sort((a, b) => {
-          const da = a.distance
-          const db = b.distance
-          if (da == null && db == null) return 0
-          if (da == null) return -1
-          if (db == null) return 1
-          return da - db
-        })
-        return withDistance
-      })
-    } finally {
-      setSorting(false)
-    }
-  }, [selected.length, originCoords, distanceFromOrigin])
-
-  const handleDragEnd = useCallback((event) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setSelected((items) => {
-      const oldIndex = items.findIndex((s) => s.id === active.id)
-      const newIndex = items.findIndex((s) => s.id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return items
-      return arrayMove(items, oldIndex, newIndex)
-    })
-  }, [])
-
-  // Debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(t)
-  }, [search])
-
-  // Fetch one page (memoized)
-  const fetchResultsPage = useCallback(async (keyword, pageNum = 1, append = false) => {
-    const raw = (keyword || '').trim()
-    const q = removeVietnameseTones(raw).toLowerCase()
-    const from = (pageNum - 1) * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
-
-    if (pageNum === 1) setLoading(true); else setLoadingMore(true)
-
-    const { data, error } = await supabase
-      .from('stores')
-      .select('id,name,address,phone,status,image_url,latitude,longitude,note')
-      .ilike('name_search', `%${q}%`)
-      .order('status', { ascending: false })
-      .order('id', { ascending: false })
-      .range(from, to)
-
-    if (pageNum === 1) setLoading(false); else setLoadingMore(false)
-
-    if (error) {
-      console.error('Search error:', error)
-      return
-    }
-
-    const rows = data || []
-    const withDistance = rows.map((s) => ({
-      ...s,
-      distance: distanceFromOrigin(s),
-    }))
-
-    setResults((prev) => (append ? [...prev, ...withDistance] : withDistance))
-    setHasMore(rows.length === PAGE_SIZE)
-    setPage(pageNum)
-  }, [distanceFromOrigin])
-
-  // Reset and fetch first page when keyword changes (same as /store/index.js)
-  useEffect(() => {
-    const keyword = debouncedSearch
-    if (keyword && keyword.length < MIN_SEARCH_LEN) {
-      setLoading(false)
-      setHasMore(false)
-      setPage(1)
-      setResults([])
-      return
-    }
-    if (keyword && keyword.length >= MIN_SEARCH_LEN) {
-      setPage(1)
-      setHasMore(true)
-      setResults([])
-      fetchResultsPage(keyword, 1, false)
-    } else {
-      setResults([])
-      setHasMore(false)
-      setLoading(false)
-      setPage(1)
-    }
-  }, [debouncedSearch, fetchResultsPage])
-
-  // Load more using IntersectionObserver
-  useEffect(() => {
-    if (!hasMore || loading || loadingMore) return
-    if (!debouncedSearch || debouncedSearch.length < MIN_SEARCH_LEN) return
-
-    const loadMoreTrigger = document.getElementById('load-more-trigger')
-    if (!loadMoreTrigger) return
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const [entry] = entries
-        if (entry.isIntersecting) {
-          fetchResultsPage(debouncedSearch, page + 1, true)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCurrentLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          })
+        },
+        (error) => {
+          console.error('Error getting location:', error)
         }
-      },
-      { threshold: 0.1, rootMargin: '100px' }
-    )
-
-    observer.observe(loadMoreTrigger)
-    return () => observer.disconnect()
-  }, [hasMore, loading, loadingMore, page, debouncedSearch, fetchResultsPage])
-
-  // Ensure selected items update distance when origin changes
-  useEffect(() => {
-    setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [originCoords, distanceFromOrigin])
-
-  // Recompute result distances when origin changes
-  useEffect(() => {
-    setResults((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [originCoords, distanceFromOrigin])
-
-  // Ensure every selected item has a distance value (legacy fill-in)
-  useEffect(() => {
-    if (!selected.length) return
-    if (!selected.some((s) => s.distance === undefined)) return
-    setSelected((prev) => prev.map((s) => ({ ...s, distance: distanceFromOrigin(s) })))
-  }, [selected, distanceFromOrigin])
-
-  const selectedIds = useMemo(() => new Set(selected.map((s) => s.id)), [selected])
-
-  // Helper to highlight search matches
-  const highlightText = useCallback((text, searchTerm) => {
-    if (!searchTerm || !text) return text
-    const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
-    const normalizedText = removeVietnameseTones(text.toLowerCase())
-    
-    const index = normalizedText.indexOf(normalizedSearch)
-    if (index === -1) return text
-    
-    const beforeMatch = text.slice(0, index)
-    const match = text.slice(index, index + searchTerm.length)
-    const afterMatch = text.slice(index + searchTerm.length)
-    
-    return (
-      <>
-        {beforeMatch}
-        <span className="bg-yellow-200 text-yellow-900 dark:bg-yellow-700 dark:text-yellow-100 px-0.5 rounded">
-          {match}
-        </span>
-        {afterMatch}
-      </>
-    )
+      )
+    }
   }, [])
+
+  // Get reference location based on mode
+  const getReferenceLocation = useCallback(() => {
+    if (locationMode === 'user' && currentLocation) {
+      return currentLocation
+    }
+    return NPP_LOCATION
+  }, [locationMode, currentLocation])
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm.length >= MIN_SEARCH_LEN) {
+        handleSearch()
+      } else {
+        setSearchResults([])
+        setHasMore(true)
+        setPage(1)
+      }
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm, locationMode]) // Re-search when location mode changes
+
+  // Remove infinite scroll - no auto load more on scroll
+
+  const handleSearch = async () => {
+    if (searchTerm.length < MIN_SEARCH_LEN) return
+
+    setLoading(true)
+    setPage(1)
+    setHasMore(true)
+
+    try {
+      const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
+      
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .limit(PAGE_SIZE)
+
+      if (error) throw error
+
+      const referenceLocation = getReferenceLocation()
+      const resultsWithDistance = data.map(store => ({
+        ...store,
+        distance: referenceLocation 
+          ? haversineKm(
+              referenceLocation.latitude,
+              referenceLocation.longitude,
+              store.latitude,
+              store.longitude
+            )
+          : null
+      }))
+
+      setSearchResults(resultsWithDistance)
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (error) {
+      console.error('Search error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (!hasMore || loadingMore || searchTerm.length < MIN_SEARCH_LEN) return
+
+    setLoadingMore(true)
+    const nextPage = page + 1
+
+    try {
+      const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
+      
+      const { data, error } = await supabase
+        .from('stores')
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1)
+
+      if (error) throw error
+
+      const referenceLocation = getReferenceLocation()
+      const resultsWithDistance = data.map(store => ({
+        ...store,
+        distance: referenceLocation 
+          ? haversineKm(
+              referenceLocation.latitude,
+              referenceLocation.longitude,
+              store.latitude,
+              store.longitude
+            )
+          : null
+      }))
+
+      setSearchResults(prev => [...prev, ...resultsWithDistance])
+      setPage(nextPage)
+      setHasMore(data.length === PAGE_SIZE)
+    } catch (error) {
+      console.error('Load more error:', error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const addToList = (store) => {
+    if (!stores.find(s => s.id === store.id)) {
+      setStores(prev => [...prev, store])
+    }
+  }
+
+  const visitListCount = stores.length
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        {/* Selected list */}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="px-4 py-6 space-y-6">
+        {/* Location Switch - Top Right */}
+        <div className="flex justify-end">
+          <LocationSwitch 
+            locationMode={locationMode}
+            onLocationModeChange={setLocationMode}
+          />
+        </div>
+
+        {/* Search Input */}
         <div>
-          {/* Header row: title + origin switch */}
-          <div className="mb-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setListCollapsed((v) => !v)}
-              className="group inline-flex items-center gap-2 cursor-pointer"
-              aria-expanded={!listCollapsed}
-              aria-controls="visit-list"
-            >
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">DS ghé thăm ({selected.length})</h2>
-              <span className="text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300">
-                {listCollapsed ? '▶' : '▼'}
-              </span>
-            </button>
+          <Input
+            type="text"
+            placeholder="Tìm kiếm cửa hàng..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+        </div>
 
-            <div className="flex items-center gap-3">
-              <div
-                role="group"
-                aria-label="Nguồn vị trí"
-                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 p-0.5 text-xs dark:border-gray-800 dark:bg-gray-900"
-              >
-                <button
-                  type="button"
-                  aria-pressed={originMode === 'npp'}
-                  onClick={() => setOriginMode('npp')}
-                  className={`${originMode === 'npp' ? 'bg-white text-emerald-600 shadow dark:bg-gray-800' : 'text-gray-600 dark:text-gray-300'} px-3 py-1 rounded-full`}
-                >
-                  NPP
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={originMode === 'current'}
-                  onClick={() => setOriginMode('current')}
-                  className={`${originMode === 'current' ? 'bg-white text-emerald-600 shadow dark:bg-gray-800' : 'text-gray-600 dark:text-gray-300'} relative px-3 py-1 rounded-full`}
-                >
-                  Tôi
-                  {originMode === 'current' && (
-                    locLoading ? (
-                      <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-gray-400 align-middle animate-pulse" />
-                    ) : locError ? (
-                      <span title={locError} className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" />
-                    ) : null
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* New route and sort buttons */}
-          {!listCollapsed && (
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleNewRoute}>
-                  Thêm lộ trình mới
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={sortByDistance} disabled={!selected.length || sorting}>
-                  {sorting ? 'Đang sắp xếp...' : 'Sắp xếp'}
-                </Button>
-              </div>
+        {/* Search Results */}
+        <div className="space-y-4">
+          {loading && searchTerm.length >= MIN_SEARCH_LEN && (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="p-4">
+                    <div className="flex space-x-4">
+                      <Skeleton className="h-16 w-16 rounded" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                        <Skeleton className="h-3 w-2/3" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
 
-          <div id="visit-list">
-            {selected.length === 0 ? (
-              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Chưa có cửa hàng nào trong danh sách</CardContent></Card>
-            ) : listCollapsed ? (
-              <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Danh sách đang ẩn</CardContent></Card>
-            ) : (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={selected.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                  <ul className="space-y-2">
-                    {selected.map((s) => (
-                      <SortableItem
-                        key={s.id}
-                        item={s}
-                        render={({ attributes, listeners }) => (
-                          <SelectedStoreItem 
-                            item={s} 
-                            dragAttributes={attributes} 
-                            dragListeners={listeners} 
-                            onRemove={removeFromSelected}
-                          />
-                        )}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-            )}
-          </div>
-        </div>
-
-        {/* Search (moved to bottom) */}
-        <div className="mt-8 flex items-center gap-3">
-          <Input
-            type="text"
-            placeholder="Tìm theo tên cửa hàng..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full"
-          />
-          <Button onClick={() => setDebouncedSearch(search.trim())}>Tìm</Button>
-        </div>
-
-        {/* Search results */}
-        <div className="mt-4 space-y-2">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}><CardContent className="flex items-center justify-between gap-3 p-3"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-8 w-20" /></CardContent></Card>
-            ))
-          ) : !debouncedSearch ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập từ khóa để tìm cửa hàng</CardContent></Card>
-          ) : debouncedSearch.length < MIN_SEARCH_LEN ? (
-            <Card><CardContent className="p-4 text-sm text-gray-500 dark:text-gray-400">Nhập tối thiểu {MIN_SEARCH_LEN} ký tự để tìm</CardContent></Card>
-          ) : results.length === 0 ? (
+          {!loading && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
             <Card>
-              <CardContent className="flex flex-col items-center gap-3 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                <div>❌ Không tìm thấy cửa hàng nào</div>
-                <Button asChild>
-                  <Link href={{ pathname: '/store/create', query: { name: debouncedSearch } }}>
-                    Thêm cửa hàng mới
-                  </Link>
-                </Button>
+              <CardContent className="p-8 text-center">
+                <p className="text-gray-500 dark:text-gray-400">
+                  Không tìm thấy cửa hàng nào
+                </p>
               </CardContent>
             </Card>
-          ) : (
+          )}
+
+          {searchResults.length > 0 && (
             <>
-              <ul className="space-y-2">
-                {results.map((s) => (
-                  <li key={s.id}>
-                    <StoreResultCard 
-                      store={s} 
-                      isSelected={selectedIds.has(s.id)} 
-                      onAdd={addToSelected}
-                      searchTerm={debouncedSearch}
-                      highlightText={highlightText}
+              <ul className="space-y-4">
+                {searchResults.map((store) => (
+                  <li key={store.id}>
+                    <StoreResultCard
+                      store={store}
+                      onAdd={() => addToList(store)}
+                      isAdded={stores.some(s => s.id === store.id)}
                     />
                   </li>
                 ))}
               </ul>
-              {/* Load more trigger for IntersectionObserver */}
-              {hasMore && <div id="load-more-trigger" className="h-1" />}
-              <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                {loadingMore ? 'Đang tải thêm…' : !hasMore ? 'Đã hết' : null}
-              </div>
+              {/* Manual Load More Button */}
+              {hasMore && (
+                <div className="text-center py-4">
+                  <Button 
+                    onClick={loadMore} 
+                    disabled={loadingMore}
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                  >
+                    {loadingMore ? 'Đang tải...' : 'Tải thêm'}
+                  </Button>
+                </div>
+              )}
+              {!hasMore && searchResults.length > 0 && (
+                <div className="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Đã hiển thị tất cả kết quả
+                </div>
+              )}
             </>
+          )}
+
+          {searchTerm.length < MIN_SEARCH_LEN && (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="text-gray-500 dark:text-gray-400">
+                  Nhập ít nhất {MIN_SEARCH_LEN} ký tự để tìm kiếm
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>

@@ -233,6 +233,39 @@ export default function AddStore() {
     }
   }
 
+  async function geocodeWithGoogle(address) {
+    try {
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+      if (!apiKey) {
+        console.log('⚠️ Google Maps API key not configured, falling back to Nominatim')
+        return await geocodeTextToLatLngAddress(address)
+      }
+      
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}&language=vi&region=vn`
+      const res = await fetch(url)
+      
+      if (!res.ok) throw new Error('Google Geocoding API error')
+      
+      const data = await res.json()
+      
+      if (data.status === 'OK' && data.results.length > 0) {
+        const result = data.results[0]
+        const { lat, lng } = result.geometry.location
+        const formattedAddress = result.formatted_address
+        
+        console.log('✅ Google Geocoding success:', { lat, lng, address: formattedAddress })
+        return { lat, lng, address: formattedAddress }
+      }
+      
+      console.log('❌ Google Geocoding no results:', data.status)
+      return null
+    } catch (error) {
+      console.error('❌ Google Geocoding error:', error)
+      // Fallback to Nominatim
+      return await geocodeTextToLatLngAddress(address)
+    }
+  }
+
   async function geocodeTextToLatLngAddress(text) {
     if (!text) return null
     try {
@@ -285,14 +318,14 @@ export default function AddStore() {
       console.log('❌ Link expansion failed:', error)
     }
 
-    // Step 3: Fallback: extract search text and geocode
-    console.log('🔍 Trying text extraction...')
+    // Step 3: Fallback: extract search text and use Google Geocoding
+    console.log('🔍 Trying text extraction with Google Geocoding...')
     const text = extractSearchTextFromGoogleMapsUrl(urlStr)
     if (text) {
       console.log('✅ Extracted text:', text)
-      const geo = await geocodeTextToLatLngAddress(text)
+      const geo = await geocodeWithGoogle(text)
       if (geo) {
-        console.log('✅ Geocoding success:', { lat: geo.lat, lng: geo.lng })
+        console.log('✅ Google Geocoding success:', { lat: geo.lat, lng: geo.lng })
         return { lat: geo.lat, lng: geo.lng }
       }
     }
@@ -365,17 +398,19 @@ export default function AddStore() {
           }
         }
         
-        // Fallback to text geocoding
+        // Fallback to Google Geocoding
         const text = extractSearchTextFromGoogleMapsUrl(gmapLink.trim())
         if (text) {
-          const geo = await geocodeTextToLatLngAddress(text)
+          const geo = await geocodeWithGoogle(text)
           if (geo) {
             lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
             if (geo.address) {
               setAddress(geo.address)
               setGmapStatus('success')
+              setGmapMessage('✅ Lấy được vị trí từ Google Geocoding')
             } else {
               setGmapStatus('success')
+              setGmapMessage('✅ Lấy được tọa độ từ Google Geocoding')
             }
           } else {
             setGmapStatus('error')
