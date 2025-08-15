@@ -642,7 +642,7 @@ export default function AddStore() {
           {/* Tên */}
           <div className="space-y-1.5">
             <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" />
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
           </div>
           {/* Địa chỉ */}
           <div className="space-y-1.5">
@@ -652,7 +652,7 @@ export default function AddStore() {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm sm:text-sm leading-relaxed text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px]"
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px]"
             />
             <Button
               type="button"
@@ -667,7 +667,7 @@ export default function AddStore() {
           {/* Ảnh */}
           <div className="space-y-1.5">
             <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
-            <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+            <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
             <p className="text-[11px] text-gray-500 dark:text-gray-400">Bắt buộc: tên, địa chỉ, ảnh.</p>
           </div>
 
@@ -697,11 +697,12 @@ export default function AddStore() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="0901 234 567"
+                  className="text-sm"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" />
+                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link google maps</Label>
@@ -710,7 +711,7 @@ export default function AddStore() {
                   value={gmapLink}
                   onChange={(e) => setGmapLink(e.target.value)}
                   placeholder="https://maps.app.goo.gl/AbCd1234"
-                  className={gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}
+                  className={`${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''} text-sm`}
                 />
                 {gmapMessage && (
                   <div className={`text-[11px] ${gmapStatus === 'error' ? 'text-red-600' : gmapStatus === 'success' ? 'text-green-600' : 'text-gray-500'}`}>{gmapMessage}</div>

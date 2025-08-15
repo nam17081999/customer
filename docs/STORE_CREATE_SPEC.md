@@ -1,9 +1,10 @@
-# Store Create Screen Specification (v1.1)
+# Store Create Screen Specification (v1.2)
 
 ## Purpose
 Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo cửa hàng mới với các thông tin bắt buộc tối thiểu và một số thông tin tùy chọn mở rộng.
 
 ## Version
+- v1.2 (2025-08-16): Chuẩn hoá kích thước font tất cả input & textarea về 14px (Tailwind `text-sm`) đồng nhất trên mọi kích thước màn hình.
 - v1.1 (2025-08-15): Thêm rule chuẩn hoá địa chỉ: nếu người dùng nhập toàn bộ lowercase thì tự động chuyển Title Case trước khi lưu.
 - v1.0 (2025-08-15): Khởi tạo tài liệu ban đầu.
 
@@ -35,6 +36,7 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 12. Phần tuỳ chọn (phone, note, gmapLink) MẶC ĐỊNH ẩn, chỉ mở khi người dùng bấm nút toggle.
 13. Không refetch hay reload trang sau khi tạo — chỉ reset state cục bộ.
 14. Placeholder phải là dữ liệu mẫu thực tế để hướng dẫn nhập.
+15. (v1.2) Kích thước font của TẤT CẢ input, file input, textarea, phone, note, gmapLink: cố định 14px (`text-sm`) trên mọi breakpoint để đảm bảo đồng nhất mật độ thị giác.
 
 ## Luồng xử lý Submit
 1. Validate bắt buộc.
@@ -47,7 +49,8 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 
 ## UI / UX Nguyên tắc
 - Chiều rộng tối đa: max-w-screen-md căn giữa, mobile-first.
-- Label kích thước text-sm trên mobile (tăng so với trước) để dễ nhìn.
+- Label kích thước text-sm.
+- (v1.2) Tất cả input & textarea dùng `text-sm` (14px) đồng bộ để tránh cảm giác font lệch giữa các trường; chấp nhận khả năng iOS có thể phóng to nếu hệ thống áp dụng policy <16px (được coi là trade-off thiết kế hiện tại).
 - Address dùng textarea đa dòng (resize-y) vì địa chỉ dài, min height ~72px.
 - Nút "Tự động lấy địa chỉ" bên dưới textarea, full width trên mobile.
 - Toggle tuỳ chọn dùng variant ghost, biểu tượng + / − đổi theo trạng thái.
@@ -85,9 +88,10 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 - [ ] Toggle tuỳ chọn ẩn/hiện không làm mất dữ liệu đã nhập.
 - [ ] Submit thành công hiển thị Msg và biến mất sau ~2.5s.
 - [ ] Khi Msg ẩn đi không gây layout jump form.
+- [ ] (v1.2) Tất cả input & textarea hiển thị cùng một cỡ chữ 14px.
 
 ## Không được thay đổi tự do
-Các mục trong phần "Immutable Rules" chỉ thay đổi nếu bump version (v1.2, v1.3...) kèm lý do.
+Các mục trong phần "Immutable Rules" chỉ thay đổi nếu bump version (v1.3, v1.4...) kèm lý do.
 
 ---
-End of v1.1
+End of v1.2
