@@ -564,11 +564,18 @@ export default function AddStore() {
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
+      // Chuẩn hoá địa chỉ: nếu toàn bộ ở dạng lowercase thì chuyển sang dạng viết hoa chữ cái đầu mỗi từ
+      let finalAddress = address.trim()
+      if (finalAddress && finalAddress === finalAddress.toLowerCase()) {
+        finalAddress = toTitleCaseVI(finalAddress)
+        if (finalAddress !== address) setAddress(finalAddress)
+      }
+
       const { error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
           name_search: nameSearch,
-          address,
+          address: finalAddress,
           note,
           phone,
           image_url: imageFilename, // Store only filename
