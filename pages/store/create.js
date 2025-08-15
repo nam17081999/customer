@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -10,6 +9,7 @@ import { useAuth } from '@/components/auth-context'
 import Link from 'next/link'
 import { toTitleCaseVI } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
+import { Msg } from '@/components/ui/msg'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -25,6 +25,8 @@ export default function AddStore() {
   const [gmapResolving, setGmapResolving] = useState(false)
   const [gmapStatus, setGmapStatus] = useState('') // 'success', 'error', 'processing'
   const [gmapMessage, setGmapMessage] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
   const lastParsedRef = useRef(null)
 
   useEffect(() => {
@@ -592,7 +594,9 @@ export default function AddStore() {
         return
       }
 
-      alert('Tạo cửa hàng thành công!')
+      // Success
+      setShowSuccess(true)
+      setTimeout(() => setShowSuccess(false), 2500)
       e.target.reset()
       setName('')
       setAddress('')
@@ -612,50 +616,72 @@ export default function AddStore() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-8 dark:bg-black">
-        <div className="mx-auto max-w-screen-md w-full">
-          <Card>
-            <CardContent className="p-6 text-center text-sm text-gray-600 dark:text-gray-400">
-              Vui lòng <Link href="/login" className="text-blue-600 underline">đăng nhập</Link> để tạo cửa hàng.
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-gray-900/40 rounded-md p-6">
+            Vui lòng <Link href="/login" className="text-blue-600 underline">đăng nhập</Link> để tạo cửa hàng.
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-3 sm:px-4 py-8 dark:bg-black">
-      <div className="mx-auto max-w-screen-md w-full">
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
-        <p className="mt-1 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Nhập thông tin cửa hàng và tải ảnh đại diện.</p>
-        <Card className="mt-5 sm:mt-6">
-          <CardContent className="p-5 sm:p-6">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="grid gap-1.5">
-                <Label htmlFor="name">Tên cửa hàng</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Cửa hàng ABC" />
-              </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <Msg type="success" show={showSuccess}>Tạo cửa hàng thành công</Msg>
+      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
+        <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Tên */}
+          <div className="space-y-1.5">
+            <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" />
+          </div>
+          {/* Địa chỉ */}
+          <div className="space-y-1.5">
+            <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+            <textarea
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
+              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm sm:text-sm leading-relaxed text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px]"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleFillAddress}
+              disabled={resolvingAddr}
+              className="mt-1 w-full sm:w-auto text-[12px] sm:text-sm"
+            >
+              {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
+            </Button>
+          </div>
+          {/* Ảnh */}
+          <div className="space-y-1.5">
+            <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
+            <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+            <p className="text-[11px] text-gray-500 dark:text-gray-400">Bắt buộc: tên, địa chỉ, ảnh.</p>
+          </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="address">Địa chỉ</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder={gmapResolving ? 'Đang lấy địa chỉ...' : (resolvingAddr ? 'Đang lấy địa chỉ...' : 'Nhập địa chỉ')}
-                    className="flex-1"
-                  />
-                  <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
-                    {resolvingAddr ? 'Đang lấy…' : 'Lấy lại'}
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Có thể chỉnh sửa địa chỉ trước khi lưu.</p>
-              </div>
+          {/* Toggle optional */}
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
+            >
+              {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
+              <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
+            </Button>
+          </div>
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="phone">Số điện thoại</Label>
+          {showAdvanced && (
+            <div className="grid gap-3 pt-2 animate-fadeIn">
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -663,44 +689,35 @@ export default function AddStore() {
                   pattern="[0-9+ ]*"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="VD: 0901234567"
+                  placeholder="0901 234 567"
                 />
               </div>
-
-              <div className="grid gap-1.5">
-                <Label htmlFor="note">Ghi chú</Label>
-                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú thêm (không bắt buộc)" />
+              <div className="space-y-1.5">
+                <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
+                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" />
               </div>
-
-              <div className="grid gap-1.5">
-                <Label htmlFor="gmap">Link Google Maps (không bắt buộc)</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link google maps</Label>
                 <Input
                   id="gmap"
                   value={gmapLink}
                   onChange={(e) => setGmapLink(e.target.value)}
-                  placeholder="Dán liên kết Google Maps"
+                  placeholder="https://maps.app.goo.gl/AbCd1234"
                   className={gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}
                 />
-                {gmapMessage && gmapStatus === 'error' && (
-                  <div className="text-xs text-red-600">
-                    {gmapMessage}
-                  </div>
+                {gmapMessage && (
+                  <div className={`text-[11px] ${gmapStatus === 'error' ? 'text-red-600' : gmapStatus === 'success' ? 'text-green-600' : 'text-gray-500'}`}>{gmapMessage}</div>
                 )}
               </div>
+            </div>
+          )}
 
-              <div className="grid gap-1.5">
-                <Label htmlFor="image">Ảnh đại diện</Label>
-                <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-              </div>
-
-              <div className="pt-2">
-                <Button type="submit" disabled={loading || gmapResolving} className="w-full text-sm sm:text-base">
-                  {loading || gmapResolving ? 'Đang thêm…' : 'Thêm cửa hàng'}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+          <div className="pt-2">
+            <Button type="submit" disabled={loading || gmapResolving} className="w-full text-sm sm:text-base">
+              {loading || gmapResolving ? 'Đang thêm…' : 'Lưu'}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -50,6 +50,30 @@ Xác định các quy tắc nghiệp vụ bất biến cho việc tìm kiếm c�
 - `endReached` gọi `loadMore()`.
 - `overscan = 300`.
 
+## 6.1. Skeleton Loading (MỚI v1.2)
+Mục tiêu: Tránh nhấp nháy trạng thái "Không tìm thấy" trong giai đoạn debounce hoặc đang fetch.
+
+Quy tắc hiển thị skeleton:
+- Điều kiện xuất hiện: `searchTerm.length >= MIN_SEARCH_LEN` VÀ (`loading === true` HOẶC đang chờ debounce => `isPendingSearch === true`).
+- Khi skeleton hiển thị: KHÔNG hiển thị trạng thái "Không tìm thấy".
+- Ẩn skeleton khi: `!loading && !isPendingSearch`.
+- Tránh double-state: chỉ một trong 3 nhóm xuất hiện cùng lúc (skeleton | empty-state | danh sách thật).
+
+Layout skeleton (phải mô phỏng gần giống thẻ store thật):
+1. Khung thẻ: border + rounded-xl giống card thật.
+2. Vùng ảnh: khối `div` cao `h-56 sm:h-64` nền xám (`bg-gray-200 dark:bg-gray-800`) có `animate-pulse`.
+3. Tiêu đề: thanh chữ nhật `h-5 w-2/3`.
+4. Meta lines: 3-4 thanh `h-3` với độ rộng giảm dần (100%, 5/6, 2/3, 1/2).
+5. Nút hành động: 2 khối `h-9 flex-1` bo góc.
+6. Số lượng skeleton mặc định: 3 thẻ.
+7. Trạng thái pending (debounce chưa gọi API) có thể giảm opacity (ví dụ `opacity-70`) để phân biệt với đang loading thật.
+
+Biến liên quan trong code:
+- `isPendingSearch = searchTerm.length >= MIN_SEARCH_LEN && lastQueryRef.current !== searchTerm`.
+- `showSkeleton = searchTerm.length >= MIN_SEARCH_LEN && (loading || isPendingSearch)`.
+
+Không được thay đổi semantic này nếu chưa cập nhật tài liệu.
+
 ## 7. Chuyển vị trí (Location Switch)
 - Chế độ: `npp` | `user`.
 - Vị trí tham chiếu:
@@ -87,8 +111,10 @@ Quy tắc:
 5. Không mutate trực tiếp mảng `searchResults` hiện tại.
 6. Không thay đổi `PAGE_SIZE`, `MIN_SEARCH_LEN`, hay debounce nếu chưa chỉnh tài liệu.
 7. Không pre-load trang kế tiếp tự động trước lần load hợp lệ đầu tiên (khi suppression còn hiệu lực).
-8. (Mới) Không hiển thị nút tạo nếu người dùng chưa đăng nhập hoặc chưa đạt đủ điều kiện no-result.
-9. (Mới) Prefill param `name` chỉ phản ánh thời điểm xây link, không ép buộc tên khi submit nếu người dùng xóa/sửa.
+8. (v1.1) Không hiển thị nút tạo nếu người dùng chưa đăng nhập hoặc chưa đạt đủ điều kiện no-result.
+9. (v1.1) Prefill param `name` chỉ phản ánh thời điểm xây link, không ép buộc tên khi submit nếu người dùng xóa/sửa.
+10. (v1.2) KHÔNG hiển thị empty-state trong khi `showSkeleton === true`.
+11. (v1.2) Logic xác định `showSkeleton` chỉ dựa trên (đủ ký tự) AND (loading OR isPendingSearch).
 
 ## 12. Các thay đổi an toàn (cập nhật tài liệu nếu đổi)
 - UI / Styling / Skeleton.
@@ -97,6 +123,7 @@ Quy tắc:
 - Thêm cache theo `searchTerm`.
 - Thêm AbortController để hủy request cũ.
 - Thay đổi text thông báo no-result hoặc label nút tạo.
+- (v1.2) Số lượng skeleton hoặc pattern thanh có thể điều chỉnh nếu giữ nguyên nguyên tắc mô phỏng.
 
 ## 13. Checklist Dev (trước khi commit)
 - [ ] Search debounce đúng thời gian.
@@ -108,6 +135,8 @@ Quy tắc:
 - [ ] Xử lý tốt khi thiếu tọa độ.
 - [ ] CTA no-result chỉ xuất hiện đúng điều kiện.
 - [ ] Link tạo chứa query `name` chính xác và được encode.
+- [ ] (v1.2) Không flash trạng thái "Không tìm thấy" trong giai đoạn debounce/loading (đã thấy skeleton thay thế).
+- [ ] (v1.2) Skeleton giống bố cục thẻ store thật.
 
 ## 14. Kịch bản test thủ công
 | Kịch bản | Kỳ vọng |
@@ -120,6 +149,7 @@ Quy tắc:
 | Cố tình trùng id khi loadMore | Không xuất hiện bản sao |
 | No result & logged in | Thấy nút tạo + param name đúng |
 | No result & not logged in | Không có nút tạo, chỉ nhắc đăng nhập |
+| Gõ nhanh thay đổi ký tự liên tục | Chỉ skeleton xuất hiện, không nhấp nháy empty-state |
 
 ## 15. Mở rộng tương lai (chưa làm)
 - Prefetch trang kế tiếp khi idle.
@@ -131,6 +161,7 @@ Quy tắc:
 ## 16. Lịch sử thay đổi
 - v1.0 (Khởi tạo): Khóa hành vi hiện tại (2025-08-15).
 - v1.1 (2025-08-15): Thêm CTA tạo cửa hàng khi không có kết quả.
+- v1.2 (2025-08-15): Thêm cơ chế skeleton mô phỏng thẻ store & chặn flash empty-state.
 
 ---
 Luôn cập nhật tài liệu này khi thay đổi hành vi liên quan.

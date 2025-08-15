@@ -236,6 +236,8 @@ export default function HomePage() {
   }
 
   const visitListCount = stores.length
+  const isPendingSearch = searchTerm.length >= MIN_SEARCH_LEN && lastQueryRef.current !== searchTerm
+  const showSkeleton = searchTerm.length >= MIN_SEARCH_LEN && (loading || isPendingSearch)
 
   // Infinite scroll observer
   const sentinelRef = useCallback(node => {
@@ -284,17 +286,31 @@ export default function HomePage() {
         </div>
         {/* Search Results */}
         <div className="space-y-4">
-          {loading && searchTerm.length >= MIN_SEARCH_LEN && (
-            <div className="space-y-4">
+          {showSkeleton && (
+            <div className="space-y-4" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
               {[...Array(3)].map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-4">
-                    <div className="flex space-x-4">
-                      <Skeleton className="h-16 w-16 rounded" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                        <Skeleton className="h-3 w-2/3" />
+                <Card
+                  key={i}
+                  className={`overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 ${loading ? '' : 'opacity-70'}`}
+                >
+                  <CardContent className="p-0">
+                    {/* Image area */}
+                    <div className="relative w-full h-56 sm:h-64 bg-gray-200 dark:bg-gray-800 animate-pulse" />
+                    {/* Content area */}
+                    <div className="p-4 flex flex-col gap-3">
+                      {/* Title */}
+                      <div className="h-5 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+                      {/* Meta lines */}
+                      <div className="space-y-2">
+                        <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+                        <div className="h-3 w-5/6 bg-gray-200 dark:bg-gray-700 rounded" />
+                        <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+                        <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+                      </div>
+                      {/* Action buttons */}
+                      <div className="flex gap-3 pt-2">
+                        <div className="h-9 flex-1 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+                        <div className="h-9 flex-1 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
                       </div>
                     </div>
                   </CardContent>
@@ -303,7 +319,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {!loading && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
+          {!loading && !isPendingSearch && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
