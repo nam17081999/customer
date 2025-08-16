@@ -70,6 +70,7 @@ export default function HomePage() {
   const observer = useRef(null)
   const suppressFirstAutoLoad = useRef(false)
   const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
+  const searchInputRef = useRef(null)
 
   // Load stores from localStorage on component mount
   useEffect(() => {
@@ -350,6 +351,13 @@ export default function HomePage() {
     }
   }, [])
 
+  // Auto focus search input on mount for faster typing
+  useEffect(() => {
+    if (searchInputRef.current) {
+      try { searchInputRef.current.focus() } catch {}
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-3 max-w-screen-md mx-auto">
@@ -364,10 +372,12 @@ export default function HomePage() {
         <div>
           {/* Font >=16px để tránh iOS tự zoom khi focus input */}
           <Input
+            ref={searchInputRef}
             type="text"
             placeholder="Tìm kiếm cửa hàng..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            autoComplete="off"
             className="w-full text-base sm:text-base"
           />
         </div>

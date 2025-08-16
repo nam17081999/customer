@@ -40,6 +40,7 @@ export default function AddStore() {
   const [showSuccess, setShowSuccess] = useState(false)
   const lastParsedRef = useRef(null)
   const parseTimerRef = useRef(null)
+  const nameAutoFillRef = useRef({ filled: false, link: null })
 
   useEffect(() => {
     if (!user) return
@@ -282,18 +283,26 @@ export default function AddStore() {
     parseTimerRef.current = setTimeout(async () => {
       const current = gmapLink.trim()
       if (!current) return
+      // Auto-fill name only once per distinct link if input currently empty
+      if (!name.trim() && (!nameAutoFillRef.current.filled || nameAutoFillRef.current.link !== current)) {
+        try {
+          const possibleName = extractSearchTextFromGoogleMapsUrl(current)
+          if (possibleName) {
+            setName(toTitleCaseVI(possibleName))
+            nameAutoFillRef.current = { filled: true, link: current }
+          }
+        } catch {}
+      }
       if (lastParsedRef.current === current) return
       lastParsedRef.current = current
       setGmapResolving(true)
       setGmapStatus('processing')
       setGmapMessage('Đang đọc link…')
       try {
-        // Order: direct / expand / search text handled inside resolveLatLngFromAnyLink
         const coords = await resolveLatLngFromAnyLink(current)
         if (coords) {
           setGmapStatus('success')
           setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
-          // Reverse geocode (always overwrite per spec rule #6)
           try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch {}
         } else {
           setGmapStatus('error')
@@ -308,7 +317,7 @@ export default function AddStore() {
       }
     }, 400)
     return () => { if (parseTimerRef.current) clearTimeout(parseTimerRef.current) }
-  }, [gmapLink])
+  }, [gmapLink, name])
 
   if (!user) {
     return (
