@@ -6,7 +6,7 @@ import { useAuth } from '@/components/auth-context'
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { SelectedStoreItem } from '@/components/store-card'
+import DetailStoreCard from '@/components/detail-store-card'
 import Link from 'next/link'
 import LocationSwitch from '@/components/location-switch'
 import { haversineKm } from '@/helper/distance'
@@ -334,7 +334,7 @@ export default function VisitListPage() {
                         <SortableItem 
                           item={store}
                           render={(item, dragAttributes, dragListeners) => (
-                            <SelectedStoreItem 
+                            <DetailStoreCard 
                               item={storeWithDistance}
                               dragAttributes={!sortByDistance ? dragAttributes : {}}
                               dragListeners={!sortByDistance ? dragListeners : {}}

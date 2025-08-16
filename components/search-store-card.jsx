@@ -85,10 +85,10 @@ export default function SearchStoreCard({ store, onAdd, isAdded, distance }) {
               </div>
             )}
             {/* Ghi chú */}
-            {store.notes && (
+            {store.note && (
               <div className="flex items-start gap-1.5">
-                <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h5l5 5v7a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 4v6h6" /></svg>
-                <p className="text-amber-600 dark:text-amber-300 italic line-clamp-2 break-words flex-1">{store.notes}</p>
+                <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h5l5 5v7a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 4v6h6" /></svg>
+                <p className="line-clamp-3 break-words flex-1">{store.note}</p>
               </div>
             )}
           </div>
