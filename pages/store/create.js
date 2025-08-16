@@ -254,6 +254,15 @@ export default function AddStore() {
       setGmapLink('')
       setGmapStatus('')
       setGmapMessage('')
+      // Clear ?name from URL so it does not persist on next visit
+      if (router.query?.name) {
+        try {
+          const { name: _discard, ...rest } = router.query
+          router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true })
+        } catch {
+          router.replace(router.pathname)
+        }
+      }
     } catch (err) {
       console.error(err)
       alert('Đã xảy ra lỗi')

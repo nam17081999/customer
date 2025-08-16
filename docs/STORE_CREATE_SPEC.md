@@ -1,9 +1,10 @@
-# Store Create Screen Specification (v1.2)
+# Store Create Screen Specification (v1.3)
 
 ## Purpose
 Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo cửa hàng mới với các thông tin bắt buộc tối thiểu và một số thông tin tùy chọn mở rộng.
 
 ## Version
+- v1.3 (2025-08-16): Thêm cơ chế prefill trường tên từ query param `?name=` khi mở màn hình tạo; sau khi tạo thành công phải xoá param `name` khỏi URL (shallow replace) để không prefill lần tiếp theo.
 - v1.2 (2025-08-16): Chuẩn hoá kích thước font tất cả input & textarea về 14px (Tailwind `text-sm`) đồng nhất trên mọi kích thước màn hình.
 - v1.1 (2025-08-15): Thêm rule chuẩn hoá địa chỉ: nếu người dùng nhập toàn bộ lowercase thì tự động chuyển Title Case trước khi lưu.
 - v1.0 (2025-08-15): Khởi tạo tài liệu ban đầu.
@@ -11,7 +12,7 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 ## Các trường dữ liệu
 | Trường | Bắt buộc | Mô tả | Ghi chú |
 |--------|----------|-------|---------|
-| name | Yes | Tên cửa hàng hiển thị | Chuẩn hóa Title Case trước khi lưu (toTitleCaseVI) |
+| name | Yes | Tên cửa hàng hiển thị | Prefill từ query `?name=` nếu có, chuẩn hóa Title Case trước khi lưu (toTitleCaseVI) |
 | address | Yes | Địa chỉ văn bản | Có auto-fill bằng geolocation hoặc reverse geocode từ link (nếu toàn lowercase sẽ auto Title Case) |
 | image_url | Yes | Tên file ảnh trên ImageKit | Ảnh nén trước khi upload (image/jpeg) |
 | phone | No | Số điện thoại liên hệ | Chỉ hiển thị khi bật phần "Thêm thông tin khác" |
@@ -37,6 +38,7 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 13. Không refetch hay reload trang sau khi tạo — chỉ reset state cục bộ.
 14. Placeholder phải là dữ liệu mẫu thực tế để hướng dẫn nhập.
 15. (v1.2) Kích thước font của TẤT CẢ input, file input, textarea, phone, note, gmapLink: cố định 14px (`text-sm`) trên mọi breakpoint để đảm bảo đồng nhất mật độ thị giác.
+16. (v1.3) Prefill tên từ query `?name=` nếu tồn tại khi mount; SAU KHI tạo thành công phải xoá param `name` khỏi URL (shallow) để không prefill lần sau.
 
 ## Luồng xử lý Submit
 1. Validate bắt buộc.
@@ -71,6 +73,7 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 - Nếu reverse geocode từ link thành công sẽ ghi đè address hiện tại (vì giả định chính xác hơn).
 - Nếu người dùng đã tự sửa address sau khi parse → thay đổi gmapLink mới vẫn có thể ghi đè (chấp nhận theo rule đơn giản; tương lai có thể khóa). 
 - Khi geolocation bị từ chối và không có link → thông báo lỗi và dừng.
+- Prefill name: chỉ diễn ra một lần khi load nếu hiện diện query `name`. Sau success phải xoá để tránh prefill cho lần tiếp.
 
 ## Hiệu năng & Tối ưu (Future Ideas - Non Binding)
 - Cache kết quả geocode forward (text → lat/lng) bằng sessionStorage theo key.
@@ -89,9 +92,11 @@ Màn hình thêm cửa hàng cho phép người dùng đã đăng nhập tạo c
 - [ ] Submit thành công hiển thị Msg và biến mất sau ~2.5s.
 - [ ] Khi Msg ẩn đi không gây layout jump form.
 - [ ] (v1.2) Tất cả input & textarea hiển thị cùng một cỡ chữ 14px.
+- [ ] Query `?name=...` có mặt → input tên được prefill.
+- [ ] Sau khi tạo thành công, URL không còn query `name`.
 
 ## Không được thay đổi tự do
 Các mục trong phần "Immutable Rules" chỉ thay đổi nếu bump version (v1.3, v1.4...) kèm lý do.
 
 ---
-End of v1.2
+End of v1.3
