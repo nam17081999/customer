@@ -10,6 +10,17 @@ import Link from 'next/link'
 import { toTitleCaseVI } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
+import {
+  cleanNominatimDisplayName,
+  parseLatLngFromText,
+  parseLatLngFromGoogleMapsUrl,
+  extractSearchTextFromGoogleMapsUrl,
+  geocodeWithGoogle,
+  geocodeTextToLatLngAddress,
+  resolveLatLngFromAnyLink,
+  reverseGeocodeFromLatLng,
+  setExpandShortLink
+} from '@/lib/createStoreUtils'
 
 export default function AddStore() {
   const { user } = useAuth()
@@ -28,6 +39,7 @@ export default function AddStore() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const lastParsedRef = useRef(null)
+  const parseTimerRef = useRef(null)
 
   useEffect(() => {
     if (!user) return
@@ -43,396 +55,6 @@ export default function AddStore() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
-
-  function cleanNominatimDisplayName(name) {
-    if (!name) return ''
-    const parts = name.split(',').map((p) => p.trim())
-    while (parts.length > 0) {
-      const last = parts[parts.length - 1]
-      if (last.toLowerCase() === 'việt nam' || /^[0-9]{4,6}$/.test(last)) {
-        parts.pop()
-        continue
-      }
-      break
-    }
-    return parts.join(', ')
-  }
-
-  function parseLatLngFromText(text) {
-    if (!text) return null
-    try {
-      const decoded = decodeURIComponent(text)
-      console.log('🔍 Parsing text for coordinates:', decoded)
-      
-      // Pattern 1: @lat,lng,zoom (most common)
-      let m = decoded.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found @lat,lng pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 2: !3dlat!4dlng (Google deep params)
-      m = decoded.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found !3d!4d pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 3: lat,lng separated by comma or %2C
-      m = decoded.match(/(-?\d{1,2}\.\d+)\s*(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found lat,lng pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 4: lat,lng with space separator
-      m = decoded.match(/(-?\d{1,2}\.\d+)\s+(-?\d{1,3}\.\d+)/i)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found lat lng pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 5: lat,lng in parentheses
-      m = decoded.match(/\((-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)\)/i)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found (lat,lng) pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      console.log('❌ No coordinate patterns found in text')
-      return null
-    } catch (error) {
-      console.log('❌ Text parsing error:', error)
-      return null
-    }
-  }
-
-  function parseLatLngFromGoogleMapsUrl(input) {
-    if (!input) return null
-    let urlStr = input.trim()
-    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
-    
-    console.log('🔍 Parsing URL:', urlStr)
-    
-    try {
-      const u = new URL(urlStr)
-      
-      // Pattern 1: @lat,lng,zoom (most common in shared links)
-      let m = urlStr.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found coordinates via @pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 2: !3dlat!4dlng (Google deep params)
-      m = urlStr.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found coordinates via !3d!4d pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 3: lat,lng in query params
-      const candParams = ['destination', 'q', 'query', 'll', 'saddr', 'daddr', 'center']
-      for (const key of candParams) {
-        const val = u.searchParams.get(key)
-        if (val) {
-          console.log(`🔍 Checking param ${key}:`, val)
-          const got = parseLatLngFromText(val)
-          if (got) {
-            console.log('✅ Found coordinates in param', key, ':', got)
-            return got
-          }
-        }
-      }
-      
-      // Pattern 4: lat,lng in pathname (for some Google Maps URLs)
-      const fromPath = parseLatLngFromText(u.pathname)
-      if (fromPath) {
-        console.log('✅ Found coordinates in pathname:', fromPath)
-        return fromPath
-      }
-      
-      // Pattern 5: lat,lng in hash fragment
-      const fromHash = parseLatLngFromText(u.hash)
-      if (fromHash) {
-        console.log('✅ Found coordinates in hash:', fromHash)
-        return fromHash
-      }
-      
-      // Pattern 6: Check for coordinates in the entire URL string
-      const fromHref = parseLatLngFromText(u.href)
-      if (fromHref) {
-        console.log('✅ Found coordinates in full URL:', fromHref)
-        return fromHref
-      }
-      
-      console.log('❌ No coordinates found in URL')
-      return null
-    } catch (error) {
-      console.log('❌ URL parsing error:', error)
-      // Last resort: try raw text regex
-      return parseLatLngFromText(input)
-    }
-  }
-
-  function extractSearchTextFromGoogleMapsUrl(input) {
-    if (!input) return null
-    let urlStr = input.trim()
-    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
-    try {
-      const u = new URL(urlStr)
-      
-      // Try query parameters first
-      const qParams = ['q', 'query', 'destination']
-      for (const k of qParams) {
-        const v = u.searchParams.get(k)
-        if (v) {
-          const decoded = decodeURIComponent(v.replace(/\+/g, ' '))
-          // Skip if it looks like coordinates
-          if (!/^-?\d+\.\d+/.test(decoded)) {
-            return decoded
-          }
-        }
-      }
-      
-      // Try /place/<name>/... → take the segment after /place/
-      const parts = u.pathname.split('/').filter(Boolean)
-      const idx = parts.findIndex((p) => p.toLowerCase() === 'place')
-      if (idx !== -1 && parts[idx + 1]) {
-        return decodeURIComponent(parts[idx + 1].replace(/\+/g, ' '))
-      }
-      
-      // Try /search/<name>/... → take the segment after /search/
-      const searchIdx = parts.findIndex((p) => p.toLowerCase() === 'search')
-      if (searchIdx !== -1 && parts[searchIdx + 1]) {
-        return decodeURIComponent(parts[searchIdx + 1].replace(/\+/g, ' '))
-      }
-      
-      return null
-    } catch {
-      return null
-    }
-  }
-
-  async function geocodeWithGoogle(address) {
-    try {
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-      if (!apiKey) {
-        console.log('⚠️ Google Maps API key not configured, falling back to Nominatim')
-        return await geocodeTextToLatLngAddress(address)
-      }
-      
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}&language=vi&region=vn`
-      const res = await fetch(url)
-      
-      if (!res.ok) throw new Error('Google Geocoding API error')
-      
-      const data = await res.json()
-      
-      if (data.status === 'OK' && data.results.length > 0) {
-        const result = data.results[0]
-        const { lat, lng } = result.geometry.location
-        const formattedAddress = result.formatted_address
-        
-        console.log('✅ Google Geocoding success:', { lat, lng, address: formattedAddress })
-        return { lat, lng, address: formattedAddress }
-      }
-      
-      console.log('❌ Google Geocoding no results:', data.status)
-      return null
-    } catch (error) {
-      console.error('❌ Google Geocoding error:', error)
-      // Fallback to Nominatim
-      return await geocodeTextToLatLngAddress(address)
-    }
-  }
-
-  async function geocodeTextToLatLngAddress(text) {
-    if (!text) return null
-    try {
-      const q = encodeURIComponent(text)
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}&accept-language=vi`
-      const res = await fetch(url)
-      if (!res.ok) return null
-      const arr = await res.json()
-      if (!Array.isArray(arr) || arr.length === 0) return null
-      const item = arr[0]
-      const lat = parseFloat(item.lat)
-      const lon = parseFloat(item.lon)
-      if (!isFinite(lat) || !isFinite(lon)) return null
-      const cleaned = cleanNominatimDisplayName(item.display_name || '')
-      return { lat, lng: lon, address: cleaned }
-    } catch {
-      return null
-    }
-  }
-
-  async function resolveLatLngFromAnyLink(input) {
-    if (!input || !input.trim()) return null
-    
-    const urlStr = input.trim()
-    console.log('🔍 Resolving coordinates from:', urlStr)
-    
-    // Step 1: Try direct parse first
-    const direct = parseLatLngFromGoogleMapsUrl(urlStr)
-    if (direct) {
-      console.log('✅ Direct parse success:', direct)
-      return direct
-    }
-
-    // Step 2: Try following redirect to expand short link and parse final URL
-    try {
-      let fullUrl = urlStr
-      if (!/^https?:\/\//i.test(fullUrl)) fullUrl = `https://${fullUrl}`
-      
-      console.log('🔄 Expanding short link...')
-      const finalUrl = await expandShortLink(fullUrl)
-      if (finalUrl && finalUrl !== fullUrl) {
-        console.log('✅ Expanded to:', finalUrl)
-        const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-        if (parsed) {
-          console.log('✅ Parse from expanded URL success:', parsed)
-          return parsed
-        }
-      }
-    } catch (error) {
-      console.log('❌ Link expansion failed:', error)
-    }
-
-    // Step 3: Fallback: extract search text and use Google Geocoding
-    console.log('🔍 Trying text extraction with Google Geocoding...')
-    const text = extractSearchTextFromGoogleMapsUrl(urlStr)
-    if (text) {
-      console.log('✅ Extracted text:', text)
-      const geo = await geocodeWithGoogle(text)
-      if (geo) {
-        console.log('✅ Google Geocoding success:', { lat: geo.lat, lng: geo.lng })
-        return { lat: geo.lat, lng: geo.lng }
-      }
-    }
-
-    console.log('❌ All resolution methods failed')
-    return null
-  }
-
-  async function reverseGeocodeFromLatLng(lat, lon) {
-    try {
-      setGmapResolving(true)
-      const latR = Number(lat.toFixed(5))
-      const lonR = Number(lon.toFixed(5))
-      const cacheKey = `revgeo:${latR},${lonR}`
-      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
-      if (cached) {
-        setAddress(cached)
-        return
-      }
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latR}&lon=${lonR}&zoom=18&addressdetails=1&accept-language=vi`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Reverse geocoding failed')
-      const data = await res.json()
-      const text = data?.display_name || ''
-      const cleaned = cleanNominatimDisplayName(text)
-      if (cleaned) {
-        setAddress(cleaned)
-        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
-      }
-    } catch (e) {
-      console.error('Reverse geocode (from link) error:', e)
-    } finally {
-      setGmapResolving(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!gmapLink || !gmapLink.trim()) {
-      setGmapStatus('')
-      setGmapMessage('')
-      return
-    }
-    
-    const t = setTimeout(async () => {
-      setGmapResolving(true)
-      setGmapStatus('processing')
-      
-      try {
-        // First try direct parse
-        const direct = parseLatLngFromGoogleMapsUrl(gmapLink.trim())
-        if (direct) {
-          const last = lastParsedRef.current
-          if (!last || Math.abs(last.lat - direct.lat) > 1e-5 || Math.abs(last.lng - direct.lng) > 1e-5) {
-            lastParsedRef.current = direct
-            await reverseGeocodeFromLatLng(direct.lat, direct.lng)
-            setGmapStatus('success')
-          }
-          return
-        }
-        
-        // Try expand via API then parse
-        const finalUrl = await expandShortLink(gmapLink.trim())
-        if (finalUrl) {
-          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-          if (parsed) {
-            lastParsedRef.current = parsed
-            await reverseGeocodeFromLatLng(parsed.lat, parsed.lng)
-            setGmapStatus('success')
-            return
-          }
-        }
-        
-        // Fallback to Google Geocoding
-        const text = extractSearchTextFromGoogleMapsUrl(gmapLink.trim())
-        if (text) {
-          const geo = await geocodeWithGoogle(text)
-          if (geo) {
-            lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
-            if (geo.address) {
-              setAddress(geo.address)
-              setGmapStatus('success')
-              setGmapMessage('✅ Lấy được vị trí từ Google Geocoding')
-            } else {
-              setGmapStatus('success')
-              setGmapMessage('✅ Lấy được tọa độ từ Google Geocoding')
-            }
-          } else {
-            setGmapStatus('error')
-            setGmapMessage('Không tìm thấy địa điểm')
-          }
-        } else {
-          setGmapStatus('error')
-          setGmapMessage('Không thể đọc được thông tin từ liên kết')
-        }
-      } catch (error) {
-        console.error('Google Maps link processing error:', error)
-        setGmapStatus('error')
-        setGmapMessage('Lỗi khi xử lý liên kết')
-      } finally {
-        setGmapResolving(false)
-      }
-    }, 400)
-    
-    return () => clearTimeout(t)
-  }, [gmapLink])
 
   async function handleFillAddress() {
     try {
@@ -456,6 +78,25 @@ export default function AddStore() {
       alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
     } finally {
       setResolvingAddr(false)
+    }
+  }
+
+  // Paste Google Maps link from clipboard
+  async function handlePasteGmap() {
+    try {
+      if (!navigator.clipboard?.readText) {
+        alert('Trình duyệt không hỗ trợ đọc clipboard')
+        return
+      }
+      const text = (await navigator.clipboard.readText()).trim()
+      if (!text) {
+        alert('Clipboard trống')
+        return
+      }
+      setGmapLink(text)
+    } catch (e) {
+      console.warn('Clipboard read error:', e)
+      alert('Không đọc được clipboard. Hãy dán thủ công (Cmd+V).')
     }
   }
 
@@ -621,6 +262,45 @@ export default function AddStore() {
     }
   }
 
+  // Debounced parsing of Google Maps link
+  useEffect(() => {
+    if (!gmapLink) {
+      setGmapStatus('')
+      setGmapMessage('')
+      return
+    }
+    if (parseTimerRef.current) clearTimeout(parseTimerRef.current)
+    parseTimerRef.current = setTimeout(async () => {
+      const current = gmapLink.trim()
+      if (!current) return
+      if (lastParsedRef.current === current) return
+      lastParsedRef.current = current
+      setGmapResolving(true)
+      setGmapStatus('processing')
+      setGmapMessage('Đang đọc link…')
+      try {
+        // Order: direct / expand / search text handled inside resolveLatLngFromAnyLink
+        const coords = await resolveLatLngFromAnyLink(current)
+        if (coords) {
+          setGmapStatus('success')
+          setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
+          // Reverse geocode (always overwrite per spec rule #6)
+          try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch {}
+        } else {
+          setGmapStatus('error')
+          setGmapMessage('Không trích xuất được tọa độ từ link')
+        }
+      } catch (err) {
+        console.warn('Parse gmap link error', err)
+        setGmapStatus('error')
+        setGmapMessage('Lỗi khi xử lý link')
+      } finally {
+        setGmapResolving(false)
+      }
+    }, 400)
+    return () => { if (parseTimerRef.current) clearTimeout(parseTimerRef.current) }
+  }, [gmapLink])
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -706,13 +386,26 @@ export default function AddStore() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link google maps</Label>
-                <Input
-                  id="gmap"
-                  value={gmapLink}
-                  onChange={(e) => setGmapLink(e.target.value)}
-                  placeholder="https://maps.app.goo.gl/AbCd1234"
-                  className={`${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''} text-sm`}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    id="gmap"
+                    value={gmapLink}
+                    onChange={(e) => setGmapLink(e.target.value)}
+                    placeholder="https://maps.app.goo.gl/AbCd1234"
+                    className={`${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''} text-sm flex-1`}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handlePasteGmap}
+                    disabled={gmapResolving}
+                    className="h-10 px-3 shrink-0 text-sm"
+                    aria-label="Dán link Google Maps"
+                  >
+                    Dán
+                  </Button>
+                </div>
                 {gmapMessage && (
                   <div className={`text-[11px] ${gmapStatus === 'error' ? 'text-red-600' : gmapStatus === 'success' ? 'text-green-600' : 'text-gray-500'}`}>{gmapMessage}</div>
                 )}
@@ -733,31 +426,17 @@ export default function AddStore() {
 
 async function expandShortLink(urlStr) {
   try {
-    console.log('🔄 Expanding short link:', urlStr)
-    
     const res = await fetch('/api/expand-maps-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: urlStr }),
     })
-    
-    if (!res.ok) {
-      console.log('❌ API error:', res.status, res.statusText)
-      return null
-    }
-    
+    if (!res.ok) return null
     const data = await res.json()
-    console.log('✅ API response:', data)
-    
-    if (data?.finalUrl && data.finalUrl !== urlStr) {
-      console.log('✅ Successfully expanded:', urlStr, '→', data.finalUrl)
-      return data.finalUrl
-    } else {
-      console.log('⚠️ No expansion needed or failed')
-      return null
-    }
-  } catch (error) {
-    console.log('❌ Expand link error:', error)
+    if (data?.finalUrl && data.finalUrl !== urlStr) return data.finalUrl
     return null
-  }
+  } catch { return null }
 }
+
+// Inject implementation instead of monkey patching namespace
+setExpandShortLink(expandShortLink)

@@ -65,7 +65,7 @@ export default function Navbar() {
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
-                                <span className="hidden sm:inline">Tìm kiếm</span>
+                                <span className="inline text-xs sm:text-sm">Tìm kiếm</span>
                             </div>
                         </Link>
                     </Button>
@@ -80,7 +80,7 @@ export default function Navbar() {
                         >
                             <Link href="/store/create" aria-label="Thêm cửa hàng">
                                 <Plus className="h-4 w-4" />
-                                <span className="hidden sm:inline">Thêm</span>
+                                <span className="inline text-xs sm:text-sm">Thêm</span>
                             </Link>
                         </Button>
                     )}
