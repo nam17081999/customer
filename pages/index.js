@@ -246,7 +246,7 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from('stores')
         .select('*')
-        .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
         .order('status', { ascending: false })
         .order('created_at', { ascending: false })
         .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1)
@@ -452,6 +452,7 @@ export default function HomePage() {
                       distance={store.distance}
                       onAdd={() => addToList(store)}
                       isAdded={stores.some(s => s.id === store.id)}
+                      searchTerm={searchTerm}
                     />
                   </div>
                 )}
