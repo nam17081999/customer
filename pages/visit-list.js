@@ -11,6 +11,7 @@ import Link from 'next/link'
 import LocationSwitch from '@/components/location-switch'
 import { haversineKm } from '@/helper/distance'
 import { NPP_LOCATION } from '@/lib/constants'
+import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 
 const STORAGE_KEY = 'selectedStores'
 const LOCATION_MODE_KEY = 'locationMode'
@@ -58,6 +59,7 @@ export default function VisitListPage() {
   const [isClient, setIsClient] = useState(false)
   const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // For location comparison
   const [userLocation, setUserLocation] = useState(getInitialUserLocation())
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false)
 
   // Get user location
   useEffect(() => {
@@ -240,7 +242,49 @@ export default function VisitListPage() {
 
   const visitListCount = selectedStores.length
 
-  const openRouteView = useCallback(() => {
+  const openRouteAir = useCallback(() => {
+    try {
+      const coords = []
+      // First point: NPP
+      coords.push([NPP_LOCATION.longitude, NPP_LOCATION.latitude])
+      // Then selected stores in current order (valid coords only)
+      selectedStores.forEach(s => {
+        if (typeof s.latitude === 'number' && typeof s.longitude === 'number') {
+          coords.push([s.longitude, s.latitude])
+        }
+      })
+      if (coords.length < 2) {
+        alert('Chưa đủ dữ liệu tọa độ để vẽ quãng đường')
+        return
+      }
+      const features = [
+        {
+          type: 'Feature',
+          properties: { name: 'Tuyến ghé thăm (đường chim bay)' },
+          geometry: { type: 'LineString', coordinates: coords }
+        },
+        // Markers
+        {
+          type: 'Feature',
+          properties: { name: 'Nhà phân phối (điểm đầu)' },
+          geometry: { type: 'Point', coordinates: coords[0] }
+        },
+        ...coords.slice(1).map((c, idx) => ({
+          type: 'Feature',
+          properties: { name: `Điểm ${idx + 1}` },
+          geometry: { type: 'Point', coordinates: c }
+        }))
+      ]
+      const fc = { type: 'FeatureCollection', features }
+      const url = `https://geojson.io/#data=data:application/json,${encodeURIComponent(JSON.stringify(fc))}`
+      window.open(url, '_blank')
+    } catch (e) {
+      console.error('Open route air view error', e)
+      alert('Không thể mở bản đồ quãng đường (chim bay)')
+    }
+  }, [selectedStores])
+
+  const openRouteRoad = useCallback(() => {
     try {
       const stops = selectedStores
         .filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number')
@@ -269,8 +313,8 @@ export default function VisitListPage() {
       const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointsParam}&travelmode=driving`
       window.open(url, '_blank')
     } catch (e) {
-      console.error('Open route view error', e)
-      alert('Không thể mở bản đồ quãng đường')
+      console.error('Open route road view error', e)
+      alert('Không thể mở bản đồ quãng đường (đường bộ)')
     }
   }, [selectedStores])
 
@@ -308,21 +352,55 @@ export default function VisitListPage() {
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" />
                 </svg>
                 Sắp xếp theo khoảng cách
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={openRouteView}
-                className="text-xs sm:text-sm"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l6 4 6-4 6 4M3 12l6 4 6-4 6 4M3 17l6 4 6-4 6 4" />
-                </svg>
-                Xem quãng đường
-              </Button>
+
+              <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs sm:text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l6 4 6-4 6 4M3 12l6 4 6-4 6 4M3 17l6 4 6-4 6 4" />
+                    </svg>
+                    Xem quãng đường
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm">
+                  <div className="p-2">
+                    <div className="text-sm font-medium mb-3 text-gray-900 dark:text-gray-100">Chọn cách xem quãng đường</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Button
+                        onClick={() => { openRouteRoad(); setRouteDialogOpen(false) }}
+                        className="h-10"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" />
+                        </svg>
+                        Đường bộ (Google Maps)
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { openRouteAir(); setRouteDialogOpen(false) }}
+                        className="h-10"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l6 4 6-4 6 4M3 12l6 4 6-4 6 4M3 17l6 4 6-4 6 4" />
+                        </svg>
+                        Chim bay (GeoJSON)
+                      </Button>
+                    </div>
+                    <DialogClose asChild>
+                      <Button variant="outline" className="w-full mt-3">Đóng</Button>
+                    </DialogClose>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
         </div>

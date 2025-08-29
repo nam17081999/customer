@@ -229,17 +229,38 @@ export default function DetailStoreCard({
                 </div>
               )}
               <div className="truncate text-base font-medium text-gray-900 dark:text-gray-100">{storeData.name}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight">{storeData.address}</div>
+              {/* Địa chỉ với biểu tượng */}
+              {storeData.address && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight mt-0.5 flex items-start gap-1.5">
+                  <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
+                  </svg>
+                  <span className="line-clamp-2 break-words">{storeData.address}</span>
+                </div>
+              )}
+              {/* SĐT với biểu tượng */}
               {storeData.phone && (
-                <div className="truncate text-sm text-gray-600 dark:text-gray-400">
-                  SĐT:{' '}
+                <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight mt-0.5 flex items-start gap-1.5">
+                  <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
                   <a
                     href={`tel:${String(storeData.phone).replace(/[^0-9+]/g, '')}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-blue-600 dark:text-blue-400 hover:underline break-all"
                   >
                     {storeData.phone}
                   </a>
+                </div>
+              )}
+              {/* Ghi chú với biểu tượng */}
+              {storeData.note && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight mt-0.5 flex items-start gap-1.5">
+                  <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  <span className="line-clamp-2 break-words">{storeData.note}</span>
                 </div>
               )}
             </div>
