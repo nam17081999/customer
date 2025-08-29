@@ -56,7 +56,6 @@ export default function VisitListPage() {
   const { user } = useAuth()
   const [selectedStores, setSelectedStores] = useState([])
   const [isClient, setIsClient] = useState(false)
-  const [sortByDistance, setSortByDistance] = useState(false)
   const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // For location comparison
   const [userLocation, setUserLocation] = useState(getInitialUserLocation())
 
@@ -177,32 +176,28 @@ export default function VisitListPage() {
   }, [])
 
   const clearAll = useCallback(() => {
+    if (!window.confirm('Bạn có chắc muốn xóa tất cả cửa hàng đã chọn?')) return
     setSelectedStores([])
   }, [])
 
-  const toggleSortByDistance = useCallback(() => {
-    setSortByDistance(prev => {
-      const newSort = !prev
-      if (newSort) {
-        const referenceLocation = getReferenceLocation()
-        setSelectedStores(prev => [...prev].sort((a, b) => {
-          const distanceA = haversineKm(
-            referenceLocation.latitude,
-            referenceLocation.longitude,
-            a.latitude,
-            a.longitude
-          )
-          const distanceB = haversineKm(
-            referenceLocation.latitude,
-            referenceLocation.longitude,
-            b.latitude,
-            b.longitude
-          )
-          return distanceA - distanceB
-        }))
-      }
-      return newSort
-    })
+  const sortByDistanceNow = useCallback(() => {
+    if (!window.confirm('Sắp xếp danh sách theo khoảng cách?')) return
+    const referenceLocation = getReferenceLocation()
+    setSelectedStores(prev => [...prev].sort((a, b) => {
+      const distanceA = haversineKm(
+        referenceLocation.latitude,
+        referenceLocation.longitude,
+        a.latitude,
+        a.longitude
+      )
+      const distanceB = haversineKm(
+        referenceLocation.latitude,
+        referenceLocation.longitude,
+        b.latitude,
+        b.longitude
+      )
+      return distanceA - distanceB
+    }))
   }, [getReferenceLocation])
 
   const handleLocationModeChange = useCallback((mode) => {
@@ -273,8 +268,8 @@ export default function VisitListPage() {
             <div className="flex items-center gap-2">
               <Button 
                 size="sm" 
-                variant={sortByDistance ? 'default' : 'outline'}
-                onClick={toggleSortByDistance}
+                variant="outline"
+                onClick={sortByDistanceNow}
                 className="text-xs sm:text-sm"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,7 +323,6 @@ export default function VisitListPage() {
                         store.longitude
                       )
                     }
-                    
                     return (
                       <div key={store.id} className="flex-1">
                         <SortableItem 
@@ -336,8 +330,8 @@ export default function VisitListPage() {
                           render={(item, dragAttributes, dragListeners) => (
                             <DetailStoreCard 
                               item={storeWithDistance}
-                              dragAttributes={!sortByDistance ? dragAttributes : {}}
-                              dragListeners={!sortByDistance ? dragListeners : {}}
+                              dragAttributes={dragAttributes}
+                              dragListeners={dragListeners}
                               onRemove={removeFromSelected}
                             />
                           )}

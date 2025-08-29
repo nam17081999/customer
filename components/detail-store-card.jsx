@@ -195,6 +195,10 @@ export default function DetailStoreCard({
 }) {
   const storeData = s || item
   const hasCoords = typeof storeData.latitude === 'number' && typeof storeData.longitude === 'number'
+  const formatDistance = (d) => {
+    if (d === null || d === undefined) return ''
+    return d < 1 ? `${(d * 1000).toFixed(0)} m` : `${d.toFixed(1)} km`
+  }
 
   return (
     <Dialog>
@@ -216,6 +220,14 @@ export default function DetailStoreCard({
               </button>
             )}
             <div className="min-w-0 flex-1">
+              {typeof storeData.distance === 'number' && (
+                <div className="mb-1">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-white text-gray-700 dark:bg-gray-900 dark:text-gray-200 border border-gray-200 dark:border-gray-700">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    {formatDistance(storeData.distance)}
+                  </span>
+                </div>
+              )}
               <div className="truncate text-base font-medium text-gray-900 dark:text-gray-100">{storeData.name}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight">{storeData.address}</div>
               {storeData.phone && (
