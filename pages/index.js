@@ -194,7 +194,7 @@ export default function HomePage() {
       const { data, error } = await supabase
         .from('stores')
         .select('*')
-        .or(`name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
+        .or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
         .order('status', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)

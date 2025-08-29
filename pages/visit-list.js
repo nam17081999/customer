@@ -240,6 +240,40 @@ export default function VisitListPage() {
 
   const visitListCount = selectedStores.length
 
+  const openRouteView = useCallback(() => {
+    try {
+      const stops = selectedStores
+        .filter(s => typeof s.latitude === 'number' && typeof s.longitude === 'number')
+        .map(s => ({ lat: s.latitude, lng: s.longitude }))
+
+      if (stops.length === 0) {
+        alert('Chưa đủ dữ liệu tọa độ để vẽ quãng đường')
+        return
+      }
+
+      const origin = `${NPP_LOCATION.latitude},${NPP_LOCATION.longitude}`
+      const MAX_WAYPOINTS = 23 // số điểm trung gian tối đa (không tính điểm đầu và cuối) cho URL Google Maps
+      const destination = `${stops[stops.length - 1].lat},${stops[stops.length - 1].lng}`
+      const waypointCount = Math.min(stops.length - 1, MAX_WAYPOINTS)
+      const waypointsList = waypointCount > 0
+        ? stops.slice(0, waypointCount).map(p => `${p.lat},${p.lng}`)
+        : []
+      const waypointsParam = waypointsList.length
+        ? `&waypoints=${encodeURIComponent(waypointsList.join('|'))}`
+        : ''
+
+      if (stops.length - 1 > MAX_WAYPOINTS) {
+        alert(`Chỉ hiển thị ${MAX_WAYPOINTS + 1} điểm dừng đầu tiên trên Google Maps (giới hạn).`)
+      }
+
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${waypointsParam}&travelmode=driving`
+      window.open(url, '_blank')
+    } catch (e) {
+      console.error('Open route view error', e)
+      alert('Không thể mở bản đồ quãng đường')
+    }
+  }, [selectedStores])
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-3 max-w-screen-md mx-auto">
@@ -277,6 +311,17 @@ export default function VisitListPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Sắp xếp theo khoảng cách
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openRouteView}
+                className="text-xs sm:text-sm"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7l6 4 6-4 6 4M3 12l6 4 6-4 6 4M3 17l6 4 6-4 6 4" />
+                </svg>
+                Xem quãng đường
               </Button>
             </div>
           )}
