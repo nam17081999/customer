@@ -206,10 +206,10 @@ export default function AddStore() {
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
-      // Chuẩn hoá địa chỉ: nếu toàn bộ ở dạng lowercase thì chuyển sang dạng viết hoa chữ cái đầu mỗi từ
+      // Chuẩn hoá địa chỉ: nếu toàn bộ ở dạng lowercase hoặc uppercase thì chuyển sang dạng viết hoa chữ cái đầu mỗi từ
       let finalAddress = address.trim()
-      if (finalAddress && finalAddress === finalAddress.toLowerCase()) {
-        finalAddress = toTitleCaseVI(finalAddress)
+      if (finalAddress && (finalAddress === finalAddress.toLowerCase() || finalAddress === finalAddress.toUpperCase())) {
+        finalAddress = toTitleCaseVI(finalAddress.toLowerCase())
         if (finalAddress !== address) setAddress(finalAddress)
       }
 
@@ -350,6 +350,15 @@ export default function AddStore() {
                 id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
+                onBlur={() => {
+                  if (!address) return;
+                  const isAllLower = address === address.toLowerCase();
+                  const isAllUpper = address === address.toUpperCase();
+                  if ((isAllLower || isAllUpper) && address.length > 2) {
+                    const fixed = toTitleCaseVI(address.toLowerCase())
+                    setAddress(fixed)
+                  }
+                }}
                 placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
               />
@@ -378,7 +387,38 @@ export default function AddStore() {
           {/* Ảnh */}
           <div className="space-y-1.5">
             <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
-            <Input id="image" type="file" accept="image/*;capture=camera" capture="environment" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
+            <div className="relative w-full">
+              {imageFile ? (
+                <div className="relative group w-full">
+                  <img
+                    src={URL.createObjectURL(imageFile)}
+                    alt="Ảnh xem trước"
+                    className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                  />
+                  <button
+                    type="button"
+                    className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600"
+                    onClick={() => setImageFile(null)}
+                    aria-label="Xoá ảnh"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                  </button>
+                </div>
+              ) : (
+                <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                  <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
+                  <input
+                    id="image"
+                    type="file"
+                    accept="image/*;capture=camera"
+                    capture="environment"
+                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </label>
+              )}
+            </div>
             <p className="text-[11px] text-gray-500 dark:text-gray-400">Bắt buộc: tên, địa chỉ, ảnh.</p>
           </div>
 
