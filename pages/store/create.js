@@ -38,6 +38,20 @@ export default function AddStore() {
   const [gmapMessage, setGmapMessage] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [autoFillAddress, setAutoFillAddress] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('autoFillAddress')
+      if (saved === 'false') return false
+      return true
+    }
+    return true
+  })
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('autoFillAddress', autoFillAddress ? 'true' : 'false')
+    }
+  }, [autoFillAddress])
   const lastParsedRef = useRef(null)
   const parseTimerRef = useRef(null)
   const nameAutoFillRef = useRef({ filled: false, link: null })
@@ -51,11 +65,11 @@ export default function AddStore() {
   // Auto-fill address on mount (no manual typing needed)
   useEffect(() => {
     if (!user) return
-    if (!address && !resolvingAddr) {
+    if (!address && !resolvingAddr && autoFillAddress) {
       handleFillAddress()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user, autoFillAddress])
 
   async function handleFillAddress() {
     try {
@@ -122,7 +136,7 @@ export default function AddStore() {
 
     if (gmapLink && gmapLink.trim()) {
       setLoading(true)
-      
+
       const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
       if (!resolved) {
         // Try expand and parse as last resort
@@ -138,7 +152,7 @@ export default function AddStore() {
         latitude = resolved.lat
         longitude = resolved.lng
       }
-      
+
       if (latitude == null || longitude == null) {
         setLoading(false)
         setGmapStatus('error')
@@ -200,7 +214,7 @@ export default function AddStore() {
       }
 
       const uploadResult = await uploadResponse.json()
-      
+
       // Lưu tên file vào database 
       const imageFilename = uploadResult.name
 
@@ -291,7 +305,7 @@ export default function AddStore() {
             setName(toTitleCaseVI(possibleName))
             nameAutoFillRef.current = { filled: true, link: current }
           }
-        } catch {}
+        } catch { }
       }
       if (lastParsedRef.current === current) return
       lastParsedRef.current = current
@@ -303,7 +317,7 @@ export default function AddStore() {
         if (coords) {
           setGmapStatus('success')
           setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
-          try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch {}
+          try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch { }
         } else {
           setGmapStatus('error')
           setGmapMessage('Không trích xuất được tọa độ từ link')
@@ -335,9 +349,29 @@ export default function AddStore() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Msg type="success" show={showSuccess}>Tạo cửa hàng thành công</Msg>
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
-        <h1 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
+        <div className='flex items-center justify-between'>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Địa chỉ tự động:</span>
+            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setAutoFillAddress(true)}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+              >
+                Bật
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoFillAddress(false)}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+              >
+                Tắt
+              </button>
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Tên */}
           <div className="space-y-1.5">
             <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
             <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
