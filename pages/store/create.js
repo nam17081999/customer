@@ -345,13 +345,26 @@ export default function AddStore() {
           {/* Địa chỉ */}
           <div className="space-y-1.5">
             <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
-            <textarea
-              id="address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px]"
-            />
+            <div className="relative">
+              <textarea
+                id="address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
+              />
+              {address && address.length > 0 && (
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none"
+                  onClick={() => setAddress('')}
+                  aria-label="Xoá nhanh địa chỉ"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                </button>
+              )}
+            </div>
             <Button
               type="button"
               variant="outline"
