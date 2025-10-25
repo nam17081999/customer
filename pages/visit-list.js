@@ -57,6 +57,7 @@ export default function VisitListPage() {
   const { user } = useAuth()
   const [selectedStores, setSelectedStores] = useState([])
   const [isClient, setIsClient] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // For location comparison
   const [userLocation, setUserLocation] = useState(getInitialUserLocation())
   const [routeDialogOpen, setRouteDialogOpen] = useState(false)
@@ -182,25 +183,189 @@ export default function VisitListPage() {
     setSelectedStores([])
   }, [])
 
-  const sortByDistanceNow = useCallback(() => {
-    if (!window.confirm('Sắp xếp danh sách theo khoảng cách?')) return
-    const referenceLocation = getReferenceLocation()
-    setSelectedStores(prev => [...prev].sort((a, b) => {
-      const distanceA = haversineKm(
-        referenceLocation.latitude,
-        referenceLocation.longitude,
-        a.latitude,
-        a.longitude
-      )
-      const distanceB = haversineKm(
-        referenceLocation.latitude,
-        referenceLocation.longitude,
-        b.latitude,
-        b.longitude
-      )
-      return distanceA - distanceB
-    }))
-  }, [getReferenceLocation])
+  // Thuật toán tối ưu quãng đường
+  function haversineKmPrecise(lat1, lng1, lat2, lng2) {
+    const R = 6371 // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  }
+
+  function nearestNeighbor(points, startIdx = 0) {
+    const n = points.length
+    const used = new Array(n).fill(false)
+    const order = [startIdx]
+    used[startIdx] = true
+    
+    for (let i = 1; i < n; i++) {
+      const last = order[order.length - 1]
+      let bestNext = -1
+      let bestDist = Infinity
+      
+      for (let j = 0; j < n; j++) {
+        if (!used[j]) {
+          const dist = haversineKmPrecise(
+            points[last].latitude,
+            points[last].longitude,
+            points[j].latitude,
+            points[j].longitude
+          )
+          if (dist < bestDist) {
+            bestDist = dist
+            bestNext = j
+          }
+        }
+      }
+      
+      used[bestNext] = true
+      order.push(bestNext)
+    }
+    
+    return order
+  }
+
+  function twoOpt(points, order) {
+    let improved = true
+    while (improved) {
+      improved = false
+      
+      for (let i = 1; i < order.length - 2; i++) {
+        for (let j = i + 1; j < order.length - 1; j++) {
+          // Tính độ dài trước khi đổi
+          const d1 = haversineKmPrecise(
+            points[order[i-1]].latitude,
+            points[order[i-1]].longitude,
+            points[order[i]].latitude,
+            points[order[i]].longitude
+          )
+          const d2 = haversineKmPrecise(
+            points[order[j]].latitude,
+            points[order[j]].longitude,
+            points[order[j+1]].latitude,
+            points[order[j+1]].longitude
+          )
+          
+          // Tính độ dài sau khi đổi
+          const d3 = haversineKmPrecise(
+            points[order[i-1]].latitude,
+            points[order[i-1]].longitude,
+            points[order[j]].latitude,
+            points[order[j]].longitude
+          )
+          const d4 = haversineKmPrecise(
+            points[order[i]].latitude,
+            points[order[i]].longitude,
+            points[order[j+1]].latitude,
+            points[order[j+1]].longitude
+          )
+          
+          // Nếu đổi cho kết quả tốt hơn
+          if (d1 + d2 > d3 + d4 + 0.001) { // threshold 1m để tránh floating point
+            // Đảo ngược đoạn từ i đến j
+            const reversed = order.slice(i, j + 1).reverse()
+            order.splice(i, j - i + 1, ...reversed)
+            improved = true
+          }
+        }
+      }
+    }
+    return order
+  }
+
+  const callOSRMTrip = async (coordinates) => {
+    try {
+      // Format: longitude,latitude for OSRM
+      const formatCoords = coords => `${coords[0]},${coords[1]}`
+      
+      // Prepare coordinates array including NPP
+      const allCoords = [
+        [NPP_LOCATION.longitude, NPP_LOCATION.latitude],
+        ...coordinates.map(store => [store.longitude, store.latitude])
+      ]
+      
+      // Build OSRM API URL
+      // source=first: start from NPP
+      // destination=last: end at last point
+      // annotations=true: get detailed info
+      const coordsStr = allCoords.map(formatCoords).join(';')
+      const url = `https://router.project-osrm.org/trip/v1/driving/${coordsStr}?source=first&roundtrip=false&annotations=true`
+      
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('OSRM request failed')
+      
+      const data = await response.json()
+      if (data.code !== 'Ok') throw new Error(data.message || 'OSRM error')
+      
+      // Get the waypoint order (skip first point which is NPP)
+      const order = data.waypoints
+        .sort((a, b) => a.waypoint_index - b.waypoint_index)
+        .map(w => w.waypoint_index)
+        .filter(idx => idx > 0)
+        .map(idx => idx - 1) // Adjust index since we remove NPP
+      
+      // Get total distance in km
+      const totalDistance = data.trips[0].distance / 1000
+      
+      return { order, totalDistance }
+    } catch (error) {
+      console.error('OSRM error:', error)
+      return null
+    }
+  }
+
+  const optimizeRoute = useCallback(async () => {
+    if (!window.confirm('Tối ưu thứ tự ghé thăm để giảm quãng đường?')) return
+
+    // Lọc các điểm có tọa độ hợp lệ
+    const validStores = selectedStores.filter(
+      store => typeof store.latitude === 'number' && typeof store.longitude === 'number'
+    )
+
+    if (validStores.length < 2) {
+      alert('Cần ít nhất 2 điểm có tọa độ để tối ưu quãng đường')
+      return
+    }
+
+    try {
+      // Gọi OSRM Trip API
+      const result = await callOSRMTrip(validStores)
+      
+      if (result) {
+        // Sắp xếp theo thứ tự OSRM trả về
+        const optimizedStores = result.order.map(idx => validStores[idx])
+        
+        // Thêm các điểm không có tọa độ vào cuối
+        const invalidStores = selectedStores.filter(
+          store => typeof store.latitude !== 'number' || typeof store.longitude !== 'number'
+        )
+        
+        // Cập nhật danh sách
+        setSelectedStores([...optimizedStores, ...invalidStores])
+        
+        alert(`Đã tối ưu quãng đường!\nTổng quãng đường (đường bộ): ${result.totalDistance.toFixed(1)}km`)
+      } else {
+        // Fallback to offline algorithm if OSRM fails
+        const startIdx = 0 // Start with first store
+        let order = nearestNeighbor(validStores, startIdx)
+        order = twoOpt(validStores, order)
+        
+        const optimizedStores = order.map(idx => validStores[idx])
+        const invalidStores = selectedStores.filter(
+          store => typeof store.latitude !== 'number' || typeof store.longitude !== 'number'
+        )
+        
+        setSelectedStores([...optimizedStores, ...invalidStores])
+        alert('Không thể kết nối tới OSRM, đã dùng thuật toán offline để tối ưu')
+      }
+    } catch (error) {
+      console.error('Route optimization error:', error)
+      alert('Có lỗi khi tối ưu quãng đường, vui lòng thử lại sau')
+    }
+  }, [selectedStores])
 
   const handleLocationModeChange = useCallback((mode) => {
     const broadcast = (m, loc) => {
@@ -347,14 +512,17 @@ export default function VisitListPage() {
               <Button 
                 size="sm" 
                 variant="outline"
-                onClick={sortByDistanceNow}
+                onClick={() => {
+                  setLoading(true)
+                  optimizeRoute().finally(() => setLoading(false))
+                }}
+                disabled={loading}
                 className="text-xs sm:text-sm"
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 </svg>
-                Sắp xếp theo khoảng cách
+                {loading ? 'Đang tối ưu...' : 'Tối ưu quãng đường'}
               </Button>
 
               <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
