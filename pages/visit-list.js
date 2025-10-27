@@ -62,21 +62,42 @@ export default function VisitListPage() {
   const [userLocation, setUserLocation] = useState(getInitialUserLocation())
   const [routeDialogOpen, setRouteDialogOpen] = useState(false)
 
+  // Helper: multiple high-accuracy geolocation attempts, pick best sample
+  async function getBestPosition({ attempts = 3, timeout = 8000, desiredAccuracy = 30 } = {}) {
+    if (!navigator.geolocation) throw new Error('Geolocation not supported')
+    const samples = []
+    for (let i = 0; i < attempts; i++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout, maximumAge: 0 })
+        })
+        if (pos && pos.coords) {
+          samples.push(pos.coords)
+          if (typeof pos.coords.accuracy === 'number' && pos.coords.accuracy <= desiredAccuracy) return pos.coords
+        }
+      } catch (err) {
+        // ignore and retry
+      }
+    }
+    if (samples.length === 0) throw new Error('Không lấy được vị trí')
+    samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
+    return samples[0]
+  }
+
   // Get user location
   useEffect(() => {
     if (navigator.geolocation && locationMode === 'user') {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          })
-        },
-        (error) => {
+      ;(async () => {
+        try {
+          const coords = await getBestPosition({ attempts: 3, timeout: 8000, desiredAccuracy: 30 })
+          setUserLocation({ latitude: coords.latitude, longitude: coords.longitude })
+          try { localStorage.setItem(USER_LOCATION_KEY, JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude })) } catch {}
+        } catch (error) {
           console.error('Error getting location:', error)
           setLocationMode('npp') // Fallback to NPP
         }
-      )
+      })()
     }
   }, [locationMode])
 
@@ -386,19 +407,18 @@ export default function VisitListPage() {
         alert('Thiết bị không hỗ trợ định vị')
         return
       }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+      ;(async () => {
+        try {
+          const coords = await getBestPosition({ attempts: 3, timeout: 8000, desiredAccuracy: 30 })
+          const loc = { latitude: coords.latitude, longitude: coords.longitude }
           setUserLocation(loc)
           setLocationMode('user')
           broadcast('user', loc)
-        },
-        (err) => {
+        } catch (err) {
           console.error('Get location on switch error:', err)
           alert('Không thể lấy được vị trí của bạn')
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      )
+        }
+      })()
     } else {
       setLocationMode('npp')
       broadcast('npp')

@@ -56,6 +56,31 @@ export default function AddStore() {
   const parseTimerRef = useRef(null)
   const nameAutoFillRef = useRef({ filled: false, link: null })
 
+  // Try multiple high-accuracy geolocation attempts and pick the best sample
+  async function getBestPosition({ attempts = 3, timeout = 10000, desiredAccuracy = 30 } = {}) {
+    if (!navigator.geolocation) throw new Error('Geolocation not supported')
+    const samples = []
+    for (let i = 0; i < attempts; i++) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout, maximumAge: 0 })
+        })
+        if (pos && pos.coords) {
+          samples.push(pos.coords)
+          if (typeof pos.coords.accuracy === 'number' && pos.coords.accuracy <= desiredAccuracy) {
+            return pos.coords
+          }
+        }
+      } catch (err) {
+        // ignore and retry
+      }
+    }
+    if (samples.length === 0) throw new Error('Không lấy được vị trí')
+    samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
+    return samples[0]
+  }
+
   useEffect(() => {
     if (!user) return
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
@@ -74,12 +99,7 @@ export default function AddStore() {
   async function handleFillAddress() {
     try {
       setResolvingAddr(true)
-      const coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos.coords),
-          (err) => reject(err)
-        )
-      })
+      const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Reverse geocoding failed')
@@ -162,19 +182,14 @@ export default function AddStore() {
     } else {
       // No link → fallback to current position
       try {
-        const coords = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => resolve(pos.coords),
-            (err) => reject(err)
-          )
-        })
+        const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
         latitude = coords.latitude
         longitude = coords.longitude
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
         setLoading(false)
         setGmapStatus('error')
-        setGmapMessage('Cần quyền truy cập vị trí')
+        setGmapMessage('Cần quyền truy cập vị trí hoặc vị trí chưa đủ chính xác')
         return
       }
     }
