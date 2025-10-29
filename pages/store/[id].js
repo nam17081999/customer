@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/components/auth-context'
@@ -31,6 +32,22 @@ export default function StoreDetail() {
   const [gmapStatus, setGmapStatus] = useState('') // 'success', 'error', 'processing'
   const [gmapMessage, setGmapMessage] = useState('')
   const lastParsedRef = useRef(null)
+  const [showMapPicker, setShowMapPicker] = useState(true)
+  const [pickedLat, setPickedLat] = useState(null)
+  const [pickedLng, setPickedLng] = useState(null)
+  const mapWrapperRef = useRef(null)
+  const [mapEditable, setMapEditable] = useState(false)
+
+  // stable handler for LocationPicker to avoid conditional hook calls and
+  // ensure the same reference is passed across renders
+  const handleLocationChange = useCallback((lat, lng) => {
+    setPickedLat(lat)
+    setPickedLng(lng)
+  }, [])
+
+  // Dynamically import the LocationPicker (client-side only)
+  // Use the existing Leaflet-based LocationPicker (no Google Maps)
+  const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
   useEffect(() => {
     if (!id) return
@@ -46,6 +63,8 @@ export default function StoreDetail() {
           setAddress(data.address || '')
           setPhone(data.phone || '')
           setNote(data.note || '')
+          setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
+          setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
         }
       })
   }, [id])
@@ -413,7 +432,7 @@ export default function StoreDetail() {
 
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Determine coordinates: prefer link if provided; else keep current store coords or use geolocation
+    // Determine coordinates: prefer link if provided; else prefer picked map coords, then existing store coords, else geolocation
     let latitude = store?.latitude ?? null
     let longitude = store?.longitude ?? null
 
@@ -441,10 +460,14 @@ export default function StoreDetail() {
           return
         }
       }
+    } else if (typeof pickedLat === 'number' && typeof pickedLng === 'number') {
+      // Use position picked on the map picker
+      latitude = pickedLat
+      longitude = pickedLng
     } else if (!latitude || !longitude) {
       // No Maps link and no existing coordinates → use current geolocation as fallback
       try {
-        console.log('📍 No Maps link, getting current location...')
+        console.log('📍 No Maps link or picked coords, getting current location...')
         const coords = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             (pos) => resolve(pos.coords),
@@ -614,6 +637,12 @@ export default function StoreDetail() {
     } catch { return null }
   }
 
+  useEffect(() => {
+    if (showMapPicker && mapWrapperRef.current) {
+      try { mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
+    }
+  }, [showMapPicker])
+
   if (!store) {
     return (
       <div className="mx-auto max-w-2xl p-6">Đang tải...</div>
@@ -652,8 +681,10 @@ export default function StoreDetail() {
                     {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
                   </Button>
                 )}
+                {/* Map is always visible in edit screen now (no toggle) */}
               </div>
             </div>
+            {/* Map picker moved below Google Maps link section (always visible) */}
             <div className="grid gap-1.5">
               <Label>Số điện thoại</Label>
               <Input
@@ -695,6 +726,20 @@ export default function StoreDetail() {
                   <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
                 </span>
               ) : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
+            </div>
+            {/* Always-visible map picker (below the Google Maps link) */}
+            <div className="grid gap-1.5" ref={mapWrapperRef}>
+              <Label>Chọn vị trí trên bản đồ</Label>
+              <div>
+                <LocationPicker
+                  initialLat={pickedLat}
+                  initialLng={pickedLng}
+                  onChange={handleLocationChange}
+                  className="rounded-md overflow-hidden"
+                  editable={mapEditable}
+                  onToggleEditable={() => setMapEditable(v => !v)}
+                />
+              </div>
             </div>
             <div className="pt-2">
               <Button type="submit" disabled={!user || saving || gmapResolving} className="w-full">
