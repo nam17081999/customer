@@ -39,6 +39,7 @@ export default function AddStore() {
   const [gmapMessage, setGmapMessage] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1 = Store Info, 2 = Location
   const [autoFillAddress, setAutoFillAddress] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = window.localStorage.getItem('autoFillAddress')
@@ -52,16 +53,23 @@ export default function AddStore() {
   const [pickedLat, setPickedLat] = useState(null)
   const [pickedLng, setPickedLng] = useState(null)
   const [mapEditable, setMapEditable] = useState(false)
+  const [userHasEditedMap, setUserHasEditedMap] = useState(false) // Track if user manually edited map
+  const [initialGPSLat, setInitialGPSLat] = useState(null) // Store initial GPS position
+  const [initialGPSLng, setInitialGPSLng] = useState(null)
   const mapWrapperRef = useRef(null)
 
   // Dynamically import LocationPicker (client-side only)
   const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
-  // Stable handler for LocationPicker
+  // Stable handler for LocationPicker - track manual edits
   const handleLocationChange = useCallback((lat, lng) => {
     setPickedLat(lat)
     setPickedLng(lng)
-  }, [])
+    // If map is editable and user is dragging, mark as manually edited
+    if (mapEditable) {
+      setUserHasEditedMap(true)
+    }
+  }, [mapEditable])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -192,6 +200,11 @@ export default function AddStore() {
         desiredAccuracy: 25
       })
 
+      // Save as initial GPS position (reference for submit)
+      setInitialGPSLat(coords.latitude)
+      setInitialGPSLng(coords.longitude)
+
+      // Update map display
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
 
@@ -263,29 +276,19 @@ export default function AddStore() {
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Determine coordinates: Priority order:
-    // 1. User-adjusted map coordinates (if map was unlocked and edited)
-    // 2. Coordinates from Google Maps link (if provided)
-    // 3. Current geolocation as fallback
+    // NEW LOGIC: Determine coordinates based on user actions
+    // Priority:
+    // 1. If user unlocked map and edited → use edited position (pickedLat/Lng)
+    // 2. If Google Maps link provided → use link coordinates
+    // 3. Otherwise → use initial GPS position (initialGPSLat/Lng)
     let latitude = null
     let longitude = null
 
-    // Check if user has manually adjusted the map
-    if (mapEditable && pickedLat != null && pickedLng != null) {
-      // User has unlocked map and potentially adjusted coordinates
-      latitude = pickedLat
-      longitude = pickedLng
-    } else if (pickedLat != null && pickedLng != null) {
-      // Map has coordinates (from auto-fill or link) but wasn't edited
-      latitude = pickedLat
-      longitude = pickedLng
-    } else if (gmapLink && gmapLink.trim()) {
-      // Try to extract from Google Maps link
+    if (gmapLink && gmapLink.trim()) {
+      // Google Maps link has highest priority - auto set position
       setLoading(true)
-
       const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
       if (!resolved) {
-        // Try expand and parse as last resort
         const finalUrl = await expandShortLink(gmapLink.trim())
         if (finalUrl) {
           const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
@@ -305,8 +308,22 @@ export default function AddStore() {
         setGmapMessage('Không đọc được tọa độ từ liên kết')
         return
       }
+    } else if (userHasEditedMap && pickedLat != null && pickedLng != null) {
+      // User unlocked and edited map → use edited position
+      latitude = pickedLat
+      longitude = pickedLng
+      console.log('✅ Using edited map position:', { latitude, longitude })
+    } else if (initialGPSLat != null && initialGPSLng != null) {
+      // User did NOT edit map → use initial GPS
+      latitude = initialGPSLat
+      longitude = initialGPSLng
+      console.log('✅ Using initial GPS position:', { latitude, longitude })
+    } else if (pickedLat != null && pickedLng != null) {
+      // Fallback: use whatever is on map
+      latitude = pickedLat
+      longitude = pickedLng
     } else {
-      // No link and no map coordinates → fallback to current position
+      // Last resort: get current GPS
       try {
         const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
         latitude = coords.latitude
@@ -314,7 +331,7 @@ export default function AddStore() {
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
         setLoading(false)
-        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí cho trang web\n3. Hoặc dán link Google Maps vào mục "Thêm thông tin khác"')
+        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí cho trang web\n3. Hoặc dán link Google Maps')
         return
       }
     }
@@ -420,6 +437,11 @@ export default function AddStore() {
       setPickedLat(null)
       setPickedLng(null)
       setMapEditable(false)
+      setUserHasEditedMap(false)
+      setInitialGPSLat(null)
+      setInitialGPSLng(null)
+      // Reset to step 1
+      setCurrentStep(1)
       // Clear ?name from URL so it does not persist on next visit
       if (router.query?.name) {
         try {
@@ -468,9 +490,10 @@ export default function AddStore() {
         if (coords) {
           setGmapStatus('success')
           setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
-          // Update map coordinates
+          // Update map coordinates and mark as link-based (will be used for submit)
           setPickedLat(coords.lat)
           setPickedLng(coords.lng)
+          // When link is provided, we'll use these coordinates (handled in submit logic)
           try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch { }
         } else {
           setGmapStatus('error')
@@ -503,149 +526,204 @@ export default function AddStore() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Msg type="success" show={showSuccess}>Tạo cửa hàng thành công</Msg>
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
-        <div className='flex items-center justify-between'>
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Thêm cửa hàng</h1>
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2 mb-6">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 dark:text-gray-400">Địa chỉ tự động:</span>
-            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-              <button
-                type="button"
-                onClick={() => setAutoFillAddress(true)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-              >
-                Bật
-              </button>
-              <button
-                type="button"
-                onClick={() => setAutoFillAddress(false)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-              >
-                Tắt
-              </button>
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'}`}>
+              {currentStep === 1 ? '1' : '✓'}
             </div>
+            <span className={`text-sm font-medium ${currentStep === 1 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+              Thông tin cửa hàng
+            </span>
+          </div>
+          <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+              2
+            </div>
+            <span className={`text-sm font-medium ${currentStep === 2 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+              Xác định vị trí
+            </span>
           </div>
         </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
-          </div>
-          {/* Địa chỉ */}
-          <div className="space-y-1.5">
-            <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
-            <div className="relative">
-              <textarea
-                id="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                onBlur={() => {
-                  if (!address) return;
-                  const isAllLower = address === address.toLowerCase();
-                  const isAllUpper = address === address.toUpperCase();
-                  if ((isAllLower || isAllUpper) && address.length > 2) {
-                    const fixed = toTitleCaseVI(address.toLowerCase())
-                    setAddress(fixed)
-                  }
-                }}
-                placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
-              />
-              {address && address.length > 0 && (
+
+        <div className='flex items-center justify-between'>
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {currentStep === 1 ? 'Bước 1: Thông tin cửa hàng' : 'Bước 2: Xác định vị trí'}
+          </h1>
+          {currentStep === 2 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">Địa chỉ tự động:</span>
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
                   type="button"
-                  tabIndex={-1}
-                  className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
-                  onClick={() => setAddress('')}
-                  aria-label="Xoá nhanh địa chỉ"
+                  onClick={() => setAutoFillAddress(true)}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                  Bật
                 </button>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setAutoFillAddress(false)}
+                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  Tắt
+                </button>
+              </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleFillAddress}
-              disabled={resolvingAddr}
-              className="mt-1 w-full sm:w-auto text-sm"
-            >
-              {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
-            </Button>
-          </div>
+          )}
+        </div>
 
-          {/* Ảnh */}
-          <div className="space-y-1.5">
-            <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
-            <div className="relative w-full">
-              {imageFile ? (
-                <div className="relative group w-full">
-                  <img
-                    src={URL.createObjectURL(imageFile)}
-                    alt="Ảnh xem trước"
-                    className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
-                  />
-                  <button
-                    type="button"
-                    className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
-                    onClick={() => setImageFile(null)}
-                    aria-label="Xoá ảnh"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
-                  </button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Step 1: Store Info */}
+          {currentStep === 1 && (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
+              </div>
+
+              {/* Ảnh */}
+              <div className="space-y-1.5">
+                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
+                <div className="relative w-full">
+                  {imageFile ? (
+                    <div className="relative group w-full">
+                      <img
+                        src={URL.createObjectURL(imageFile)}
+                        alt="Ảnh xem trước"
+                        className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
+                        onClick={() => setImageFile(null)}
+                        aria-label="Xoá ảnh"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
+                      <input
+                        id="image"
+                        type="file"
+                        accept="image/*;capture=camera"
+                        capture="environment"
+                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
-              ) : (
-                <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                  <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
-                  <input
-                    id="image"
-                    type="file"
-                    accept="image/*;capture=camera"
-                    capture="environment"
-                    onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </label>
+              </div>
+
+              {/* Toggle optional */}
+              <div className="pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
+                >
+                  {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
+                  <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
+                </Button>
+              </div>
+
+              {showAdvanced && (
+                <div className="grid gap-3 pt-2 animate-fadeIn">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9+ ]*"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="0901 234 567"
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
+                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-sm" />
+                  </div>
+                </div>
               )}
-            </div>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400">Bắt buộc: tên, địa chỉ, ảnh.</p>
-          </div>
 
-          {/* Toggle optional */}
-          <div className="pt-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAdvanced(v => !v)}
-              className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
-            >
-              {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
-              <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
-            </Button>
-          </div>
+              {/* Next button for step 1 */}
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!name || !imageFile) {
+                      alert('Vui lòng nhập tên cửa hàng và chụp ảnh trước khi tiếp tục')
+                      return
+                    }
+                    setCurrentStep(2)
+                  }}
+                  className="w-full text-sm sm:text-base"
+                >
+                  Tiếp theo: Xác định vị trí →
+                </Button>
+              </div>
+            </>
+          )}
 
-          {showAdvanced && (
-            <div className="grid gap-3 pt-2 animate-fadeIn">
+          {/* Step 2: Location */}
+          {currentStep === 2 && (
+            <>
+              {/* Địa chỉ */}
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9+ ]*"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0901 234 567"
-                  className="text-sm"
-                />
+                <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+                <div className="relative">
+                  <textarea
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    onBlur={() => {
+                      if (!address) return;
+                      const isAllLower = address === address.toLowerCase();
+                      const isAllUpper = address === address.toUpperCase();
+                      if ((isAllLower || isAllUpper) && address.length > 2) {
+                        const fixed = toTitleCaseVI(address.toLowerCase())
+                        setAddress(fixed)
+                      }
+                    }}
+                    placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
+                  />
+                  {address && address.length > 0 && (
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
+                      onClick={() => setAddress('')}
+                      aria-label="Xoá nhanh địa chỉ"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                    </button>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleFillAddress}
+                  disabled={resolvingAddr}
+                  className="mt-1 w-full sm:w-auto text-sm"
+                >
+                  {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
+                </Button>
               </div>
+
+              {/* Google Maps Link (optional) */}
               <div className="space-y-1.5">
-                <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-sm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link google maps</Label>
+                <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link Google Maps (tùy chọn)</Label>
                 <div className="flex gap-2">
                   <Input
                     id="gmap"
@@ -670,12 +748,10 @@ export default function AddStore() {
                   <div className={`text-[11px] ${gmapStatus === 'error' ? 'text-red-600' : gmapStatus === 'success' ? 'text-green-600' : 'text-gray-500'}`}>{gmapMessage}</div>
                 )}
               </div>
-            </div>
-          )}
 
-          {/* Map Picker - Moved to bottom */}
-          <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
-            <div className="flex items-center justify-between">
+              {/* Map Picker */}
+              <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
+                <div className="flex items-center justify-between">
               <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                 Vị trí trên bản đồ
               </Label>
@@ -705,7 +781,7 @@ export default function AddStore() {
                   editable={mapEditable}
                   onToggleEditable={() => setMapEditable(v => !v)}
                 />
-                {/* Reload location button - top left of map - works even when locked */}
+                {/* Reload location button - gets fresh GPS and updates map */}
                 <button
                   type="button"
                   onClick={async (e) => {
@@ -714,7 +790,7 @@ export default function AddStore() {
                     try {
                       setResolvingAddr(true)
 
-                      // Get fresh GPS with optimized settings
+                      // Get fresh GPS
                       const coords = await getBestPosition({
                         attempts: 3,
                         timeout: 4000,
@@ -722,10 +798,18 @@ export default function AddStore() {
                         desiredAccuracy: 25
                       })
 
+                      // Update initial GPS reference (for submit if not edited)
+                      setInitialGPSLat(coords.latitude)
+                      setInitialGPSLng(coords.longitude)
+
+                      // Update map display
                       setPickedLat(coords.latitude)
                       setPickedLng(coords.longitude)
 
-                      // Also update address with new location (with timeout)
+                      // Reset edited flag since this is a fresh GPS load
+                      setUserHasEditedMap(false)
+
+                      // Also update address
                       try {
                         const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
 
@@ -743,7 +827,6 @@ export default function AddStore() {
                         }
                       } catch (addrErr) {
                         console.warn('Could not get address:', addrErr.message)
-                        // Keep coordinates even if address fails
                       }
                     } catch (err) {
                       console.error('Get location error:', err)
@@ -807,11 +890,26 @@ export default function AddStore() {
             </div>
           </div>
 
-          <div className="pt-2">
-            <Button type="submit" disabled={loading || gmapResolving} className="w-full text-sm sm:text-base">
-              {loading || gmapResolving ? 'Đang thêm…' : 'Lưu'}
+          {/* Back and Submit buttons for step 2 */}
+          <div className="pt-2 flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCurrentStep(1)}
+              className="w-1/3 text-sm sm:text-base"
+            >
+              ← Quay lại
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading || gmapResolving}
+              className="flex-1 text-sm sm:text-base"
+            >
+              {loading || gmapResolving ? 'Đang thêm…' : 'Lưu cửa hàng'}
             </Button>
           </div>
+            </>
+          )}
         </form>
       </div>
     </div>
