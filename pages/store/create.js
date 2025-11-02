@@ -72,28 +72,96 @@ export default function AddStore() {
   const parseTimerRef = useRef(null)
   const nameAutoFillRef = useRef({ filled: false, link: null })
 
-  // Try multiple high-accuracy geolocation attempts and pick the best sample
-  async function getBestPosition({ attempts = 3, timeout = 10000, desiredAccuracy = 30 } = {}) {
+  // Improved GPS location with progressive timeout and maxWaitTime
+  async function getBestPosition({
+    attempts = 4,
+    timeout = 5000,        // Giảm từ 10s → 5s
+    maxWaitTime = 10000,   // Tổng thời gian tối đa 10s
+    desiredAccuracy = 25   // Mục tiêu 25m
+  } = {}) {
     if (!navigator.geolocation) throw new Error('Geolocation not supported')
+
     const samples = []
+    const startTime = Date.now()
+
+    // Try to get cached position first (< 30 seconds old)
+    try {
+      const cached = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          {
+            enableHighAccuracy: false,
+            timeout: 1000,
+            maximumAge: 30000 // Accept 30s old
+          }
+        )
+      })
+      if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
+        console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
+        return cached.coords
+      }
+    } catch (err) {
+      // No cache, continue to get fresh location
+    }
+
     for (let i = 0; i < attempts; i++) {
+      // Check total elapsed time
+      const elapsed = Date.now() - startTime
+      if (elapsed > maxWaitTime) {
+        console.log('⏱️ Đã hết thời gian chờ tối đa:', elapsed + 'ms')
+        break
+      }
+
       try {
-        // eslint-disable-next-line no-await-in-loop
+        // Progressive timeout: 5s → 4s → 3s → 2s
+        const dynamicTimeout = Math.max(2000, timeout - (i * 1000))
+        const remainingTime = maxWaitTime - elapsed
+        const actualTimeout = Math.min(dynamicTimeout, remainingTime)
+
+        if (actualTimeout < 1000) break // Too little time left
+
         const pos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout, maximumAge: 0 })
+          const timeoutId = setTimeout(() => reject(new Error('Timeout')), actualTimeout)
+          navigator.geolocation.getCurrentPosition(
+            (result) => {
+              clearTimeout(timeoutId)
+              resolve(result)
+            },
+            (err) => {
+              clearTimeout(timeoutId)
+              reject(err)
+            },
+            {
+              enableHighAccuracy: true,
+              timeout: actualTimeout,
+              maximumAge: 0
+            }
+          )
         })
-        if (pos && pos.coords) {
+
+        if (pos?.coords) {
           samples.push(pos.coords)
-          if (typeof pos.coords.accuracy === 'number' && pos.coords.accuracy <= desiredAccuracy) {
+          console.log(`📍 Sample ${i+1}: ${pos.coords.accuracy?.toFixed(1) || '?'}m (${Date.now() - startTime}ms)`)
+
+          // Early exit if good enough
+          if (pos.coords.accuracy && pos.coords.accuracy <= desiredAccuracy) {
+            console.log('✅ Đạt độ chính xác mong muốn')
             return pos.coords
           }
         }
       } catch (err) {
-        // ignore and retry
+        console.warn(`⚠️ Attempt ${i+1} failed:`, err.message)
       }
     }
-    if (samples.length === 0) throw new Error('Không lấy được vị trí')
+
+    if (samples.length === 0) {
+      throw new Error('Không lấy được vị trí sau nhiều lần thử')
+    }
+
+    // Return best sample
     samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
+    console.log(`📊 Chọn sample tốt nhất: ${samples[0].accuracy?.toFixed(1) || '?'}m`)
     return samples[0]
   }
 
@@ -116,42 +184,45 @@ export default function AddStore() {
     try {
       setResolvingAddr(true)
 
-      // Create a timeout promise that will reject after 5 seconds
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 5000)
+      // Get GPS coordinates with improved logic
+      const coords = await getBestPosition({
+        attempts: 3,           // Giảm từ 4 → 3
+        timeout: 4000,         // 4s thay vì 10s
+        maxWaitTime: 8000,     // Tổng tối đa 8s
+        desiredAccuracy: 25
       })
 
-      // Race between getting location and timeout
-      const fillAddressPromise = (async () => {
-        const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
+      setPickedLat(coords.latitude)
+      setPickedLng(coords.longitude)
+
+      // Get address (with its own timeout)
+      try {
         const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
-        const res = await fetch(url)
-        if (!res.ok) throw new Error('Reverse geocoding failed')
-        const data = await res.json()
-        const text = data?.display_name || ''
-        const cleaned = cleanNominatimDisplayName(text)
-        return { cleaned, coords }
-      })()
 
-      const result = await Promise.race([fillAddressPromise, timeoutPromise])
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout for geocoding
 
-      if (result?.cleaned) {
-        setAddress(result.cleaned)
-        // Update map coordinates
-        setPickedLat(result.coords.latitude)
-        setPickedLng(result.coords.longitude)
-      } else {
-        alert('Không lấy được địa chỉ từ Nominatim')
+        const res = await fetch(url, { signal: controller.signal })
+        clearTimeout(timeoutId)
+
+        if (res.ok) {
+          const data = await res.json()
+          const text = data?.display_name || ''
+          const cleaned = cleanNominatimDisplayName(text)
+          if (cleaned) setAddress(cleaned)
+        }
+      } catch (addrErr) {
+        console.warn('Could not get address:', addrErr.message)
+        // Keep the coordinates even if address lookup fails
       }
     } catch (err) {
       console.error('Auto fill address error:', err)
 
-      if (err.message === 'TIMEOUT') {
-        // Timeout after 5 seconds - disable auto-fill and notify user
+      if (err.message.includes('Timeout') || err.message.includes('timeout')) {
         setAutoFillAddress(false)
-        alert('Lấy địa chỉ tự động quá lâu (>5s). Đã chuyển sang chế độ nhập thủ công. Vui lòng nhập địa chỉ.')
+        alert('Lấy vị trí GPS quá lâu (>8s). Đã tắt tự động. Vui lòng thử lại hoặc nhập thủ công.')
       } else {
-        alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này hoặc nhập thủ công.')
+        alert('Không lấy được vị trí GPS.\n\nVui lòng:\n1. Bật GPS/định vị\n2. Cấp quyền truy cập cho trang web\n3. Hoặc nhập thủ công')
       }
     } finally {
       setResolvingAddr(false)
@@ -625,14 +696,78 @@ export default function AddStore() {
               )}
             </div>
             <div className="space-y-2">
-              <LocationPicker
-                initialLat={pickedLat}
-                initialLng={pickedLng}
-                onChange={handleLocationChange}
-                className="rounded-md overflow-hidden"
-                editable={mapEditable}
-                onToggleEditable={() => setMapEditable(v => !v)}
-              />
+              <div className="relative">
+                <LocationPicker
+                  initialLat={pickedLat}
+                  initialLng={pickedLng}
+                  onChange={handleLocationChange}
+                  className="rounded-md overflow-hidden"
+                  editable={mapEditable}
+                  onToggleEditable={() => setMapEditable(v => !v)}
+                />
+                {/* Reload location button - top left of map - works even when locked */}
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    try {
+                      setResolvingAddr(true)
+
+                      // Get fresh GPS with optimized settings
+                      const coords = await getBestPosition({
+                        attempts: 3,
+                        timeout: 4000,
+                        maxWaitTime: 8000,
+                        desiredAccuracy: 25
+                      })
+
+                      setPickedLat(coords.latitude)
+                      setPickedLng(coords.longitude)
+
+                      // Also update address with new location (with timeout)
+                      try {
+                        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+
+                        const controller = new AbortController()
+                        const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+                        const res = await fetch(url, { signal: controller.signal })
+                        clearTimeout(timeoutId)
+
+                        if (res.ok) {
+                          const data = await res.json()
+                          const text = data?.display_name || ''
+                          const cleaned = cleanNominatimDisplayName(text)
+                          if (cleaned) setAddress(cleaned)
+                        }
+                      } catch (addrErr) {
+                        console.warn('Could not get address:', addrErr.message)
+                        // Keep coordinates even if address fails
+                      }
+                    } catch (err) {
+                      console.error('Get location error:', err)
+                      alert('Không thể lấy vị trí GPS.\n\nVui lòng:\n1. Bật GPS/định vị\n2. Cấp quyền truy cập\n3. Hoặc dùng link Google Maps')
+                    } finally {
+                      setResolvingAddr(false)
+                    }
+                  }}
+                  disabled={resolvingAddr}
+                  className="absolute top-2 left-2 z-[10000] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  style={{ pointerEvents: 'auto' }}
+                  title="Lấy lại vị trí GPS hiện tại (hoạt động cả khi map khóa)"
+                  aria-label="Lấy lại vị trí GPS"
+                >
+                  <svg
+                    className={`w-4 h-4 text-gray-700 dark:text-gray-200 ${resolvingAddr ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
               <div className="flex items-center justify-between">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {mapEditable ? (
@@ -650,9 +785,23 @@ export default function AddStore() {
                   size="sm"
                   variant={mapEditable ? "default" : "outline"}
                   onClick={() => setMapEditable(v => !v)}
-                  className="text-xs"
+                  className="text-xs flex items-center gap-1.5"
                 >
-                  {mapEditable ? 'Khóa lại' : 'Mở khóa để chỉnh'}
+                  {mapEditable ? (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Khóa lại
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                      Mở khóa để chỉnh
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

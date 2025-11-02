@@ -271,7 +271,10 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
       {/* Dim overlay when locked */}
       {!editable && (
         // block pointer events when locked so the map cannot be dragged/zoomed
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'auto', touchAction: 'none' }} />
+        // but allow buttons with higher z-index to still work
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'none', touchAction: 'none' }}>
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'auto', touchAction: 'none' }} />
+        </div>
       )}
     </div>
   )

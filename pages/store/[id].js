@@ -3,7 +3,6 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/components/auth-context'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -674,92 +673,104 @@ export default function StoreDetail() {
 
   if (!store) {
     return (
-      <div className="mx-auto max-w-2xl p-6">Đang tải...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto">
+          <div className="text-center text-sm text-gray-600 dark:text-gray-400">Đang tải...</div>
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Chi tiết cửa hàng</h1>
-        <Button variant="ghost" size="sm" onClick={() => router.push('/')}>Quay lại</Button>
-      </div>
-      <Card className="mt-4">
-        <CardContent className="space-y-4 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Chỉnh sửa cửa hàng</h1>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/')}>Quay lại</Button>
+        </div>
+
+        <form onSubmit={onSave} className="space-y-4">
           {store?.image_url && (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
-              </DialogTrigger>
-              <DialogContent className="overflow-hidden p-0">
-                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
-              </DialogContent>
-            </Dialog>
+            <div className="space-y-1.5">
+              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh hiện tại</Label>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
+                </DialogTrigger>
+                <DialogContent className="overflow-hidden p-0">
+                  <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
-          <form onSubmit={onSave} className="space-y-4">
-            <div className="grid gap-1.5">
-              <Label>Tên</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!user} />
+
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!user} className="text-sm" />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ</Label>
+            <div className="flex flex-col gap-2">
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="text-sm" placeholder={gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : (resolvingAddr ? 'Đang tự động lấy địa chỉ…' : undefined)} />
+              {user && (
+                <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr} className="w-full sm:w-auto text-sm">
+                  {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
+                </Button>
+              )}
             </div>
-            <div className="grid gap-1.5">
-              <Label>Địa chỉ</Label>
-              <div className="flex items-center gap-2">
-                <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="flex-1" placeholder={gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : (resolvingAddr ? 'Đang tự động lấy địa chỉ…' : undefined)} />
-                {user && (
-                  <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr}>
-                    {resolvingAddr ? 'Đang lấy…' : 'Tự điền'}
-                  </Button>
-                )}
-                {/* Map is always visible in edit screen now (no toggle) */}
-              </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
+            <Input
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9+ ]*"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              disabled={!user}
+              className="text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!user} className="text-sm" />
+          </div>
+
+          {user && (
+            <div className="space-y-1.5">
+              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Đổi ảnh (tùy chọn)</Label>
+              <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
             </div>
-            {/* Map picker moved below Google Maps link section (always visible) */}
-            <div className="grid gap-1.5">
-              <Label>Số điện thoại</Label>
-              <Input
-                type="tel"
-                inputMode="numeric"
-                pattern="[0-9+ ]*"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={!user}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label>Ghi chú</Label>
-              <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!user} />
-            </div>
-            {user && (
-              <div className="grid gap-1.5">
-                <Label>Đổi ảnh (tùy chọn)</Label>
-                <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link Google Maps (không bắt buộc)</Label>
+            <Input
+              value={gmapLink}
+              onChange={(e) => setGmapLink(e.target.value)}
+              placeholder="Dán liên kết chia sẻ vị trí từ Google Maps"
+              disabled={!user}
+              className={`text-sm ${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}`}
+            />
+            {gmapMessage && gmapStatus === 'error' && (
+              <div className="text-xs text-red-600">
+                {gmapMessage}
               </div>
             )}
-            <div className="grid gap-1.5">
-              <Label>Link Google Maps (không bắt buộc)</Label>
-              <Input
-                value={gmapLink}
-                onChange={(e) => setGmapLink(e.target.value)}
-                placeholder="Dán liên kết chia sẻ vị trí từ Google Maps"
-                disabled={!user}
-                className={gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}
-              />
-              {gmapMessage && gmapStatus === 'error' && (
-                <div className="text-xs text-red-600">
-                  {gmapMessage}
-                </div>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? (
-                <span className="inline-flex items-center gap-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400">{gmapResolving ? (
+              <span className="inline-flex items-center gap-2">
                   <span>Đang lấy địa chỉ từ liên kết…</span>
                   <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
                 </span>
               ) : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
             </div>
-            {/* Always-visible map picker (below the Google Maps link) */}
-            <div className="grid gap-1.5" ref={mapWrapperRef}>
+            {/* Always-visible map picker */}
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Chọn vị trí trên bản đồ</Label>
+                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Chọn vị trí trên bản đồ</Label>
                 {pickedLat && pickedLng ? (
                   <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -802,21 +813,35 @@ export default function StoreDetail() {
                     size="sm"
                     variant={mapEditable ? "default" : "outline"}
                     onClick={() => setMapEditable(v => !v)}
-                    className="text-xs"
+                    className="text-xs flex items-center gap-1.5"
                   >
-                    {mapEditable ? 'Khóa lại' : 'Mở khóa để chỉnh'}
+                    {mapEditable ? (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Khóa lại
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                        Mở khóa để chỉnh
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
             </div>
-            <div className="pt-2">
-              <Button type="submit" disabled={!user || saving || gmapResolving} className="w-full">
-                {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving) ? 'Đang lưu...' : 'Lưu thay đổi'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+
+          <div className="pt-2">
+            <Button type="submit" disabled={!user || saving || gmapResolving} className="w-full text-sm sm:text-base">
+              {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving) ? 'Đang lưu...' : 'Lưu thay đổi'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
