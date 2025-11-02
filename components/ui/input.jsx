@@ -21,7 +21,7 @@ const Input = React.forwardRef(({ className, type = 'text', value, onChange, ...
         <button
           type="button"
           tabIndex={-1}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
           onClick={() => onChange({ target: { value: '' } })}
           aria-label="Xoá nhanh"
         >

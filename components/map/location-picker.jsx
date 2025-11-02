@@ -273,36 +273,6 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
         // block pointer events when locked so the map cannot be dragged/zoomed
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'auto', touchAction: 'none' }} />
       )}
-
-      {/* Lock/unlock icon overlay (top-right) */}
-      <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (onToggleEditable) onToggleEditable() }}
-        aria-label={editable ? 'Khóa bản đồ' : 'Mở khóa bản đồ'}
-        style={{ position: 'absolute', right: 10, top: 10, zIndex: 10010, background: 'white', borderRadius: 8, padding: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer' }}
-      >
-        {editable ? (
-          // locked (black outline)
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="black" strokeWidth="1.8" />
-            <path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        ) : (
-          // unlocked (black outline, shackle open)
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="black" strokeWidth="1.8" />
-            <path d="M16 10c0-2.2-1.8-4-4-4-1.5 0-2.8.8-3.5 2" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M9.5 14h5" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-
-      <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
-        <div className="bg-white/90 rounded shadow p-1 text-xs">
-          {center[0].toFixed(6)}, {center[1].toFixed(6)}
-        </div>
-      </div>
-
-      
     </div>
   )
 }

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
@@ -46,6 +47,21 @@ export default function AddStore() {
     }
     return true
   })
+
+  // Map states
+  const [pickedLat, setPickedLat] = useState(null)
+  const [pickedLng, setPickedLng] = useState(null)
+  const [mapEditable, setMapEditable] = useState(false)
+  const mapWrapperRef = useRef(null)
+
+  // Dynamically import LocationPicker (client-side only)
+  const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
+
+  // Stable handler for LocationPicker
+  const handleLocationChange = useCallback((lat, lng) => {
+    setPickedLat(lat)
+    setPickedLng(lng)
+  }, [])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -99,18 +115,44 @@ export default function AddStore() {
   async function handleFillAddress() {
     try {
       setResolvingAddr(true)
-      const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Reverse geocoding failed')
-      const data = await res.json()
-      const text = data?.display_name || ''
-      const cleaned = cleanNominatimDisplayName(text)
-      if (cleaned) setAddress(cleaned)
-      else alert('Không lấy được địa chỉ từ Nominatim')
+
+      // Create a timeout promise that will reject after 5 seconds
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 5000)
+      })
+
+      // Race between getting location and timeout
+      const fillAddressPromise = (async () => {
+        const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('Reverse geocoding failed')
+        const data = await res.json()
+        const text = data?.display_name || ''
+        const cleaned = cleanNominatimDisplayName(text)
+        return { cleaned, coords }
+      })()
+
+      const result = await Promise.race([fillAddressPromise, timeoutPromise])
+
+      if (result?.cleaned) {
+        setAddress(result.cleaned)
+        // Update map coordinates
+        setPickedLat(result.coords.latitude)
+        setPickedLng(result.coords.longitude)
+      } else {
+        alert('Không lấy được địa chỉ từ Nominatim')
+      }
     } catch (err) {
       console.error('Auto fill address error:', err)
-      alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+
+      if (err.message === 'TIMEOUT') {
+        // Timeout after 5 seconds - disable auto-fill and notify user
+        setAutoFillAddress(false)
+        alert('Lấy địa chỉ tự động quá lâu (>5s). Đã chuyển sang chế độ nhập thủ công. Vui lòng nhập địa chỉ.')
+      } else {
+        alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này hoặc nhập thủ công.')
+      }
     } finally {
       setResolvingAddr(false)
     }
@@ -150,11 +192,24 @@ export default function AddStore() {
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Determine coordinates: prefer link if provided; else geolocation
+    // Determine coordinates: Priority order:
+    // 1. User-adjusted map coordinates (if map was unlocked and edited)
+    // 2. Coordinates from Google Maps link (if provided)
+    // 3. Current geolocation as fallback
     let latitude = null
     let longitude = null
 
-    if (gmapLink && gmapLink.trim()) {
+    // Check if user has manually adjusted the map
+    if (mapEditable && pickedLat != null && pickedLng != null) {
+      // User has unlocked map and potentially adjusted coordinates
+      latitude = pickedLat
+      longitude = pickedLng
+    } else if (pickedLat != null && pickedLng != null) {
+      // Map has coordinates (from auto-fill or link) but wasn't edited
+      latitude = pickedLat
+      longitude = pickedLng
+    } else if (gmapLink && gmapLink.trim()) {
+      // Try to extract from Google Maps link
       setLoading(true)
 
       const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
@@ -180,7 +235,7 @@ export default function AddStore() {
         return
       }
     } else {
-      // No link → fallback to current position
+      // No link and no map coordinates → fallback to current position
       try {
         const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
         latitude = coords.latitude
@@ -188,10 +243,16 @@ export default function AddStore() {
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
         setLoading(false)
-        setGmapStatus('error')
-        setGmapMessage('Cần quyền truy cập vị trí hoặc vị trí chưa đủ chính xác')
+        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí cho trang web\n3. Hoặc dán link Google Maps vào mục "Thêm thông tin khác"')
         return
       }
+    }
+
+    // Final validation: Ensure we have valid coordinates
+    if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
+      setLoading(false)
+      alert('⚠️ Thiếu thông tin vị trí\n\nVị trí cửa hàng chưa được xác định. Vui lòng:\n1. Bật "Địa chỉ tự động" để lấy GPS\n2. Hoặc dán link Google Maps (mục "Thêm thông tin khác")\n3. Hoặc mở khóa bản đồ và chọn vị trí')
+      return
     }
 
     try {
@@ -284,6 +345,10 @@ export default function AddStore() {
       setGmapLink('')
       setGmapStatus('')
       setGmapMessage('')
+      // Reset map states
+      setPickedLat(null)
+      setPickedLng(null)
+      setMapEditable(false)
       // Clear ?name from URL so it does not persist on next visit
       if (router.query?.name) {
         try {
@@ -332,6 +397,9 @@ export default function AddStore() {
         if (coords) {
           setGmapStatus('success')
           setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
+          // Update map coordinates
+          setPickedLat(coords.lat)
+          setPickedLng(coords.lng)
           try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch { }
         } else {
           setGmapStatus('error')
@@ -372,14 +440,14 @@ export default function AddStore() {
               <button
                 type="button"
                 onClick={() => setAutoFillAddress(true)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
               >
                 Bật
               </button>
               <button
                 type="button"
                 onClick={() => setAutoFillAddress(false)}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
               >
                 Tắt
               </button>
@@ -415,7 +483,7 @@ export default function AddStore() {
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none"
+                  className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
                   onClick={() => setAddress('')}
                   aria-label="Xoá nhanh địa chỉ"
                 >
@@ -433,6 +501,7 @@ export default function AddStore() {
               {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
             </Button>
           </div>
+
           {/* Ảnh */}
           <div className="space-y-1.5">
             <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
@@ -446,7 +515,7 @@ export default function AddStore() {
                   />
                   <button
                     type="button"
-                    className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600"
+                    className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
                     onClick={() => setImageFile(null)}
                     aria-label="Xoá ảnh"
                   >
@@ -532,6 +601,62 @@ export default function AddStore() {
               </div>
             </div>
           )}
+
+          {/* Map Picker - Moved to bottom */}
+          <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
+            <div className="flex items-center justify-between">
+              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                Vị trí trên bản đồ
+              </Label>
+              {pickedLat && pickedLng ? (
+                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Đã có vị trí
+                </span>
+              ) : (
+                <span className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Chưa có vị trí
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <LocationPicker
+                initialLat={pickedLat}
+                initialLng={pickedLng}
+                onChange={handleLocationChange}
+                className="rounded-md overflow-hidden"
+                editable={mapEditable}
+                onToggleEditable={() => setMapEditable(v => !v)}
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {mapEditable ? (
+                    <span className="text-orange-600 dark:text-orange-400">
+                      Đang mở khóa - Kéo bản đồ để chỉnh vị trí
+                    </span>
+                  ) : (
+                    <span>
+                      Đã khóa - Chỉ xem vị trí
+                    </span>
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mapEditable ? "default" : "outline"}
+                  onClick={() => setMapEditable(v => !v)}
+                  className="text-xs"
+                >
+                  {mapEditable ? 'Khóa lại' : 'Mở khóa để chỉnh'}
+                </Button>
+              </div>
+            </div>
+          </div>
 
           <div className="pt-2">
             <Button type="submit" disabled={loading || gmapResolving} className="w-full text-sm sm:text-base">

@@ -480,11 +480,18 @@ export default function StoreDetail() {
       } catch (geoErr) {
         console.error('❌ Cannot get current location:', geoErr)
         setSaving(false)
-        alert('Cần quyền truy cập vị trí hoặc nhập link Google Maps để cập nhật tọa độ')
+        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí\n3. Hoặc dán link Google Maps\n4. Hoặc mở khóa bản đồ và chọn vị trí')
         return
       }
     }
     // If we have existing coordinates and no Maps link, keep the existing ones
+
+    // Final validation: Ensure we have valid coordinates
+    if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
+      setSaving(false)
+      alert('⚠️ Thiếu thông tin vị trí\n\nVị trí cửa hàng chưa được xác định. Vui lòng:\n1. Dán link Google Maps\n2. Hoặc nhấn nút "Tự điền" để lấy GPS\n3. Hoặc mở khóa bản đồ và chọn vị trí')
+      return
+    }
 
     let image_url = store?.image_url || null
     let uploadedFileId = null
@@ -591,34 +598,56 @@ export default function StoreDetail() {
   async function handleFillAddress() {
     try {
       setResolvingAddr(true)
-      const coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => resolve(pos.coords),
-          (err) => reject(err)
-        )
+
+      // Create a timeout promise that will reject after 5 seconds
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 5000)
       })
-      // Cache by rounded coordinates in sessionStorage to cut repeat hits
-      const lat = Number(coords.latitude.toFixed(5))
-      const lon = Number(coords.longitude.toFixed(5))
-      const cacheKey = `revgeo:${lat},${lon}`
-      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
-      if (cached) {
-        setAddress(cached)
-        return
+
+      // Race between getting location and timeout
+      const fillAddressPromise = (async () => {
+        const coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve(pos.coords),
+            (err) => reject(err)
+          )
+        })
+        // Cache by rounded coordinates in sessionStorage to cut repeat hits
+        const lat = Number(coords.latitude.toFixed(5))
+        const lon = Number(coords.longitude.toFixed(5))
+        const cacheKey = `revgeo:${lat},${lon}`
+        const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
+        if (cached) {
+          return cached
+        }
+        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=vi`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('Reverse geocoding failed')
+        const data = await res.json()
+        const text = data?.display_name || ''
+        const cleaned = cleanNominatimDisplayName(text)
+        return { cleaned, cacheKey }
+      })()
+
+      const result = await Promise.race([fillAddressPromise, timeoutPromise])
+
+      if (typeof result === 'string') {
+        // Cached result
+        setAddress(result)
+      } else if (result?.cleaned) {
+        setAddress(result.cleaned)
+        try { sessionStorage.setItem(result.cacheKey, result.cleaned) } catch {}
+      } else {
+        alert('Không lấy được địa chỉ từ Nominatim')
       }
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=vi`
-      const res = await fetch(url)
-      if (!res.ok) throw new Error('Reverse geocoding failed')
-      const data = await res.json()
-      const text = data?.display_name || ''
-      const cleaned = cleanNominatimDisplayName(text)
-      if (cleaned) {
-        setAddress(cleaned)
-        try { sessionStorage.setItem(cacheKey, cleaned) } catch {}
-      } else alert('Không lấy được địa chỉ từ Nominatim')
     } catch (err) {
       console.error('Auto fill address error:', err)
-      alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+
+      if (err.message === 'TIMEOUT') {
+        alert('Lấy địa chỉ tự động quá lâu (>5s). Vui lòng thử lại hoặc nhập thủ công.')
+      } else {
+        alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+      }
     } finally {
       setResolvingAddr(false)
     }
@@ -729,8 +758,25 @@ export default function StoreDetail() {
             </div>
             {/* Always-visible map picker (below the Google Maps link) */}
             <div className="grid gap-1.5" ref={mapWrapperRef}>
-              <Label>Chọn vị trí trên bản đồ</Label>
-              <div>
+              <div className="flex items-center justify-between">
+                <Label>Chọn vị trí trên bản đồ</Label>
+                {pickedLat && pickedLng ? (
+                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Đã có vị trí
+                  </span>
+                ) : (
+                  <span className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Chưa có vị trí
+                  </span>
+                )}
+              </div>
+              <div className="space-y-2">
                 <LocationPicker
                   initialLat={pickedLat}
                   initialLng={pickedLng}
@@ -739,6 +785,28 @@ export default function StoreDetail() {
                   editable={mapEditable}
                   onToggleEditable={() => setMapEditable(v => !v)}
                 />
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {mapEditable ? (
+                      <span className="text-orange-600 dark:text-orange-400">
+                        Đang mở khóa - Kéo bản đồ để chỉnh vị trí
+                      </span>
+                    ) : (
+                      <span>
+                        Đã khóa - Chỉ xem vị trí
+                      </span>
+                    )}
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={mapEditable ? "default" : "outline"}
+                    onClick={() => setMapEditable(v => !v)}
+                    className="text-xs"
+                  >
+                    {mapEditable ? 'Khóa lại' : 'Mở khóa để chỉnh'}
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="pt-2">

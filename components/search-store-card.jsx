@@ -115,7 +115,7 @@ export default function SearchStoreCard({ store, onAdd, isAdded, distance, searc
                     <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
                     <a
                       href={`tel:${store.phone.replace(/\s+/g,'')}`}
-                      className="font-medium text-gray-700 dark:text-gray-200 hover:underline flex-1 break-all"
+                      className="font-medium text-gray-700 dark:text-gray-200 hover:underline flex-1 break-all cursor-pointer"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {store.phone}
