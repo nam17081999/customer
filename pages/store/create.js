@@ -11,13 +11,11 @@ import Link from 'next/link'
 import { toTitleCaseVI } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
+import { FullPageLoading } from '@/components/ui/full-page-loading'
 import {
   cleanNominatimDisplayName,
-  parseLatLngFromText,
   parseLatLngFromGoogleMapsUrl,
   extractSearchTextFromGoogleMapsUrl,
-  geocodeWithGoogle,
-  geocodeTextToLatLngAddress,
   resolveLatLngFromAnyLink,
   reverseGeocodeFromLatLng,
   setExpandShortLink
@@ -28,6 +26,14 @@ export default function AddStore() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
+  // unified message state
+  const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
+  const msgTimerRef = useRef(null)
+  function showMessage(type, text, duration = 2500) {
+    if (msgTimerRef.current) { clearTimeout(msgTimerRef.current); msgTimerRef.current = null }
+    setMsgState({ type, text, show: true })
+    msgTimerRef.current = setTimeout(() => { setMsgState((s) => ({ ...s, show: false })); msgTimerRef.current = null }, duration)
+  }
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [imageFile, setImageFile] = useState(null)
@@ -38,16 +44,7 @@ export default function AddStore() {
   const [gmapStatus, setGmapStatus] = useState('') // 'success', 'error', 'processing'
   const [gmapMessage, setGmapMessage] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Store Info, 2 = Location
-  const [autoFillAddress, setAutoFillAddress] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('autoFillAddress')
-      if (saved === 'false') return false
-      return true
-    }
-    return true
-  })
 
   // Map states
   const [pickedLat, setPickedLat] = useState(null)
@@ -56,6 +53,7 @@ export default function AddStore() {
   const [userHasEditedMap, setUserHasEditedMap] = useState(false) // Track if user manually edited map
   const [initialGPSLat, setInitialGPSLat] = useState(null) // Store initial GPS position
   const [initialGPSLng, setInitialGPSLng] = useState(null)
+  const [heading, setHeading] = useState(null) // Store compass heading for map rotation
   const mapWrapperRef = useRef(null)
 
   // Dynamically import LocationPicker (client-side only)
@@ -70,12 +68,6 @@ export default function AddStore() {
       setUserHasEditedMap(true)
     }
   }, [mapEditable])
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('autoFillAddress', autoFillAddress ? 'true' : 'false')
-    }
-  }, [autoFillAddress])
   const lastParsedRef = useRef(null)
   const parseTimerRef = useRef(null)
   const nameAutoFillRef = useRef({ filled: false, link: null })
@@ -99,7 +91,7 @@ export default function AddStore() {
           resolve,
           reject,
           {
-            enableHighAccuracy: false,
+            enableHighAccuracy: true, // Changed to true to get heading
             timeout: 1000,
             maximumAge: 30000 // Accept 30s old
           }
@@ -150,7 +142,7 @@ export default function AddStore() {
 
         if (pos?.coords) {
           samples.push(pos.coords)
-          console.log(`📍 Sample ${i+1}: ${pos.coords.accuracy?.toFixed(1) || '?'}m (${Date.now() - startTime}ms)`)
+          console.log(`📍 Sample ${i+1}: ${pos.coords.accuracy?.toFixed(1) || '?'}m, heading: ${pos.coords.heading || 'N/A'} (${Date.now() - startTime}ms)`)
 
           // Early exit if good enough
           if (pos.coords.accuracy && pos.coords.accuracy <= desiredAccuracy) {
@@ -179,14 +171,13 @@ export default function AddStore() {
     if (qName) setName(toTitleCaseVI(qName))
   }, [user, router.query.name])
 
-  // Auto-fill address on mount (no manual typing needed)
+  // Auto-fetch location when entering step 2
   useEffect(() => {
-    if (!user) return
-    if (!address && !resolvingAddr && autoFillAddress) {
+    if (currentStep === 2 && !pickedLat && !pickedLng && !resolvingAddr) {
       handleFillAddress()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, autoFillAddress])
+  }, [currentStep])
 
   async function handleFillAddress() {
     try {
@@ -208,35 +199,16 @@ export default function AddStore() {
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
 
-      // Get address (with its own timeout)
-      try {
-        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
-
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5s timeout for geocoding
-
-        const res = await fetch(url, { signal: controller.signal })
-        clearTimeout(timeoutId)
-
-        if (res.ok) {
-          const data = await res.json()
-          const text = data?.display_name || ''
-          const cleaned = cleanNominatimDisplayName(text)
-          if (cleaned) setAddress(cleaned)
-        }
-      } catch (addrErr) {
-        console.warn('Could not get address:', addrErr.message)
-        // Keep the coordinates even if address lookup fails
+      // Save heading/bearing if available for map rotation
+      if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
+        setHeading(coords.heading)
+        console.log('📍 Heading:', coords.heading)
       }
+
+      // Don't auto-fill address anymore - user must enter manually
     } catch (err) {
-      console.error('Auto fill address error:', err)
-
-      if (err.message.includes('Timeout') || err.message.includes('timeout')) {
-        setAutoFillAddress(false)
-        alert('Lấy vị trí GPS quá lâu (>8s). Đã tắt tự động. Vui lòng thử lại hoặc nhập thủ công.')
-      } else {
-        alert('Không lấy được vị trí GPS.\n\nVui lòng:\n1. Bật GPS/định vị\n2. Cấp quyền truy cập cho trang web\n3. Hoặc nhập thủ công')
-      }
+      console.error('Get location error:', err)
+      showMessage('error', 'Không lấy được vị trí GPS. Vui lòng bật GPS và cấp quyền.')
     } finally {
       setResolvingAddr(false)
     }
@@ -246,30 +218,30 @@ export default function AddStore() {
   async function handlePasteGmap() {
     try {
       if (!navigator.clipboard?.readText) {
-        alert('Trình duyệt không hỗ trợ đọc clipboard')
+        showMessage('error', 'Trình duyệt không hỗ trợ đọc clipboard')
         return
       }
       const text = (await navigator.clipboard.readText()).trim()
       if (!text) {
-        alert('Clipboard trống')
+        showMessage('info', 'Clipboard trống')
         return
       }
       setGmapLink(text)
     } catch (e) {
       console.warn('Clipboard read error:', e)
-      alert('Không đọc được clipboard. Hãy dán thủ công (Cmd+V).')
+      showMessage('error', 'Không đọc được clipboard. Hãy dán thủ công (Cmd+V).')
     }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!user) {
-      alert('Vui lòng đăng nhập để tạo cửa hàng')
+      showMessage('error', 'Vui lòng đăng nhập để tạo cửa hàng')
       return
     }
 
     if (!name || !address || !imageFile) {
-      alert('Tên, địa chỉ và ảnh là bắt buộc')
+      showMessage('error', 'Tên, địa chỉ và ảnh là bắt buộc')
       return
     }
 
@@ -331,7 +303,7 @@ export default function AddStore() {
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
         setLoading(false)
-        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí cho trang web\n3. Hoặc dán link Google Maps')
+        showMessage('error', 'Không thể lấy vị trí GPS. Vui lòng cấp quyền định vị hoặc dùng link Google Maps')
         return
       }
     }
@@ -339,7 +311,7 @@ export default function AddStore() {
     // Final validation: Ensure we have valid coordinates
     if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
       setLoading(false)
-      alert('⚠️ Thiếu thông tin vị trí\n\nVị trí cửa hàng chưa được xác định. Vui lòng:\n1. Bật "Địa chỉ tự động" để lấy GPS\n2. Hoặc dán link Google Maps (mục "Thêm thông tin khác")\n3. Hoặc mở khóa bản đồ và chọn vị trí')
+      showMessage('error', 'Thiếu thông tin vị trí. Vui lòng bật "Địa chỉ tự động" hoặc dán link Google Maps hoặc mở khóa bản đồ và chọn vị trí')
       return
     }
 
@@ -416,14 +388,13 @@ export default function AddStore() {
         } catch (deleteErr) {
           console.warn('Could not delete uploaded image:', deleteErr)
         }
-        alert('Lỗi khi lưu dữ liệu')
+        showMessage('error', 'Lỗi khi lưu dữ liệu')
         setLoading(false)
         return
       }
 
       // Success
-      setShowSuccess(true)
-      setTimeout(() => setShowSuccess(false), 2500)
+      showMessage('success', 'Lưu thành công', 2500)
       e.target.reset()
       setName('')
       setAddress('')
@@ -453,7 +424,7 @@ export default function AddStore() {
       }
     } catch (err) {
       console.error(err)
-      alert('Đã xảy ra lỗi')
+      showMessage('error', 'Đã xảy ra lỗi khi tạo cửa hàng')
     } finally {
       setLoading(false)
     }
@@ -524,7 +495,8 @@ export default function AddStore() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <Msg type="success" show={showSuccess}>Tạo cửa hàng thành công</Msg>
+      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
+      <FullPageLoading visible={loading || resolvingAddr || gmapResolving} message={loading ? 'Đang tạo cửa hàng…' : resolvingAddr ? 'Đang lấy vị trí…' : 'Đang xử lý liên kết…'} />
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
@@ -551,27 +523,6 @@ export default function AddStore() {
           <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {currentStep === 1 ? 'Bước 1: Thông tin cửa hàng' : 'Bước 2: Xác định vị trí'}
           </h1>
-          {currentStep === 2 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">Địa chỉ tự động:</span>
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={() => setAutoFillAddress(true)}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-                >
-                  Bật
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAutoFillAddress(false)}
-                  className={`px-3 py-1 text-sm font-medium rounded-md transition-colors cursor-pointer ${!autoFillAddress ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'}`}
-                >
-                  Tắt
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -662,7 +613,7 @@ export default function AddStore() {
                   type="button"
                   onClick={() => {
                     if (!name || !imageFile) {
-                      alert('Vui lòng nhập tên cửa hàng và chụp ảnh trước khi tiếp tục')
+                      showMessage('error', 'Vui lòng nhập tên cửa hàng và chụp ảnh trước khi tiếp tục')
                       return
                     }
                     setCurrentStep(2)
@@ -680,7 +631,7 @@ export default function AddStore() {
             <>
               {/* Địa chỉ */}
               <div className="space-y-1.5">
-                <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+                <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc - nhập tay)</Label>
                 <div className="relative">
                   <textarea
                     id="address"
@@ -695,7 +646,7 @@ export default function AddStore() {
                         setAddress(fixed)
                       }
                     }}
-                    placeholder={gmapResolving || resolvingAddr ? 'Đang lấy địa chỉ…' : '123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh'}
+                    placeholder="Nhập địa chỉ: 123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
                   />
                   {address && address.length > 0 && (
@@ -710,15 +661,6 @@ export default function AddStore() {
                     </button>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleFillAddress}
-                  disabled={resolvingAddr}
-                  className="mt-1 w-full sm:w-auto text-sm"
-                >
-                  {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
-                </Button>
               </div>
 
               {/* Google Maps Link (optional) */}
@@ -751,144 +693,142 @@ export default function AddStore() {
 
               {/* Map Picker */}
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
+                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Vị trí trên bản đồ
+                </Label>
+
+                {/* Map controls - above map */}
                 <div className="flex items-center justify-between">
-              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                Vị trí trên bản đồ
-              </Label>
-              {pickedLat && pickedLng ? (
-                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Đã có vị trí
-                </span>
-              ) : (
-                <span className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  Chưa có vị trí
-                </span>
-              )}
-            </div>
-            <div className="space-y-2">
-              <div className="relative">
-                <LocationPicker
-                  initialLat={pickedLat}
-                  initialLng={pickedLng}
-                  onChange={handleLocationChange}
-                  className="rounded-md overflow-hidden"
-                  editable={mapEditable}
-                  onToggleEditable={() => setMapEditable(v => !v)}
-                />
-                {/* Reload location button - gets fresh GPS and updates map */}
-                <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    try {
-                      setResolvingAddr(true)
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={async (e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        try {
+                          setResolvingAddr(true)
 
-                      // Get fresh GPS
-                      const coords = await getBestPosition({
-                        attempts: 3,
-                        timeout: 4000,
-                        maxWaitTime: 8000,
-                        desiredAccuracy: 25
-                      })
+                          // Get fresh GPS with heading
+                          const coords = await getBestPosition({
+                            attempts: 3,
+                            timeout: 4000,
+                            maxWaitTime: 8000,
+                            desiredAccuracy: 25
+                          })
 
-                      // Update initial GPS reference (for submit if not edited)
-                      setInitialGPSLat(coords.latitude)
-                      setInitialGPSLng(coords.longitude)
+                          // Update initial GPS reference (for submit if not edited)
+                          setInitialGPSLat(coords.latitude)
+                          setInitialGPSLng(coords.longitude)
 
-                      // Update map display
-                      setPickedLat(coords.latitude)
-                      setPickedLng(coords.longitude)
+                          // Update map display
+                          setPickedLat(coords.latitude)
+                          setPickedLng(coords.longitude)
 
-                      // Reset edited flag since this is a fresh GPS load
-                      setUserHasEditedMap(false)
+                          // Save heading/bearing if available
+                          if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
+                            setHeading(coords.heading)
+                            console.log('📍 Heading:', coords.heading)
+                          }
 
-                      // Also update address
-                      try {
-                        const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&zoom=18&addressdetails=1&accept-language=vi`
+                          // Reset edited flag since this is a fresh GPS load
+                          setUserHasEditedMap(false)
 
-                        const controller = new AbortController()
-                        const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-                        const res = await fetch(url, { signal: controller.signal })
-                        clearTimeout(timeoutId)
-
-                        if (res.ok) {
-                          const data = await res.json()
-                          const text = data?.display_name || ''
-                          const cleaned = cleanNominatimDisplayName(text)
-                          if (cleaned) setAddress(cleaned)
+                          showMessage('success', 'Đã cập nhật vị trí GPS mới')
+                        } catch (err) {
+                          console.error('Get location error:', err)
+                          showMessage('error', 'Không thể lấy vị trí GPS. Vui lòng cấp quyền định vị')
+                        } finally {
+                          setResolvingAddr(false)
                         }
-                      } catch (addrErr) {
-                        console.warn('Could not get address:', addrErr.message)
-                      }
-                    } catch (err) {
-                      console.error('Get location error:', err)
-                      alert('Không thể lấy vị trí GPS.\n\nVui lòng:\n1. Bật GPS/định vị\n2. Cấp quyền truy cập\n3. Hoặc dùng link Google Maps')
-                    } finally {
-                      setResolvingAddr(false)
-                    }
-                  }}
-                  disabled={resolvingAddr}
-                  className="absolute top-2 left-2 z-[10000] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md p-2 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                  style={{ pointerEvents: 'auto' }}
-                  title="Lấy lại vị trí GPS hiện tại (hoạt động cả khi map khóa)"
-                  aria-label="Lấy lại vị trí GPS"
-                >
-                  <svg
-                    className={`w-4 h-4 text-gray-700 dark:text-gray-200 ${resolvingAddr ? 'animate-spin' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {mapEditable ? (
-                    <span className="text-orange-600 dark:text-orange-400">
-                      Đang mở khóa - Kéo bản đồ để chỉnh vị trí
-                    </span>
-                  ) : (
-                    <span>
-                      Đã khóa - Chỉ xem vị trí
-                    </span>
-                  )}
-                </p>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={mapEditable ? "default" : "outline"}
-                  onClick={() => setMapEditable(v => !v)}
-                  className="text-xs flex items-center gap-1.5"
-                >
-                  {mapEditable ? (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      }}
+                      disabled={resolvingAddr}
+                      className="text-xs flex items-center gap-1.5 h-8"
+                      title="Lấy lại vị trí GPS hiện tại của bạn"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 ${resolvingAddr ? 'animate-spin' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      Khóa lại
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      {resolvingAddr ? 'Đang lấy...' : 'Lấy vị trí hiện tại'}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={mapEditable ? "default" : "outline"}
+                      onClick={() => setMapEditable(v => !v)}
+                      className="text-xs flex items-center gap-1.5 h-8"
+                    >
+                      {mapEditable ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                          Khóa lại
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                          </svg>
+                          Mở khóa để chỉnh
+                        </>
+                      )}
+                    </Button>
+                </div>
+
+                {/* Map with overlay badges */}
+                <div className="relative">
+                  {/* Position status badge - top left inside map */}
+                  {pickedLat && pickedLng ? (
+                    <div className="absolute top-2 left-2 z-[1000] bg-green-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Mở khóa để chỉnh
-                    </>
+                      Đã có vị trí
+                    </div>
+                  ) : (
+                    <div className="absolute top-2 left-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Chưa có vị trí
+                    </div>
                   )}
-                </Button>
+
+                  {/* Lock status badge - top right inside map */}
+                  {mapEditable ? (
+                    <div className="absolute top-2 right-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                      Đang mở khóa
+                    </div>
+                  ) : (
+                    <div className="absolute top-2 right-2 z-[1000] bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Đã khóa
+                    </div>
+                  )}
+
+                  <LocationPicker
+                    initialLat={pickedLat}
+                    initialLng={pickedLng}
+                    onChange={handleLocationChange}
+                    className="rounded-md overflow-hidden"
+                    editable={mapEditable}
+                    onToggleEditable={() => setMapEditable(v => !v)}
+                    heading={heading}
+                  />
+                </div>
               </div>
-            </div>
-          </div>
 
           {/* Back and Submit buttons for step 2 */}
           <div className="pt-2 flex gap-2">

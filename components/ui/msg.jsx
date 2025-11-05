@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export function Msg({ type = 'info', children, show = true, duration = 300 }) {
+export function Msg({ type = 'info', children, show = true, duration = 2500 }) {
   const [mounted, setMounted] = useState(show)
   const [visible, setVisible] = useState(show)
   const hideTimerRef = useRef(null)
@@ -22,7 +22,7 @@ export function Msg({ type = 'info', children, show = true, duration = 300 }) {
       // Schedule unmount after animation duration
       hideTimerRef.current = setTimeout(() => {
         setMounted(false)
-      }, duration)
+      }, 300)
     }
 
     return () => {
@@ -35,7 +35,7 @@ export function Msg({ type = 'info', children, show = true, duration = 300 }) {
 
   if (!mounted) return null
 
-  const base = 'pointer-events-none select-none fixed left-1/2 -translate-x-1/2 top-5 z-50 px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 shadow-lg backdrop-blur-sm'
+  const base = 'pointer-events-none select-none fixed left-1/2 -translate-x-1/2 top-5 z-[60000] px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 shadow-lg backdrop-blur-sm'
   const styles = {
     success: 'bg-emerald-600/95 text-white shadow-emerald-900/30',
     error: 'bg-red-600/95 text-white shadow-red-900/30',
@@ -55,7 +55,13 @@ export function Msg({ type = 'info', children, show = true, duration = 300 }) {
       ].join(' ')}
     >
       {type === 'success' && (
-        <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+        <svg className="w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+      )}
+      {type === 'error' && (
+        <svg className="w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+      )}
+      {type === 'info' && (
+        <svg className="w-4 h-4 text-white shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       )}
       <span className="leading-snug">{children}</span>
     </div>

@@ -90,7 +90,7 @@ function CenterTracker({ onCenterChange, icon, onInit, debug = false }) {
   return null
 }
 
-export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false }) {
+export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false, heading = null }) {
   // Convert Google coordinates back to OSM for initial display
   const googleToOsm = useCallback((lat, lng) => {
     const latOffset = 0.00007  // Inverse of OSM->Google adjustment
@@ -137,6 +137,37 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
   useEffect(() => {
     centerRef.current = center
   }, [center])
+
+  // Rotate map based on heading/bearing
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    // If heading is available and valid, rotate the map
+    // heading/bearing: 0 = North, 90 = East, 180 = South, 270 = West
+    if (heading !== null && heading !== undefined && !isNaN(heading)) {
+      try {
+        // Leaflet doesn't have built-in rotation, but we can rotate the container
+        // Note: This requires CSS transform which may affect performance
+        const container = map.getContainer()
+        if (container) {
+          // Rotate counter-clockwise to align north with user's direction
+          container.style.transform = `rotate(${-heading}deg)`
+          container.style.transformOrigin = 'center center'
+        }
+      } catch (e) {
+        console.warn('Could not rotate map:', e)
+      }
+    } else {
+      // Reset rotation if no heading
+      try {
+        const container = map.getContainer()
+        if (container) {
+          container.style.transform = 'none'
+        }
+      } catch (e) {}
+    }
+  }, [heading])
 
   // enable/disable dragging when editable changes (zoom always disabled)
   useEffect(() => {

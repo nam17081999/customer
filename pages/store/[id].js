@@ -12,6 +12,8 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
 import { getFullImageUrl } from '@/helper/imageUtils'
 import imageCompression from 'browser-image-compression'
+import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { Msg } from '@/components/ui/msg'
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -21,6 +23,14 @@ export default function StoreDetail() {
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
+  // unified message state
+  const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
+  const msgTimerRef = useRef(null)
+  function showMessage(type, text, duration = 2000) {
+    if (msgTimerRef.current) { clearTimeout(msgTimerRef.current); msgTimerRef.current = null }
+    setMsgState({ type, text, show: true })
+    msgTimerRef.current = setTimeout(() => { setMsgState((s) => ({ ...s, show: false })); msgTimerRef.current = null }, duration)
+  }
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [imageFile, setImageFile] = useState(null)
@@ -426,7 +436,7 @@ export default function StoreDetail() {
 
   async function onSave(e) {
     e.preventDefault()
-    if (!user) { alert('Vui lòng đăng nhập để sửa cửa hàng'); return }
+    if (!user) { showMessage('error', 'Vui lòng đăng nhập để sửa cửa hàng'); return }
     setSaving(true)
 
     const normalizedName = toTitleCaseVI(name.trim())
@@ -479,7 +489,7 @@ export default function StoreDetail() {
       } catch (geoErr) {
         console.error('❌ Cannot get current location:', geoErr)
         setSaving(false)
-        alert('⚠️ Không thể lấy vị trí GPS\n\nVui lòng:\n1. Bật GPS/định vị trên thiết bị\n2. Cấp quyền truy cập vị trí\n3. Hoặc dán link Google Maps\n4. Hoặc mở khóa bản đồ và chọn vị trí')
+        showMessage('error', 'Không thể lấy vị trí GPS. Vui lòng bật GPS và cấp quyền hoặc dùng link Google Maps')
         return
       }
     }
@@ -488,7 +498,7 @@ export default function StoreDetail() {
     // Final validation: Ensure we have valid coordinates
     if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
       setSaving(false)
-      alert('⚠️ Thiếu thông tin vị trí\n\nVị trí cửa hàng chưa được xác định. Vui lòng:\n1. Dán link Google Maps\n2. Hoặc nhấn nút "Tự điền" để lấy GPS\n3. Hoặc mở khóa bản đồ và chọn vị trí')
+      showMessage('error', 'Thiếu thông tin vị trí. Vị trí cửa hàng chưa được xác định. Vui lòng dán link Google Maps hoặc mở khóa bản đồ và chọn vị trí')
       return
     }
 
@@ -558,7 +568,7 @@ export default function StoreDetail() {
         }
       }
 
-      alert('Đã lưu')
+      showMessage('success', 'Đã lưu')
       router.push('/')
     } catch (err) {
       console.error(err)
@@ -574,7 +584,7 @@ export default function StoreDetail() {
           console.warn('Could not delete uploaded image on rollback:', deleteErr)
         }
       }
-      alert('Lưu thất bại')
+      showMessage('error', 'Lưu thất bại')
     } finally {
       setSaving(false)
     }
@@ -637,15 +647,15 @@ export default function StoreDetail() {
         setAddress(result.cleaned)
         try { sessionStorage.setItem(result.cacheKey, result.cleaned) } catch {}
       } else {
-        alert('Không lấy được địa chỉ từ Nominatim')
+        showMessage('error', 'Không lấy được địa chỉ từ Nominatim')
       }
     } catch (err) {
       console.error('Auto fill address error:', err)
 
       if (err.message === 'TIMEOUT') {
-        alert('Lấy địa chỉ tự động quá lâu (>5s). Vui lòng thử lại hoặc nhập thủ công.')
+        showMessage('error', 'Lấy địa chỉ tự động quá lâu (>5s). Vui lòng thử lại hoặc nhập thủ công.')
       } else {
-        alert('Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
+        showMessage('error', 'Không lấy được địa chỉ. Vui lòng cấp quyền định vị cho trang này và thử lại.')
       }
     } finally {
       setResolvingAddr(false)
@@ -683,6 +693,8 @@ export default function StoreDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
+      <FullPageLoading visible={saving || gmapResolving || resolvingAddr} message={saving ? 'Đang lưu thay đổi…' : gmapResolving ? 'Đang phân tích liên kết…' : 'Đang lấy vị trí…'} />
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
         <div className="flex items-center justify-between">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Chỉnh sửa cửa hàng</h1>
@@ -769,25 +781,71 @@ export default function StoreDetail() {
             </div>
             {/* Always-visible map picker */}
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Chọn vị trí trên bản đồ</Label>
+              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Vị trí trên bản đồ</Label>
+
+              {/* Map controls - above map */}
+              <div className="flex items-center justify-end py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mapEditable ? "default" : "outline"}
+                  onClick={() => setMapEditable(v => !v)}
+                  className="text-xs flex items-center gap-1.5 h-8"
+                >
+                  {mapEditable ? (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Khóa lại
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                      Mở khóa để chỉnh
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Map with overlay badges */}
+              <div className="relative">
+                {/* Position status badge - top left inside map */}
                 {pickedLat && pickedLng ? (
-                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute top-2 left-2 z-[1000] bg-green-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     Đã có vị trí
-                  </span>
+                  </div>
                 ) : (
-                  <span className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute top-2 left-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     Chưa có vị trí
-                  </span>
+                  </div>
                 )}
-              </div>
-              <div className="space-y-2">
+
+                {/* Lock status badge - top right inside map */}
+                {mapEditable ? (
+                  <div className="absolute top-2 right-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                    </svg>
+                    Đang mở khóa
+                  </div>
+                ) : (
+                  <div className="absolute top-2 right-2 z-[1000] bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Đã khóa
+                  </div>
+                )}
+
                 <LocationPicker
                   initialLat={pickedLat}
                   initialLng={pickedLng}
@@ -796,42 +854,6 @@ export default function StoreDetail() {
                   editable={mapEditable}
                   onToggleEditable={() => setMapEditable(v => !v)}
                 />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {mapEditable ? (
-                      <span className="text-orange-600 dark:text-orange-400">
-                        Đang mở khóa - Kéo bản đồ để chỉnh vị trí
-                      </span>
-                    ) : (
-                      <span>
-                        Đã khóa - Chỉ xem vị trí
-                      </span>
-                    )}
-                  </p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={mapEditable ? "default" : "outline"}
-                    onClick={() => setMapEditable(v => !v)}
-                    className="text-xs flex items-center gap-1.5"
-                  >
-                    {mapEditable ? (
-                      <>
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Khóa lại
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                        </svg>
-                        Mở khóa để chỉnh
-                      </>
-                    )}
-                  </Button>
-                </div>
               </div>
             </div>
 
