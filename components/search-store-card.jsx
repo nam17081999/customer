@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button'
 import Image from 'next/image'
 import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
-import DetailStoreCard, { DetailStoreModalContent } from '@/components/detail-store-card'
+import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import { formatAddressParts } from '@/lib/utils'
 
-export default function SearchStoreCard({ store, onAdd, isAdded, distance, searchTerm }) {
+export default function SearchStoreCard({ store, distance, searchTerm }) {
   const [imageError, setImageError] = useState(false)
 
   const handleImageError = () => {
@@ -24,6 +25,8 @@ export default function SearchStoreCard({ store, onAdd, isAdded, distance, searc
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl
     return `${IMAGEKIT_URL_ENDPOINT}${imageUrl}`
   }
+
+  const addressText = formatAddressParts(store)
 
   const renderHighlightedName = (name, term) => {
     const text = name || ''
@@ -107,7 +110,7 @@ export default function SearchStoreCard({ store, onAdd, isAdded, distance, searc
                 {/* Địa chỉ */}
                 <div className="flex items-start gap-1.5">
                   <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" /></svg>
-                  <p className="line-clamp-3 break-words flex-1">{store.address}</p>
+                  <p className="line-clamp-3 break-words flex-1">{addressText}</p>
                 </div>
                 {/* Số điện thoại */}
                 {store.phone && (
@@ -144,32 +147,13 @@ export default function SearchStoreCard({ store, onAdd, isAdded, distance, searc
                     Bản đồ
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  onClick={(e) => { e.stopPropagation(); onAdd(store) }}
-                  disabled={isAdded}
-                  variant={isAdded ? 'secondary' : 'default'}
-                  className="flex-1 inline-flex items-center justify-center gap-2 text-sm"
-                >
-                  {isAdded ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                      Đã thêm
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                      Thêm
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        <DetailStoreModalContent store={{ ...store, distance }} context="search" onAdd={onAdd} isAdded={isAdded} />
+        <DetailStoreModalContent store={{ ...store, distance }} context="search" />
       </DialogContent>
     </Dialog>
   )

@@ -277,7 +277,7 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
         touchZoom={false}
         doubleClickZoom={false}
         className="leaflet-container"
-        style={{ height: 320, width: '100%', touchAction: 'none', cursor: 'grab' }}
+        style={{ height: 420, width: '100%', touchAction: 'none', cursor: 'grab' }}
         whenCreated={(map) => {
           mapRef.current = map
           mapCreatedRef.current = true

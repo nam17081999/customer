@@ -44,15 +44,7 @@
       "description": "Thêm cửa hàng mới",
       "url": "/store/create",
       "icons": [{ "src": "/icon-add.png", "sizes": "96x96" }]
-    },
-    {
-      "name": "Danh sách thăm",
-      "short_name": "Danh sách",
-      "description": "Xem danh sách thăm viếng",
-      "url": "/visit-list",
-      "icons": [{ "src": "/icon-list.png", "sizes": "96x96" }]
     }
   ],
   "prefer_related_applications": false
 }
-

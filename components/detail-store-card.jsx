@@ -5,36 +5,23 @@ import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/
 import Image from 'next/image'
 import Link from 'next/link'
 import { getFullImageUrl } from '@/helper/imageUtils'
+import { formatAddressParts } from '@/lib/utils'
 
-export function DetailStoreModalContent({ store, context = 'search', onAdd, isAdded, onRemove }) {
+export function DetailStoreModalContent({ store }) {
   if (!store) return null
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
   const status = store.status || (store.active ? 'active' : null)
+  const addressText = formatAddressParts(store)
   const formatDistance = (d) => {
     if (d === null || d === undefined) return ''
     return d < 1 ? `${(d * 1000).toFixed(0)} m` : `${d.toFixed(1)} km`
   }
-
-  const handleAdd = () => { if (!isAdded && onAdd) onAdd(store) }
-  const handleRemove = () => { if (onRemove) onRemove(store.id) }
 
   const ActionSection = () => (
     <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-200 dark:border-gray-700 mt-4 md:mt-6">
       {/* Mobile (2 buttons per row) */}
       <div className="sm:hidden">
         <div className="grid grid-cols-2 gap-2">
-          {context === 'search' && (
-            <Button onClick={handleAdd} disabled={isAdded} className="w-full h-11 text-sm">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" /></svg>
-              {isAdded ? 'Đã thêm' : 'Thêm'}
-            </Button>
-          )}
-          {context === 'list' && onRemove && (
-            <Button variant="outline" onClick={handleRemove} className="w-full h-11 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              Loại bỏ
-            </Button>
-          )}
           {hasCoords && (
             <Button asChild variant="outline" className="w-full h-11 text-sm">
               <a href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
@@ -61,22 +48,6 @@ export function DetailStoreModalContent({ store, context = 'search', onAdd, isAd
       </div>
       {/* Desktop */}
       <div className="hidden sm:flex gap-3">
-        {context === 'search' && (
-          <Button onClick={handleAdd} disabled={isAdded} className="flex-1 h-12">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" /></svg>
-            {isAdded ? 'Đã thêm' : 'Thêm'}
-          </Button>
-        )}
-        {context === 'list' && onRemove && (
-          <Button
-            variant="outline"
-            onClick={handleRemove}
-            className="flex-1 h-12 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            Loại bỏ
-          </Button>
-        )}
         {hasCoords && (
           <Button asChild variant="outline" className="flex-1 h-12">
             <a
@@ -136,7 +107,7 @@ export function DetailStoreModalContent({ store, context = 'search', onAdd, isAd
         <div className="flex-1 space-y-3 md:space-y-4">
           <div>
             <h3 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">{store.name}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{store.address}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{addressText}</p>
           </div>
           <div className="space-y-3">
             {store.phone && (
@@ -185,16 +156,13 @@ export function DetailStoreModalContent({ store, context = 'search', onAdd, isAd
 
 export default function DetailStoreCard({ 
   store: s, 
-  isSelected, 
-  onAdd, 
-  onRemove,
   item,
   dragAttributes, 
   dragListeners,
-  isAdded,
 }) {
   const storeData = s || item
   const hasCoords = typeof storeData.latitude === 'number' && typeof storeData.longitude === 'number'
+  const addressText = formatAddressParts(storeData)
   const formatDistance = (d) => {
     if (d === null || d === undefined) return ''
     return d < 1 ? `${(d * 1000).toFixed(0)} m` : `${d.toFixed(1)} km`
@@ -230,13 +198,13 @@ export default function DetailStoreCard({
               )}
               <div className="truncate text-base font-medium text-gray-900 dark:text-gray-100">{storeData.name}</div>
               {/* Địa chỉ với biểu tượng */}
-              {storeData.address && (
+              {addressText && (
                 <div className="text-sm text-gray-600 dark:text-gray-400 leading-tight mt-0.5 flex items-start gap-1.5">
                   <svg className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
                   </svg>
-                  <span className="line-clamp-2 break-words">{storeData.address}</span>
+                  <span className="line-clamp-2 break-words">{addressText}</span>
                 </div>
               )}
               {/* SĐT với biểu tượng */}
@@ -283,21 +251,12 @@ export default function DetailStoreCard({
                   </a>
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(e) => { e.stopPropagation(); onRemove?.(storeData.id) }}
-                className="h-8 w-8 p-0 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950"
-                aria-label="Xóa khỏi danh sách"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </Button>
             </div>
           </CardContent>
         </Card>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        <DetailStoreModalContent store={storeData} context="list" onRemove={onRemove} />
+        <DetailStoreModalContent store={storeData} context="search" />
       </DialogContent>
     </Dialog>
   )

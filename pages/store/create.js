@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
@@ -12,20 +12,17 @@ import { toTitleCaseVI } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import {
-  cleanNominatimDisplayName,
-  parseLatLngFromGoogleMapsUrl,
-  extractSearchTextFromGoogleMapsUrl,
-  resolveLatLngFromAnyLink,
-  reverseGeocodeFromLatLng,
-  setExpandShortLink
-} from '@/lib/createStoreUtils'
+
+const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
 export default function AddStore() {
   const { user } = useAuth()
   const router = useRouter()
   const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
+  const [addressDetail, setAddressDetail] = useState('')
+  const [ward, setWard] = useState('')
+  const [district, setDistrict] = useState('')
+  const [city, setCity] = useState('')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -37,12 +34,14 @@ export default function AddStore() {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [imageFile, setImageFile] = useState(null)
+  const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
-  const [gmapLink, setGmapLink] = useState('')
-  const [gmapResolving, setGmapResolving] = useState(false)
-  const [gmapStatus, setGmapStatus] = useState('') // 'success', 'error', 'processing'
-  const [gmapMessage, setGmapMessage] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Store Info, 2 = Location
 
@@ -56,8 +55,6 @@ export default function AddStore() {
   const [heading, setHeading] = useState(null) // Store compass heading for map rotation
   const mapWrapperRef = useRef(null)
 
-  // Dynamically import LocationPicker (client-side only)
-  const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
   // Stable handler for LocationPicker - track manual edits
   const handleLocationChange = useCallback((lat, lng) => {
@@ -68,9 +65,6 @@ export default function AddStore() {
       setUserHasEditedMap(true)
     }
   }, [mapEditable])
-  const lastParsedRef = useRef(null)
-  const parseTimerRef = useRef(null)
-  const nameAutoFillRef = useRef({ filled: false, link: null })
 
   // Improved GPS location with progressive timeout and maxWaitTime
   async function getBestPosition({
@@ -205,42 +199,28 @@ export default function AddStore() {
         console.log('📍 Heading:', coords.heading)
       }
 
-      // Don't auto-fill address anymore - user must enter manually
+      // Do not auto-fill address parts here
     } catch (err) {
       console.error('Get location error:', err)
-      showMessage('error', 'Không lấy được vị trí GPS. Vui lòng bật GPS và cấp quyền.')
+      showMessage('error', 'Không lấy được vị trí. Vui lòng tải lại trang hoặc kiểm tra lại cài đặt vị trí.')
     } finally {
       setResolvingAddr(false)
     }
   }
 
   // Paste Google Maps link from clipboard
-  async function handlePasteGmap() {
-    try {
-      if (!navigator.clipboard?.readText) {
-        showMessage('error', 'Trình duyệt không hỗ trợ đọc clipboard')
-        return
-      }
-      const text = (await navigator.clipboard.readText()).trim()
-      if (!text) {
-        showMessage('info', 'Clipboard trống')
-        return
-      }
-      setGmapLink(text)
-    } catch (e) {
-      console.warn('Clipboard read error:', e)
-      showMessage('error', 'Không đọc được clipboard. Hãy dán thủ công (Cmd+V).')
-    }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault()
+    if (resolvingAddr) {
+      showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
+      return
+    }
     if (!user) {
       showMessage('error', 'Vui lòng đăng nhập để tạo cửa hàng')
       return
     }
 
-    if (!name || !address || !imageFile) {
+    if (!name || !addressDetail || !ward || !district || !city || !imageFile) {
       showMessage('error', 'Tên, địa chỉ và ảnh là bắt buộc')
       return
     }
@@ -248,39 +228,14 @@ export default function AddStore() {
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // NEW LOGIC: Determine coordinates based on user actions
+    // Determine coordinates based on user actions
     // Priority:
     // 1. If user unlocked map and edited → use edited position (pickedLat/Lng)
-    // 2. If Google Maps link provided → use link coordinates
-    // 3. Otherwise → use initial GPS position (initialGPSLat/Lng)
+    // 2. Otherwise → use initial GPS position (initialGPSLat/Lng)
     let latitude = null
     let longitude = null
 
-    if (gmapLink && gmapLink.trim()) {
-      // Google Maps link has highest priority - auto set position
-      setLoading(true)
-      const resolved = await resolveLatLngFromAnyLink(gmapLink.trim())
-      if (!resolved) {
-        const finalUrl = await expandShortLink(gmapLink.trim())
-        if (finalUrl) {
-          const parsed = parseLatLngFromGoogleMapsUrl(finalUrl)
-          if (parsed) {
-            latitude = parsed.lat
-            longitude = parsed.lng
-          }
-        }
-      } else {
-        latitude = resolved.lat
-        longitude = resolved.lng
-      }
-
-      if (latitude == null || longitude == null) {
-        setLoading(false)
-        setGmapStatus('error')
-        setGmapMessage('Không đọc được tọa độ từ liên kết')
-        return
-      }
-    } else if (userHasEditedMap && pickedLat != null && pickedLng != null) {
+    if (userHasEditedMap && pickedLat != null && pickedLng != null) {
       // User unlocked and edited map → use edited position
       latitude = pickedLat
       longitude = pickedLng
@@ -356,18 +311,19 @@ export default function AddStore() {
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
-      // Chuẩn hoá địa chỉ: nếu toàn bộ ở dạng lowercase hoặc uppercase thì chuyển sang dạng viết hoa chữ cái đầu mỗi từ
-      let finalAddress = address.trim()
-      if (finalAddress && (finalAddress === finalAddress.toLowerCase() || finalAddress === finalAddress.toUpperCase())) {
-        finalAddress = toTitleCaseVI(finalAddress.toLowerCase())
-        if (finalAddress !== address) setAddress(finalAddress)
-      }
+      const normalizedDetail = toTitleCaseVI(addressDetail.trim())
+      const normalizedWard = toTitleCaseVI(ward.trim())
+      const normalizedDistrict = toTitleCaseVI(district.trim())
+      const normalizedCity = toTitleCaseVI(city.trim())
 
       const { error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
           name_search: nameSearch,
-          address: finalAddress,
+          address_detail: normalizedDetail,
+          ward: normalizedWard,
+          district: normalizedDistrict,
+          city: normalizedCity,
           note,
           phone,
           image_url: imageFilename, // Store only filename
@@ -397,13 +353,13 @@ export default function AddStore() {
       showMessage('success', 'Lưu thành công', 2500)
       e.target.reset()
       setName('')
-      setAddress('')
+      setAddressDetail('')
+      setWard('')
+      setDistrict('')
+      setCity('')
       setPhone('')
       setNote('')
       setImageFile(null)
-      setGmapLink('')
-      setGmapStatus('')
-      setGmapMessage('')
       // Reset map states
       setPickedLat(null)
       setPickedLng(null)
@@ -430,56 +386,7 @@ export default function AddStore() {
     }
   }
 
-  // Debounced parsing of Google Maps link
-  useEffect(() => {
-    if (!gmapLink) {
-      setGmapStatus('')
-      setGmapMessage('')
-      return
-    }
-    if (parseTimerRef.current) clearTimeout(parseTimerRef.current)
-    parseTimerRef.current = setTimeout(async () => {
-      const current = gmapLink.trim()
-      if (!current) return
-      // Auto-fill name only once per distinct link if input currently empty
-      if (!name.trim() && (!nameAutoFillRef.current.filled || nameAutoFillRef.current.link !== current)) {
-        try {
-          const possibleName = extractSearchTextFromGoogleMapsUrl(current)
-          if (possibleName) {
-            setName(toTitleCaseVI(possibleName))
-            nameAutoFillRef.current = { filled: true, link: current }
-          }
-        } catch { }
-      }
-      if (lastParsedRef.current === current) return
-      lastParsedRef.current = current
-      setGmapResolving(true)
-      setGmapStatus('processing')
-      setGmapMessage('Đang đọc link…')
-      try {
-        const coords = await resolveLatLngFromAnyLink(current)
-        if (coords) {
-          setGmapStatus('success')
-          setGmapMessage(`Tọa độ: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
-          // Update map coordinates and mark as link-based (will be used for submit)
-          setPickedLat(coords.lat)
-          setPickedLng(coords.lng)
-          // When link is provided, we'll use these coordinates (handled in submit logic)
-          try { await reverseGeocodeFromLatLng(coords.lat, coords.lng, setAddress) } catch { }
-        } else {
-          setGmapStatus('error')
-          setGmapMessage('Không trích xuất được tọa độ từ link')
-        }
-      } catch (err) {
-        console.warn('Parse gmap link error', err)
-        setGmapStatus('error')
-        setGmapMessage('Lỗi khi xử lý link')
-      } finally {
-        setGmapResolving(false)
-      }
-    }, 400)
-    return () => { if (parseTimerRef.current) clearTimeout(parseTimerRef.current) }
-  }, [gmapLink, name])
+  
 
   if (!user) {
     return (
@@ -496,7 +403,7 @@ export default function AddStore() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
-      <FullPageLoading visible={loading || resolvingAddr || gmapResolving} message={loading ? 'Đang tạo cửa hàng…' : resolvingAddr ? 'Đang lấy vị trí…' : 'Đang xử lý liên kết…'} />
+      <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
@@ -534,6 +441,45 @@ export default function AddStore() {
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
               </div>
 
+              {/* Địa chỉ */}
+              <div className="space-y-1.5">
+                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+                <div className="grid gap-2">
+                  <Input
+                    id="address_detail"
+                    value={addressDetail}
+                    onChange={(e) => setAddressDetail(e.target.value)}
+                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+                    className="text-sm"
+                  />
+                  <Input
+                    id="ward"
+                    value={ward}
+                    onChange={(e) => setWard(e.target.value)}
+                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
+                    placeholder="Xã / Phường"
+                    className="text-sm"
+                  />
+                  <Input
+                    id="district"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
+                    placeholder="Quận / Huyện"
+                    className="text-sm"
+                  />
+                  <Input
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
+                    placeholder="Thành phố / Tỉnh"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+
               {/* Ảnh */}
               <div className="space-y-1.5">
                 <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
@@ -541,7 +487,7 @@ export default function AddStore() {
                   {imageFile ? (
                     <div className="relative group w-full">
                       <img
-                        src={URL.createObjectURL(imageFile)}
+                        src={previewUrl}
                         alt="Ảnh xem trước"
                         className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
                       />
@@ -612,8 +558,8 @@ export default function AddStore() {
                 <Button
                   type="button"
                   onClick={() => {
-                    if (!name || !imageFile) {
-                      showMessage('error', 'Vui lòng nhập tên cửa hàng và chụp ảnh trước khi tiếp tục')
+                    if (!name || !addressDetail || !ward || !district || !city || !imageFile) {
+                      showMessage('error', 'Vui lòng nhập tên, địa chỉ và chụp ảnh trước khi tiếp tục')
                       return
                     }
                     setCurrentStep(2)
@@ -629,68 +575,6 @@ export default function AddStore() {
           {/* Step 2: Location */}
           {currentStep === 2 && (
             <>
-              {/* Địa chỉ */}
-              <div className="space-y-1.5">
-                <Label htmlFor="address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc - nhập tay)</Label>
-                <div className="relative">
-                  <textarea
-                    id="address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    onBlur={() => {
-                      if (!address) return;
-                      const isAllLower = address === address.toLowerCase();
-                      const isAllUpper = address === address.toUpperCase();
-                      if ((isAllLower || isAllUpper) && address.length > 2) {
-                        const fixed = toTitleCaseVI(address.toLowerCase())
-                        setAddress(fixed)
-                      }
-                    }}
-                    placeholder="Nhập địa chỉ: 123 Đường Lê Lợi, Phường 7, Quận 3, TP. Hồ Chí Minh"
-                    className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 resize-y min-h-[72px] pr-9"
-                  />
-                  {address && address.length > 0 && (
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      className="absolute right-2 top-2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
-                      onClick={() => setAddress('')}
-                      aria-label="Xoá nhanh địa chỉ"
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Google Maps Link (optional) */}
-              <div className="space-y-1.5">
-                <Label htmlFor="gmap" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link Google Maps (tùy chọn)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="gmap"
-                    value={gmapLink}
-                    onChange={(e) => setGmapLink(e.target.value)}
-                    placeholder="https://maps.app.goo.gl/AbCd1234"
-                    className={`${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''} text-sm flex-1`}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handlePasteGmap}
-                    disabled={gmapResolving}
-                    className="h-10 px-3 shrink-0 text-sm"
-                    aria-label="Dán link Google Maps"
-                  >
-                    Dán
-                  </Button>
-                </div>
-                {gmapMessage && (
-                  <div className={`text-[11px] ${gmapStatus === 'error' ? 'text-red-600' : gmapStatus === 'success' ? 'text-green-600' : 'text-gray-500'}`}>{gmapMessage}</div>
-                )}
-              </div>
-
               {/* Map Picker */}
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
                 <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -818,15 +702,25 @@ export default function AddStore() {
                     </div>
                   )}
 
-                  <LocationPicker
-                    initialLat={pickedLat}
-                    initialLng={pickedLng}
-                    onChange={handleLocationChange}
-                    className="rounded-md overflow-hidden"
-                    editable={mapEditable}
-                    onToggleEditable={() => setMapEditable(v => !v)}
-                    heading={heading}
-                  />
+                  <div className="relative">
+                    <LocationPicker
+                      initialLat={pickedLat}
+                      initialLng={pickedLng}
+                      onChange={handleLocationChange}
+                      className="rounded-md overflow-hidden"
+                      editable={mapEditable}
+                      onToggleEditable={() => setMapEditable(v => !v)}
+                      heading={heading}
+                    />
+                    {resolvingAddr && (
+                      <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-white/70 dark:bg-black/60 backdrop-blur-sm rounded-md">
+                        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                          <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+                          Đang lấy vị trí…
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -842,10 +736,10 @@ export default function AddStore() {
             </Button>
             <Button
               type="submit"
-              disabled={loading || gmapResolving}
+              disabled={loading || resolvingAddr}
               className="flex-1 text-sm sm:text-base"
             >
-              {loading || gmapResolving ? 'Đang thêm…' : 'Lưu cửa hàng'}
+              {loading || resolvingAddr ? 'Đang thêm…' : 'Lưu cửa hàng'}
             </Button>
           </div>
             </>
@@ -855,20 +749,3 @@ export default function AddStore() {
     </div>
   )
 }
-
-async function expandShortLink(urlStr) {
-  try {
-    const res = await fetch('/api/expand-maps-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: urlStr }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data?.finalUrl && data.finalUrl !== urlStr) return data.finalUrl
-    return null
-  } catch { return null }
-}
-
-// Inject implementation instead of monkey patching namespace
-setExpandShortLink(expandShortLink)

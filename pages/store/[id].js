@@ -15,6 +15,8 @@ import imageCompression from 'browser-image-compression'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
 
+const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
+
 export default function StoreDetail() {
   const router = useRouter()
   const { id } = router.query
@@ -22,7 +24,10 @@ export default function StoreDetail() {
 
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
+  const [addressDetail, setAddressDetail] = useState('')
+  const [ward, setWard] = useState('')
+  const [district, setDistrict] = useState('')
+  const [city, setCity] = useState('')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -54,22 +59,22 @@ export default function StoreDetail() {
     setPickedLng(lng)
   }, [])
 
-  // Dynamically import the LocationPicker (client-side only)
-  // Use the existing Leaflet-based LocationPicker (no Google Maps)
-  const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
   useEffect(() => {
     if (!id) return
     supabase
       .from('stores')
-      .select('id,name,address,phone,note,image_url,latitude,longitude')
+      .select('id,name,address_detail,ward,district,city,phone,note,image_url,latitude,longitude')
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => {
         setStore(data)
         if (data) {
           setName(toTitleCaseVI(data.name || ''))
-          setAddress(data.address || '')
+          setAddressDetail(data.address_detail || '')
+          setWard(data.ward || '')
+          setDistrict(data.district || '')
+          setCity(data.city || '')
           setPhone(data.phone || '')
           setNote(data.note || '')
           setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
@@ -323,7 +328,7 @@ export default function StoreDetail() {
       const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
       if (cached) {
         console.log('✅ Found cached address:', cached)
-        setAddress(cached)
+        setAddressDetail(cached)
         return
       }
       
@@ -338,7 +343,7 @@ export default function StoreDetail() {
       
       if (cleaned) {
         console.log('✅ Reverse geocoded address:', cleaned)
-        setAddress(cleaned)
+        setAddressDetail(cleaned)
         // Cache the result
         try { 
           sessionStorage.setItem(cacheKey, cleaned) 
@@ -410,7 +415,7 @@ export default function StoreDetail() {
             lastParsedRef.current = { lat: geo.lat, lng: geo.lng }
             console.log('✅ Geocoding success:', { lat: geo.lat, lng: geo.lng })
             if (geo.address) {
-              setAddress(geo.address)
+            setAddressDetail(geo.address)
               console.log('✅ Updated address:', geo.address)
             }
             setGmapStatus('success')
@@ -436,7 +441,15 @@ export default function StoreDetail() {
 
   async function onSave(e) {
     e.preventDefault()
+    if (resolvingAddr) {
+      showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
+      return
+    }
     if (!user) { showMessage('error', 'Vui lòng đăng nhập để sửa cửa hàng'); return }
+    if (!addressDetail || !ward || !district || !city) {
+      showMessage('error', 'Vui lòng nhập đầy đủ địa chỉ')
+      return
+    }
     setSaving(true)
 
     const normalizedName = toTitleCaseVI(name.trim())
@@ -546,10 +559,26 @@ export default function StoreDetail() {
       // compute normalized search name when updating
       const name_search = removeVietnameseTones(normalizedName)
 
-      const { error: updateErr } = await supabase
-        .from('stores')
-        .update({ name: normalizedName, name_search, address, phone, note, image_url, latitude, longitude })
-        .eq('id', id)
+    const normalizedDetail = toTitleCaseVI(addressDetail.trim())
+    const normalizedWard = toTitleCaseVI(ward.trim())
+    const normalizedDistrict = toTitleCaseVI(district.trim())
+    const normalizedCity = toTitleCaseVI(city.trim())
+    const { error: updateErr } = await supabase
+      .from('stores')
+      .update({
+        name: normalizedName,
+        name_search,
+        address_detail: normalizedDetail,
+        ward: normalizedWard,
+        district: normalizedDistrict,
+        city: normalizedCity,
+        phone,
+        note,
+        image_url,
+        latitude,
+        longitude
+      })
+      .eq('id', id)
       if (updateErr) throw updateErr
 
       // Optional cleanup: delete old image if replaced
@@ -702,6 +731,7 @@ export default function StoreDetail() {
         </div>
 
         <form onSubmit={onSave} className="space-y-4">
+          <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300">Phần 1: Thông tin cửa hàng</h2>
           {store?.image_url && (
             <div className="space-y-1.5">
               <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh hiện tại</Label>
@@ -723,13 +753,39 @@ export default function StoreDetail() {
 
           <div className="space-y-1.5">
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ</Label>
-            <div className="flex flex-col gap-2">
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} disabled={!user} className="text-sm" placeholder={gmapResolving ? 'Đang lấy địa chỉ từ liên kết…' : (resolvingAddr ? 'Đang tự động lấy địa chỉ…' : undefined)} />
-              {user && (
-                <Button type="button" variant="outline" onClick={handleFillAddress} disabled={resolvingAddr} className="w-full sm:w-auto text-sm">
-                  {resolvingAddr ? 'Đang lấy…' : 'Tự động lấy địa chỉ'}
-                </Button>
-              )}
+            <div className="grid gap-2">
+              <Input
+                value={addressDetail}
+                onChange={(e) => setAddressDetail(e.target.value)}
+                onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                disabled={!user}
+                className="text-sm"
+                placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+              />
+              <Input
+                value={ward}
+                onChange={(e) => setWard(e.target.value)}
+                onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
+                disabled={!user}
+                className="text-sm"
+                placeholder="Xã / Phường"
+              />
+              <Input
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
+                disabled={!user}
+                className="text-sm"
+                placeholder="Quận / Huyện"
+              />
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
+                disabled={!user}
+                className="text-sm"
+                placeholder="Thành phố / Tỉnh"
+              />
             </div>
           </div>
 
@@ -779,6 +835,7 @@ export default function StoreDetail() {
                 </span>
               ) : 'Nếu nhập, sẽ ưu tiên tọa độ và tự cập nhật địa chỉ từ liên kết.'}</p>
             </div>
+            <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300 pt-2">Phần 2: Bản đồ</h2>
             {/* Always-visible map picker */}
             <div className="space-y-1.5">
               <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Vị trí trên bản đồ</Label>
@@ -858,8 +915,8 @@ export default function StoreDetail() {
             </div>
 
           <div className="pt-2">
-            <Button type="submit" disabled={!user || saving || gmapResolving} className="w-full text-sm sm:text-base">
-              {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving) ? 'Đang lưu...' : 'Lưu thay đổi'}
+            <Button type="submit" disabled={!user || saving || gmapResolving || resolvingAddr} className="w-full text-sm sm:text-base">
+              {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving || resolvingAddr) ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>
         </form>

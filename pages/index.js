@@ -5,15 +5,12 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
-import { useAuth } from '@/components/auth-context'
 import SearchStoreCard from '@/components/search-store-card'
 import LocationSwitch from '@/components/location-switch'
 
-const STORAGE_KEY = 'selectedStores'
 const LOCATION_MODE_KEY = 'locationMode'
 const USER_LOCATION_KEY = 'userLocation'
 const NPP_LOCATION = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
@@ -34,31 +31,8 @@ function getInitialUserLocation() {
   return null
 }
 
-function getFileNameFromUrl(url) {
-  if (!url) return null;
-  
-  // Since image_url is now always just filename, return as is
-  // But keep URL parsing for backward compatibility if needed
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    return url;
-  }
-  
-  try {
-    const marker = '/object/public/stores/'
-    const idx = url.indexOf(marker)
-    if (idx !== -1) return url.substring(idx + marker.length)
-    const u = new URL(url)
-    const parts = u.pathname.split('/')
-    return parts[parts.length - 1]
-  } catch {
-    return null
-  }
-}
-
 export default function HomePage() {
-  const { user } = useAuth()
   const [searchResults, setSearchResults] = useState([])
-  const [stores, setStores] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [currentLocation, setCurrentLocation] = useState(getInitialUserLocation())
   const [loading, setLoading] = useState(false)
@@ -66,35 +40,11 @@ export default function HomePage() {
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
   const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // 'user' or 'npp'
-  const [isClient, setIsClient] = useState(false)
   const observer = useRef(null)
   const suppressFirstAutoLoad = useRef(false)
   const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
   const searchInputRef = useRef(null)
-
-  // Load stores from localStorage on component mount
-  useEffect(() => {
-    setIsClient(true)
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        const parsedStores = JSON.parse(saved)
-        setStores(parsedStores)
-      } catch (error) {
-        console.error('Error parsing saved stores:', error)
-        setStores([])
-      }
-    }
-  }, [])
-
-  // Save to localStorage whenever stores changes and notify navbar
-  useEffect(() => {
-    if (isClient) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stores))
-      // Dispatch custom event to notify navbar
-      window.dispatchEvent(new CustomEvent('selectedStoresUpdated'))
-    }
-  }, [stores, isClient])  // Get current location
+  // Get current location
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -227,12 +177,7 @@ export default function HomePage() {
         return newDistance === store.distance ? store : { ...store, distance: newDistance }
       }))
     }
-    if (stores.length > 0) {
-      setStores(prev => prev.map(store => {
-        const newDistance = computeDistance(store, referenceLocation)
-        return newDistance === store.distance ? store : { ...store, distance: newDistance }
-      }))
-    }
+    // no visit list
   }, [locationMode, currentLocation, getReferenceLocation, computeDistance])
 
   const loadMore = useCallback(async () => {
@@ -275,14 +220,6 @@ export default function HomePage() {
     }
   }, [hasMore, loadingMore, loading, searchTerm, page, getReferenceLocation])
 
-  const addToList = (store) => {
-    if (!stores.find(s => s.id === store.id)) {
-      const referenceLocation = getReferenceLocation()
-      const distance = computeDistance(store, referenceLocation)
-      setStores(prev => [...prev, { ...store, distance }])
-    }
-  }
-
   // Guarded switch: only allow switching to 'user' if geolocation succeeds
   const handleLocationModeChange = useCallback((mode) => {
     const broadcast = (m, loc) => {
@@ -322,7 +259,6 @@ export default function HomePage() {
     }
   }, [currentLocation])
 
-  const visitListCount = stores.length
   const isPendingSearch = searchTerm.length >= MIN_SEARCH_LEN && lastQueryRef.current !== searchTerm
   const showSkeleton = searchTerm.length >= MIN_SEARCH_LEN && (loading || isPendingSearch)
 
@@ -416,22 +352,17 @@ export default function HomePage() {
             </div>
           )}
 
-          {!loading && !isPendingSearch && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
+              {!loading && !isPendingSearch && searchTerm.length >= MIN_SEARCH_LEN && searchResults.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
                   Không tìm thấy cửa hàng nào
                 </p>
-                {user && (
-                  <Button asChild>
-                    <Link href={`/store/create?name=${encodeURIComponent(searchTerm)}`}>
-                      + Tạo cửa hàng mới
-                    </Link>
-                  </Button>
-                )}
-                {!user && (
-                  <p className="text-xs mt-4 text-gray-400">Đăng nhập để tạo cửa hàng mới</p>
-                )}
+                <Button asChild>
+                  <Link href={`/store/create?name=${encodeURIComponent(searchTerm)}`}>
+                    + Tạo cửa hàng mới
+                  </Link>
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -450,8 +381,6 @@ export default function HomePage() {
                     <SearchStoreCard
                       store={store}
                       distance={store.distance}
-                      onAdd={() => addToList(store)}
-                      isAdded={stores.some(s => s.id === store.id)}
                       searchTerm={searchTerm}
                     />
                   </div>

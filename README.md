@@ -8,7 +8,6 @@
 - 📍 **GPS & Bản đồ**: Tự động lấy vị trí, tính khoảng cách, hiển thị trên bản đồ
 - 📷 **Upload ảnh**: Chụp và nén ảnh tự động, lưu trữ an toàn
 - 🗺️ **Google Maps**: Parse link Google Maps tự động điền thông tin
-- 📝 **Danh sách thăm**: Quản lý và sắp xếp cửa hàng cần thăm (drag & drop)
 - 🌙 **Dark mode**: Giao diện tối/sáng thân thiện mắt
 - 📱 **Mobile-first**: Tối ưu cho thiết bị di động
 
@@ -82,8 +81,6 @@ Dán link Google Maps (bao gồm cả short links) để tự động:
 ### Smart Search
 Tìm kiếm theo tên có hoặc không dấu. Ví dụ: "Ha Noi" sẽ tìm thấy "Hà Nội".
 
-### Visit List
-Sắp xếp danh sách cửa hàng cần thăm bằng kéo thả, xem trên bản đồ, tạo route tối ưu.
 
 ## 🔒 Security
 
