@@ -25,10 +25,10 @@
     "imagekit": "^6.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.539.0",
-    "next": "15.4.6",
+    "next": "15.4.10",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-  "react-leaflet": "^5.0.0",
+    "react-leaflet": "^5.0.0",
     "react-virtuoso": "^4.14.0",
     "swr": "^2.3.5",
     "tailwind-merge": "^3.3.1"
