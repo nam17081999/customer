@@ -27,7 +27,7 @@ export default function StoreDetail() {
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
-  const [city, setCity] = useState('')
+  const [city, setCity] = useState('Hà Nội')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -74,7 +74,7 @@ export default function StoreDetail() {
           setAddressDetail(data.address_detail || '')
           setWard(data.ward || '')
           setDistrict(data.district || '')
-          setCity(data.city || '')
+          setCity(data.city || 'Hà Nội')
           setPhone(data.phone || '')
           setNote(data.note || '')
           setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
@@ -446,8 +446,8 @@ export default function StoreDetail() {
       return
     }
     if (!user) { showMessage('error', 'Vui lòng đăng nhập để sửa cửa hàng'); return }
-    if (!addressDetail || !ward || !district || !city) {
-      showMessage('error', 'Vui lòng nhập đầy đủ địa chỉ')
+    if (!district) {
+      showMessage('error', 'Vui lòng nhập quận/huyện')
       return
     }
     setSaving(true)
@@ -562,7 +562,7 @@ export default function StoreDetail() {
     const normalizedDetail = toTitleCaseVI(addressDetail.trim())
     const normalizedWard = toTitleCaseVI(ward.trim())
     const normalizedDistrict = toTitleCaseVI(district.trim())
-    const normalizedCity = toTitleCaseVI(city.trim())
+    const normalizedCity = toTitleCaseVI((city || 'Hà Nội').trim())
     const { error: updateErr } = await supabase
       .from('stores')
       .update({
