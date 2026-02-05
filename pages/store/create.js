@@ -22,7 +22,7 @@ export default function AddStore() {
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
-  const [city, setCity] = useState('')
+  const [city, setCity] = useState('Hà Nội')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -220,8 +220,8 @@ export default function AddStore() {
       return
     }
 
-    if (!name || !addressDetail || !ward || !district || !city || !imageFile) {
-      showMessage('error', 'Tên, địa chỉ và ảnh là bắt buộc')
+    if (!name || !district || !imageFile) {
+      showMessage('error', 'Tên, quận/huyện và ảnh là bắt buộc')
       return
     }
 
@@ -314,7 +314,7 @@ export default function AddStore() {
       const normalizedDetail = toTitleCaseVI(addressDetail.trim())
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
-      const normalizedCity = toTitleCaseVI(city.trim())
+      const normalizedCity = toTitleCaseVI((city || 'Hà Nội').trim())
 
       const { error: insertError } = await supabase.from('stores').insert([
         {
@@ -356,7 +356,7 @@ export default function AddStore() {
       setAddressDetail('')
       setWard('')
       setDistrict('')
-      setCity('')
+      setCity('Hà Nội')
       setPhone('')
       setNote('')
       setImageFile(null)
@@ -558,8 +558,8 @@ export default function AddStore() {
                 <Button
                   type="button"
                   onClick={() => {
-                    if (!name || !addressDetail || !ward || !district || !city || !imageFile) {
-                      showMessage('error', 'Vui lòng nhập tên, địa chỉ và chụp ảnh trước khi tiếp tục')
+                    if (!name || !district || !imageFile) {
+                      showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
                       return
                     }
                     setCurrentStep(2)
