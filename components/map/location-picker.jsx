@@ -207,17 +207,22 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
 
   useEffect(() => {
     if (initialLat && initialLng) {
+      const osm = googleToOsm(initialLat, initialLng)
+      const nextCenter = [
+        Number(osm.lat.toFixed(6)),
+        Number(osm.lng.toFixed(6))
+      ]
       // If map already created, just set view once without changing the controlled prop
       if (mapRef.current && mapCreatedRef.current) {
-        try { mapRef.current.setView([initialLat, initialLng], mapRef.current.getZoom()) } catch (e) {}
-        setCenter([initialLat, initialLng])
+        try { mapRef.current.setView(nextCenter, mapRef.current.getZoom()) } catch (e) {}
+        setCenter(nextCenter)
       } else {
         // before map creation, set initial center so MapContainer starts there
-        setInitialCenter([initialLat, initialLng])
-        setCenter([initialLat, initialLng])
+        setInitialCenter(nextCenter)
+        setCenter(nextCenter)
       }
     }
-  }, [initialLat, initialLng])
+  }, [initialLat, initialLng, googleToOsm])
 
   // Convert OSM coordinates to match Google Maps more closely
   // These offsets were calculated by comparing multiple points between OSM and Google Maps
