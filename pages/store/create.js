@@ -6,8 +6,6 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/components/auth-context'
-import Link from 'next/link'
 import { toTitleCaseVI } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
@@ -16,7 +14,6 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
 export default function AddStore() {
-  const { user } = useAuth()
   const router = useRouter()
   const [name, setName] = useState('')
   const [addressDetail, setAddressDetail] = useState('')
@@ -55,6 +52,7 @@ export default function AddStore() {
   const [heading, setHeading] = useState(null) // Store compass heading for map rotation
   const mapWrapperRef = useRef(null)
   const [geoBlocked, setGeoBlocked] = useState(false)
+  const [step2Key, setStep2Key] = useState(0)
 
 
   // Stable handler for LocationPicker - track manual edits
@@ -190,10 +188,9 @@ export default function AddStore() {
   }
 
   useEffect(() => {
-    if (!user) return
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
     if (qName) setName(toTitleCaseVI(qName))
-  }, [user, router.query.name])
+  }, [router.query.name])
 
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
@@ -205,9 +202,18 @@ export default function AddStore() {
 
   // Auto-fetch location when entering step 2
   useEffect(() => {
-      if (currentStep === 2 && !pickedLat && !pickedLng && !resolvingAddr) {
-        handleFillAddress()
-      }
+    if (currentStep !== 2) return
+    // Reset map-related state to ensure a fresh GPS fetch each time
+    setGeoBlocked(false)
+    setMapEditable(false)
+    setUserHasEditedMap(false)
+    setPickedLat(null)
+    setPickedLng(null)
+    setInitialGPSLat(null)
+    setInitialGPSLng(null)
+    setHeading(null)
+    setStep2Key((k) => k + 1) // force remount map
+    if (!resolvingAddr) handleFillAddress()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
 
@@ -216,12 +222,12 @@ export default function AddStore() {
       setResolvingAddr(true)
 
       // Get GPS coordinates with improved logic
-      const { coords, error } = await getBestPosition({
-        attempts: 3,           // Giảm từ 4 → 3
-        timeout: 4000,         // 4s thay vì 10s
-        maxWaitTime: 8000,     // Tổng tối đa 8s
-        desiredAccuracy: 25
-      })
+    const { coords, error } = await getBestPosition({
+      attempts: 3,           // Giảm từ 4 → 3
+      timeout: 4000,         // 4s thay vì 10s
+      maxWaitTime: 8000,     // Tổng tối đa 8s
+      desiredAccuracy: 25
+    })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
@@ -236,12 +242,6 @@ export default function AddStore() {
       // Update map display
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
-
-      // Save heading/bearing if available for map rotation
-      if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
-        setHeading(coords.heading)
-        console.log('📍 Heading:', coords.heading)
-      }
 
       // Do not auto-fill address parts here
     } catch (err) {
@@ -259,11 +259,6 @@ export default function AddStore() {
       showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
       return
     }
-    if (!user) {
-      showMessage('error', 'Vui lòng đăng nhập để tạo cửa hàng')
-      return
-    }
-
     if (!name || !district || !imageFile) {
       showMessage('error', 'Tên, quận/huyện và ảnh là bắt buộc')
       return
@@ -437,18 +432,6 @@ export default function AddStore() {
   }
 
   
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <div className="px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto">
-          <div className="text-center text-sm text-gray-600 dark:text-gray-400 bg-white/60 dark:bg-gray-900/40 rounded-md p-6">
-            Vui lòng <Link href="/login" className="text-blue-600 underline">đăng nhập</Link> để tạo cửa hàng.
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -634,26 +617,26 @@ export default function AddStore() {
                           setResolvingAddr(true)
 
                           // Get fresh GPS with heading
-                          const { coords, error } = await getBestPosition({
-                            attempts: 3,
-                            timeout: 4000,
-                            maxWaitTime: 8000,
-                            desiredAccuracy: 25
-                          })
-                          if (!coords) {
-                            setGeoBlocked(true)
-                            showMessage('error', getGeoErrorMessage(error))
-                            return
-                          }
-                          setGeoBlocked(false)
+          const { coords, error } = await getBestPosition({
+            attempts: 3,
+            timeout: 4000,
+            maxWaitTime: 8000,
+            desiredAccuracy: 25
+          })
+          if (!coords) {
+            setGeoBlocked(true)
+            showMessage('error', getGeoErrorMessage(error))
+            return
+          }
+          setGeoBlocked(false)
 
-                          // Update initial GPS reference (for submit if not edited)
-                          setInitialGPSLat(coords.latitude)
-                          setInitialGPSLng(coords.longitude)
+          // Update initial GPS reference (for submit if not edited)
+          setInitialGPSLat(coords.latitude)
+          setInitialGPSLng(coords.longitude)
 
-                          // Update map display
-                          setPickedLat(coords.latitude)
-                          setPickedLng(coords.longitude)
+          // Update map display
+          setPickedLat(coords.latitude)
+          setPickedLng(coords.longitude)
 
                           // Save heading/bearing if available
                           if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
@@ -751,6 +734,7 @@ export default function AddStore() {
 
                   <div className="relative">
                     <LocationPicker
+                      key={`step2-${step2Key}-${pickedLat ?? 'x'}-${pickedLng ?? 'y'}`}
                       initialLat={pickedLat}
                       initialLng={pickedLng}
                       onChange={handleLocationChange}

@@ -2,7 +2,6 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
-import { useAuth } from '@/components/auth-context'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -20,7 +19,6 @@ const LocationPicker = dynamic(() => import('@/components/map/location-picker'),
 export default function StoreDetail() {
   const router = useRouter()
   const { id } = router.query
-  const { user, loading } = useAuth()
 
   const [store, setStore] = useState(null)
   const [name, setName] = useState('')
@@ -445,7 +443,6 @@ export default function StoreDetail() {
       showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
       return
     }
-    if (!user) { showMessage('error', 'Vui lòng đăng nhập để sửa cửa hàng'); return }
     if (!district) {
       showMessage('error', 'Vui lòng nhập quận/huyện')
       return
@@ -748,7 +745,7 @@ export default function StoreDetail() {
 
           <div className="space-y-1.5">
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} disabled={!user} className="text-sm" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="text-sm" />
           </div>
 
           <div className="space-y-1.5">
@@ -758,7 +755,7 @@ export default function StoreDetail() {
                 value={addressDetail}
                 onChange={(e) => setAddressDetail(e.target.value)}
                 onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
-                disabled={!user}
+                disabled={false}
                 className="text-sm"
                 placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
               />
@@ -766,7 +763,7 @@ export default function StoreDetail() {
                 value={ward}
                 onChange={(e) => setWard(e.target.value)}
                 onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
-                disabled={!user}
+                disabled={false}
                 className="text-sm"
                 placeholder="Xã / Phường"
               />
@@ -774,7 +771,7 @@ export default function StoreDetail() {
                 value={district}
                 onChange={(e) => setDistrict(e.target.value)}
                 onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
-                disabled={!user}
+                disabled={false}
                 className="text-sm"
                 placeholder="Quận / Huyện"
               />
@@ -782,7 +779,7 @@ export default function StoreDetail() {
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
-                disabled={!user}
+                disabled={false}
                 className="text-sm"
                 placeholder="Thành phố / Tỉnh"
               />
@@ -797,22 +794,20 @@ export default function StoreDetail() {
               pattern="[0-9+ ]*"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              disabled={!user}
+              disabled={false}
               className="text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} disabled={!user} className="text-sm" />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} className="text-sm" />
           </div>
 
-          {user && (
-            <div className="space-y-1.5">
-              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Đổi ảnh (tùy chọn)</Label>
-              <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Đổi ảnh (tùy chọn)</Label>
+            <Input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="text-sm" />
+          </div>
 
           <div className="space-y-1.5">
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Link Google Maps (không bắt buộc)</Label>
@@ -820,7 +815,7 @@ export default function StoreDetail() {
               value={gmapLink}
               onChange={(e) => setGmapLink(e.target.value)}
               placeholder="Dán liên kết chia sẻ vị trí từ Google Maps"
-              disabled={!user}
+              disabled={false}
               className={`text-sm ${gmapStatus === 'error' ? 'border-red-500' : gmapStatus === 'success' ? 'border-green-500' : ''}`}
             />
             {gmapMessage && gmapStatus === 'error' && (
@@ -915,8 +910,8 @@ export default function StoreDetail() {
             </div>
 
           <div className="pt-2">
-            <Button type="submit" disabled={!user || saving || gmapResolving || resolvingAddr} className="w-full text-sm sm:text-base">
-              {!user ? 'Vui lòng đăng nhập' : (saving || gmapResolving || resolvingAddr) ? 'Đang lưu...' : 'Lưu thay đổi'}
+            <Button type="submit" disabled={saving || gmapResolving || resolvingAddr} className="w-full text-sm sm:text-base">
+              {(saving || gmapResolving || resolvingAddr) ? 'Đang lưu...' : 'Lưu thay đổi'}
             </Button>
           </div>
         </form>

@@ -90,41 +90,12 @@ function CenterTracker({ onCenterChange, icon, onInit, debug = false }) {
   return null
 }
 
-export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false, heading = null, height = 420 }) {
-  // Convert Google coordinates back to OSM for initial display
-  const googleToOsm = useCallback((lat, lng) => {
-    const latOffset = 0.00007  // Inverse of OSM->Google adjustment
-    const lngOffset = 0
-
-    return {
-      lat: lat - latOffset,
-      lng: lng - lngOffset
-    }
-  }, [])
-
-  // Initialize with exact decimal places, converting from Google to OSM coordinates
+export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false, height = 420 }) {
   const defaultLat = 10.776900
   const defaultLng = 106.700980
-  
   const [center, setCenter] = useState(() => {
-    if (initialLat && initialLng) {
-      // Convert from Google to OSM coordinates for display
-      const osm = googleToOsm(initialLat, initialLng)
-      return [
-        Number(osm.lat.toFixed(6)),
-        Number(osm.lng.toFixed(6))
-      ]
-    }
-    return [defaultLat, defaultLng]
-  })
-  
-  const [initialCenter, setInitialCenter] = useState(() => {
-    if (initialLat && initialLng) {
-      const osm = googleToOsm(initialLat, initialLng)
-      return [
-        Number(osm.lat.toFixed(6)),
-        Number(osm.lng.toFixed(6))
-      ]
+    if (typeof initialLat === 'number' && typeof initialLng === 'number') {
+      return [initialLat, initialLng]
     }
     return [defaultLat, defaultLng]
   })
@@ -138,36 +109,12 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
     centerRef.current = center
   }, [center])
 
-  // Rotate map based on heading/bearing
+  // Whenever center state changes, keep the map view in sync
   useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    // If heading is available and valid, rotate the map
-    // heading/bearing: 0 = North, 90 = East, 180 = South, 270 = West
-    if (heading !== null && heading !== undefined && !isNaN(heading)) {
-      try {
-        // Leaflet doesn't have built-in rotation, but we can rotate the container
-        // Note: This requires CSS transform which may affect performance
-        const container = map.getContainer()
-        if (container) {
-          // Rotate counter-clockwise to align north with user's direction
-          container.style.transform = `rotate(${-heading}deg)`
-          container.style.transformOrigin = 'center center'
-        }
-      } catch (e) {
-        console.warn('Could not rotate map:', e)
-      }
-    } else {
-      // Reset rotation if no heading
-      try {
-        const container = map.getContainer()
-        if (container) {
-          container.style.transform = 'none'
-        }
-      } catch (e) {}
+    if (mapRef.current && Array.isArray(center) && center.length === 2) {
+      try { mapRef.current.setView(center, mapRef.current.getZoom(), { animate: false }) } catch {}
     }
-  }, [heading])
+  }, [center])
 
   // enable/disable dragging when editable changes (zoom always disabled)
   useEffect(() => {
@@ -197,50 +144,28 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
   // separate DOM overlay).
   useEffect(() => {
     try {
+      // iconAnchor y slightly above bottom to align pin tip to exact lat/lng
       const svgHtml = `<svg width="28" height="40" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C7.031 0 3 4.031 3 9c0 7.5 9 18 9 18s9-10.5 9-18c0-4.969-4.031-9-9-9z" fill="#ef4444"/><circle cx="12" cy="9" r="3" fill="white" /></svg>`
-      const icon = L.divIcon({ className: '', html: svgHtml, iconSize: [28, 40], iconAnchor: [14, 40] })
+      const icon = L.divIcon({ className: '', html: svgHtml, iconSize: [28, 40], iconAnchor: [20, 32] })
       setCenterIcon(icon)
     } catch (e) {
       // ignore
     }
   }, [])
 
+  // Update center when props change (fresh coordinates)
   useEffect(() => {
-    if (initialLat && initialLng) {
-      const osm = googleToOsm(initialLat, initialLng)
-      const nextCenter = [
-        Number(osm.lat.toFixed(6)),
-        Number(osm.lng.toFixed(6))
-      ]
-      // If map already created, just set view once without changing the controlled prop
-      if (mapRef.current && mapCreatedRef.current) {
-        try { mapRef.current.setView(nextCenter, mapRef.current.getZoom()) } catch (e) {}
-        setCenter(nextCenter)
-      } else {
-        // before map creation, set initial center so MapContainer starts there
-        setInitialCenter(nextCenter)
-        setCenter(nextCenter)
+    if (typeof initialLat === 'number' && typeof initialLng === 'number') {
+      setCenter([initialLat, initialLng])
+      if (mapRef.current) {
+        try { mapRef.current.setView([initialLat, initialLng], mapRef.current.getZoom(), { animate: false }) } catch {}
       }
     }
-  }, [initialLat, initialLng, googleToOsm])
-
-  // Convert OSM coordinates to match Google Maps more closely
-  // These offsets were calculated by comparing multiple points between OSM and Google Maps
-  const osmToGoogle = useCallback((lat, lng) => {
-    // Hệ số điều chỉnh cho Việt Nam, đặc biệt là khu vực HCMC
-    // Được tính bằng cách so sánh nhiều điểm giữa OSM và Google Maps
-    const latOffset = 0.00007  
-    const lngOffset = 0 
-    
-    return {
-      lat: lat + latOffset,
-      lng: lng + lngOffset
-    }
-  }, [])
+  }, [initialLat, initialLng])
 
   // stable handler that only updates state when the center meaningfully changes.
   // We ensure coordinates are handled with exact precision (6 decimal places) and
-  // adjusted to match Google Maps coordinates more closely.
+  // adjusted to exact precision.
   const handleCenterChange = useCallback((lat, lng) => {
     const cur = centerRef.current || [0, 0]
     const latDiff = Math.abs((cur[0] || 0) - lat)
@@ -249,31 +174,23 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
     // Only update if change is significant (>0.000001 degree, about 10cm)
     if (latDiff < 0.000001 && lngDiff < 0.000001) return
     
-    // Convert OSM coordinates to match Google Maps
-    const adjusted = osmToGoogle(lat, lng)
-    
-    // Use exact precision after adjustment
-    const exactLat = Number(adjusted.lat.toFixed(6))
-    const exactLng = Number(adjusted.lng.toFixed(6))
-    
     setCenter([lat, lng]) // Keep original coordinates for map display
     if (editable && onChange) {
-      onChange(exactLat, exactLng) // Send adjusted coordinates to parent
+      onChange(lat, lng)
     }
     
     // Log both original and adjusted coordinates in debug mode
     if (debug) {
-      console.log('Map center (OSM):', { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) })
-      console.log('Adjusted for Google:', { lat: exactLat, lng: exactLng })
+      console.log('Map center:', { lat, lng })
     }
-  }, [onChange, debug, osmToGoogle])
+  }, [onChange, debug])
 
   return (
     <div className={className} style={{ position: 'relative' }}>
       {/* Ensure the leaflet container class is present and touchAction is set so touch/pointer
           events are handled by the map (fixes inability to drag on touch devices / mobiles). */}
       <MapContainer
-        center={initialCenter}
+        center={center}
         zoom={18}
         maxZoom={18}
         minZoom={18}
