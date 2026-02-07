@@ -195,6 +195,14 @@ export default function AddStore() {
     if (qName) setName(toTitleCaseVI(qName))
   }, [user, router.query.name])
 
+  useEffect(() => {
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
+  }, [])
+
+  useEffect(() => {
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
+  }, [currentStep])
+
   // Auto-fetch location when entering step 2
   useEffect(() => {
       if (currentStep === 2 && !pickedLat && !pickedLng && !resolvingAddr) {
@@ -474,7 +482,7 @@ export default function AddStore() {
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-sm" />
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
               </div>
 
               {/* Địa chỉ */}
@@ -487,7 +495,7 @@ export default function AddStore() {
                     onChange={(e) => setAddressDetail(e.target.value)}
                     onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
                     placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
-                    className="text-sm"
+                    className="text-base sm:text-base"
                   />
                   <Input
                     id="ward"
@@ -495,7 +503,7 @@ export default function AddStore() {
                     onChange={(e) => setWard(e.target.value)}
                     onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
                     placeholder="Xã / Phường"
-                    className="text-sm"
+                    className="text-base sm:text-base"
                   />
                   <Input
                     id="district"
@@ -503,7 +511,7 @@ export default function AddStore() {
                     onChange={(e) => setDistrict(e.target.value)}
                     onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
                     placeholder="Quận / Huyện"
-                    className="text-sm"
+                    className="text-base sm:text-base"
                   />
                   <Input
                     id="city"
@@ -511,7 +519,7 @@ export default function AddStore() {
                     onChange={(e) => setCity(e.target.value)}
                     onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
                     placeholder="Thành phố / Tỉnh"
-                    className="text-sm"
+                    className="text-base sm:text-base"
                   />
                 </div>
               </div>
@@ -579,12 +587,12 @@ export default function AddStore() {
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="0901 234 567"
-                      className="text-sm"
+                      className="text-base sm:text-base"
                     />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-sm" />
+                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
                   </div>
                 </div>
               )}
