@@ -90,7 +90,7 @@ function CenterTracker({ onCenterChange, icon, onInit, debug = false }) {
   return null
 }
 
-export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false, heading = null }) {
+export default function LocationPicker({ initialLat, initialLng, onChange, className, editable = true, onToggleEditable, debug = false, heading = null, height = 420 }) {
   // Convert Google coordinates back to OSM for initial display
   const googleToOsm = useCallback((lat, lng) => {
     const latOffset = 0.00007  // Inverse of OSM->Google adjustment
@@ -277,7 +277,7 @@ export default function LocationPicker({ initialLat, initialLng, onChange, class
         touchZoom={false}
         doubleClickZoom={false}
         className="leaflet-container"
-        style={{ height: 420, width: '100%', touchAction: 'none', cursor: 'grab' }}
+        style={{ height, width: '100%', touchAction: 'none', cursor: 'grab' }}
         whenCreated={(map) => {
           mapRef.current = map
           mapCreatedRef.current = true
