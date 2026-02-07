@@ -54,6 +54,7 @@ export default function AddStore() {
   const [initialGPSLng, setInitialGPSLng] = useState(null)
   const [heading, setHeading] = useState(null) // Store compass heading for map rotation
   const mapWrapperRef = useRef(null)
+  const [geoBlocked, setGeoBlocked] = useState(false)
 
 
   // Stable handler for LocationPicker - track manual edits
@@ -73,10 +74,13 @@ export default function AddStore() {
     maxWaitTime = 10000,   // Tổng thời gian tối đa 10s
     desiredAccuracy = 25   // Mục tiêu 25m
   } = {}) {
-    if (!navigator.geolocation) throw new Error('Geolocation not supported')
+    if (!navigator.geolocation) {
+      return { coords: null, error: new Error('Geolocation not supported') }
+    }
 
     const samples = []
     const startTime = Date.now()
+    let lastError = null
 
     // Try to get cached position first (< 30 seconds old)
     try {
@@ -93,10 +97,11 @@ export default function AddStore() {
       })
       if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
         console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
-        return cached.coords
+        return { coords: cached.coords, error: null }
       }
     } catch (err) {
       // No cache, continue to get fresh location
+      lastError = err
     }
 
     for (let i = 0; i < attempts; i++) {
@@ -141,22 +146,47 @@ export default function AddStore() {
           // Early exit if good enough
           if (pos.coords.accuracy && pos.coords.accuracy <= desiredAccuracy) {
             console.log('✅ Đạt độ chính xác mong muốn')
-            return pos.coords
+            return { coords: pos.coords, error: null }
           }
         }
       } catch (err) {
         console.warn(`⚠️ Attempt ${i+1} failed:`, err.message)
+        lastError = err
       }
     }
 
     if (samples.length === 0) {
-      throw new Error('Không lấy được vị trí sau nhiều lần thử')
+      const e = new Error('Không lấy được vị trí sau nhiều lần thử')
+      e.cause = lastError || undefined
+      return { coords: null, error: e }
     }
 
     // Return best sample
     samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
     console.log(`📊 Chọn sample tốt nhất: ${samples[0].accuracy?.toFixed(1) || '?'}m`)
-    return samples[0]
+    return { coords: samples[0], error: null }
+  }
+
+  function getGeoErrorMessage(err) {
+    const base = 'Không lấy được vị trí. Vui lòng bật định vị và mở cài đặt quyền vị trí của trình duyệt để cho phép.'
+    const code = err?.code ?? err?.cause?.code
+    if (code === 1) {
+      return 'Bạn đã từ chối quyền định vị. Vui lòng mở cài đặt quyền vị trí của trình duyệt để cho phép và thử lại.'
+    }
+    if (code === 2) {
+      return 'Không xác định được vị trí. Hãy bật GPS, kiểm tra tín hiệu hoặc thử lại.'
+    }
+    if (code === 3) {
+      return 'Lấy vị trí quá lâu. Vui lòng kiểm tra GPS/mạng và thử lại.'
+    }
+    const msg = (err?.message || err?.cause?.message || '').toLowerCase()
+    if (msg.includes('not supported')) {
+      return 'Thiết bị hoặc trình duyệt không hỗ trợ định vị. Vui lòng dùng thiết bị khác.'
+    }
+    if (msg.includes('timeout')) {
+      return 'Lấy vị trí quá lâu. Vui lòng kiểm tra GPS/mạng và thử lại.'
+    }
+    return base
   }
 
   useEffect(() => {
@@ -167,9 +197,9 @@ export default function AddStore() {
 
   // Auto-fetch location when entering step 2
   useEffect(() => {
-    if (currentStep === 2 && !pickedLat && !pickedLng && !resolvingAddr) {
-      handleFillAddress()
-    }
+      if (currentStep === 2 && !pickedLat && !pickedLng && !resolvingAddr) {
+        handleFillAddress()
+      }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
 
@@ -178,12 +208,18 @@ export default function AddStore() {
       setResolvingAddr(true)
 
       // Get GPS coordinates with improved logic
-      const coords = await getBestPosition({
+      const { coords, error } = await getBestPosition({
         attempts: 3,           // Giảm từ 4 → 3
         timeout: 4000,         // 4s thay vì 10s
         maxWaitTime: 8000,     // Tổng tối đa 8s
         desiredAccuracy: 25
       })
+      if (!coords) {
+        setGeoBlocked(true)
+        showMessage('error', getGeoErrorMessage(error))
+        return
+      }
+      setGeoBlocked(false)
 
       // Save as initial GPS position (reference for submit)
       setInitialGPSLat(coords.latitude)
@@ -202,7 +238,7 @@ export default function AddStore() {
       // Do not auto-fill address parts here
     } catch (err) {
       console.error('Get location error:', err)
-      showMessage('error', 'Không lấy được vị trí. Vui lòng tải lại trang hoặc kiểm tra lại cài đặt vị trí.')
+      showMessage('error', getGeoErrorMessage(err))
     } finally {
       setResolvingAddr(false)
     }
@@ -252,13 +288,19 @@ export default function AddStore() {
     } else {
       // Last resort: get current GPS
       try {
-        const coords = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
+        const { coords, error } = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
+        if (!coords) {
+          setGeoBlocked(true)
+          showMessage('error', getGeoErrorMessage(error))
+          return
+        }
+        setGeoBlocked(false)
         latitude = coords.latitude
         longitude = coords.longitude
       } catch (geoErr) {
         console.error('Không lấy được tọa độ:', geoErr)
         setLoading(false)
-        showMessage('error', 'Không thể lấy vị trí GPS. Vui lòng cấp quyền định vị hoặc dùng link Google Maps')
+        showMessage('error', getGeoErrorMessage(geoErr))
         return
       }
     }
@@ -426,12 +468,6 @@ export default function AddStore() {
           </div>
         </div>
 
-        <div className='flex items-center justify-between'>
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {currentStep === 1 ? 'Bước 1: Thông tin cửa hàng' : 'Bước 2: Xác định vị trí'}
-          </h1>
-        </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Step 1: Store Info */}
           {currentStep === 1 && (
@@ -577,10 +613,6 @@ export default function AddStore() {
             <>
               {/* Map Picker */}
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
-                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                  Vị trí trên bản đồ
-                </Label>
-
                 {/* Map controls - above map */}
                 <div className="flex items-center justify-between">
                     <Button
@@ -594,12 +626,18 @@ export default function AddStore() {
                           setResolvingAddr(true)
 
                           // Get fresh GPS with heading
-                          const coords = await getBestPosition({
+                          const { coords, error } = await getBestPosition({
                             attempts: 3,
                             timeout: 4000,
                             maxWaitTime: 8000,
                             desiredAccuracy: 25
                           })
+                          if (!coords) {
+                            setGeoBlocked(true)
+                            showMessage('error', getGeoErrorMessage(error))
+                            return
+                          }
+                          setGeoBlocked(false)
 
                           // Update initial GPS reference (for submit if not edited)
                           setInitialGPSLat(coords.latitude)
@@ -619,12 +657,13 @@ export default function AddStore() {
                           setUserHasEditedMap(false)
 
                           showMessage('success', 'Đã cập nhật vị trí GPS mới')
-                        } catch (err) {
-                          console.error('Get location error:', err)
-                          showMessage('error', 'Không thể lấy vị trí GPS. Vui lòng cấp quyền định vị')
-                        } finally {
-                          setResolvingAddr(false)
-                        }
+      } catch (err) {
+        console.error('Get location error:', err)
+        setGeoBlocked(true)
+        showMessage('error', getGeoErrorMessage(err))
+      } finally {
+        setResolvingAddr(false)
+      }
                       }}
                       disabled={resolvingAddr}
                       className="text-xs flex items-center gap-1.5 h-8"
@@ -639,7 +678,7 @@ export default function AddStore() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
-                      {resolvingAddr ? 'Đang lấy...' : 'Lấy vị trí hiện tại'}
+                      {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
                     </Button>
                     <Button
                       type="button"
@@ -707,11 +746,36 @@ export default function AddStore() {
                       initialLat={pickedLat}
                       initialLng={pickedLng}
                       onChange={handleLocationChange}
-                      className="rounded-md overflow-hidden"
+                      className={`rounded-md overflow-hidden ${geoBlocked ? 'blur-sm pointer-events-none select-none' : ''}`}
                       editable={mapEditable}
                       onToggleEditable={() => setMapEditable(v => !v)}
                       heading={heading}
+                      height="60vh"
                     />
+                    {geoBlocked && (
+                      <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
+                        <div className="w-full max-w-md rounded-xl border border-red-200 bg-white/95 p-5 text-center shadow-lg">
+                          <div className="text-base font-semibold text-red-600">
+                            Không thể lấy vị trí của bạn
+                          </div>
+                          <div className="mt-2 text-sm text-gray-700">
+                            Vui lòng bật định vị/GPS và cho phép quyền vị trí cho trình duyệt.
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            Mở Cài đặt → Quyền vị trí → cho phép truy cập vị trí, sau đó thử lại.
+                          </div>
+                          <div className="mt-4">
+                            <Button
+                              type="button"
+                              onClick={() => window.location.reload()}
+                              className="w-full"
+                            >
+                              Tải lại trang
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {resolvingAddr && (
                       <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-white/70 dark:bg-black/60 backdrop-blur-sm rounded-md">
                         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
@@ -736,7 +800,7 @@ export default function AddStore() {
             </Button>
             <Button
               type="submit"
-              disabled={loading || resolvingAddr}
+              disabled={loading || resolvingAddr || geoBlocked}
               className="flex-1 text-sm sm:text-base"
             >
               {loading || resolvingAddr ? 'Đang thêm…' : 'Lưu cửa hàng'}

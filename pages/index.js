@@ -9,27 +9,6 @@ import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
-import LocationSwitch from '@/components/location-switch'
-
-const LOCATION_MODE_KEY = 'locationMode'
-const USER_LOCATION_KEY = 'userLocation'
-const NPP_LOCATION = { latitude: 21.077358236549987, longitude: 105.69518029931452 }
-
-function getInitialLocationMode() {
-  if (typeof window === 'undefined') return 'npp'
-  const saved = localStorage.getItem(LOCATION_MODE_KEY)
-  return (saved === 'user' || saved === 'npp') ? saved : 'npp'
-}
-function getInitialUserLocation() {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = localStorage.getItem(USER_LOCATION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed.latitude === 'number' && typeof parsed.longitude === 'number') return parsed
-  } catch {}
-  return null
-}
 
 export default function HomePage() {
   const [searchResults, setSearchResults] = useState([])
@@ -39,12 +18,11 @@ export default function HomePage() {
   const [selectedDistrict, setSelectedDistrict] = useState('')
   const [selectedWard, setSelectedWard] = useState('')
   const [wardDistrictMap, setWardDistrictMap] = useState(new Map())
-  const [currentLocation, setCurrentLocation] = useState(getInitialUserLocation())
+  const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [locationMode, setLocationMode] = useState(getInitialLocationMode()) // 'user' or 'npp'
   const observer = useRef(null)
   const suppressFirstAutoLoad = useRef(false)
   const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
@@ -121,62 +99,20 @@ export default function HomePage() {
   }, [selectedDistrict, selectedWard, wardDistrictMap])
   // Get current location
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCurrentLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          })
-        },
-        (error) => {
-          console.error('Error getting location:', error)
-        }
-      )
-    }
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCurrentLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+      },
+      (error) => {
+        console.error('Error getting location:', error)
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
   }, [])
-
-  // Init & sync locationMode across pages (listeners only; initial state hydrated via initializer)
-  useEffect(() => {
-    const handleModeChanged = (e) => {
-      const mode = e.detail?.mode
-      if (mode && mode !== locationMode) setLocationMode(mode)
-      if (mode === 'user' && !currentLocation) {
-        const savedLoc = localStorage.getItem(USER_LOCATION_KEY)
-        if (savedLoc) {
-          try {
-            const parsed = JSON.parse(savedLoc)
-            if (parsed && typeof parsed.latitude === 'number') setCurrentLocation(parsed)
-          } catch {}
-        }
-      }
-    }
-    const handleStorage = (e) => {
-      if (e.key === LOCATION_MODE_KEY && (e.newValue === 'user' || e.newValue === 'npp')) {
-        setLocationMode(e.newValue)
-      }
-      if (e.key === USER_LOCATION_KEY && e.newValue && !currentLocation) {
-        try {
-          const parsed = JSON.parse(e.newValue)
-          if (parsed && typeof parsed.latitude === 'number') setCurrentLocation(parsed)
-        } catch {}
-      }
-    }
-    window.addEventListener('locationModeChanged', handleModeChanged)
-    window.addEventListener('storage', handleStorage)
-    return () => {
-      window.removeEventListener('locationModeChanged', handleModeChanged)
-      window.removeEventListener('storage', handleStorage)
-    }
-  }, [locationMode, currentLocation])
-
-  // Get reference location based on mode
-  const getReferenceLocation = useCallback(() => {
-    if (locationMode === 'user' && currentLocation) {
-      return currentLocation
-    }
-    return NPP_LOCATION
-  }, [locationMode, currentLocation])
 
   // Helper: compute distance for a store given current reference
   const computeDistance = useCallback((store, refLoc) => {
@@ -220,7 +156,7 @@ export default function HomePage() {
       if (searchCacheRef.current.has(cacheKey)) {
         const cached = searchCacheRef.current.get(cacheKey)
         lastQueryRef.current = queryKey
-        const referenceLocation = getReferenceLocation()
+        const referenceLocation = currentLocation
         const resultsWithDistance = cached.map(store => ({
           ...store,
           distance: computeDistance(store, referenceLocation)
@@ -250,7 +186,7 @@ export default function HomePage() {
       lastQueryRef.current = queryKey
 
       searchCacheRef.current.set(cacheKey, data)
-      const referenceLocation = getReferenceLocation()
+      const referenceLocation = currentLocation
       const resultsWithDistance = data.map(store => ({
         ...store,
         distance: computeDistance(store, referenceLocation)
@@ -267,15 +203,14 @@ export default function HomePage() {
 
   // Recompute distances when location mode or currentLocation changes (không cần refetch)
   useEffect(() => {
-    const referenceLocation = getReferenceLocation()
     if (searchResults.length > 0) {
       setSearchResults(prev => prev.map(store => {
-        const newDistance = computeDistance(store, referenceLocation)
+        const newDistance = computeDistance(store, currentLocation)
         return newDistance === store.distance ? store : { ...store, distance: newDistance }
       }))
     }
     // no visit list
-  }, [locationMode, currentLocation, getReferenceLocation, computeDistance])
+  }, [currentLocation, computeDistance])
 
   const loadMore = useCallback(async () => {
     if (loading || !hasMore || loadingMore || searchTerm.length < MIN_SEARCH_LEN) return
@@ -288,7 +223,7 @@ export default function HomePage() {
       const cacheKey = `q:${searchTerm}|d:${selectedDistrict}|w:${selectedWard}|p:${nextPage}`
       if (searchCacheRef.current.has(cacheKey)) {
         const cached = searchCacheRef.current.get(cacheKey)
-        const referenceLocation = getReferenceLocation()
+        const referenceLocation = currentLocation
         const resultsWithDistance = cached.map(store => ({
           ...store,
           distance: computeDistance(store, referenceLocation)
@@ -322,7 +257,7 @@ export default function HomePage() {
       if (error) throw error
 
       searchCacheRef.current.set(cacheKey, data)
-      const referenceLocation = getReferenceLocation()
+      const referenceLocation = currentLocation
       const resultsWithDistance = data.map(store => ({
         ...store,
         distance: computeDistance(store, referenceLocation)
@@ -342,46 +277,7 @@ export default function HomePage() {
     } finally {
       setLoadingMore(false)
     }
-  }, [hasMore, loadingMore, loading, searchTerm, page, getReferenceLocation, selectedDistrict, selectedWard])
-
-  // Guarded switch: only allow switching to 'user' if geolocation succeeds
-  const handleLocationModeChange = useCallback((mode) => {
-    const broadcast = (m, loc) => {
-      try {
-        localStorage.setItem(LOCATION_MODE_KEY, m)
-        if (loc) localStorage.setItem(USER_LOCATION_KEY, JSON.stringify(loc))
-      } catch {}
-      window.dispatchEvent(new CustomEvent('locationModeChanged', { detail: { mode: m } }))
-    }
-
-    if (mode === 'user') {
-      if (currentLocation) {
-        setLocationMode('user')
-        broadcast('user', currentLocation)
-        return
-      }
-      if (!navigator.geolocation) {
-        alert('Thiết bị không hỗ trợ định vị')
-        return
-      }
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
-          setCurrentLocation(loc)
-            setLocationMode('user')
-          broadcast('user', loc)
-        },
-        (err) => {
-          console.error('Get location on switch error:', err)
-          alert('Không thể lấy được vị trí của bạn')
-        },
-        { enableHighAccuracy: true, timeout: 8000 }
-      )
-    } else {
-      setLocationMode('npp')
-      broadcast('npp')
-    }
-  }, [currentLocation])
+  }, [hasMore, loadingMore, loading, searchTerm, page, currentLocation, selectedDistrict, selectedWard])
 
   const isPendingSearch = (searchTerm.length >= MIN_SEARCH_LEN || selectedDistrict || selectedWard) && lastQueryRef.current !== `${searchTerm}|${selectedDistrict}|${selectedWard}`
   const showSkeleton = (searchTerm.length >= MIN_SEARCH_LEN || selectedDistrict || selectedWard) && (loading || isPendingSearch)
@@ -421,13 +317,6 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-3 max-w-screen-md mx-auto">
-        {/* Location Switch - Top Right */}
-        <div className="flex justify-end">
-          <LocationSwitch 
-            locationMode={locationMode}
-            onLocationModeChange={handleLocationModeChange}
-          />
-        </div>
         {/* Search + Filters */}
         <div className="flex flex-col gap-2">
           {/* Font >=16px để tránh iOS tự zoom khi focus input */}
