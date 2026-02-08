@@ -6,16 +6,22 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { toTitleCaseVI } from '@/lib/utils'
+import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
+import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { haversineKm } from '@/helper/distance'
+import { formatDistance } from '@/helper/validation'
+import { DetailStoreModalContent } from '@/components/detail-store-card'
 
 const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
 export default function AddStore() {
   const router = useRouter()
   const [name, setName] = useState('')
+  const nameInputRef = useRef(null)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
@@ -41,6 +47,13 @@ export default function AddStore() {
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Store Info, 2 = Location
+  const [duplicateCandidates, setDuplicateCandidates] = useState([])
+  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
+  const [duplicateCheckError, setDuplicateCheckError] = useState('')
+  const [allowDuplicate, setAllowDuplicate] = useState(false)
+  const duplicateCheckTimerRef = useRef(null)
+  const duplicateCheckSeqRef = useRef(0)
+  const DUPLICATE_RADIUS_KM = 0.1
 
   // Map states
   const [pickedLat, setPickedLat] = useState(null)
@@ -200,6 +213,105 @@ export default function AddStore() {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
   }, [currentStep])
 
+  useEffect(() => {
+    if (currentStep === 1 && nameInputRef.current) {
+      try { nameInputRef.current.focus() } catch {}
+    }
+  }, [currentStep])
+
+  function resetCreateForm() {
+    setName('')
+    setAddressDetail('')
+    setWard('')
+    setDistrict('')
+    setCity('Hà Nội')
+    setPhone('')
+    setNote('')
+    setImageFile(null)
+    setShowAdvanced(false)
+    setAllowDuplicate(false)
+    setDuplicateCandidates([])
+    setDuplicateCheckError('')
+    setDuplicateCheckLoading(false)
+    setCurrentStep(1)
+    setPickedLat(null)
+    setPickedLng(null)
+    setMapEditable(false)
+    setUserHasEditedMap(false)
+    setInitialGPSLat(null)
+    setInitialGPSLng(null)
+    setHeading(null)
+    setGeoBlocked(false)
+    setStep2Key((k) => k + 1)
+    if (router.query?.name) {
+      try {
+        const { name: _discard, ...rest } = router.query
+        router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true })
+      } catch {
+        router.replace(router.pathname)
+      }
+    }
+  }
+
+  function normalizeNameForMatch(raw) {
+    const base = removeVietnameseTones(String(raw || ''))
+    return base
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  function extractWords(normalized) {
+    return normalized
+      .split(' ')
+      .map((w) => w.trim())
+      .filter((w) => w.length >= 2)
+  }
+
+  function isSimilarName(inputNorm, inputWordsSet, storeName, storeNameSearch) {
+    const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
+    if (!storeNorm || !inputNorm) return false
+    if (storeNorm === inputNorm) return true
+    if (storeNorm.includes(inputNorm) || inputNorm.includes(storeNorm)) return true
+    const storeWords = extractWords(storeNorm)
+    for (const w of storeWords) {
+      if (inputWordsSet.has(w)) return true
+    }
+    return false
+  }
+
+  async function findNearbySimilarStores(lat, lng, inputName) {
+    const inputNorm = normalizeNameForMatch(inputName)
+    if (!inputNorm || lat == null || lng == null) return []
+    const inputWordsSet = new Set(extractWords(inputNorm))
+
+    const latRad = (lat * Math.PI) / 180
+    const deltaLat = DUPLICATE_RADIUS_KM / 111.32
+    const deltaLon = DUPLICATE_RADIUS_KM / (111.32 * Math.cos(latRad) || 1)
+
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, city, image_url, phone, note, status')
+      .gte('latitude', lat - deltaLat)
+      .lte('latitude', lat + deltaLat)
+      .gte('longitude', lng - deltaLon)
+      .lte('longitude', lng + deltaLon)
+
+    if (error) throw error
+    if (!Array.isArray(data)) return []
+
+    const matches = data
+      .filter((s) => isFinite(s?.latitude) && isFinite(s?.longitude))
+      .map((s) => ({
+        ...s,
+        distance: haversineKm(lat, lng, s.latitude, s.longitude)
+      }))
+      .filter((s) => s.distance <= DUPLICATE_RADIUS_KM && isSimilarName(inputNorm, inputWordsSet, s.name, s.name_search))
+      .sort((a, b) => a.distance - b.distance)
+
+    return matches
+  }
+
   // Auto-fetch location when entering step 2
   useEffect(() => {
     if (currentStep !== 2) return
@@ -216,6 +328,132 @@ export default function AddStore() {
     if (!resolvingAddr) handleFillAddress()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
+
+  useEffect(() => {
+    if (!name.trim() || pickedLat == null || pickedLng == null) {
+      setDuplicateCandidates([])
+      setDuplicateCheckError('')
+      setDuplicateCheckLoading(false)
+      return
+    }
+
+    if (duplicateCheckTimerRef.current) {
+      clearTimeout(duplicateCheckTimerRef.current)
+      duplicateCheckTimerRef.current = null
+    }
+
+    duplicateCheckTimerRef.current = setTimeout(async () => {
+      const seq = ++duplicateCheckSeqRef.current
+      setDuplicateCheckLoading(true)
+      setDuplicateCheckError('')
+      try {
+        const matches = await findNearbySimilarStores(pickedLat, pickedLng, name)
+        if (seq !== duplicateCheckSeqRef.current) return
+        setDuplicateCandidates(matches)
+        setAllowDuplicate(false)
+      } catch (err) {
+        if (seq !== duplicateCheckSeqRef.current) return
+        console.error('Duplicate check error:', err)
+        setDuplicateCandidates([])
+        setDuplicateCheckError('Không kiểm tra được trùng tên gần đây.')
+      } finally {
+        if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
+      }
+    }, 1000)
+
+    return () => {
+      if (duplicateCheckTimerRef.current) {
+        clearTimeout(duplicateCheckTimerRef.current)
+        duplicateCheckTimerRef.current = null
+      }
+    }
+  }, [name, pickedLat, pickedLng])
+
+  useEffect(() => {
+    setAllowDuplicate(false)
+  }, [name, pickedLat, pickedLng])
+
+  function renderDuplicatePanel() {
+    if (allowDuplicate) return null
+    if (duplicateCheckError) {
+      return (
+        <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-orange-300">
+          {duplicateCheckError}
+        </div>
+      )
+    }
+    if (duplicateCandidates.length === 0) return null
+
+    return (
+      <>
+        <div className="rounded-lg border border-gray-800 bg-gray-900/80 p-3 space-y-3 text-gray-100">
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-semibold text-sm">
+              Phát hiện cửa hàng có thể đã được tạo
+            </div>
+          </div>
+          <div className="space-y-2">
+            {duplicateCandidates.map((s) => (
+              <Dialog key={s.id}>
+                <DialogTrigger asChild>
+                  <Card className="border border-gray-800 bg-black/60 cursor-pointer hover:bg-gray-900/80 transition-colors">
+                    <CardContent className="p-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-gray-100">
+                          {s.name || 'Cửa hàng chưa đặt tên'}
+                        </div>
+                        <div className="mt-1 text-[11px] text-gray-400 line-clamp-2 flex items-start gap-1.5">
+                          <svg className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
+                          </svg>
+                          <span className="line-clamp-2 break-words">{formatAddressParts(s) || 'Không có địa chỉ'}</span>
+                        </div>
+                        {s.phone && (
+                          <div className="mt-1 text-[11px] text-gray-300 truncate flex items-center gap-1.5">
+                            <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            <span>{s.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-800 text-gray-200">
+                          {formatDistance(s.distance)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+                  <DetailStoreModalContent store={s} context="search" showEdit={false} />
+                </DialogContent>
+              </Dialog>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1 h-10 text-sm sm:text-base border-gray-700 text-gray-200 hover:bg-gray-800"
+            onClick={() => resetCreateForm()}
+          >
+            Quay lại
+          </Button>
+          <Button
+            type="button"
+            className="flex-1 h-10 text-sm sm:text-base"
+            onClick={() => setAllowDuplicate(true)}
+          >
+            Vẫn tạo cửa hàng
+          </Button>
+        </div>
+      </>
+    )
+  }
+
 
   async function handleFillAddress() {
     try {
@@ -317,6 +555,24 @@ export default function AddStore() {
 
     try {
       setLoading(true)
+
+      // Final duplicate check right before submit (use final coordinates)
+      let nearDupes = []
+      try {
+        nearDupes = await findNearbySimilarStores(latitude, longitude, normalizedName)
+      } catch (dupErr) {
+        console.error('Duplicate check failed:', dupErr)
+        showMessage('error', 'Không kiểm tra được trùng tên gần đây. Vui lòng thử lại.')
+        setLoading(false)
+        return
+      }
+
+      if (nearDupes.length > 0 && !allowDuplicate) {
+        setDuplicateCandidates(nearDupes)
+        showMessage('error', 'Phát hiện cửa hàng trùng/tương tự trong 100m. Vui lòng xác nhận nếu vẫn muốn tạo.')
+        setLoading(false)
+        return
+      }
 
       // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
       const options = {
@@ -465,137 +721,146 @@ export default function AddStore() {
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
+                <Input ref={nameInputRef} id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
+                {renderDuplicatePanel()}
               </div>
 
-              {/* Địa chỉ */}
-              <div className="space-y-1.5">
-                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
-                <div className="grid gap-2">
-                  <Input
-                    id="address_detail"
-                    value={addressDetail}
-                    onChange={(e) => setAddressDetail(e.target.value)}
-                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
-                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
-                    className="text-base sm:text-base"
-                  />
-                  <Input
-                    id="ward"
-                    value={ward}
-                    onChange={(e) => setWard(e.target.value)}
-                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
-                    placeholder="Xã / Phường"
-                    className="text-base sm:text-base"
-                  />
-                  <Input
-                    id="district"
-                    value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
-                    onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
-                    placeholder="Quận / Huyện"
-                    className="text-base sm:text-base"
-                  />
-                  <Input
-                    id="city"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
-                    placeholder="Thành phố / Tỉnh"
-                    className="text-base sm:text-base"
-                  />
-                </div>
-              </div>
-
-              {/* Ảnh */}
-              <div className="space-y-1.5">
-                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
-                <div className="relative w-full">
-                  {imageFile ? (
-                    <div className="relative group w-full">
-                      <img
-                        src={previewUrl}
-                        alt="Ảnh xem trước"
-                        className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+              {(allowDuplicate || duplicateCandidates.length === 0) ? (
+                <>
+                  {/* Địa chỉ */}
+                  <div className="space-y-1.5">
+                    <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+                    <div className="grid gap-2">
+                      <Input
+                        id="address_detail"
+                        value={addressDetail}
+                        onChange={(e) => setAddressDetail(e.target.value)}
+                        onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                        placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+                        className="text-base sm:text-base"
                       />
-                      <button
-                        type="button"
-                        className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
-                        onClick={() => setImageFile(null)}
-                        aria-label="Xoá ảnh"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
-                      </button>
+                      <Input
+                        id="ward"
+                        value={ward}
+                        onChange={(e) => setWard(e.target.value)}
+                        onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
+                        placeholder="Xã / Phường"
+                        className="text-base sm:text-base"
+                      />
+                      <Input
+                        id="district"
+                        value={district}
+                        onChange={(e) => setDistrict(e.target.value)}
+                        onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
+                        placeholder="Quận / Huyện"
+                        className="text-base sm:text-base"
+                      />
+                      <Input
+                        id="city"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
+                        placeholder="Thành phố / Tỉnh"
+                        className="text-base sm:text-base"
+                      />
                     </div>
-                  ) : (
-                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
-                      <input
-                        id="image"
-                        type="file"
-                        accept="image/*;capture=camera"
-                        capture="environment"
-                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                        className="hidden"
-                      />
-                    </label>
+                  </div>
+
+                  {/* Ảnh */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
+                    <div className="relative w-full">
+                      {imageFile ? (
+                        <div className="relative group w-full">
+                          <img
+                            src={previewUrl}
+                            alt="Ảnh xem trước"
+                            className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                          />
+                          <button
+                            type="button"
+                            className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
+                            onClick={() => setImageFile(null)}
+                            aria-label="Xoá ảnh"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                          <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
+                          <input
+                            id="image"
+                            type="file"
+                            accept="image/*;capture=camera"
+                            capture="environment"
+                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Toggle optional */}
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAdvanced(v => !v)}
+                      className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
+                    >
+                      {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
+                      <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
+                    </Button>
+                  </div>
+
+                  {showAdvanced && (
+                    <div className="grid gap-3 pt-2 animate-fadeIn">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          inputMode="numeric"
+                          pattern="[0-9+ ]*"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="0901 234 567"
+                          className="text-base sm:text-base"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
+                        <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
+                      </div>
+                    </div>
                   )}
-                </div>
-              </div>
 
-              {/* Toggle optional */}
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAdvanced(v => !v)}
-                  className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
-                >
-                  {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
-                  <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
-                </Button>
-              </div>
-
-              {showAdvanced && (
-                <div className="grid gap-3 pt-2 animate-fadeIn">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9+ ]*"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0901 234 567"
-                      className="text-base sm:text-base"
-                    />
+                  {/* Next button for step 1 */}
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!name || !district || !imageFile) {
+                          showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
+                          return
+                        }
+                        setCurrentStep(2)
+                      }}
+                      className="w-full text-sm sm:text-base"
+                    >
+                      Tiếp theo: Xác định vị trí →
+                    </Button>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
-                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-300">
+                  Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục nhập địa chỉ và thêm ảnh.
                 </div>
               )}
-
-              {/* Next button for step 1 */}
-              <div className="pt-2">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (!name || !district || !imageFile) {
-                      showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
-                      return
-                    }
-                    setCurrentStep(2)
-                  }}
-                  className="w-full text-sm sm:text-base"
-                >
-                  Tiếp theo: Xác định vị trí →
-                </Button>
-              </div>
             </>
           )}
 
@@ -781,6 +1046,7 @@ export default function AddStore() {
               </div>
 
           {/* Back and Submit buttons for step 2 */}
+          {renderDuplicatePanel()}
           <div className="pt-2 flex gap-2">
             <Button
               type="button"
