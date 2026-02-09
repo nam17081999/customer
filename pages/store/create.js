@@ -19,6 +19,29 @@ import { DetailStoreModalContent } from '@/components/detail-store-card'
 const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
 export default function AddStore() {
+  const IGNORED_NAME_TERMS = [
+    'cửa hàng',
+    'tạp hoá',
+    'quán nước',
+    'giải khát',
+    'nhà nghỉ',
+    'nhà hàng',
+    'cyber cà phê',
+    'cafe',
+    'lẩu',
+    'siêu thị',
+    'quán',
+    'gym',
+    'đại lý',
+    'cơm',
+    'phở',
+    'bún',
+    'shop',
+    'kok',
+    'karaoke',
+    'bi-a',
+    'bia'
+  ]
   const router = useRouter()
   const [name, setName] = useState('')
   const nameInputRef = useRef(null)
@@ -46,13 +69,17 @@ export default function AddStore() {
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1) // 1 = Store Info, 2 = Location
+  const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
+  const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
+  const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
+  const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
   const duplicateCheckTimerRef = useRef(null)
   const duplicateCheckSeqRef = useRef(0)
+  const duplicateGeoRequestedRef = useRef(false)
   const DUPLICATE_RADIUS_KM = 0.1
 
   // Map states
@@ -233,6 +260,9 @@ export default function AddStore() {
     setDuplicateCandidates([])
     setDuplicateCheckError('')
     setDuplicateCheckLoading(false)
+    setDuplicateCheckLat(null)
+    setDuplicateCheckLng(null)
+    duplicateGeoRequestedRef.current = false
     setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
@@ -261,21 +291,37 @@ export default function AddStore() {
       .trim()
   }
 
+  function stripIgnoredPhrases(normalized) {
+    const ignoredList = IGNORED_NAME_TERMS
+      .map((t) => normalizeNameForMatch(t))
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+    let out = ` ${normalized} `
+    for (const phrase of ignoredList) {
+      if (!phrase) continue
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(`\\b${escaped}\\b`, 'g')
+      out = out.replace(re, ' ')
+    }
+    return out.replace(/\s+/g, ' ').trim()
+  }
+
   function extractWords(normalized) {
-    return normalized
+    const cleaned = stripIgnoredPhrases(normalized)
+    return cleaned
       .split(' ')
       .map((w) => w.trim())
       .filter((w) => w.length >= 2)
   }
 
-  function isSimilarName(inputNorm, inputWordsSet, storeName, storeNameSearch) {
+  function isSimilarNameByWords(inputWords, storeName, storeNameSearch) {
     const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
-    if (!storeNorm || !inputNorm) return false
-    if (storeNorm === inputNorm) return true
-    if (storeNorm.includes(inputNorm) || inputNorm.includes(storeNorm)) return true
+    if (!storeNorm || inputWords.length === 0) return false
     const storeWords = extractWords(storeNorm)
-    for (const w of storeWords) {
-      if (inputWordsSet.has(w)) return true
+    if (storeWords.length === 0) return false
+    const storeSet = new Set(storeWords)
+    for (const w of inputWords) {
+      if (storeSet.has(w)) return true
     }
     return false
   }
@@ -283,19 +329,29 @@ export default function AddStore() {
   async function findNearbySimilarStores(lat, lng, inputName) {
     const inputNorm = normalizeNameForMatch(inputName)
     if (!inputNorm || lat == null || lng == null) return []
-    const inputWordsSet = new Set(extractWords(inputNorm))
+    const inputWords = extractWords(inputNorm)
+    if (inputWords.length === 0) return []
 
     const latRad = (lat * Math.PI) / 180
     const deltaLat = DUPLICATE_RADIUS_KM / 111.32
     const deltaLon = DUPLICATE_RADIUS_KM / (111.32 * Math.cos(latRad) || 1)
 
+    const orTerms = inputWords
+      .map((w) => w.replace(/[%_]/g, ''))
+      .filter(Boolean)
+      .map((w) => `name_search.ilike.%${w}%`)
+      .join(',')
+    if (!orTerms) return []
+
     const { data, error } = await supabase
       .from('stores')
       .select('id, name, name_search, latitude, longitude, address_detail, ward, district, city, image_url, phone, note, status')
+      .or(orTerms)
       .gte('latitude', lat - deltaLat)
       .lte('latitude', lat + deltaLat)
       .gte('longitude', lng - deltaLon)
       .lte('longitude', lng + deltaLon)
+      .limit(50)
 
     if (error) throw error
     if (!Array.isArray(data)) return []
@@ -306,15 +362,15 @@ export default function AddStore() {
         ...s,
         distance: haversineKm(lat, lng, s.latitude, s.longitude)
       }))
-      .filter((s) => s.distance <= DUPLICATE_RADIUS_KM && isSimilarName(inputNorm, inputWordsSet, s.name, s.name_search))
+      .filter((s) => s.distance <= DUPLICATE_RADIUS_KM && isSimilarNameByWords(inputWords, s.name, s.name_search))
       .sort((a, b) => a.distance - b.distance)
 
     return matches
   }
 
-  // Auto-fetch location when entering step 2
+  // Auto-fetch location when entering step 3
   useEffect(() => {
-    if (currentStep !== 2) return
+    if (currentStep !== 3) return
     // Reset map-related state to ensure a fresh GPS fetch each time
     setGeoBlocked(false)
     setMapEditable(false)
@@ -330,10 +386,14 @@ export default function AddStore() {
   }, [currentStep])
 
   useEffect(() => {
-    if (!name.trim() || pickedLat == null || pickedLng == null) {
+    if (!name.trim()) {
       setDuplicateCandidates([])
       setDuplicateCheckError('')
       setDuplicateCheckLoading(false)
+      setDuplicateCheckDone(false)
+      setDuplicateCheckLat(null)
+      setDuplicateCheckLng(null)
+      duplicateGeoRequestedRef.current = false
       return
     }
 
@@ -343,19 +403,54 @@ export default function AddStore() {
     }
 
     duplicateCheckTimerRef.current = setTimeout(async () => {
+      let checkLat = duplicateCheckLat
+      let checkLng = duplicateCheckLng
+      if (checkLat == null || checkLng == null) {
+        if (!duplicateGeoRequestedRef.current) {
+          duplicateGeoRequestedRef.current = true
+          try {
+            setDuplicateCheckLoading(true)
+            const { coords, error } = await getBestPosition({
+              attempts: 2,
+              timeout: 3000,
+              maxWaitTime: 6000,
+              desiredAccuracy: 50
+            })
+            if (!coords) {
+              setDuplicateCheckError(getGeoErrorMessage(error))
+              setDuplicateCheckLoading(false)
+              return
+            }
+            checkLat = coords.latitude
+            checkLng = coords.longitude
+            setDuplicateCheckLat(checkLat)
+            setDuplicateCheckLng(checkLng)
+          } catch (err) {
+            console.error('Get location error:', err)
+            setDuplicateCheckError(getGeoErrorMessage(err))
+            setDuplicateCheckLoading(false)
+            return
+          }
+        } else {
+          return
+        }
+      }
+
       const seq = ++duplicateCheckSeqRef.current
       setDuplicateCheckLoading(true)
       setDuplicateCheckError('')
       try {
-        const matches = await findNearbySimilarStores(pickedLat, pickedLng, name)
+        const matches = await findNearbySimilarStores(checkLat, checkLng, name)
         if (seq !== duplicateCheckSeqRef.current) return
         setDuplicateCandidates(matches)
         setAllowDuplicate(false)
+        setDuplicateCheckDone(true)
       } catch (err) {
         if (seq !== duplicateCheckSeqRef.current) return
         console.error('Duplicate check error:', err)
         setDuplicateCandidates([])
         setDuplicateCheckError('Không kiểm tra được trùng tên gần đây.')
+        setDuplicateCheckDone(false)
       } finally {
         if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
       }
@@ -367,14 +462,22 @@ export default function AddStore() {
         duplicateCheckTimerRef.current = null
       }
     }
-  }, [name, pickedLat, pickedLng])
+  }, [name, duplicateCheckLat, duplicateCheckLng])
 
   useEffect(() => {
     setAllowDuplicate(false)
-  }, [name, pickedLat, pickedLng])
+    setDuplicateCheckDone(false)
+  }, [name])
 
   function renderDuplicatePanel() {
     if (allowDuplicate) return null
+    if (duplicateCheckLoading) {
+      return (
+        <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
+          Đang kiểm tra cửa hàng trùng/tương tự trong 100m…
+        </div>
+      )
+    }
     if (duplicateCheckError) {
       return (
         <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-orange-300">
@@ -433,6 +536,9 @@ export default function AddStore() {
             ))}
           </div>
         </div>
+        <div className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+          Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
+        </div>
         <div className="flex items-center gap-2 mt-3">
           <Button
             type="button"
@@ -445,7 +551,10 @@ export default function AddStore() {
           <Button
             type="button"
             className="flex-1 h-10 text-sm sm:text-base"
-            onClick={() => setAllowDuplicate(true)}
+            onClick={() => {
+              setAllowDuplicate(true)
+              setCurrentStep(2)
+            }}
           >
             Vẫn tạo cửa hàng
           </Button>
@@ -697,26 +806,35 @@ export default function AddStore() {
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
           <div className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${currentStep === 1 ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'}`}>
-              {currentStep === 1 ? '1' : '✓'}
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 1 ? 'bg-blue-600 text-white' : currentStep > 1 ? 'bg-green-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+              {currentStep > 1 ? '✓' : '1'}
             </div>
-            <span className={`text-sm font-medium ${currentStep === 1 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Thông tin cửa hàng
+            <span className={`text-xs font-medium ${currentStep === 1 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+              Tên cửa hàng
             </span>
           </div>
-          <div className="w-12 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
+          <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
           <div className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-              2
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 2 ? 'bg-blue-600 text-white' : currentStep > 2 ? 'bg-green-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+              {currentStep > 2 ? '✓' : '2'}
             </div>
-            <span className={`text-sm font-medium ${currentStep === 2 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+            <span className={`text-xs font-medium ${currentStep === 2 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+              Địa chỉ & ảnh
+            </span>
+          </div>
+          <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+              3
+            </div>
+            <span className={`text-xs font-medium ${currentStep === 3 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
               Xác định vị trí
             </span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Step 1: Store Info */}
+          {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
               <div className="space-y-1.5">
@@ -726,146 +844,172 @@ export default function AddStore() {
               </div>
 
               {(allowDuplicate || duplicateCandidates.length === 0) ? (
-                <>
-                  {/* Địa chỉ */}
-                  <div className="space-y-1.5">
-                    <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
-                    <div className="grid gap-2">
-                      <Input
-                        id="address_detail"
-                        value={addressDetail}
-                        onChange={(e) => setAddressDetail(e.target.value)}
-                        onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
-                        placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
-                        className="text-base sm:text-base"
-                      />
-                      <Input
-                        id="ward"
-                        value={ward}
-                        onChange={(e) => setWard(e.target.value)}
-                        onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
-                        placeholder="Xã / Phường"
-                        className="text-base sm:text-base"
-                      />
-                      <Input
-                        id="district"
-                        value={district}
-                        onChange={(e) => setDistrict(e.target.value)}
-                        onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
-                        placeholder="Quận / Huyện"
-                        className="text-base sm:text-base"
-                      />
-                      <Input
-                        id="city"
-                        value={city}
-                        onChange={(e) => setCity(e.target.value)}
-                        onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
-                        placeholder="Thành phố / Tỉnh"
-                        className="text-base sm:text-base"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Ảnh */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
-                    <div className="relative w-full">
-                      {imageFile ? (
-                        <div className="relative group w-full">
-                          <img
-                            src={previewUrl}
-                            alt="Ảnh xem trước"
-                            className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
-                          />
-                          <button
-                            type="button"
-                            className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
-                            onClick={() => setImageFile(null)}
-                            aria-label="Xoá ảnh"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                          <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
-                          <input
-                            id="image"
-                            type="file"
-                            accept="image/*;capture=camera"
-                            capture="environment"
-                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Toggle optional */}
-                  <div className="pt-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAdvanced(v => !v)}
-                      className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
-                    >
-                      {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
-                      <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
-                    </Button>
-                  </div>
-
-                  {showAdvanced && (
-                    <div className="grid gap-3 pt-2 animate-fadeIn">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          inputMode="numeric"
-                          pattern="[0-9+ ]*"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="0901 234 567"
-                          className="text-base sm:text-base"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                        <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Next button for step 1 */}
-                  <div className="pt-2">
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (!name || !district || !imageFile) {
-                          showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
-                          return
-                        }
-                        setCurrentStep(2)
-                      }}
-                      className="w-full text-sm sm:text-base"
-                    >
-                      Tiếp theo: Xác định vị trí →
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-300">
-                  Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục nhập địa chỉ và thêm ảnh.
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!name.trim()) {
+                        showMessage('error', 'Vui lòng nhập tên cửa hàng')
+                        return
+                      }
+                      if (!duplicateCheckDone) {
+                        showMessage('error', 'Vui lòng chờ kiểm tra trùng tên')
+                        return
+                      }
+                      setCurrentStep(2)
+                    }}
+                    className="w-full text-sm sm:text-base"
+                  >
+                    Tiếp theo →
+                  </Button>
                 </div>
-              )}
+              ) : null}
             </>
           )}
 
-          {/* Step 2: Location */}
+          {/* Step 2: Address + Image */}
           {currentStep === 2 && (
+            <>
+              {/* Địa chỉ */}
+              <div className="space-y-1.5">
+                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
+                <div className="grid gap-2">
+                  <Input
+                    id="address_detail"
+                    value={addressDetail}
+                    onChange={(e) => setAddressDetail(e.target.value)}
+                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+                    className="text-base sm:text-base"
+                  />
+                  <Input
+                    id="ward"
+                    value={ward}
+                    onChange={(e) => setWard(e.target.value)}
+                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
+                    placeholder="Xã / Phường"
+                    className="text-base sm:text-base"
+                  />
+                  <Input
+                    id="district"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
+                    placeholder="Quận / Huyện"
+                    className="text-base sm:text-base"
+                  />
+                  <Input
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
+                    placeholder="Thành phố / Tỉnh"
+                    className="text-base sm:text-base"
+                  />
+                </div>
+              </div>
+
+              {/* Ảnh */}
+              <div className="space-y-1.5">
+                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
+                <div className="relative w-full">
+                  {imageFile ? (
+                    <div className="relative group w-full">
+                      <img
+                        src={previewUrl}
+                        alt="Ảnh xem trước"
+                        className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
+                        onClick={() => setImageFile(null)}
+                        aria-label="Xoá ảnh"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
+                      <input
+                        id="image"
+                        type="file"
+                        accept="image/*;capture=camera"
+                        capture="environment"
+                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              {/* Toggle optional */}
+              <div className="pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdvanced(v => !v)}
+                  className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
+                >
+                  {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
+                  <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
+                </Button>
+              </div>
+
+              {showAdvanced && (
+                <div className="grid gap-3 pt-2 animate-fadeIn">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9+ ]*"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="0901 234 567"
+                      className="text-base sm:text-base"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
+                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCurrentStep(1)}
+                  className="w-1/3 text-sm sm:text-base"
+                >
+                  ← Quay lại
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (!name || !district || !imageFile) {
+                      showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
+                      return
+                    }
+                    setCurrentStep(3)
+                  }}
+                  className="flex-1 text-sm sm:text-base"
+                >
+                  Tiếp theo: Xác định vị trí →
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* Step 3: Location */}
+          {currentStep === 3 && (
             <>
               {/* Map Picker */}
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
@@ -1045,13 +1189,12 @@ export default function AddStore() {
                 </div>
               </div>
 
-          {/* Back and Submit buttons for step 2 */}
-          {renderDuplicatePanel()}
+          {/* Back and Submit buttons for step 3 */}
           <div className="pt-2 flex gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setCurrentStep(1)}
+              onClick={() => setCurrentStep(2)}
               className="w-1/3 text-sm sm:text-base"
             >
               ← Quay lại
