@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -15,6 +14,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { haversineKm } from '@/helper/distance'
 import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
 const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
@@ -59,6 +59,16 @@ export default function AddStore() {
   }
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
+  const NAME_SUGGESTIONS = [
+    'Cửa hàng',
+    'Tạp hoá',
+    'Quán nước',
+    'Karaoke',
+    'Nhà hàng',
+    'Quán',
+    'Cafe',
+    'Siêu thị'
+  ]
   const [imageFile, setImageFile] = useState(null)
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
   useEffect(() => {
@@ -90,6 +100,8 @@ export default function AddStore() {
   const [initialGPSLat, setInitialGPSLat] = useState(null) // Store initial GPS position
   const [initialGPSLng, setInitialGPSLng] = useState(null)
   const [heading, setHeading] = useState(null) // Store compass heading for map rotation
+  const [compassError, setCompassError] = useState('')
+  const compassOnceRef = useRef(false)
   const mapWrapperRef = useRef(null)
   const [geoBlocked, setGeoBlocked] = useState(false)
   const [step2Key, setStep2Key] = useState(0)
@@ -270,7 +282,9 @@ export default function AddStore() {
     setUserHasEditedMap(false)
     setInitialGPSLat(null)
     setInitialGPSLng(null)
-    setHeading(null)
+    // Keep last heading until a new compass sample is obtained
+    setCompassError('')
+    compassOnceRef.current = false
     setGeoBlocked(false)
     setStep2Key((k) => k + 1)
     if (router.query?.name) {
@@ -382,8 +396,80 @@ export default function AddStore() {
     setHeading(null)
     setStep2Key((k) => k + 1) // force remount map
     if (!resolvingAddr) handleFillAddress()
+    compassOnceRef.current = false
+    requestCompassHeadingOnce()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
+
+  async function requestCompassHeadingOnce() {
+    if (compassOnceRef.current) return
+    compassOnceRef.current = true
+    setCompassError('')
+    try {
+      if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const res = await DeviceOrientationEvent.requestPermission()
+          if (res !== 'granted') {
+            setCompassError('Cần cho phép la bàn để xoay bản đồ theo hướng')
+            return
+          }
+        } catch {
+          setCompassError('Không thể xin quyền la bàn')
+          return
+        }
+      }
+
+      await new Promise((resolve) => {
+        const samples = []
+        let done = false
+
+        const pushSample = (deg) => {
+          const v = ((deg % 360) + 360) % 360
+          samples.push(v)
+          if (samples.length >= 5) {
+            done = true
+            window.removeEventListener('deviceorientation', handler, true)
+            // circular mean
+            const rad = samples.map((d) => (d * Math.PI) / 180)
+            const sinSum = rad.reduce((a, r) => a + Math.sin(r), 0)
+            const cosSum = rad.reduce((a, r) => a + Math.cos(r), 0)
+            const mean = Math.atan2(sinSum / rad.length, cosSum / rad.length)
+            const meanDeg = ((mean * 180) / Math.PI + 360) % 360
+            setHeading(meanDeg)
+            resolve()
+          }
+        }
+
+        const handler = (event) => {
+          if (done) return
+          if (typeof event.webkitCompassHeading === 'number') {
+            pushSample(event.webkitCompassHeading)
+            return
+          }
+          if (typeof event.alpha === 'number') {
+            const h = (360 - event.alpha) % 360
+            pushSample(h)
+          }
+        }
+        window.addEventListener('deviceorientation', handler, true)
+        setTimeout(() => {
+          if (!done) {
+            window.removeEventListener('deviceorientation', handler, true)
+            if (samples.length > 0) {
+              const rad = samples.map((d) => (d * Math.PI) / 180)
+              const sinSum = rad.reduce((a, r) => a + Math.sin(r), 0)
+              const cosSum = rad.reduce((a, r) => a + Math.cos(r), 0)
+              const mean = Math.atan2(sinSum / rad.length, cosSum / rad.length)
+              const meanDeg = ((mean * 180) / Math.PI + 360) % 360
+              setHeading(meanDeg)
+            }
+            resolve()
+          }
+        }, 1200)
+      })
+    } catch {}
+  }
 
   useEffect(() => {
     if (!name.trim()) {
@@ -462,7 +548,7 @@ export default function AddStore() {
         duplicateCheckTimerRef.current = null
       }
     }
-  }, [name, duplicateCheckLat, duplicateCheckLng])
+  }, [name])
 
   useEffect(() => {
     setAllowDuplicate(false)
@@ -840,6 +926,28 @@ export default function AddStore() {
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
                 <Input ref={nameInputRef} id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
+                <div className="flex flex-wrap gap-2 py-1 max-h-[3.6rem] sm:max-h-none">
+                  {NAME_SUGGESTIONS.map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-3 py-1 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => {
+                        setName((prev) => {
+                          const base = (prev || '').trim()
+                          if (!base) return label
+                          const norm = removeVietnameseTones(base).toLowerCase()
+                          const normLabel = removeVietnameseTones(label).toLowerCase()
+                          if (norm.includes(normLabel)) return prev
+                          return `${base} ${label}`
+                        })
+                        try { nameInputRef.current?.focus() } catch {}
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 {renderDuplicatePanel()}
               </div>
 
@@ -1014,7 +1122,7 @@ export default function AddStore() {
               {/* Map Picker */}
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
                 {/* Map controls - above map */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                     <Button
                       type="button"
                       size="sm"
@@ -1047,11 +1155,10 @@ export default function AddStore() {
           setPickedLat(coords.latitude)
           setPickedLng(coords.longitude)
 
-                          // Save heading/bearing if available
-                          if (coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading)) {
-                            setHeading(coords.heading)
-                            console.log('📍 Heading:', coords.heading)
-                          }
+                          // Do not use GPS heading; rely on compass sampling instead
+                          // Also try compass once on refresh (user gesture)
+                          compassOnceRef.current = false
+                          requestCompassHeadingOnce()
 
                           // Reset edited flag since this is a fresh GPS load
                           setUserHasEditedMap(false)
@@ -1153,6 +1260,11 @@ export default function AddStore() {
                       heading={heading}
                       height="60vh"
                     />
+                    {compassError && (
+                      <div className="absolute bottom-2 left-2 right-2 z-[1200] rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-800">
+                        {compassError}
+                      </div>
+                    )}
                     {geoBlocked && (
                       <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
                         <div className="w-full max-w-md rounded-xl border border-red-200 bg-white/95 p-5 text-center shadow-lg">
