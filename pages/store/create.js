@@ -575,6 +575,20 @@ export default function AddStore() {
     }
   }
 
+  function validateStep2AndGoNext() {
+    const errs = {}
+    if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
+    if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
+    if (!imageFile) errs.image = 'Vui lòng chụp ảnh'
+    setFieldErrors((prev) => ({ ...prev, ...errs }))
+    if (Object.keys(errs).length > 0) {
+      showMessage('error', 'Vui lòng nhập đủ quận/huyện, xã/phường và ảnh')
+      return false
+    }
+    setCurrentStep(3)
+    return true
+  }
+
   function renderDuplicatePanel() {
     if (allowDuplicate) return null
     if (duplicateCheckError) {
@@ -701,6 +715,14 @@ export default function AddStore() {
   // Paste Google Maps link from clipboard
   async function handleSubmit(e) {
     e.preventDefault()
+    if (currentStep !== 3) {
+      if (currentStep === 1) {
+        runDuplicateCheckByButton()
+      } else if (currentStep === 2) {
+        validateStep2AndGoNext()
+      }
+      return
+    }
     if (resolvingAddr) {
       showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
       return
@@ -906,7 +928,7 @@ export default function AddStore() {
               {currentStep > 1 ? '✓' : '1'}
             </div>
             <span className={`text-xs font-medium ${currentStep === 1 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Tên cửa hàng
+              Tên
             </span>
           </div>
           <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
@@ -915,7 +937,7 @@ export default function AddStore() {
               {currentStep > 2 ? '✓' : '2'}
             </div>
             <span className={`text-xs font-medium ${currentStep === 2 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Địa chỉ & ảnh
+              Địa chỉ
             </span>
           </div>
           <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
@@ -924,7 +946,7 @@ export default function AddStore() {
               3
             </div>
             <span className={`text-xs font-medium ${currentStep === 3 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Xác định vị trí
+              Vị trí
             </span>
           </div>
         </div>
@@ -954,7 +976,7 @@ export default function AddStore() {
                     <button
                       key={label}
                       type="button"
-                      className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-3 py-1 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                       onClick={() => {
                         setName((prev) => {
                           const base = (prev || '').trim()
@@ -1026,7 +1048,7 @@ export default function AddStore() {
                       <button
                         key={d}
                         type="button"
-                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-[11px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                         onClick={() => {
                           setDistrict(d)
                           setWard('')
@@ -1062,7 +1084,7 @@ export default function AddStore() {
                       <button
                         key={w}
                         type="button"
-                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-[11px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
                         onClick={() => setWard(w)}
                       >
                         {w}
@@ -1177,16 +1199,7 @@ export default function AddStore() {
                 <Button
                   type="button"
                   onClick={() => {
-                    const errs = {}
-                    if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
-                    if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
-                    if (!imageFile) errs.image = 'Vui lòng chụp ảnh'
-                    setFieldErrors((prev) => ({ ...prev, ...errs }))
-                    if (Object.keys(errs).length > 0) {
-                      showMessage('error', 'Vui lòng nhập đủ quận/huyện, xã/phường và ảnh')
-                      return
-                    }
-                    setCurrentStep(3)
+                    validateStep2AndGoNext()
                   }}
                   className="flex-1 text-sm sm:text-base"
                 >
