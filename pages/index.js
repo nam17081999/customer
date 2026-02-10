@@ -5,7 +5,7 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE } from '@/lib/constants'
+import { MIN_SEARCH_LEN, SEARCH_DEBOUNCE_MS, PAGE_SIZE, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
@@ -39,8 +39,12 @@ export default function HomePage() {
           .not('district', 'is', null)
         if (error) throw error
         const uniq = Array.from(new Set((data || []).map(d => (d?.district || '').trim()).filter(Boolean)))
-        uniq.sort((a, b) => a.localeCompare(b, 'vi'))
-        setDistricts(uniq)
+        Object.keys(DISTRICT_WARD_SUGGESTIONS).forEach((d) => {
+          if (d) uniq.push(d)
+        })
+        const uniqDistricts = Array.from(new Set(uniq))
+        uniqDistricts.sort((a, b) => a.localeCompare(b, 'vi'))
+        setDistricts(uniqDistricts)
       } catch (e) {
         console.error('Load districts error:', e)
       }
@@ -58,6 +62,9 @@ export default function HomePage() {
         if (error) throw error
         const map = new Map()
         const uniq = Array.from(new Set((data || []).map(d => (d?.ward || '').trim()).filter(Boolean)))
+        Object.values(DISTRICT_WARD_SUGGESTIONS).forEach((wardsList) => {
+          wardsList.forEach((w) => uniq.push(w))
+        })
         ;(data || []).forEach((row) => {
           const ward = (row?.ward || '').trim()
           const district = (row?.district || '').trim()
@@ -65,8 +72,15 @@ export default function HomePage() {
           if (!map.has(ward)) map.set(ward, new Set())
           if (district) map.get(ward).add(district)
         })
-        uniq.sort((a, b) => a.localeCompare(b, 'vi'))
-        setWards(uniq)
+        Object.entries(DISTRICT_WARD_SUGGESTIONS).forEach(([d, wardsList]) => {
+          wardsList.forEach((w) => {
+            if (!map.has(w)) map.set(w, new Set())
+            map.get(w).add(d)
+          })
+        })
+        const uniqWards = Array.from(new Set(uniq))
+        uniqWards.sort((a, b) => a.localeCompare(b, 'vi'))
+        setWards(uniqWards)
         setWardDistrictMap(map)
       } catch (e) {
         console.error('Load wards error:', e)
@@ -81,6 +95,7 @@ export default function HomePage() {
 
   const districtsForSelectedWard = selectedWard ? Array.from(wardDistrictMap.get(selectedWard) || []) : []
   const isDistrictLocked = selectedWard && districtsForSelectedWard.length === 1
+  const districtOptions = selectedWard ? districtsForSelectedWard : districts
 
   useEffect(() => {
     if (isDistrictLocked) {
@@ -168,7 +183,7 @@ export default function HomePage() {
 
       let query = supabase
         .from('stores')
-        .select('id,name,address_detail,ward,district,city,phone,image_url,latitude,longitude,status,created_at')
+        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,status,created_at')
         .or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
       if (selectedDistrict) {
         query = query.eq('district', selectedDistrict)
@@ -241,7 +256,7 @@ export default function HomePage() {
 
       let query = supabase
         .from('stores')
-        .select('id,name,address_detail,ward,district,city,phone,image_url,latitude,longitude,status,created_at')
+        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,status,created_at')
         .or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
       if (selectedDistrict) {
         query = query.eq('district', selectedDistrict)
@@ -330,40 +345,48 @@ export default function HomePage() {
             className="w-full text-base sm:text-base"
           />
           <div className="flex gap-2">
-            <select
-              value={selectedWard}
-              onChange={(e) => {
-                const ward = e.target.value
-                setSelectedWard(ward)
-                setSearchResults([])
-                setHasMore(true)
-                setPage(1)
-                lastQueryRef.current = ''
-              }}
-              className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
-            >
-              <option value="">Xã/Phường</option>
-              {wardOptions.map((w) => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
-            <select
-              value={selectedDistrict}
-              onChange={(e) => {
-                setSelectedDistrict(e.target.value)
-                setSearchResults([])
-                setHasMore(true)
-                setPage(1)
-                lastQueryRef.current = ''
-              }}
-              disabled={isDistrictLocked}
-              className="flex-1 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
-            >
-              <option value="">Quận/Huyện</option>
-              {districts.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+            <div className="flex-1">
+              <input
+                list="district-options"
+                value={selectedDistrict}
+                onChange={(e) => {
+                  setSelectedDistrict(e.target.value)
+                  setSearchResults([])
+                  setHasMore(true)
+                  setPage(1)
+                  lastQueryRef.current = ''
+                }}
+                disabled={isDistrictLocked}
+                placeholder="Quận/Huyện"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
+              />
+              <datalist id="district-options">
+                {districtOptions.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
+            </div>
+            <div className="flex-1">
+              <input
+                list="ward-options"
+                value={selectedWard}
+                onChange={(e) => {
+                  const ward = e.target.value
+                  setSelectedWard(ward)
+                  setSearchResults([])
+                  setHasMore(true)
+                  setPage(1)
+                  lastQueryRef.current = ''
+                }}
+                placeholder="Xã/Phường"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
+              />
+              <datalist id="ward-options">
+                {wardOptions.map((w) => (
+                  <option key={w} value={w} />
+                ))}
+              </datalist>
+            </div>
           </div>
         </div>
         {/* Search Results */}

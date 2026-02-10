@@ -25,7 +25,6 @@ export default function StoreDetail() {
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
-  const [city, setCity] = useState('Hà Nội')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -62,7 +61,7 @@ export default function StoreDetail() {
     if (!id) return
     supabase
       .from('stores')
-      .select('id,name,address_detail,ward,district,city,phone,note,image_url,latitude,longitude')
+      .select('id,name,address_detail,ward,district,phone,note,image_url,latitude,longitude')
       .eq('id', id)
       .maybeSingle()
       .then(({ data }) => {
@@ -72,7 +71,6 @@ export default function StoreDetail() {
           setAddressDetail(data.address_detail || '')
           setWard(data.ward || '')
           setDistrict(data.district || '')
-          setCity(data.city || 'Hà Nội')
           setPhone(data.phone || '')
           setNote(data.note || '')
           setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
@@ -559,7 +557,6 @@ export default function StoreDetail() {
     const normalizedDetail = toTitleCaseVI(addressDetail.trim())
     const normalizedWard = toTitleCaseVI(ward.trim())
     const normalizedDistrict = toTitleCaseVI(district.trim())
-    const normalizedCity = toTitleCaseVI((city || 'Hà Nội').trim())
     const { error: updateErr } = await supabase
       .from('stores')
       .update({
@@ -568,7 +565,6 @@ export default function StoreDetail() {
         address_detail: normalizedDetail,
         ward: normalizedWard,
         district: normalizedDistrict,
-        city: normalizedCity,
         phone,
         note,
         image_url,
@@ -752,12 +748,12 @@ export default function StoreDetail() {
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ</Label>
             <div className="grid gap-2">
               <Input
-                value={addressDetail}
-                onChange={(e) => setAddressDetail(e.target.value)}
-                onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
                 disabled={false}
                 className="text-sm"
-                placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+                placeholder="Quận / Huyện"
               />
               <Input
                 value={ward}
@@ -768,20 +764,12 @@ export default function StoreDetail() {
                 placeholder="Xã / Phường"
               />
               <Input
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
+                value={addressDetail}
+                onChange={(e) => setAddressDetail(e.target.value)}
+                onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
                 disabled={false}
                 className="text-sm"
-                placeholder="Quận / Huyện"
-              />
-              <Input
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
-                disabled={false}
-                className="text-sm"
-                placeholder="Thành phố / Tỉnh"
+                placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
               />
             </div>
           </div>

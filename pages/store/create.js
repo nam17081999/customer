@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
+import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
@@ -56,7 +57,6 @@ export default function AddStore() {
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
-  const [city, setCity] = useState('Hà Nội')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -67,6 +67,7 @@ export default function AddStore() {
   }
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
   const NAME_SUGGESTIONS = [
     'Cửa hàng',
     'Tạp hoá',
@@ -272,7 +273,6 @@ export default function AddStore() {
     setAddressDetail('')
     setWard('')
     setDistrict('')
-    setCity('Hà Nội')
     setPhone('')
     setNote('')
     setImageFile(null)
@@ -296,6 +296,7 @@ export default function AddStore() {
     compassOnceRef.current = false
     setGeoBlocked(false)
     setStep2Key((k) => k + 1)
+    setFieldErrors({})
     if (router.query?.name) {
       try {
         const { name: _discard, ...rest } = router.query
@@ -368,7 +369,7 @@ export default function AddStore() {
 
     const { data, error } = await supabase
       .from('stores')
-      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, city, image_url, phone, note, status')
+      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, status')
       .or(orTerms)
       .gte('latitude', lat - deltaLat)
       .lte('latitude', lat + deltaLat)
@@ -409,6 +410,8 @@ export default function AddStore() {
     requestCompassHeadingOnce()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
+
+
 
   async function requestCompassHeadingOnce() {
     if (compassOnceRef.current) return
@@ -504,12 +507,19 @@ export default function AddStore() {
     setNameValid(false)
   }, [name])
 
+  useEffect(() => {
+    if (district && !DISTRICT_WARD_SUGGESTIONS[district]) {
+      setWard('')
+    }
+  }, [district])
+
   async function runDuplicateCheckByButton() {
     const trimmed = name.trim()
     if (!trimmed) {
-      showMessage('error', 'Vui lòng nhập tên cửa hàng')
+      setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
       return
     }
+    setFieldErrors((prev) => ({ ...prev, name: '' }))
     let checkLat = duplicateCheckLat
     let checkLng = duplicateCheckLng
     if (checkLat == null || checkLng == null) {
@@ -695,8 +705,8 @@ export default function AddStore() {
       showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
       return
     }
-    if (!name || !district || !imageFile) {
-      showMessage('error', 'Tên, quận/huyện và ảnh là bắt buộc')
+    if (!name || !district || !ward || !imageFile) {
+      showMessage('error', 'Tên, quận/huyện, xã/phường và ảnh là bắt buộc')
       return
     }
 
@@ -813,7 +823,6 @@ export default function AddStore() {
       const normalizedDetail = toTitleCaseVI(addressDetail.trim())
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
-      const normalizedCity = toTitleCaseVI((city || 'Hà Nội').trim())
 
       const { error: insertError } = await supabase.from('stores').insert([
         {
@@ -822,7 +831,6 @@ export default function AddStore() {
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,
-          city: normalizedCity,
           note,
           phone,
           image_url: imageFilename, // Store only filename
@@ -855,7 +863,6 @@ export default function AddStore() {
       setAddressDetail('')
       setWard('')
       setDistrict('')
-      setCity('Hà Nội')
       setPhone('')
       setNote('')
       setImageFile(null)
@@ -928,8 +935,21 @@ export default function AddStore() {
             <>
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
-                <Input ref={nameInputRef} id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+                <Input
+                  ref={nameInputRef}
+                  id="name"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
+                  }}
+                  placeholder="Cửa hàng Tạp Hóa Minh Anh"
+                  className="text-base sm:text-base"
+                />
+                {fieldErrors.name && (
+                  <div className="text-xs text-red-600">{fieldErrors.name}</div>
+                )}
+                <div className="flex flex-wrap gap-2 py-1">
                   {NAME_SUGGESTIONS.map((label) => (
                     <button
                       key={label}
@@ -987,37 +1007,82 @@ export default function AddStore() {
                 <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
                 <div className="grid gap-2">
                   <Input
-                    id="address_detail"
-                    value={addressDetail}
-                    onChange={(e) => setAddressDetail(e.target.value)}
-                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
-                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
-                    className="text-base sm:text-base"
-                  />
-                  <Input
-                    id="ward"
-                    value={ward}
-                    onChange={(e) => setWard(e.target.value)}
-                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
-                    placeholder="Xã / Phường"
-                    className="text-base sm:text-base"
-                  />
-                  <Input
                     id="district"
                     value={district}
-                    onChange={(e) => setDistrict(e.target.value)}
+                    onChange={(e) => {
+                      setDistrict(e.target.value)
+                      if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
+                    }}
                     onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
                     placeholder="Quận / Huyện"
                     className="text-base sm:text-base"
                   />
+                  <div className="flex flex-wrap gap-2">
+                    {DISTRICT_SUGGESTIONS.filter((d) => {
+                      const q = removeVietnameseTones(district || '').toLowerCase()
+                      const t = removeVietnameseTones(d).toLowerCase()
+                      return !q || t.includes(q)
+                    }).slice(0, 8).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-[11px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => {
+                          setDistrict(d)
+                          setWard('')
+                        }}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                  {fieldErrors.district && (
+                    <div className="text-xs text-red-600">{fieldErrors.district}</div>
+                  )}
                   <Input
-                    id="city"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    onBlur={() => { if (city) setCity(toTitleCaseVI(city.trim())) }}
-                    placeholder="Thành phố / Tỉnh"
+                    id="ward"
+                    value={ward}
+                    onChange={(e) => {
+                      setWard(e.target.value)
+                      if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
+                    }}
+                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
+                    placeholder="Xã / Phường"
                     className="text-base sm:text-base"
                   />
+                  {fieldErrors.ward && (
+                    <div className="text-xs text-red-600">{fieldErrors.ward}</div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {(district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []).filter((w) => {
+                      const q = removeVietnameseTones(ward || '').toLowerCase()
+                      const t = removeVietnameseTones(w).toLowerCase()
+                      return !q || t.includes(q)
+                    }).map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-[11px] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => setWard(w)}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
+                  <Input
+                    id="address_detail"
+                    value={addressDetail}
+                    onChange={(e) => {
+                      setAddressDetail(e.target.value)
+                      if (fieldErrors.address_detail) setFieldErrors((prev) => ({ ...prev, address_detail: '' }))
+                    }}
+                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
+                    className="text-base sm:text-base"
+                  />
+                  {fieldErrors.address_detail && (
+                    <div className="text-xs text-red-600">{fieldErrors.address_detail}</div>
+                  )}
                 </div>
               </div>
 
@@ -1050,12 +1115,18 @@ export default function AddStore() {
                         type="file"
                         accept="image/*;capture=camera"
                         capture="environment"
-                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                        onChange={(e) => {
+                          setImageFile(e.target.files?.[0] || null)
+                          if (fieldErrors.image) setFieldErrors((prev) => ({ ...prev, image: '' }))
+                        }}
                         className="hidden"
                       />
                     </label>
                   )}
                 </div>
+                {fieldErrors.image && (
+                  <div className="text-xs text-red-600">{fieldErrors.image}</div>
+                )}
               </div>
 
               {/* Toggle optional */}
@@ -1106,8 +1177,13 @@ export default function AddStore() {
                 <Button
                   type="button"
                   onClick={() => {
-                    if (!name || !district || !imageFile) {
-                      showMessage('error', 'Vui lòng nhập tên, quận/huyện và chụp ảnh trước khi tiếp tục')
+                    const errs = {}
+                    if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
+                    if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
+                    if (!imageFile) errs.image = 'Vui lòng chụp ảnh'
+                    setFieldErrors((prev) => ({ ...prev, ...errs }))
+                    if (Object.keys(errs).length > 0) {
+                      showMessage('error', 'Vui lòng nhập đủ quận/huyện, xã/phường và ảnh')
                       return
                     }
                     setCurrentStep(3)
