@@ -40,7 +40,15 @@ export default function AddStore() {
     'kok',
     'karaoke',
     'bi-a',
-    'bia'
+    'bia',
+    'net',
+    'game',
+    'internet',
+    'beer',
+    'coffee',
+    'mart',
+    'store',
+    'minimart'
   ]
   const router = useRouter()
   const [name, setName] = useState('')
@@ -84,6 +92,7 @@ export default function AddStore() {
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
   const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
+  const [nameValid, setNameValid] = useState(false)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
   const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
   const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
@@ -480,90 +489,84 @@ export default function AddStore() {
       setDuplicateCheckLat(null)
       setDuplicateCheckLng(null)
       duplicateGeoRequestedRef.current = false
+      setNameValid(false)
       return
     }
-
-    if (duplicateCheckTimerRef.current) {
-      clearTimeout(duplicateCheckTimerRef.current)
-      duplicateCheckTimerRef.current = null
-    }
-
-    duplicateCheckTimerRef.current = setTimeout(async () => {
-      let checkLat = duplicateCheckLat
-      let checkLng = duplicateCheckLng
-      if (checkLat == null || checkLng == null) {
-        if (!duplicateGeoRequestedRef.current) {
-          duplicateGeoRequestedRef.current = true
-          try {
-            setDuplicateCheckLoading(true)
-            const { coords, error } = await getBestPosition({
-              attempts: 2,
-              timeout: 3000,
-              maxWaitTime: 6000,
-              desiredAccuracy: 50
-            })
-            if (!coords) {
-              setDuplicateCheckError(getGeoErrorMessage(error))
-              setDuplicateCheckLoading(false)
-              return
-            }
-            checkLat = coords.latitude
-            checkLng = coords.longitude
-            setDuplicateCheckLat(checkLat)
-            setDuplicateCheckLng(checkLng)
-          } catch (err) {
-            console.error('Get location error:', err)
-            setDuplicateCheckError(getGeoErrorMessage(err))
-            setDuplicateCheckLoading(false)
-            return
-          }
-        } else {
-          return
-        }
-      }
-
-      const seq = ++duplicateCheckSeqRef.current
-      setDuplicateCheckLoading(true)
-      setDuplicateCheckError('')
-      try {
-        const matches = await findNearbySimilarStores(checkLat, checkLng, name)
-        if (seq !== duplicateCheckSeqRef.current) return
-        setDuplicateCandidates(matches)
-        setAllowDuplicate(false)
-        setDuplicateCheckDone(true)
-      } catch (err) {
-        if (seq !== duplicateCheckSeqRef.current) return
-        console.error('Duplicate check error:', err)
-        setDuplicateCandidates([])
-        setDuplicateCheckError('Không kiểm tra được trùng tên gần đây.')
-        setDuplicateCheckDone(false)
-      } finally {
-        if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
-      }
-    }, 1000)
-
-    return () => {
-      if (duplicateCheckTimerRef.current) {
-        clearTimeout(duplicateCheckTimerRef.current)
-        duplicateCheckTimerRef.current = null
-      }
-    }
+    setDuplicateCandidates([])
+    setDuplicateCheckError('')
+    setDuplicateCheckDone(false)
+    setNameValid(false)
   }, [name])
 
   useEffect(() => {
     setAllowDuplicate(false)
     setDuplicateCheckDone(false)
+    setNameValid(false)
   }, [name])
+
+  async function runDuplicateCheckByButton() {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      showMessage('error', 'Vui lòng nhập tên cửa hàng')
+      return
+    }
+    let checkLat = duplicateCheckLat
+    let checkLng = duplicateCheckLng
+    if (checkLat == null || checkLng == null) {
+      if (!duplicateGeoRequestedRef.current) {
+        duplicateGeoRequestedRef.current = true
+      }
+      try {
+        setDuplicateCheckLoading(true)
+        const { coords, error } = await getBestPosition({
+          attempts: 2,
+          timeout: 3000,
+          maxWaitTime: 6000,
+          desiredAccuracy: 50
+        })
+        if (!coords) {
+          setDuplicateCheckError(getGeoErrorMessage(error))
+          setDuplicateCheckLoading(false)
+          return
+        }
+        checkLat = coords.latitude
+        checkLng = coords.longitude
+        setDuplicateCheckLat(checkLat)
+        setDuplicateCheckLng(checkLng)
+      } catch (err) {
+        console.error('Get location error:', err)
+        setDuplicateCheckError(getGeoErrorMessage(err))
+        setDuplicateCheckLoading(false)
+        return
+      }
+    }
+
+    const seq = ++duplicateCheckSeqRef.current
+    setDuplicateCheckLoading(true)
+    setDuplicateCheckError('')
+    try {
+      const matches = await findNearbySimilarStores(checkLat, checkLng, trimmed)
+      if (seq !== duplicateCheckSeqRef.current) return
+      setDuplicateCandidates(matches)
+      setAllowDuplicate(false)
+      setDuplicateCheckDone(true)
+      const ok = matches.length === 0
+      setNameValid(ok)
+      if (ok) setCurrentStep(2)
+    } catch (err) {
+      if (seq !== duplicateCheckSeqRef.current) return
+      console.error('Duplicate check error:', err)
+      setDuplicateCandidates([])
+      setDuplicateCheckError('Không kiểm tra được trùng tên gần đây.')
+      setDuplicateCheckDone(false)
+      setNameValid(false)
+    } finally {
+      if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
+    }
+  }
 
   function renderDuplicatePanel() {
     if (allowDuplicate) return null
-    if (duplicateCheckLoading) {
-      return (
-        <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
-          Đang kiểm tra cửa hàng trùng/tương tự trong 100m…
-        </div>
-      )
-    }
     if (duplicateCheckError) {
       return (
         <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-orange-300">
@@ -926,7 +929,7 @@ export default function AddStore() {
               <div className="space-y-1.5">
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
                 <Input ref={nameInputRef} id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Cửa hàng Tạp Hóa Minh Anh" className="text-base sm:text-base" />
-                <div className="flex flex-wrap gap-2 py-1 max-h-[3.6rem] sm:max-h-none">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
                   {NAME_SUGGESTIONS.map((label) => (
                     <button
                       key={label}
@@ -935,11 +938,11 @@ export default function AddStore() {
                       onClick={() => {
                         setName((prev) => {
                           const base = (prev || '').trim()
-                          if (!base) return label
+                          if (!base) return `${label} `
                           const norm = removeVietnameseTones(base).toLowerCase()
                           const normLabel = removeVietnameseTones(label).toLowerCase()
                           if (norm.includes(normLabel)) return prev
-                          return `${base} ${label}`
+                          return `${base} ${label} `
                         })
                         try { nameInputRef.current?.focus() } catch {}
                       }}
@@ -948,6 +951,11 @@ export default function AddStore() {
                     </button>
                   ))}
                 </div>
+                {duplicateCheckLoading && (
+                  <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
+                    Đang kiểm tra cửa hàng trùng/tương tự trong 100m…
+                  </div>
+                )}
                 {renderDuplicatePanel()}
               </div>
 
@@ -956,19 +964,15 @@ export default function AddStore() {
                   <Button
                     type="button"
                     onClick={() => {
-                      if (!name.trim()) {
-                        showMessage('error', 'Vui lòng nhập tên cửa hàng')
-                        return
-                      }
                       if (!duplicateCheckDone) {
-                        showMessage('error', 'Vui lòng chờ kiểm tra trùng tên')
+                        runDuplicateCheckByButton()
                         return
                       }
-                      setCurrentStep(2)
+                      if (nameValid) setCurrentStep(2)
                     }}
                     className="w-full text-sm sm:text-base"
                   >
-                    Tiếp theo →
+                    {duplicateCheckDone ? 'Tiếp theo →' : 'Kiểm tra tên'}
                   </Button>
                 </div>
               ) : null}
