@@ -14,7 +14,7 @@ import imageCompression from 'browser-image-compression'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
 
-const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
+const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
 export default function StoreDetail() {
   const router = useRouter()
@@ -824,78 +824,15 @@ export default function StoreDetail() {
             <div className="space-y-1.5">
               <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Vị trí trên bản đồ</Label>
 
-              {/* Map controls - above map */}
-              <div className="flex items-center justify-end py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={mapEditable ? "default" : "outline"}
-                  onClick={() => setMapEditable(v => !v)}
-                  className="text-xs flex items-center gap-1.5 h-8"
-                >
-                  {mapEditable ? (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Khóa lại
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                      </svg>
-                      Mở khóa để chỉnh
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Map with overlay badges */}
-              <div className="relative">
-                {/* Position status badge - top left inside map */}
-                {pickedLat && pickedLng ? (
-                  <div className="absolute top-2 left-2 z-[1000] bg-green-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Đã có vị trí
-                  </div>
-                ) : (
-                  <div className="absolute top-2 left-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    Chưa có vị trí
-                  </div>
-                )}
-
-                {/* Lock status badge - top right inside map */}
-                {mapEditable ? (
-                  <div className="absolute top-2 right-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
-                    Đang mở khóa
-                  </div>
-                ) : (
-                  <div className="absolute top-2 right-2 z-[1000] bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    Đã khóa
-                  </div>
-                )}
-
-                <LocationPicker
-                  initialLat={pickedLat}
-                  initialLng={pickedLng}
-                  onChange={handleLocationChange}
-                  className="rounded-md overflow-hidden"
-                  editable={mapEditable}
-                  onToggleEditable={() => setMapEditable(v => !v)}
-                />
-              </div>
+              {/* Map with controls inside */}
+              <StoreLocationPicker
+                initialLat={pickedLat}
+                initialLng={pickedLng}
+                onChange={handleLocationChange}
+                editable={mapEditable}
+                onToggleEditable={() => setMapEditable(v => !v)}
+                showControls={true}
+              />
             </div>
 
           <div className="pt-2">
