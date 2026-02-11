@@ -19,6 +19,7 @@ export default function LocationPicker({
   const mapContainerRef = useRef(null)
   const centerRef = useRef([initialLng ?? defaultLng, initialLat ?? defaultLat])
   const markerRef = useRef(null)
+  const editableRef = useRef(editable)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -41,35 +42,31 @@ export default function LocationPicker({
       },
       center: centerRef.current,
       zoom: 18,
-      minZoom: 18,
-      maxZoom: 18,
+      minZoom: 3,
+      maxZoom: 20,
       attributionControl: true
     })
     mapRef.current = map
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
     map.dragPan.enable()
-    map.scrollZoom.disable()
-    map.doubleClickZoom.disable()
-    map.boxZoom.disable()
-    map.keyboard.disable()
+    map.scrollZoom.enable()
+    map.doubleClickZoom.enable()
+    map.boxZoom.enable()
+    map.keyboard.enable()
+    map.touchZoomRotate.enable()
     map.touchZoomRotate.disableRotation()
 
-    const markerEl = document.createElement('div')
-    markerEl.style.width = '28px'
-    markerEl.style.height = '40px'
-    markerEl.style.background =
-      'url("data:image/svg+xml;utf8,<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"28\\" height=\\"40\\" viewBox=\\"0 0 24 36\\"><path d=\\"M12 0C7.031 0 3 4.031 3 9c0 7.5 9 18 9 18s9-10.5 9-18c0-4.969-4.031-9-9-9z\\" fill=\\"%23ef4444\\"/><circle cx=\\"12\\" cy=\\"9\\" r=\\"3\\" fill=\\"white\\" /></svg>") no-repeat center'
-    markerEl.style.transform = 'translate(-50%, -100%)'
-
-    const marker = new maplibregl.Marker({ element: markerEl })
+    // Use native Marker from MapLibre to avoid CSS anchor drift on custom markers.
+    const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
       .setLngLat(centerRef.current)
       .addTo(map)
     markerRef.current = marker
 
     const updateCenter = () => {
       const c = map.getCenter()
-      const lat = Number(c.lat.toFixed(6))
-      const lng = Number(c.lng.toFixed(6))
+      const lat = Number(c.lat.toFixed(7))
+      const lng = Number(c.lng.toFixed(7))
       centerRef.current = [lng, lat]
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat])
@@ -79,7 +76,7 @@ export default function LocationPicker({
     map.on('move', updateCenter)
     map.on('moveend', () => {
       updateCenter()
-      if (editable && onChange) {
+      if (editableRef.current && onChange) {
         const [lng, lat] = centerRef.current
         onChange(lat, lng)
       }
@@ -87,6 +84,17 @@ export default function LocationPicker({
         const [lng, lat] = centerRef.current
         console.log('Map center:', { lat, lng })
       }
+    })
+
+    // Support "tap/click to pin" when unlocked.
+    map.on('click', (e) => {
+      if (!editableRef.current) return
+      const lat = Number(e.lngLat.lat.toFixed(7))
+      const lng = Number(e.lngLat.lng.toFixed(7))
+      centerRef.current = [lng, lat]
+      map.easeTo({ center: [lng, lat], duration: 250 })
+      if (markerRef.current) markerRef.current.setLngLat([lng, lat])
+      if (onChange) onChange(lat, lng)
     })
 
     return () => {
@@ -108,10 +116,21 @@ export default function LocationPicker({
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    editableRef.current = editable
     if (editable) {
       map.dragPan.enable()
+      map.scrollZoom.enable()
+      map.doubleClickZoom.enable()
+      map.boxZoom.enable()
+      map.keyboard.enable()
+      if (map.touchZoomRotate && map.touchZoomRotate.enable) map.touchZoomRotate.enable()
     } else {
       map.dragPan.disable()
+      map.scrollZoom.disable()
+      map.doubleClickZoom.disable()
+      map.boxZoom.disable()
+      map.keyboard.disable()
+      if (map.touchZoomRotate && map.touchZoomRotate.disable) map.touchZoomRotate.disable()
     }
     // Always disable rotate interactions; bearing is controlled by heading only.
     try {

@@ -48,13 +48,15 @@ export default function StoreDetail() {
   const [pickedLng, setPickedLng] = useState(null)
   const mapWrapperRef = useRef(null)
   const [mapEditable, setMapEditable] = useState(false)
+  const [userHasEditedMap, setUserHasEditedMap] = useState(false)
 
   // stable handler for LocationPicker to avoid conditional hook calls and
   // ensure the same reference is passed across renders
   const handleLocationChange = useCallback((lat, lng) => {
     setPickedLat(lat)
     setPickedLng(lng)
-  }, [])
+    if (mapEditable) setUserHasEditedMap(true)
+  }, [mapEditable])
 
 
   useEffect(() => {
@@ -75,6 +77,7 @@ export default function StoreDetail() {
           setNote(data.note || '')
           setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
           setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
+          setUserHasEditedMap(false)
         }
       })
   }, [id])
@@ -449,7 +452,8 @@ export default function StoreDetail() {
 
     const normalizedName = toTitleCaseVI(name.trim())
 
-    // Determine coordinates: prefer link if provided; else prefer picked map coords, then existing store coords, else geolocation
+    // Determine coordinates: prefer link if provided; else prefer manually edited map coords,
+    // then existing store coords, else geolocation
     let latitude = store?.latitude ?? null
     let longitude = store?.longitude ?? null
 
@@ -477,8 +481,8 @@ export default function StoreDetail() {
           return
         }
       }
-    } else if (typeof pickedLat === 'number' && typeof pickedLng === 'number') {
-      // Use position picked on the map picker
+    } else if (userHasEditedMap && typeof pickedLat === 'number' && typeof pickedLng === 'number') {
+      // Use position only if user manually adjusted map
       latitude = pickedLat
       longitude = pickedLng
     } else if (!latitude || !longitude) {
@@ -509,7 +513,6 @@ export default function StoreDetail() {
       showMessage('error', 'Thiếu thông tin vị trí. Vị trí cửa hàng chưa được xác định. Vui lòng dán link Google Maps hoặc mở khóa bản đồ và chọn vị trí')
       return
     }
-
     let image_url = store?.image_url || null
     let uploadedFileId = null
 
@@ -725,19 +728,17 @@ export default function StoreDetail() {
 
         <form onSubmit={onSave} className="space-y-4">
           <h2 className="text-sm font-semibold text-gray-600 dark:text-gray-300">Phần 1: Thông tin cửa hàng</h2>
-          {store?.image_url && (
-            <div className="space-y-1.5">
-              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh hiện tại</Label>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
-                </DialogTrigger>
-                <DialogContent className="overflow-hidden p-0">
-                  <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
-                </DialogContent>
-              </Dialog>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh hiện tại</Label>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={96} height={96} sizes="96px" quality={70} className="h-24 w-24 cursor-zoom-in rounded object-cover ring-1 ring-gray-200 dark:ring-gray-800" />
+              </DialogTrigger>
+              <DialogContent className="overflow-hidden p-0">
+                <Image src={getFullImageUrl(store.image_url)} alt={store.name} width={800} height={800} className="max-h-[80vh] w-auto object-contain" />
+              </DialogContent>
+            </Dialog>
+          </div>
 
           <div className="space-y-1.5">
             <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên</Label>

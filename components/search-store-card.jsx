@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
-import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
+import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 
 export default function SearchStoreCard({ store, distance, searchTerm }) {
   const [imageError, setImageError] = useState(false)
@@ -20,11 +20,7 @@ export default function SearchStoreCard({ store, distance, searchTerm }) {
     return d < 1 ? `${(d * 1000).toFixed(0)}m` : `${d.toFixed(1)}km`
   }
 
-  const getImageSrc = (imageUrl) => {
-    if (!imageUrl) return null
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) return imageUrl
-    return `${IMAGEKIT_URL_ENDPOINT}${imageUrl}`
-  }
+  const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
 
   const addressText = formatAddressParts(store)
 
@@ -68,22 +64,15 @@ export default function SearchStoreCard({ store, distance, searchTerm }) {
           <CardContent className="p-0">
             {/* Image Top */}
             <div className="relative w-full h-56 sm:h-64 bg-gray-100 dark:bg-gray-800">
-              {!imageError && store.image_url ? (
-                <Image
-                  src={getImageSrc(store.image_url)}
-                  alt={store.name || 'store image'}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width:640px) 100vw, 50vw"
-                  onError={handleImageError}
-                  priority
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-2">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                  <span className="text-xs text-gray-500">Chưa có ảnh</span>
-                </div>
-              )}
+              <Image
+                src={imageSrc}
+                alt={store.name || 'store image'}
+                fill
+                className="object-cover"
+                sizes="(max-width:640px) 100vw, 50vw"
+                onError={handleImageError}
+                priority
+              />
               {/* Top badges (verified & distance) */}
               <div className="absolute top-2 left-2 flex flex-wrap gap-2">
                 {store.active && (

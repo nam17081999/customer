@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useLoadScript, GoogleMap } from '@react-google-maps/api'
 
 // A lightweight Google Maps location picker that mirrors the center-overlay UX.
-// Props: initialLat, initialLng, onChange(lat,lng), editable (boolean), className, onToggleEditable
-export default function GoogleLocationPicker({ initialLat, initialLng, onChange, editable = true, className, onToggleEditable }) {
+// Props: initialLat, initialLng, onChange(lat,lng), editable (boolean), className, onToggleEditable, height
+export default function GoogleLocationPicker({ initialLat, initialLng, onChange, editable = true, className, onToggleEditable, height = 320 }) {
   const defaultCenter = { lat: initialLat || 10.7769, lng: initialLng || 106.70098 }
   const [center, setCenter] = useState(defaultCenter)
   const mapRef = useRef(null)
@@ -22,7 +22,7 @@ export default function GoogleLocationPicker({ initialLat, initialLng, onChange,
   }, [initialLat, initialLng])
 
   const libs = ['places']
-  const apiKey = typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY : undefined
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey, libraries: libs })
 
   const onMapLoad = useCallback((map) => {
@@ -43,12 +43,15 @@ export default function GoogleLocationPicker({ initialLat, initialLng, onChange,
   if (loadError) return <div>Không tải được bản đồ Google</div>
   if (!isLoaded) return <div>Đang nạp bản đồ…</div>
 
+  // Parse height - support both number and string like "60vh"
+  const mapHeight = typeof height === 'number' ? height : height
+
   return (
     <div className={className} style={{ position: 'relative' }}>
       <GoogleMap
-        mapContainerStyle={{ width: '100%', height: 320 }}
+        mapContainerStyle={{ width: '100%', height: mapHeight }}
         center={center}
-        zoom={16}
+        zoom={18}
         options={{
           disableDefaultUI: true,
           gestureHandling: editable ? 'greedy' : 'none',

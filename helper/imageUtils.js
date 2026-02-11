@@ -1,12 +1,14 @@
 import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants';
 
+export const STORE_PLACEHOLDER_IMAGE = '/store-placeholder.svg'
+
 /**
  * Get full image URL from filename using ImageKit.io
  * @param {string} filename - Image filename from database
  * @returns {string} Full ImageKit.io URL with optimizations
  */
 export function getFullImageUrl(filename) {
-  if (!filename) return '';
+  if (!filename) return STORE_PLACEHOLDER_IMAGE;
   
   // If it's already a full ImageKit URL, return as is
   if (filename.startsWith('https://ik.imagekit.io/')) {
@@ -30,7 +32,7 @@ export function getFullImageUrl(filename) {
  * @returns {string} Optimized ImageKit.io URL
  */
 export function getThumbnailUrl(filename, width = 300, height = 200) {
-  if (!filename) return '';
+  if (!filename) return STORE_PLACEHOLDER_IMAGE;
   
   // If it's already a full ImageKit URL, return as is
   if (filename.startsWith('https://ik.imagekit.io/')) {

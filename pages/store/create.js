@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
-import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
+import {
+  DISTRICT_WARD_SUGGESTIONS,
+  DISTRICT_SUGGESTIONS,
+} from '@/lib/constants'
 import imageCompression from 'browser-image-compression'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
@@ -17,7 +20,7 @@ import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
-const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
+const LocationPicker = dynamic(() => import('@/components/map/google-location-picker'), { ssr: false })
 
 export default function AddStore() {
   const IGNORED_NAME_TERMS = [
@@ -115,6 +118,21 @@ export default function AddStore() {
   const mapWrapperRef = useRef(null)
   const [geoBlocked, setGeoBlocked] = useState(false)
   const [step2Key, setStep2Key] = useState(0)
+  const hasUnsavedChanges = useMemo(() => {
+    if (loading) return false
+    return Boolean(
+      name.trim() ||
+      addressDetail.trim() ||
+      ward.trim() ||
+      district.trim() ||
+      phone.trim() ||
+      note.trim() ||
+      imageFile ||
+      pickedLat != null ||
+      pickedLng != null ||
+      currentStep !== 1
+    )
+  }, [name, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading])
 
 
   // Stable handler for LocationPicker - track manual edits
@@ -267,6 +285,30 @@ export default function AddStore() {
       try { nameInputRef.current.focus() } catch {}
     }
   }, [currentStep])
+
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!hasUnsavedChanges) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  useEffect(() => {
+    const onRouteChangeStart = (nextUrl) => {
+      if (!hasUnsavedChanges) return
+      if (nextUrl === router.asPath) return
+      const ok = window.confirm('Bạn có dữ liệu chưa lưu. Bạn có chắc muốn rời trang?')
+      if (ok) return
+      router.events.emit('routeChangeError')
+      // eslint-disable-next-line no-throw-literal
+      throw 'Route change aborted by user'
+    }
+    router.events.on('routeChangeStart', onRouteChangeStart)
+    return () => router.events.off('routeChangeStart', onRouteChangeStart)
+  }, [hasUnsavedChanges, router])
 
   function resetCreateForm() {
     setName('')
@@ -579,10 +621,9 @@ export default function AddStore() {
     const errs = {}
     if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
     if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
-    if (!imageFile) errs.image = 'Vui lòng chụp ảnh'
     setFieldErrors((prev) => ({ ...prev, ...errs }))
     if (Object.keys(errs).length > 0) {
-      showMessage('error', 'Vui lòng nhập đủ quận/huyện, xã/phường và ảnh')
+      showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
     }
     setCurrentStep(3)
@@ -727,8 +768,8 @@ export default function AddStore() {
       showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
       return
     }
-    if (!name || !district || !ward || !imageFile) {
-      showMessage('error', 'Tên, quận/huyện, xã/phường và ảnh là bắt buộc')
+    if (!name || !district || !ward) {
+      showMessage('error', 'Tên, quận/huyện và xã/phường là bắt buộc')
       return
     }
 
@@ -804,41 +845,43 @@ export default function AddStore() {
         return
       }
 
-      // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
-      const options = {
-        maxSizeMB: 1, // Tăng từ 0.35 lên 1MB
-        maxWidthOrHeight: 1600, // Tăng từ 1024 lên 1600px
-        useWebWorker: true,
-        initialQuality: 0.8, // Tăng từ 0.65 lên 0.8
-        fileType: 'image/jpeg',
+      let uploadResult = null
+      let imageFilename = null
+      if (imageFile) {
+        // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1600,
+          useWebWorker: true,
+          initialQuality: 0.8,
+          fileType: 'image/jpeg',
+        }
+        let fileToUpload = imageFile
+        try {
+          const compressed = await imageCompression(imageFile, options)
+          fileToUpload = compressed
+        } catch (cmpErr) {
+          console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
+        }
+
+        // Upload lên ImageKit nếu có ảnh
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+        formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
+        formData.append('useUniqueFileName', 'true')
+
+        const uploadResponse = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Upload ảnh thất bại')
+        }
+
+        uploadResult = await uploadResponse.json()
+        imageFilename = uploadResult.name
       }
-      let fileToUpload = imageFile
-      try {
-        const compressed = await imageCompression(imageFile, options)
-        fileToUpload = compressed
-      } catch (cmpErr) {
-        console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
-      }
-
-      // Upload lên ImageKit
-      const formData = new FormData()
-      formData.append('file', fileToUpload)
-      formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
-      formData.append('useUniqueFileName', 'true')
-
-      const uploadResponse = await fetch('/api/upload-image', {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!uploadResponse.ok) {
-        throw new Error('Upload ảnh thất bại')
-      }
-
-      const uploadResult = await uploadResponse.json()
-
-      // Lưu tên file vào database 
-      const imageFilename = uploadResult.name
 
       const nameSearch = removeVietnameseTones(normalizedName)
 
@@ -855,7 +898,7 @@ export default function AddStore() {
           district: normalizedDistrict,
           note,
           phone,
-          image_url: imageFilename, // Store only filename
+          image_url: imageFilename, // nullable when store has no image
           latitude,
           longitude,
         },
@@ -864,14 +907,16 @@ export default function AddStore() {
       if (insertError) {
         console.error(insertError)
         // Try to delete uploaded image on error
-        try {
-          await fetch('/api/upload-image', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileId: uploadResult.fileId }),
-          })
-        } catch (deleteErr) {
-          console.warn('Could not delete uploaded image:', deleteErr)
+        if (uploadResult?.fileId) {
+          try {
+            await fetch('/api/upload-image', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId: uploadResult.fileId }),
+            })
+          } catch (deleteErr) {
+            console.warn('Could not delete uploaded image:', deleteErr)
+          }
         }
         showMessage('error', 'Lỗi khi lưu dữ liệu')
         setLoading(false)
@@ -1039,25 +1084,23 @@ export default function AddStore() {
                     placeholder="Quận / Huyện"
                     className="text-base sm:text-base"
                   />
-                  <div className="flex flex-wrap gap-2">
-                    {DISTRICT_SUGGESTIONS.filter((d) => {
-                      const q = removeVietnameseTones(district || '').toLowerCase()
-                      const t = removeVietnameseTones(d).toLowerCase()
-                      return !q || t.includes(q)
-                    }).slice(0, 8).map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        onClick={() => {
-                          setDistrict(d)
-                          setWard('')
-                        }}
-                      >
-                        {d}
-                      </button>
-                    ))}
-                  </div>
+                  {!(DISTRICT_SUGGESTIONS.some((d) => removeVietnameseTones(d).toLowerCase() === removeVietnameseTones(district || '').toLowerCase())) && (
+                    <div className="flex flex-wrap gap-2">
+                      {DISTRICT_SUGGESTIONS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => {
+                            setDistrict(d)
+                            setWard('')
+                          }}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {fieldErrors.district && (
                     <div className="text-xs text-red-600">{fieldErrors.district}</div>
                   )}
@@ -1075,22 +1118,20 @@ export default function AddStore() {
                   {fieldErrors.ward && (
                     <div className="text-xs text-red-600">{fieldErrors.ward}</div>
                   )}
-                  <div className="flex flex-wrap gap-2">
-                    {(district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []).filter((w) => {
-                      const q = removeVietnameseTones(ward || '').toLowerCase()
-                      const t = removeVietnameseTones(w).toLowerCase()
-                      return !q || t.includes(q)
-                    }).map((w) => (
-                      <button
-                        key={w}
-                        type="button"
-                        className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                        onClick={() => setWard(w)}
-                      >
-                        {w}
-                      </button>
-                    ))}
-                  </div>
+                  {district && !(DISTRICT_WARD_SUGGESTIONS[district] || []).some((w) => removeVietnameseTones(w).toLowerCase() === removeVietnameseTones(ward || '').toLowerCase()) && (
+                    <div className="flex flex-wrap gap-2">
+                      {(DISTRICT_WARD_SUGGESTIONS[district] || []).map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => setWard(w)}
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <Input
                     id="address_detail"
                     value={addressDetail}
@@ -1110,7 +1151,7 @@ export default function AddStore() {
 
               {/* Ảnh */}
               <div className="space-y-1.5">
-                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (bắt buộc)</Label>
+                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (không bắt buộc)</Label>
                 <div className="relative w-full">
                   {imageFile ? (
                     <div className="relative group w-full">
@@ -1146,9 +1187,6 @@ export default function AddStore() {
                     </label>
                   )}
                 </div>
-                {fieldErrors.image && (
-                  <div className="text-xs text-red-600">{fieldErrors.image}</div>
-                )}
               </div>
 
               {/* Toggle optional */}
@@ -1216,6 +1254,7 @@ export default function AddStore() {
               <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
                 {/* Map controls - above map */}
                 <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
                     <Button
                       type="button"
                       size="sm"
@@ -1280,6 +1319,7 @@ export default function AddStore() {
                       </svg>
                       {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
                     </Button>
+                  </div>
                     <Button
                       type="button"
                       size="sm"
@@ -1343,14 +1383,13 @@ export default function AddStore() {
 
                   <div className="relative">
                     <LocationPicker
-                      key={`step2-${step2Key}-${pickedLat ?? 'x'}-${pickedLng ?? 'y'}`}
+                      key={`step2-${step2Key}`}
                       initialLat={pickedLat}
                       initialLng={pickedLng}
                       onChange={handleLocationChange}
                       className={`rounded-md overflow-hidden ${geoBlocked ? 'blur-sm pointer-events-none select-none' : ''}`}
                       editable={mapEditable}
                       onToggleEditable={() => setMapEditable(v => !v)}
-                      heading={heading}
                       height="60vh"
                     />
                     {compassError && (
@@ -1358,6 +1397,14 @@ export default function AddStore() {
                         {compassError}
                       </div>
                     )}
+                    {typeof pickedLat === 'number' && typeof pickedLng === 'number' && (
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        Tọa độ: {pickedLat.toFixed(7)}, {pickedLng.toFixed(7)}
+                      </div>
+                    )}
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Mở khóa rồi chạm trực tiếp lên bản đồ để chấm lại vị trí chính xác.
+                    </div>
                     {geoBlocked && (
                       <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
                         <div className="w-full max-w-md rounded-xl border border-red-200 bg-white/95 p-5 text-center shadow-lg">

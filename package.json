@@ -17,6 +17,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-slot": "^1.2.3",
+    "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.54.0",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
