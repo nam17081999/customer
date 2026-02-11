@@ -20,7 +20,7 @@ import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
-const LocationPicker = dynamic(() => import('@/components/map/google-location-picker'), { ssr: false })
+const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
 export default function AddStore() {
   const IGNORED_NAME_TERMS = [
@@ -144,6 +144,49 @@ export default function AddStore() {
       setUserHasEditedMap(true)
     }
   }, [mapEditable])
+
+  // Handler for getting fresh GPS location
+  const handleGetLocation = useCallback(async () => {
+    try {
+      setResolvingAddr(true)
+
+      const { coords, error } = await getBestPosition({
+        attempts: 3,
+        timeout: 4000,
+        maxWaitTime: 8000,
+        desiredAccuracy: 25
+      })
+      if (!coords) {
+        setGeoBlocked(true)
+        showMessage('error', getGeoErrorMessage(error))
+        return
+      }
+      setGeoBlocked(false)
+
+      // Update initial GPS reference (for submit if not edited)
+      setInitialGPSLat(coords.latitude)
+      setInitialGPSLng(coords.longitude)
+
+      // Update map display
+      setPickedLat(coords.latitude)
+      setPickedLng(coords.longitude)
+
+      // Also try compass once on refresh (user gesture)
+      compassOnceRef.current = false
+      requestCompassHeadingOnce()
+
+      // Reset edited flag since this is a fresh GPS load
+      setUserHasEditedMap(false)
+
+      showMessage('success', 'Đã cập nhật vị trí GPS mới')
+    } catch (err) {
+      console.error('Get location error:', err)
+      setGeoBlocked(true)
+      showMessage('error', getGeoErrorMessage(err))
+    } finally {
+      setResolvingAddr(false)
+    }
+  }, [])
 
   // Improved GPS location with progressive timeout and maxWaitTime
   async function getBestPosition({
@@ -965,38 +1008,8 @@ export default function AddStore() {
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
-      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-4 max-w-screen-md mx-auto">
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 1 ? 'bg-blue-600 text-white' : currentStep > 1 ? 'bg-green-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-              {currentStep > 1 ? '✓' : '1'}
-            </div>
-            <span className={`text-xs font-medium ${currentStep === 1 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Tên
-            </span>
-          </div>
-          <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
-          <div className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 2 ? 'bg-blue-600 text-white' : currentStep > 2 ? 'bg-green-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-              {currentStep > 2 ? '✓' : '2'}
-            </div>
-            <span className={`text-xs font-medium ${currentStep === 2 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Địa chỉ
-            </span>
-          </div>
-          <div className="w-8 h-0.5 bg-gray-300 dark:bg-gray-700"></div>
-          <div className="flex items-center gap-2">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-semibold ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
-              3
-            </div>
-            <span className={`text-xs font-medium ${currentStep === 3 ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
-              Vị trí
-            </span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
@@ -1251,194 +1264,22 @@ export default function AddStore() {
           {currentStep === 3 && (
             <>
               {/* Map Picker */}
-              <div className="space-y-1.5 pt-2" ref={mapWrapperRef}>
-                {/* Map controls - above map */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={async (e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        try {
-                          setResolvingAddr(true)
-
-                          // Get fresh GPS with heading
-          const { coords, error } = await getBestPosition({
-            attempts: 3,
-            timeout: 4000,
-            maxWaitTime: 8000,
-            desiredAccuracy: 25
-          })
-          if (!coords) {
-            setGeoBlocked(true)
-            showMessage('error', getGeoErrorMessage(error))
-            return
-          }
-          setGeoBlocked(false)
-
-          // Update initial GPS reference (for submit if not edited)
-          setInitialGPSLat(coords.latitude)
-          setInitialGPSLng(coords.longitude)
-
-          // Update map display
-          setPickedLat(coords.latitude)
-          setPickedLng(coords.longitude)
-
-                          // Do not use GPS heading; rely on compass sampling instead
-                          // Also try compass once on refresh (user gesture)
-                          compassOnceRef.current = false
-                          requestCompassHeadingOnce()
-
-                          // Reset edited flag since this is a fresh GPS load
-                          setUserHasEditedMap(false)
-
-                          showMessage('success', 'Đã cập nhật vị trí GPS mới')
-      } catch (err) {
-        console.error('Get location error:', err)
-        setGeoBlocked(true)
-        showMessage('error', getGeoErrorMessage(err))
-      } finally {
-        setResolvingAddr(false)
-      }
-                      }}
-                      disabled={resolvingAddr}
-                      className="text-xs flex items-center gap-1.5 h-8"
-                      title="Lấy lại vị trí GPS hiện tại của bạn"
-                    >
-                      <svg
-                        className={`w-3.5 h-3.5 ${resolvingAddr ? 'animate-spin' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
-                    </Button>
-                  </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={mapEditable ? "default" : "outline"}
-                      onClick={() => setMapEditable(v => !v)}
-                      className="text-xs flex items-center gap-1.5 h-8"
-                    >
-                      {mapEditable ? (
-                        <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                          Khóa lại
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                          </svg>
-                          Mở khóa để chỉnh
-                        </>
-                      )}
-                    </Button>
-                </div>
-
-                {/* Map with overlay badges */}
-                <div className="relative">
-                  {/* Position status badge - top left inside map */}
-                  {pickedLat && pickedLng ? (
-                    <div className="absolute top-2 left-2 z-[1000] bg-green-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Đã có vị trí
-                    </div>
-                  ) : (
-                    <div className="absolute top-2 left-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      Chưa có vị trí
-                    </div>
-                  )}
-
-                  {/* Lock status badge - top right inside map */}
-                  {mapEditable ? (
-                    <div className="absolute top-2 right-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                      </svg>
-                      Đang mở khóa
-                    </div>
-                  ) : (
-                    <div className="absolute top-2 right-2 z-[1000] bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Đã khóa
-                    </div>
-                  )}
-
-                  <div className="relative">
-                    <LocationPicker
-                      key={`step2-${step2Key}`}
-                      initialLat={pickedLat}
-                      initialLng={pickedLng}
-                      onChange={handleLocationChange}
-                      className={`rounded-md overflow-hidden ${geoBlocked ? 'blur-sm pointer-events-none select-none' : ''}`}
-                      editable={mapEditable}
-                      onToggleEditable={() => setMapEditable(v => !v)}
-                      height="60vh"
-                    />
-                    {compassError && (
-                      <div className="absolute bottom-2 left-2 right-2 z-[1200] rounded-md border border-orange-300 bg-orange-50 px-3 py-2 text-xs text-orange-800">
-                        {compassError}
-                      </div>
-                    )}
-                    {typeof pickedLat === 'number' && typeof pickedLng === 'number' && (
-                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        Tọa độ: {pickedLat.toFixed(7)}, {pickedLng.toFixed(7)}
-                      </div>
-                    )}
-                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Mở khóa rồi chạm trực tiếp lên bản đồ để chấm lại vị trí chính xác.
-                    </div>
-                    {geoBlocked && (
-                      <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
-                        <div className="w-full max-w-md rounded-xl border border-red-200 bg-white/95 p-5 text-center shadow-lg">
-                          <div className="text-base font-semibold text-red-600">
-                            Không thể lấy vị trí của bạn
-                          </div>
-                          <div className="mt-2 text-sm text-gray-700">
-                            Vui lòng bật định vị/GPS và cho phép quyền vị trí cho trình duyệt.
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500">
-                            Mở Cài đặt → Quyền vị trí → cho phép truy cập vị trí, sau đó thử lại.
-                          </div>
-                          <div className="mt-4">
-                            <Button
-                              type="button"
-                              onClick={() => window.location.reload()}
-                              className="w-full"
-                            >
-                              Tải lại trang
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {resolvingAddr && (
-                      <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-white/70 dark:bg-black/60 backdrop-blur-sm rounded-md">
-                        <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-                          <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
-                          Đang lấy vị trí…
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="pt-1" ref={mapWrapperRef}>
+                <StoreLocationPicker
+                  mapKey={`step2-${step2Key}`}
+                  initialLat={pickedLat}
+                  initialLng={pickedLng}
+                  onChange={handleLocationChange}
+                  editable={mapEditable}
+                  onToggleEditable={() => setMapEditable(v => !v)}
+                  onGetLocation={handleGetLocation}
+                  heading={heading}
+                  height="65vh"
+                  compassError={compassError}
+                  geoBlocked={geoBlocked}
+                  onReload={() => window.location.reload()}
+                  resolvingAddr={resolvingAddr}
+                />
               </div>
 
           {/* Back and Submit buttons for step 3 */}
