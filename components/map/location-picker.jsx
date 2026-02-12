@@ -20,6 +20,16 @@ export default function LocationPicker({
   const centerRef = useRef([initialLng ?? defaultLng, initialLat ?? defaultLat])
   const markerRef = useRef(null)
   const editableRef = useRef(editable)
+  const onChangeRef = useRef(onChange)
+  const debugRef = useRef(debug)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
+
+  useEffect(() => {
+    debugRef.current = debug
+  }, [debug])
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -49,13 +59,23 @@ export default function LocationPicker({
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
-    map.dragPan.enable()
-    map.scrollZoom.enable()
-    map.doubleClickZoom.enable()
-    map.boxZoom.enable()
-    map.keyboard.enable()
-    map.touchZoomRotate.enable()
-    map.touchZoomRotate.disableRotation()
+    // Locked mode: only allow zoom via built-in +/- control (NavigationControl).
+    if (editableRef.current) {
+      map.dragPan.enable()
+      map.scrollZoom.enable()
+      map.doubleClickZoom.enable()
+      map.boxZoom.enable()
+      map.keyboard.enable()
+      map.touchZoomRotate.enable()
+      map.touchZoomRotate.disableRotation()
+    } else {
+      map.dragPan.disable()
+      map.scrollZoom.disable()
+      map.doubleClickZoom.disable()
+      map.boxZoom.disable()
+      map.keyboard.disable()
+      if (map.touchZoomRotate && map.touchZoomRotate.disable) map.touchZoomRotate.disable()
+    }
 
     // Use native Marker from MapLibre to avoid CSS anchor drift on custom markers.
     const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
@@ -76,11 +96,11 @@ export default function LocationPicker({
     map.on('move', updateCenter)
     map.on('moveend', () => {
       updateCenter()
-      if (editableRef.current && onChange) {
+      if (editableRef.current && onChangeRef.current) {
         const [lng, lat] = centerRef.current
-        onChange(lat, lng)
+        onChangeRef.current(lat, lng)
       }
-      if (debug) {
+      if (debugRef.current) {
         const [lng, lat] = centerRef.current
         console.log('Map center:', { lat, lng })
       }
@@ -94,14 +114,14 @@ export default function LocationPicker({
       centerRef.current = [lng, lat]
       map.easeTo({ center: [lng, lat], duration: 250 })
       if (markerRef.current) markerRef.current.setLngLat([lng, lat])
-      if (onChange) onChange(lat, lng)
+      if (onChangeRef.current) onChangeRef.current(lat, lng)
     })
 
     return () => {
       map.remove()
       mapRef.current = null
     }
-  }, [editable, onChange, debug])
+  }, [])
 
   useEffect(() => {
     const map = mapRef.current
@@ -153,7 +173,7 @@ export default function LocationPicker({
     <div className={className} style={{ position: 'relative' }}>
       <div
         ref={mapContainerRef}
-        style={{ height, width: '100%', touchAction: 'none', cursor: editable ? 'grab' : 'default' }}
+        style={{ height, width: '100%', touchAction: editable ? 'none' : 'manipulation', cursor: editable ? 'grab' : 'default' }}
       />
       {!editable && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'none' }} />

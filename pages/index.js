@@ -10,15 +10,6 @@ import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 
-// Build ward->district map from DISTRICT_WARD_SUGGESTIONS (static, no state needed)
-const WARD_DISTRICT_MAP = new Map()
-Object.entries(DISTRICT_WARD_SUGGESTIONS).forEach(([district, wardsList]) => {
-  wardsList.forEach((ward) => {
-    if (!WARD_DISTRICT_MAP.has(ward)) WARD_DISTRICT_MAP.set(ward, new Set())
-    WARD_DISTRICT_MAP.get(ward).add(district)
-  })
-})
-
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
 
@@ -42,27 +33,18 @@ export default function HomePage() {
   const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
   const searchInputRef = useRef(null)
   const searchCacheRef = useRef(new Map())
+  const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
   const wardOptions = selectedDistrict
     ? (DISTRICT_WARD_SUGGESTIONS[selectedDistrict] || []).slice().sort((a, b) => a.localeCompare(b, 'vi'))
     : ALL_WARDS
-
-  const districtsForSelectedWard = selectedWard ? Array.from(WARD_DISTRICT_MAP.get(selectedWard) || []) : []
-  const isDistrictLocked = selectedWard && districtsForSelectedWard.length === 1
-  const districtOptions = selectedWard ? districtsForSelectedWard : DISTRICTS
-
-  useEffect(() => {
-    if (isDistrictLocked) {
-      const only = districtsForSelectedWard[0] || ''
-      if (only && selectedDistrict !== only) setSelectedDistrict(only)
-    }
-  }, [isDistrictLocked, districtsForSelectedWard, selectedDistrict])
+  const districtOptions = DISTRICTS
 
   useEffect(() => {
     if (selectedWard && selectedDistrict) {
-      const districtsForWard = WARD_DISTRICT_MAP.get(selectedWard)
-      if (districtsForWard && !districtsForWard.has(selectedDistrict)) {
+      const wardsInDistrict = DISTRICT_WARD_SUGGESTIONS[selectedDistrict] || []
+      if (!wardsInDistrict.includes(selectedWard)) {
         setSelectedWard('')
       }
     }
@@ -91,10 +73,10 @@ export default function HomePage() {
     return haversineKm(refLoc.latitude, refLoc.longitude, store.latitude, store.longitude)
   }, [])
 
-  // Search triggers when district or ward is selected
+  // Search triggers when name or filters change
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (selectedDistrict || selectedWard) {
+      if (hasSearchCriteria) {
         handleSearch()
       } else {
         setSearchResults([])
@@ -105,13 +87,13 @@ export default function HomePage() {
     }, SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [searchTerm, selectedDistrict, selectedWard])
+  }, [searchTerm, selectedDistrict, selectedWard, hasSearchCriteria])
 
   // Remove infinite scroll - no auto load more on scroll
 
   const handleSearch = async () => {
-    // Require at least district or ward to be selected
-    if (!selectedDistrict && !selectedWard) return
+    // Require at least one criterion (name or location filters)
+    if (!hasSearchCriteria) return
 
     const queryKey = `${searchTerm}|${selectedDistrict}|${selectedWard}` // include filters
     if (lastQueryRef.current === queryKey) return // tránh fetch trùng
@@ -140,7 +122,7 @@ export default function HomePage() {
       let query = supabase
         .from('stores')
         .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,status,created_at')
-      // Apply district/ward filters (required)
+      // Apply district/ward filters (optional)
       if (selectedDistrict) {
         query = query.eq('district', selectedDistrict)
       }
@@ -188,7 +170,7 @@ export default function HomePage() {
   }, [currentLocation, computeDistance])
 
   const loadMore = useCallback(async () => {
-    if (loading || !hasMore || loadingMore || (!selectedDistrict && !selectedWard)) return
+    if (loading || !hasMore || loadingMore || !hasSearchCriteria) return
 
     setLoadingMore(true)
     const nextPage = page + 1
@@ -254,16 +236,16 @@ export default function HomePage() {
     } finally {
       setLoadingMore(false)
     }
-  }, [hasMore, loadingMore, loading, searchTerm, page, currentLocation, selectedDistrict, selectedWard])
+  }, [hasMore, loadingMore, loading, searchTerm, page, currentLocation, selectedDistrict, selectedWard, hasSearchCriteria])
 
-  const isPendingSearch = (selectedDistrict || selectedWard) && lastQueryRef.current !== `${searchTerm}|${selectedDistrict}|${selectedWard}`
-  const showSkeleton = (selectedDistrict || selectedWard) && (loading || isPendingSearch)
+  const isPendingSearch = hasSearchCriteria && lastQueryRef.current !== `${searchTerm}|${selectedDistrict}|${selectedWard}`
+  const showSkeleton = hasSearchCriteria && (loading || isPendingSearch)
 
   // Infinite scroll observer
   const sentinelRef = useCallback(node => {
     if (!hasMore) return
     if (loading || loadingMore) return
-    if (!selectedDistrict && !selectedWard) return
+    if (!hasSearchCriteria) return
     if (observer.current) observer.current.disconnect()
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting) {
@@ -275,7 +257,7 @@ export default function HomePage() {
       }
     }, { rootMargin: '400px' }) // tải trước khi chạm đáy
     if (node) observer.current.observe(node)
-  }, [hasMore, loading, loadingMore, loadMore, selectedDistrict, selectedWard])
+  }, [hasMore, loading, loadingMore, loadMore, hasSearchCriteria])
 
   // Cleanup observer on unmount
   useEffect(() => {
@@ -308,33 +290,28 @@ export default function HomePage() {
           />
           <div className="flex gap-2">
             <div className="flex-1">
-              <input
-                list="district-options"
+              <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
-                disabled={isDistrictLocked}
-                placeholder="Quận/Huyện"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
-              />
-              <datalist id="district-options">
+              >
+                <option value="">Quận/Huyện</option>
                 {districtOptions.map((d) => (
-                  <option key={d} value={d} />
+                  <option key={d} value={d}>{d}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div className="flex-1">
-              <input
-                list="ward-options"
+              <select
                 value={selectedWard}
                 onChange={(e) => setSelectedWard(e.target.value)}
-                placeholder="Xã/Phường"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
-              />
-              <datalist id="ward-options">
+              >
+                <option value="">Xã/Phường</option>
                 {wardOptions.map((w) => (
-                  <option key={w} value={w} />
+                  <option key={w} value={w}>{w}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
           </div>
         </div>
@@ -373,7 +350,7 @@ export default function HomePage() {
             </div>
           )}
 
-              {!loading && !isPendingSearch && (selectedDistrict || selectedWard) && searchResults.length === 0 && (
+              {!loading && !isPendingSearch && hasSearchCriteria && searchResults.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
@@ -436,11 +413,11 @@ export default function HomePage() {
             </div>
           )}
 
-          {!selectedDistrict && !selectedWard && (
+          {!hasSearchCriteria && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-gray-500 dark:text-gray-400">
-                  Chọn Quận/Huyện hoặc Xã/Phường để tìm kiếm
+                  Nhập tên cửa hàng hoặc chọn Quận/Huyện, Xã/Phường để tìm kiếm
                 </p>
               </CardContent>
             </Card>

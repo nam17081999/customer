@@ -435,6 +435,19 @@ export default function AddStore() {
     return false
   }
 
+  function containsAllInputWords(inputWords, storeName, storeNameSearch) {
+    if (!Array.isArray(inputWords) || inputWords.length === 0) return false
+    const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
+    if (!storeNorm) return false
+    const storeWords = extractWords(storeNorm)
+    if (storeWords.length === 0) return false
+    const storeSet = new Set(storeWords)
+    for (const w of inputWords) {
+      if (!storeSet.has(w)) return false
+    }
+    return true
+  }
+
   async function findNearbySimilarStores(lat, lng, inputName) {
     const inputNorm = normalizeNameForMatch(inputName)
     if (!inputNorm || lat == null || lng == null) return []
@@ -475,6 +488,57 @@ export default function AddStore() {
       .sort((a, b) => a.distance - b.distance)
 
     return matches
+  }
+
+  async function findGlobalExactNameMatches(inputName) {
+    const inputNorm = normalizeNameForMatch(inputName)
+    if (!inputNorm) return []
+
+    const inputWords = extractWords(inputNorm)
+    if (inputWords.length === 0) return []
+    const orTerms = inputWords
+      .map((w) => w.replace(/[%_]/g, ''))
+      .filter(Boolean)
+      .map((w) => `name_search.ilike.%${w}%`)
+      .join(',')
+    if (!orTerms) return []
+
+    const { data, error } = await supabase
+      .from('stores')
+      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, status')
+      .or(orTerms)
+      .limit(200)
+
+    if (error) throw error
+    if (!Array.isArray(data)) return []
+
+    return data
+      .filter((s) => containsAllInputWords(inputWords, s.name, s.name_search))
+      .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'vi'))
+  }
+
+  function mergeDuplicateCandidates(nearbyMatches = [], globalMatches = []) {
+    const byId = new Map()
+    globalMatches.forEach((s) => {
+      byId.set(s.id, { ...s, matchScope: 'global' })
+    })
+    nearbyMatches.forEach((s) => {
+      const existing = byId.get(s.id)
+      byId.set(s.id, {
+        ...(existing || {}),
+        ...s,
+        matchScope: existing ? 'nearby+global' : 'nearby'
+      })
+    })
+
+    return Array.from(byId.values()).sort((a, b) => {
+      const aHasDistance = typeof a.distance === 'number'
+      const bHasDistance = typeof b.distance === 'number'
+      if (aHasDistance && bHasDistance) return a.distance - b.distance
+      if (aHasDistance) return -1
+      if (bHasDistance) return 1
+      return (a.name || '').localeCompare((b.name || ''), 'vi')
+    })
   }
 
   // Auto-fetch location when entering step 3
@@ -640,7 +704,11 @@ export default function AddStore() {
     setDuplicateCheckLoading(true)
     setDuplicateCheckError('')
     try {
-      const matches = await findNearbySimilarStores(checkLat, checkLng, trimmed)
+      const [nearMatches, globalMatches] = await Promise.all([
+        findNearbySimilarStores(checkLat, checkLng, trimmed),
+        findGlobalExactNameMatches(trimmed),
+      ])
+      const matches = mergeDuplicateCandidates(nearMatches, globalMatches)
       if (seq !== duplicateCheckSeqRef.current) return
       setDuplicateCandidates(matches)
       setAllowDuplicate(false)
@@ -652,7 +720,7 @@ export default function AddStore() {
       if (seq !== duplicateCheckSeqRef.current) return
       console.error('Duplicate check error:', err)
       setDuplicateCandidates([])
-      setDuplicateCheckError('Không kiểm tra được trùng tên gần đây.')
+      setDuplicateCheckError('Không kiểm tra được trùng tên (gần đây/toàn hệ thống).')
       setDuplicateCheckDone(false)
       setNameValid(false)
     } finally {
@@ -719,9 +787,15 @@ export default function AddStore() {
                         )}
                       </div>
                       <div className="shrink-0">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-800 text-gray-200">
-                          {formatDistance(s.distance)}
-                        </span>
+                        {typeof s.distance === 'number' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-800 text-gray-200">
+                            {formatDistance(s.distance)}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-900/60 text-amber-200">
+                            Trùng tên toàn hệ thống
+                          </span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -872,18 +946,23 @@ export default function AddStore() {
 
       // Final duplicate check right before submit (use final coordinates)
       let nearDupes = []
+      let globalDupes = []
       try {
-        nearDupes = await findNearbySimilarStores(latitude, longitude, normalizedName)
+        ;[nearDupes, globalDupes] = await Promise.all([
+          findNearbySimilarStores(latitude, longitude, normalizedName),
+          findGlobalExactNameMatches(normalizedName),
+        ])
       } catch (dupErr) {
         console.error('Duplicate check failed:', dupErr)
-        showMessage('error', 'Không kiểm tra được trùng tên gần đây. Vui lòng thử lại.')
+        showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
         setLoading(false)
         return
       }
 
-      if (nearDupes.length > 0 && !allowDuplicate) {
-        setDuplicateCandidates(nearDupes)
-        showMessage('error', 'Phát hiện cửa hàng trùng/tương tự trong 100m. Vui lòng xác nhận nếu vẫn muốn tạo.')
+      const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes)
+      if (allDupes.length > 0 && !allowDuplicate) {
+        setDuplicateCandidates(allDupes)
+        showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
         setLoading(false)
         return
       }
@@ -1053,7 +1132,7 @@ export default function AddStore() {
                 </div>
                 {duplicateCheckLoading && (
                   <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
-                    Đang kiểm tra cửa hàng trùng/tương tự trong 100m…
+                    Đang kiểm tra trùng tên gần đây và toàn hệ thống…
                   </div>
                 )}
                 {renderDuplicatePanel()}
@@ -1068,7 +1147,7 @@ export default function AddStore() {
                         runDuplicateCheckByButton()
                         return
                       }
-                      if (nameValid) setCurrentStep(2)
+                      if (nameValid || allowDuplicate) setCurrentStep(2)
                     }}
                     className="w-full text-sm sm:text-base"
                   >

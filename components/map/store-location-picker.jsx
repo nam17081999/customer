@@ -45,9 +45,9 @@ export default function StoreLocationPicker({
 }) {
   return (
     <div className={`relative ${className}`}>
-      {/* Control buttons - bottom left inside map */}
+      {/* Control buttons - top right inside map */}
       {showControls && (
-        <div className="absolute bottom-3 left-2 z-[1000] flex gap-1.5">
+        <div className="absolute top-3 right-2 z-[1000] flex flex-col gap-1.5 items-end">
           {/* Get location button */}
           {onGetLocation && (
             <button
@@ -55,7 +55,7 @@ export default function StoreLocationPicker({
               onClick={onGetLocation}
               disabled={resolvingAddr}
               className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-              title="Lấy lại vị trí GPS hiện tại"
+              title="Lấy lại vị trí hiện tại"
             >
               <svg
                 className={`w-3.5 h-3.5 ${resolvingAddr ? 'animate-spin' : ''}`}
@@ -66,7 +66,7 @@ export default function StoreLocationPicker({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              {resolvingAddr ? 'Đang lấy...' : 'GPS'}
+              {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
             </button>
           )}
           
