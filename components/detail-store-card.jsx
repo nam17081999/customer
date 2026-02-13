@@ -10,7 +10,7 @@ import { formatAddressParts } from '@/lib/utils'
 export function DetailStoreModalContent({ store, showEdit = true }) {
   if (!store) return null
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
-  const status = store.status || (store.active ? 'active' : null)
+  const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
   const formatDistance = (d) => {
     if (d === null || d === undefined) return ''
@@ -115,15 +115,13 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
                 <a href={`tel:${String(store.phone).replace(/[^0-9+]/g,'')}`} className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all cursor-pointer">{store.phone}</a>
               </div>
             )}
-            {status && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0 flex items-center gap-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                  <span className="hidden sm:inline">Trạng thái:</span>
-                </span>
-                <span className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium ${status==='active' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'}`}>{status==='active' ? 'Xác thực' : 'Chưa xác thực'}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                <span className="hidden sm:inline">Trạng thái:</span>
+              </span>
+              <span className={`text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium ${isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'}`}>{isActive ? 'Xác thực' : 'Chưa xác thực'}</span>
+            </div>
             {typeof store.distance === 'number' && (
               <div className="flex items-center gap-3">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-shrink-0 flex items-center gap-1">

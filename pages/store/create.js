@@ -471,7 +471,7 @@ export default function AddStore() {
 
     const { data, error } = await supabase
       .from('stores')
-      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, status')
+      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, active')
       .or(orTerms)
       .gte('latitude', lat - deltaLat)
       .lte('latitude', lat + deltaLat)
@@ -509,7 +509,7 @@ export default function AddStore() {
 
     const { data, error } = await supabase
       .from('stores')
-      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, status')
+      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, active')
       .or(orTerms)
       .limit(200)
 
