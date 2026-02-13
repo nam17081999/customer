@@ -47,7 +47,7 @@ export default function StoreLocationPicker({
     <div className={`relative ${className}`}>
       {/* Control buttons - top right inside map */}
       {showControls && (
-        <div className="absolute top-3 right-2 z-[1000] flex flex-col gap-1.5 items-end">
+        <div className="absolute top-3 right-2 z-[1100] flex flex-col gap-1.5 items-end">
           {/* Get location button */}
           {onGetLocation && (
             <button

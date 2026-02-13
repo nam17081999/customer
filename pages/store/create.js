@@ -154,7 +154,8 @@ export default function AddStore() {
         attempts: 3,
         timeout: 4000,
         maxWaitTime: 8000,
-        desiredAccuracy: 25
+        desiredAccuracy: 25,
+        skipCache: true,
       })
       if (!coords) {
         setGeoBlocked(true)
@@ -193,7 +194,8 @@ export default function AddStore() {
     attempts = 4,
     timeout = 5000,        // Giảm từ 10s → 5s
     maxWaitTime = 10000,   // Tổng thời gian tối đa 10s
-    desiredAccuracy = 25   // Mục tiêu 25m
+    desiredAccuracy = 25,  // Mục tiêu 25m
+    skipCache = false,
   } = {}) {
     if (!navigator.geolocation) {
       return { coords: null, error: new Error('Geolocation not supported') }
@@ -203,26 +205,28 @@ export default function AddStore() {
     const startTime = Date.now()
     let lastError = null
 
-    // Try to get cached position first (< 30 seconds old)
-    try {
-      const cached = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          reject,
-          {
-            enableHighAccuracy: true, // Changed to true to get heading
-            timeout: 1000,
-            maximumAge: 30000 // Accept 30s old
-          }
-        )
-      })
-      if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
-        console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
-        return { coords: cached.coords, error: null }
+    if (!skipCache) {
+      // Try to get cached position first (< 30 seconds old)
+      try {
+        const cached = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            reject,
+            {
+              enableHighAccuracy: true, // Changed to true to get heading
+              timeout: 1000,
+              maximumAge: 30000 // Accept 30s old
+            }
+          )
+        })
+        if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
+          console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
+          return { coords: cached.coords, error: null }
+        }
+      } catch (err) {
+        // No cache, continue to get fresh location
+        lastError = err
       }
-    } catch (err) {
-      // No cache, continue to get fresh location
-      lastError = err
     }
 
     for (let i = 0; i < attempts; i++) {

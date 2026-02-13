@@ -78,10 +78,20 @@ export default function LocationPicker({
     }
 
     // Use native Marker from MapLibre to avoid CSS anchor drift on custom markers.
+    const setControlsOnTop = () => {
+      const container = map.getContainer()
+      if (!container) return
+      container.querySelectorAll('.maplibregl-ctrl').forEach((ctrl) => {
+        ctrl.style.zIndex = '20'
+      })
+    }
+
     const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
       .setLngLat(centerRef.current)
       .addTo(map)
     markerRef.current = marker
+
+    setControlsOnTop()
 
     const updateCenter = () => {
       const c = map.getCenter()
@@ -176,7 +186,16 @@ export default function LocationPicker({
         style={{ height, width: '100%', touchAction: editable ? 'none' : 'manipulation', cursor: editable ? 'grab' : 'default' }}
       />
       {!editable && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'none' }} />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(255,255,255,0.55)',
+            zIndex: 10,
+            pointerEvents: 'none',
+            touchAction: 'none',
+          }}
+        />
       )}
     </div>
   )
