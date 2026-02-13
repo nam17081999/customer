@@ -121,7 +121,7 @@ export default function HomePage() {
 
       let query = supabase
         .from('stores')
-        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,status,created_at')
+        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,active,created_at')
       // Apply district/ward filters (optional)
       if (selectedDistrict) {
         query = query.eq('district', selectedDistrict)
@@ -134,7 +134,7 @@ export default function HomePage() {
         query = query.or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
       }
       const { data, error } = await query
-        .order('status', { ascending: false })
+        .order('active', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE)
 
@@ -198,7 +198,7 @@ export default function HomePage() {
 
       let query = supabase
         .from('stores')
-        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,status,created_at')
+        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,active,created_at')
       if (selectedDistrict) {
         query = query.eq('district', selectedDistrict)
       }
@@ -209,7 +209,7 @@ export default function HomePage() {
         query = query.or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
       }
       const { data, error } = await query
-        .order('status', { ascending: false })
+        .order('active', { ascending: false })
         .order('created_at', { ascending: false })
         .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1)
 
