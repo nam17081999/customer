@@ -125,7 +125,7 @@ export default function MapPage() {
           layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
         },
         center: DEFAULT_CENTER,
-        zoom: 8,
+        zoom: 13,
         minZoom: 3,
         maxZoom: 20,
         attributionControl: true
@@ -133,6 +133,24 @@ export default function MapPage() {
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
       map.on('zoom', applyMarkerStyleByZoom)
+
+      // Try to center on user location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!cancelled) {
+              map.flyTo({
+                center: [pos.coords.longitude, pos.coords.latitude],
+                zoom: 13,
+                duration: 1200
+              })
+            }
+          },
+          () => { /* ignore error, keep default center */ },
+          { enableHighAccuracy: true, timeout: 8000 }
+        )
+      }
+
       mapRef.current = map
       activeMap = map
       setMapReady(true)
@@ -306,29 +324,27 @@ export default function MapPage() {
     if (!matched) return
 
     const map = mapRef.current
-    const marker = markerByStoreIdRef.current.get(matched.id)
-    if (!map || !marker) return
+    if (!map) return
 
     map.flyTo({ center: [matched.coords.lng, matched.coords.lat], zoom: 16, duration: 900 })
-    setSelectedStore(matched)
   }, [searchTerm, storesWithCoords])
 
   return (
     <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100">
       <div ref={mapContainerRef} className="absolute inset-0" />
 
-      <div className="pointer-events-none absolute inset-x-0 top-4 z-20 px-3 sm:top-5 sm:px-4">
-        <div className="pointer-events-auto mx-auto w-full max-w-3xl rounded-2xl bg-slate-900/86 p-2 shadow-[0_14px_46px_rgba(2,6,23,0.52)] ring-1 ring-white/20 backdrop-blur-md">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-2 sm:gap-2.5">
+      <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
+        <div className="pointer-events-auto mx-auto w-full max-w-md rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
             <Input
               list="store-name-options"
-              placeholder="Nhập tên cửa hàng..."
+              placeholder="Tìm cửa hàng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSearch()
               }}
-              className="h-11 rounded-xl border-slate-700 bg-slate-950/92 px-4 text-[15px] text-slate-100 placeholder:text-slate-400"
+              className="h-9 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-[16px] sm:text-sm text-slate-100 placeholder:text-slate-400"
             />
             <datalist id="store-name-options">
               {storeNames.map((name) => (
@@ -337,10 +353,10 @@ export default function MapPage() {
             </datalist>
             <Button
               onClick={handleSearch}
-              className="h-11 rounded-xl bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-6"
+              className="h-9 rounded-lg bg-sky-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
               disabled={loading || Boolean(error)}
             >
-              Tìm kiếm
+              Tìm
             </Button>
           </div>
         </div>
