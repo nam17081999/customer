@@ -1,4 +1,5 @@
 import "../app/globals.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import Navbar from "@/components/navbar";
 import Head from "next/head";
 import ErrorBoundary from "@/components/error-boundary";

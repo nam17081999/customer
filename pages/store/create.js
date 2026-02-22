@@ -19,6 +19,7 @@ import { haversineKm } from '@/helper/distance'
 import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import { invalidateStoreCache } from '@/lib/storeCache'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
@@ -1048,6 +1049,8 @@ export default function AddStore() {
         setLoading(false)
         return
       }
+
+      invalidateStoreCache()
 
       // Success
       showMessage('success', 'Lưu thành công', 2500)

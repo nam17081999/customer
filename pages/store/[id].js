@@ -13,6 +13,7 @@ import { getFullImageUrl } from '@/helper/imageUtils'
 import imageCompression from 'browser-image-compression'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
+import { invalidateStoreCache } from '@/lib/storeCache'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
@@ -576,6 +577,8 @@ export default function StoreDetail() {
       })
       .eq('id', id)
       if (updateErr) throw updateErr
+
+      invalidateStoreCache()
 
       // Optional cleanup: delete old image if replaced
       if (imageFile && store?.image_url) {
