@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { getFullImageUrl } from '@/helper/imageUtils'
-import { getCachedStores, setCachedStores } from '@/lib/storeCache'
+import { getOrRefreshStores } from '@/lib/storeCache'
 
 const DEFAULT_CENTER = [106.70098, 10.7769]
-const PAGE_SIZE = 1000
 
 function normalizeText(value = '') {
   return removeVietnameseTones(String(value).toLowerCase()).trim()
@@ -178,47 +176,8 @@ export default function MapPage() {
       setError('')
 
       try {
-        // 1) Quick count query (very cheap)
-        const { count: dbCount, error: countErr } = await supabase
-          .from('stores')
-          .select('id', { count: 'exact', head: true })
-
-        if (countErr) throw countErr
-
-        // 2) Check cache — if count matches, use cached data
-        const cached = await getCachedStores()
-        if (cached && cached.count === dbCount) {
-          if (active) {
-            setStores(cached.data)
-            setLoading(false)
-          }
-          return
-        }
-
-        // 3) Count changed or no cache → fetch all rows
-        const all = []
-        let from = 0
-
-        while (true) {
-          const to = from + PAGE_SIZE - 1
-          const { data, error: queryError } = await supabase
-            .from('stores')
-            .select('id,name,image_url,latitude,longitude,address_detail,ward,district,phone,note,active')
-            .range(from, to)
-
-          if (queryError) throw queryError
-
-          const pageData = Array.isArray(data) ? data : []
-          all.push(...pageData)
-
-          if (pageData.length < PAGE_SIZE) break
-          from += PAGE_SIZE
-        }
-
-        if (active) {
-          setStores(all)
-          setCachedStores(all, dbCount)
-        }
+        const data = await getOrRefreshStores()
+        if (active) setStores(data)
       } catch (e) {
         if (active) {
           console.error(e)
