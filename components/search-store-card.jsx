@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
-import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
@@ -71,7 +71,6 @@ export default function SearchStoreCard({ store, distance, searchTerm }) {
                 className="object-cover"
                 sizes="(max-width:640px) 100vw, 50vw"
                 onError={handleImageError}
-                priority
               />
               {/* Top badges (verified & distance) */}
               <div className="absolute top-2 left-2 flex flex-wrap gap-2">
@@ -142,6 +141,7 @@ export default function SearchStoreCard({ store, distance, searchTerm }) {
         </Card>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+        <DialogTitle className="sr-only">{store.name || 'Chi tiết cửa hàng'}</DialogTitle>
         <DetailStoreModalContent store={{ ...store, distance }} context="search" />
       </DialogContent>
     </Dialog>
