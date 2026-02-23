@@ -12,7 +12,7 @@ import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
 } from '@/lib/constants'
-import imageCompression from 'browser-image-compression'
+// browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { haversineKm } from '@/helper/distance'
@@ -23,38 +23,50 @@ import { invalidateStoreCache, getOrRefreshStores, appendStoreToCache } from '@/
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
+const IGNORED_NAME_TERMS = [
+  'cửa hàng',
+  'tạp hoá',
+  'quán nước',
+  'giải khát',
+  'nhà nghỉ',
+  'nhà hàng',
+  'cyber cà phê',
+  'cafe',
+  'lẩu',
+  'siêu thị',
+  'quán',
+  'gym',
+  'đại lý',
+  'cơm',
+  'phở',
+  'bún',
+  'shop',
+  'kok',
+  'karaoke',
+  'bi-a',
+  'bia',
+  'net',
+  'game',
+  'internet',
+  'beer',
+  'coffee',
+  'mart',
+  'store',
+  'minimart'
+]
+
+const NAME_SUGGESTIONS = [
+  'Cửa hàng',
+  'Tạp hoá',
+  'Quán nước',
+  'Karaoke',
+  'Nhà hàng',
+  'Quán',
+  'Cafe',
+  'Siêu thị'
+]
+
 export default function AddStore() {
-  const IGNORED_NAME_TERMS = [
-    'cửa hàng',
-    'tạp hoá',
-    'quán nước',
-    'giải khát',
-    'nhà nghỉ',
-    'nhà hàng',
-    'cyber cà phê',
-    'cafe',
-    'lẩu',
-    'siêu thị',
-    'quán',
-    'gym',
-    'đại lý',
-    'cơm',
-    'phở',
-    'bún',
-    'shop',
-    'kok',
-    'karaoke',
-    'bi-a',
-    'bia',
-    'net',
-    'game',
-    'internet',
-    'beer',
-    'coffee',
-    'mart',
-    'store',
-    'minimart'
-  ]
   const router = useRouter()
   const [name, setName] = useState('')
   const nameInputRef = useRef(null)
@@ -72,16 +84,6 @@ export default function AddStore() {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const NAME_SUGGESTIONS = [
-    'Cửa hàng',
-    'Tạp hoá',
-    'Quán nước',
-    'Karaoke',
-    'Nhà hàng',
-    'Quán',
-    'Cafe',
-    'Siêu thị'
-  ]
   const [imageFile, setImageFile] = useState(null)
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
   useEffect(() => {
@@ -950,6 +952,7 @@ export default function AddStore() {
         }
         let fileToUpload = imageFile
         try {
+          const { default: imageCompression } = await import('browser-image-compression')
           const compressed = await imageCompression(imageFile, options)
           fileToUpload = compressed
         } catch (cmpErr) {

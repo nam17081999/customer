@@ -162,6 +162,7 @@ export default function HomePage() {
               <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
+                aria-label="Chọn quận/huyện"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
               >
                 <option value="">Quận/Huyện</option>
@@ -174,6 +175,7 @@ export default function HomePage() {
               <select
                 value={selectedWard}
                 onChange={(e) => setSelectedWard(e.target.value)}
+                aria-label="Chọn xã/phường"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
               >
                 <option value="">Xã/Phường</option>

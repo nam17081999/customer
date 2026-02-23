@@ -1,7 +1,8 @@
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { getFullImageUrl } from '@/helper/imageUtils'
@@ -246,7 +247,18 @@ export default function MapPage() {
 
       const nameLabel = document.createElement('span')
       nameLabel.className = 'store-marker-name'
-      nameLabel.textContent = store.name || 'Cửa hàng'
+      // Show 3 words per line, wrap rest to next line
+      const rawName = store.name || 'Cửa hàng'
+      const words = rawName.split(/\s+/)
+      if (words.length <= 3) {
+        nameLabel.textContent = rawName
+      } else {
+        const lines = []
+        for (let i = 0; i < words.length; i += 3) {
+          lines.push(words.slice(i, i + 3).join(' '))
+        }
+        nameLabel.innerHTML = lines.map(l => l.replace(/</g, '&lt;')).join('<br>')
+      }
       markerEl.appendChild(nameLabel)
 
       const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
@@ -323,6 +335,7 @@ export default function MapPage() {
 
       <Dialog open={!!selectedStore} onOpenChange={(open) => { if (!open) setSelectedStore(null) }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogTitle className="sr-only">{selectedStore?.name || 'Chi tiết cửa hàng'}</DialogTitle>
           <DetailStoreModalContent store={selectedStore} showEdit={true} />
         </DialogContent>
       </Dialog>
@@ -413,12 +426,9 @@ export default function MapPage() {
           font-weight: 600;
           color: #1e293b;
           background: rgba(255, 255, 255, 0.92);
-          padding: 1px 6px;
+          padding: 2px 6px;
           border-radius: 4px;
           white-space: nowrap;
-          max-width: 120px;
-          overflow: hidden;
-          text-overflow: ellipsis;
           text-align: center;
           box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
           line-height: 1.4;

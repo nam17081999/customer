@@ -6,6 +6,7 @@ const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
+const DialogTitle = DialogPrimitive.Title;
 
 const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
@@ -38,4 +39,4 @@ const DialogHeader = ({ className, ...props }) => (
   <div className={cn("flex flex-col space-y-1.5 p-4", className)} {...props} />
 );
 
-export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogContent, DialogClose, DialogHeader };
+export { Dialog, DialogPortal, DialogOverlay, DialogTrigger, DialogContent, DialogClose, DialogHeader, DialogTitle };
