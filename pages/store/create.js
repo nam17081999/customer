@@ -12,48 +12,61 @@ import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
 } from '@/lib/constants'
-import imageCompression from 'browser-image-compression'
+// browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { haversineKm } from '@/helper/distance'
 import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import { invalidateStoreCache, getOrRefreshStores, appendStoreToCache } from '@/lib/storeCache'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
+const IGNORED_NAME_TERMS = [
+  'cửa hàng',
+  'tạp hoá',
+  'quán nước',
+  'giải khát',
+  'nhà nghỉ',
+  'nhà hàng',
+  'cyber cà phê',
+  'cafe',
+  'lẩu',
+  'siêu thị',
+  'quán',
+  'gym',
+  'đại lý',
+  'cơm',
+  'phở',
+  'bún',
+  'shop',
+  'kok',
+  'karaoke',
+  'bi-a',
+  'bia',
+  'net',
+  'game',
+  'internet',
+  'beer',
+  'coffee',
+  'mart',
+  'store',
+  'minimart'
+]
+
+const NAME_SUGGESTIONS = [
+  'Cửa hàng',
+  'Tạp hoá',
+  'Quán nước',
+  'Karaoke',
+  'Nhà hàng',
+  'Quán',
+  'Cafe',
+  'Siêu thị'
+]
+
 export default function AddStore() {
-  const IGNORED_NAME_TERMS = [
-    'cửa hàng',
-    'tạp hoá',
-    'quán nước',
-    'giải khát',
-    'nhà nghỉ',
-    'nhà hàng',
-    'cyber cà phê',
-    'cafe',
-    'lẩu',
-    'siêu thị',
-    'quán',
-    'gym',
-    'đại lý',
-    'cơm',
-    'phở',
-    'bún',
-    'shop',
-    'kok',
-    'karaoke',
-    'bi-a',
-    'bia',
-    'net',
-    'game',
-    'internet',
-    'beer',
-    'coffee',
-    'mart',
-    'store',
-    'minimart'
-  ]
   const router = useRouter()
   const [name, setName] = useState('')
   const nameInputRef = useRef(null)
@@ -71,16 +84,6 @@ export default function AddStore() {
   const [phone, setPhone] = useState('')
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const NAME_SUGGESTIONS = [
-    'Cửa hàng',
-    'Tạp hoá',
-    'Quán nước',
-    'Karaoke',
-    'Nhà hàng',
-    'Quán',
-    'Cafe',
-    'Siêu thị'
-  ]
   const [imageFile, setImageFile] = useState(null)
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
   useEffect(() => {
@@ -458,31 +461,9 @@ export default function AddStore() {
     const inputWords = extractWords(inputNorm)
     if (inputWords.length === 0) return []
 
-    const latRad = (lat * Math.PI) / 180
-    const deltaLat = DUPLICATE_RADIUS_KM / 111.32
-    const deltaLon = DUPLICATE_RADIUS_KM / (111.32 * Math.cos(latRad) || 1)
+    const allStores = await getOrRefreshStores()
 
-    const orTerms = inputWords
-      .map((w) => w.replace(/[%_]/g, ''))
-      .filter(Boolean)
-      .map((w) => `name_search.ilike.%${w}%`)
-      .join(',')
-    if (!orTerms) return []
-
-    const { data, error } = await supabase
-      .from('stores')
-      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, active')
-      .or(orTerms)
-      .gte('latitude', lat - deltaLat)
-      .lte('latitude', lat + deltaLat)
-      .gte('longitude', lng - deltaLon)
-      .lte('longitude', lng + deltaLon)
-      .limit(50)
-
-    if (error) throw error
-    if (!Array.isArray(data)) return []
-
-    const matches = data
+    const matches = allStores
       .filter((s) => isFinite(s?.latitude) && isFinite(s?.longitude))
       .map((s) => ({
         ...s,
@@ -500,23 +481,10 @@ export default function AddStore() {
 
     const inputWords = extractWords(inputNorm)
     if (inputWords.length === 0) return []
-    const orTerms = inputWords
-      .map((w) => w.replace(/[%_]/g, ''))
-      .filter(Boolean)
-      .map((w) => `name_search.ilike.%${w}%`)
-      .join(',')
-    if (!orTerms) return []
 
-    const { data, error } = await supabase
-      .from('stores')
-      .select('id, name, name_search, latitude, longitude, address_detail, ward, district, image_url, phone, note, active')
-      .or(orTerms)
-      .limit(200)
+    const allStores = await getOrRefreshStores()
 
-    if (error) throw error
-    if (!Array.isArray(data)) return []
-
-    return data
+    return allStores
       .filter((s) => containsAllInputWords(inputWords, s.name, s.name_search))
       .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'vi'))
   }
@@ -984,6 +952,7 @@ export default function AddStore() {
         }
         let fileToUpload = imageFile
         try {
+          const { default: imageCompression } = await import('browser-image-compression')
           const compressed = await imageCompression(imageFile, options)
           fileToUpload = compressed
         } catch (cmpErr) {
@@ -1015,7 +984,7 @@ export default function AddStore() {
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
 
-      const { error: insertError } = await supabase.from('stores').insert([
+      const { data: insertedRows, error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
           name_search: nameSearch,
@@ -1028,7 +997,7 @@ export default function AddStore() {
           latitude,
           longitude,
         },
-      ])
+      ]).select()
 
       if (insertError) {
         console.error(insertError)
@@ -1047,6 +1016,14 @@ export default function AddStore() {
         showMessage('error', 'Lỗi khi lưu dữ liệu')
         setLoading(false)
         return
+      }
+
+      // Append new store to IndexedDB cache (avoid full refetch)
+      const newStore = insertedRows?.[0]
+      if (newStore) {
+        await appendStoreToCache(newStore)
+      } else {
+        await invalidateStoreCache()
       }
 
       // Success

@@ -10,9 +10,17 @@ import Image from 'next/image'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
 import { getFullImageUrl } from '@/helper/imageUtils'
-import imageCompression from 'browser-image-compression'
+import {
+  cleanNominatimDisplayName,
+  parseLatLngFromText,
+  parseLatLngFromGoogleMapsUrl,
+  extractSearchTextFromGoogleMapsUrl,
+  geocodeTextToLatLngAddress,
+} from '@/lib/createStoreUtils'
+// browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
+import { invalidateStoreCache } from '@/lib/storeCache'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
 
@@ -21,6 +29,7 @@ export default function StoreDetail() {
   const { id } = router.query
 
   const [store, setStore] = useState(null)
+  const [notFound, setNotFound] = useState(false)
   const [name, setName] = useState('')
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
@@ -66,19 +75,21 @@ export default function StoreDetail() {
       .select('id,name,address_detail,ward,district,phone,note,image_url,latitude,longitude')
       .eq('id', id)
       .maybeSingle()
-      .then(({ data }) => {
-        setStore(data)
-        if (data) {
-          setName(toTitleCaseVI(data.name || ''))
-          setAddressDetail(data.address_detail || '')
-          setWard(data.ward || '')
-          setDistrict(data.district || '')
-          setPhone(data.phone || '')
-          setNote(data.note || '')
-          setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
-          setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
-          setUserHasEditedMap(false)
+      .then(({ data, error }) => {
+        if (error || !data) {
+          setNotFound(true)
+          return
         }
+        setStore(data)
+        setName(toTitleCaseVI(data.name || ''))
+        setAddressDetail(data.address_detail || '')
+        setWard(data.ward || '')
+        setDistrict(data.district || '')
+        setPhone(data.phone || '')
+        setNote(data.note || '')
+        setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
+        setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
+        setUserHasEditedMap(false)
       })
   }, [id])
 
@@ -98,174 +109,6 @@ export default function StoreDetail() {
     } catch {
       return null
     }
-  }
-
-  function parseLatLngFromText(text) {
-    if (!text) return null
-    try {
-      const decoded = decodeURIComponent(text)
-      console.log('🔍 Parsing text for coordinates:', decoded)
-      
-      // Pattern 1: @lat,lng,zoom (most common)
-      let m = decoded.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found @lat,lng pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 2: !3dlat!4dlng (Google deep params)
-      m = decoded.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found !3d!4d pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 3: lat,lng separated by comma or %2C
-      m = decoded.match(/(-?\d{1,2}\.\d+)\s*(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found lat,lng pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      console.log('❌ No coordinate patterns found in text')
-      return null
-    } catch (error) {
-      console.log('❌ Text parsing error:', error)
-      return null
-    }
-  }
-
-  function parseLatLngFromGoogleMapsUrl(input) {
-    if (!input) return null
-    let urlStr = input.trim()
-    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
-    
-    console.log('🔍 Parsing URL:', urlStr)
-    
-    try {
-      const u = new URL(urlStr)
-      
-      // Pattern 1: @lat,lng,zoom (most common in shared links)
-      let m = urlStr.match(/@(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found coordinates via @pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 2: !3dlat!4dlng (Google deep params)
-      m = urlStr.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/)
-      if (m) {
-        const lat = parseFloat(m[1]); const lng = parseFloat(m[2])
-        if (isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-          console.log('✅ Found coordinates via !3d!4d pattern:', { lat, lng })
-          return { lat, lng }
-        }
-      }
-      
-      // Pattern 3: lat,lng in query params
-      const candParams = ['destination', 'q', 'query', 'll', 'saddr', 'daddr', 'center']
-      for (const key of candParams) {
-        const val = u.searchParams.get(key)
-        if (val) {
-          console.log(`🔍 Checking param ${key}:`, val)
-          const got = parseLatLngFromText(val)
-          if (got) {
-            console.log('✅ Found coordinates in param', key, ':', got)
-            return got
-          }
-        }
-      }
-      
-      // Pattern 4: lat,lng in pathname
-      const fromPath = parseLatLngFromText(u.pathname)
-      if (fromPath) {
-        console.log('✅ Found coordinates in pathname:', fromPath)
-        return fromPath
-      }
-      
-      // Pattern 5: lat,lng in hash fragment
-      const fromHash = parseLatLngFromText(u.hash)
-      if (fromHash) {
-        console.log('✅ Found coordinates in hash:', fromHash)
-        return fromHash
-      }
-      
-      console.log('❌ No coordinates found in URL')
-      return null
-    } catch (error) {
-      console.log('❌ URL parsing error:', error)
-      // Last resort: try raw text regex
-      return parseLatLngFromText(input)
-    }
-  }
-
-  function extractSearchTextFromGoogleMapsUrl(input) {
-    if (!input) return null
-    let urlStr = input.trim()
-    if (!/^https?:\/\//i.test(urlStr)) urlStr = `https://${urlStr}`
-    try {
-      const u = new URL(urlStr)
-      
-      // Try query parameters first
-      const qParams = ['q', 'query', 'destination']
-      for (const k of qParams) {
-        const v = u.searchParams.get(k)
-        if (v) {
-          const decoded = decodeURIComponent(v.replace(/\+/g, ' '))
-          // Skip if it looks like coordinates
-          if (!/^-?\d+\.\d+/.test(decoded)) {
-            return decoded
-          }
-        }
-      }
-      
-      // Try /place/<name>/... → take the segment after /place/
-      const parts = u.pathname.split('/').filter(Boolean)
-      const idx = parts.findIndex((p) => p.toLowerCase() === 'place')
-      if (idx !== -1 && parts[idx + 1]) {
-        return decodeURIComponent(parts[idx + 1].replace(/\+/g, ' '))
-      }
-      
-      // Try /search/<name>/... → take the segment after /search/
-      const searchIdx = parts.findIndex((p) => p.toLowerCase() === 'search')
-      if (searchIdx !== -1 && parts[searchIdx + 1]) {
-        return decodeURIComponent(parts[searchIdx + 1].replace(/\+/g, ' '))
-      }
-      
-      return null
-    } catch {
-      return null
-    }
-  }
-
-  async function geocodeTextToLatLngAddress(text) {
-    if (!text) return null
-    try {
-      const q = encodeURIComponent(text)
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${q}&accept-language=vi`
-      const res = await fetch(url)
-      if (!res.ok) return null
-      const arr = await res.json()
-      if (!Array.isArray(arr) || arr.length === 0) return null
-      const item = arr[0]
-      const lat = parseFloat(item.lat)
-      const lon = parseFloat(item.lon)
-      if (!isFinite(lat) || !isFinite(lon)) return null
-      const cleaned = cleanNominatimDisplayName(item.display_name || '')
-      return { lat, lng: lon, address: cleaned }
-    } catch { return null }
   }
 
   async function resolveLatLngFromAnyLink(input) {
@@ -528,6 +371,7 @@ export default function StoreDetail() {
         }
         let fileToUpload = imageFile
         try {
+          const { default: imageCompression } = await import('browser-image-compression')
           const compressed = await imageCompression(imageFile, options)
           fileToUpload = compressed
         } catch (cmpErr) {
@@ -577,6 +421,8 @@ export default function StoreDetail() {
       .eq('id', id)
       if (updateErr) throw updateErr
 
+      invalidateStoreCache()
+
       // Optional cleanup: delete old image if replaced
       if (imageFile && store?.image_url) {
         const oldFilename = store.image_url
@@ -613,20 +459,6 @@ export default function StoreDetail() {
     } finally {
       setSaving(false)
     }
-  }
-
-  function cleanNominatimDisplayName(name) {
-    if (!name) return ''
-    const parts = name.split(',').map((p) => p.trim())
-    while (parts.length > 0) {
-      const last = parts[parts.length - 1]
-      if (last.toLowerCase() === 'việt nam' || /^[0-9]{4,6}$/.test(last)) {
-        parts.pop()
-        continue
-      }
-      break
-    }
-    return parts.join(', ')
   }
 
   async function handleFillAddress() {
@@ -667,9 +499,9 @@ export default function StoreDetail() {
 
       if (typeof result === 'string') {
         // Cached result
-        setAddress(result)
+        setAddressDetail(result)
       } else if (result?.cleaned) {
-        setAddress(result.cleaned)
+        setAddressDetail(result.cleaned)
         try { sessionStorage.setItem(result.cacheKey, result.cleaned) } catch {}
       } else {
         showMessage('error', 'Không lấy được địa chỉ từ Nominatim')
@@ -705,6 +537,18 @@ export default function StoreDetail() {
       try { mapWrapperRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }) } catch (e) {}
     }
   }, [showMapPicker])
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto text-center space-y-4">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Không tìm thấy cửa hàng</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Cửa hàng này không tồn tại hoặc đã bị xóa.</p>
+          <Button variant="outline" size="sm" onClick={() => router.push('/')}>Quay lại trang chủ</Button>
+        </div>
+      </div>
+    )
+  }
 
   if (!store) {
     return (

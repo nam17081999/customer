@@ -1,14 +1,15 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { SEARCH_DEBOUNCE_MS, PAGE_SIZE, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
+import { SEARCH_DEBOUNCE_MS, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
+import { getOrRefreshStores } from '@/lib/storeCache'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -19,20 +20,14 @@ const ALL_WARDS = Array.from(
 ).sort((a, b) => a.localeCompare(b, 'vi'))
 
 export default function HomePage() {
-  const [searchResults, setSearchResults] = useState([])
+  const [allStores, setAllStores] = useState([])
+  const [storesLoaded, setStoresLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDistrict, setSelectedDistrict] = useState('')
   const [selectedWard, setSelectedWard] = useState('')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [page, setPage] = useState(1)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const observer = useRef(null)
-  const suppressFirstAutoLoad = useRef(false)
-  const lastQueryRef = useRef('') // lưu searchTerm cuối đã fetch để tránh fetch trùng (không phụ thuộc locationMode)
   const searchInputRef = useRef(null)
-  const searchCacheRef = useRef(new Map())
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
@@ -73,198 +68,72 @@ export default function HomePage() {
     return haversineKm(refLoc.latitude, refLoc.longitude, store.latitude, store.longitude)
   }, [])
 
-  // Search triggers when name or filters change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (hasSearchCriteria) {
-        handleSearch()
-      } else {
-        setSearchResults([])
-        setHasMore(true)
-        setPage(1)
-        lastQueryRef.current = ''
-      }
-    }, SEARCH_DEBOUNCE_MS)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm, selectedDistrict, selectedWard, hasSearchCriteria])
-
-  // Remove infinite scroll - no auto load more on scroll
-
-  const handleSearch = async () => {
-    // Require at least one criterion (name or location filters)
-    if (!hasSearchCriteria) return
-
-    const queryKey = `${searchTerm}|${selectedDistrict}|${selectedWard}` // include filters
-    if (lastQueryRef.current === queryKey) return // tránh fetch trùng
-
+  // Load all stores from IndexedDB cache (or fetch if count changed)
+  const loadAllStores = useCallback(async () => {
+    if (storesLoaded) return
     setLoading(true)
-    setPage(1)
-    setHasMore(true)
-    suppressFirstAutoLoad.current = true
-
     try {
-      const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
-      const cacheKey = `q:${searchTerm}|d:${selectedDistrict}|w:${selectedWard}|p:1`
-      if (searchCacheRef.current.has(cacheKey)) {
-        const cached = searchCacheRef.current.get(cacheKey)
-        lastQueryRef.current = queryKey
-        const referenceLocation = currentLocation
-        const resultsWithDistance = cached.map(store => ({
-          ...store,
-          distance: computeDistance(store, referenceLocation)
-        }))
-        setSearchResults(resultsWithDistance)
-        setHasMore(cached.length === PAGE_SIZE)
-        return
-      }
-
-      let query = supabase
-        .from('stores')
-        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,active,created_at')
-      // Apply district/ward filters (optional)
-      if (selectedDistrict) {
-        query = query.eq('district', selectedDistrict)
-      }
-      if (selectedWard) {
-        query = query.eq('ward', selectedWard)
-      }
-      // Apply text filter if provided (optional)
-      if (searchTerm.trim()) {
-        query = query.or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
-      }
-      const { data, error } = await query
-        .order('active', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE)
-
-      if (error) throw error
-
-      lastQueryRef.current = queryKey
-
-      searchCacheRef.current.set(cacheKey, data)
-      const referenceLocation = currentLocation
-      const resultsWithDistance = data.map(store => ({
-        ...store,
-        distance: computeDistance(store, referenceLocation)
-      }))
-
-      setSearchResults(resultsWithDistance)
-      setHasMore(data.length === PAGE_SIZE)
-    } catch (error) {
-      console.error('Search error:', error)
+      const data = await getOrRefreshStores()
+      setAllStores(data)
+      setStoresLoaded(true)
+    } catch (err) {
+      console.error('Failed to load stores:', err)
     } finally {
       setLoading(false)
     }
-  }
+  }, [storesLoaded])
 
-  // Recompute distances when location mode or currentLocation changes (không cần refetch)
+  // Trigger load when user starts typing or selects a filter
   useEffect(() => {
-    if (searchResults.length > 0) {
-      setSearchResults(prev => prev.map(store => {
-        const newDistance = computeDistance(store, currentLocation)
-        return newDistance === store.distance ? store : { ...store, distance: newDistance }
-      }))
+    if (hasSearchCriteria && !storesLoaded) {
+      loadAllStores()
     }
-    // no visit list
-  }, [currentLocation, computeDistance])
+  }, [hasSearchCriteria, storesLoaded, loadAllStores])
 
-  const loadMore = useCallback(async () => {
-    if (loading || !hasMore || loadingMore || !hasSearchCriteria) return
+  // Local filtering
+  const searchResults = useMemo(() => {
+    if (!hasSearchCriteria || !storesLoaded) return []
 
-    setLoadingMore(true)
-    const nextPage = page + 1
+    let results = allStores
 
-    try {
-      const normalizedSearch = removeVietnameseTones(searchTerm.toLowerCase())
-      const cacheKey = `q:${searchTerm}|d:${selectedDistrict}|w:${selectedWard}|p:${nextPage}`
-      if (searchCacheRef.current.has(cacheKey)) {
-        const cached = searchCacheRef.current.get(cacheKey)
-        const referenceLocation = currentLocation
-        const resultsWithDistance = cached.map(store => ({
-          ...store,
-          distance: computeDistance(store, referenceLocation)
-        }))
-        setSearchResults(prev => {
-          const existingIds = new Set(prev.map(s => s.id))
-          const merged = [...prev]
-          resultsWithDistance.forEach(s => { if (!existingIds.has(s.id)) merged.push(s) })
-          return merged
-        })
-        setPage(nextPage)
-        setHasMore(cached.length === PAGE_SIZE)
-        return
-      }
-
-      let query = supabase
-        .from('stores')
-        .select('id,name,address_detail,ward,district,phone,image_url,latitude,longitude,active,created_at')
-      if (selectedDistrict) {
-        query = query.eq('district', selectedDistrict)
-      }
-      if (selectedWard) {
-        query = query.eq('ward', selectedWard)
-      }
-      if (searchTerm.trim()) {
-        query = query.or(`name.ilike.%${searchTerm}%,name_search.ilike.%${normalizedSearch}%`)
-      }
-      const { data, error } = await query
-        .order('active', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE - 1)
-
-      if (error) throw error
-
-      searchCacheRef.current.set(cacheKey, data)
-      const referenceLocation = currentLocation
-      const resultsWithDistance = data.map(store => ({
-        ...store,
-        distance: computeDistance(store, referenceLocation)
-      }))
-
-      setSearchResults(prev => {
-        // tránh trùng (nếu server trả về record đã có)
-        const existingIds = new Set(prev.map(s => s.id))
-        const merged = [...prev]
-        resultsWithDistance.forEach(s => { if (!existingIds.has(s.id)) merged.push(s) })
-        return merged
+    // District filter
+    if (selectedDistrict) {
+      results = results.filter((s) => s.district === selectedDistrict)
+    }
+    // Ward filter
+    if (selectedWard) {
+      results = results.filter((s) => s.ward === selectedWard)
+    }
+    // Text search
+    if (searchTerm.trim()) {
+      const term = searchTerm.trim().toLowerCase()
+      const termNorm = removeVietnameseTones(term)
+      results = results.filter((s) => {
+        const name = (s.name || '').toLowerCase()
+        const nameSearch = (s.name_search || '').toLowerCase()
+        return name.includes(term) || nameSearch.includes(termNorm)
       })
-      setPage(nextPage)
-      setHasMore(data.length === PAGE_SIZE)
-    } catch (error) {
-      console.error('Load more error:', error)
-    } finally {
-      setLoadingMore(false)
     }
-  }, [hasMore, loadingMore, loading, searchTerm, page, currentLocation, selectedDistrict, selectedWard, hasSearchCriteria])
 
-  const isPendingSearch = hasSearchCriteria && lastQueryRef.current !== `${searchTerm}|${selectedDistrict}|${selectedWard}`
-  const showSkeleton = hasSearchCriteria && (loading || isPendingSearch)
+    // Sort: active first, then by created_at desc
+    results = results.slice().sort((a, b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1
+      const da = a.created_at || ''
+      const db = b.created_at || ''
+      return db.localeCompare(da)
+    })
 
-  // Infinite scroll observer
-  const sentinelRef = useCallback(node => {
-    if (!hasMore) return
-    if (loading || loadingMore) return
-    if (!hasSearchCriteria) return
-    if (observer.current) observer.current.disconnect()
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        if (suppressFirstAutoLoad.current) {
-          suppressFirstAutoLoad.current = false
-          return
-        }
-        loadMore()
-      }
-    }, { rootMargin: '400px' }) // tải trước khi chạm đáy
-    if (node) observer.current.observe(node)
-  }, [hasMore, loading, loadingMore, loadMore, hasSearchCriteria])
+    // Add distance
+    const refLoc = currentLocation
+    return results.map((s) => ({
+      ...s,
+      distance: computeDistance(s, refLoc)
+    }))
+  }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance])
 
-  // Cleanup observer on unmount
-  useEffect(() => {
-    return () => {
-      if (observer.current) observer.current.disconnect()
-    }
-  }, [])
+  // Search triggers when name or filters change
+  // (no longer needs debounced API call — kept for UX smoothness)
+  const showSkeleton = hasSearchCriteria && (loading || !storesLoaded)
 
   // Auto focus search input on mount for faster typing
   useEffect(() => {
@@ -293,6 +162,7 @@ export default function HomePage() {
               <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
+                aria-label="Chọn quận/huyện"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
               >
                 <option value="">Quận/Huyện</option>
@@ -305,6 +175,7 @@ export default function HomePage() {
               <select
                 value={selectedWard}
                 onChange={(e) => setSelectedWard(e.target.value)}
+                aria-label="Chọn xã/phường"
                 className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
               >
                 <option value="">Xã/Phường</option>
@@ -350,7 +221,7 @@ export default function HomePage() {
             </div>
           )}
 
-              {!loading && !isPendingSearch && hasSearchCriteria && searchResults.length === 0 && (
+          {!showSkeleton && hasSearchCriteria && searchResults.length === 0 && (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-gray-500 dark:text-gray-400 mb-4">
@@ -366,13 +237,10 @@ export default function HomePage() {
           )}
 
           {searchResults.length > 0 && (
-            <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-250px)]">{/* Responsive container height */}
+            <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-250px)]">
               <Virtuoso
                 data={searchResults}
                 computeItemKey={(index, item) => `${item.id}:${item.distance == null ? 'x' : item.distance.toFixed(3)}`}
-                endReached={() => {
-                  if (!loadingMore && hasMore) loadMore()
-                }}
                 overscan={300}
                 itemContent={(index, store) => (
                   <div className="mb-4" key={`${store.id}-${store.distance == null ? 'x' : store.distance.toFixed(3)}`}>
@@ -386,26 +254,7 @@ export default function HomePage() {
                 components={{
                   Footer: () => (
                     <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      {loadingMore && hasMore && (
-                        <div className="space-y-3">
-                          <div className="flex justify-center text-xs text-gray-500 dark:text-gray-400">Đang tải thêm...</div>
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            {[...Array(2)].map((_, i) => (
-                              <Card key={i} className="animate-pulse">
-                                <CardContent className="p-0">
-                                  <div className="h-40 bg-gray-200 dark:bg-gray-800" />
-                                  <div className="p-4 space-y-2">
-                                    <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
-                                    <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
-                                    <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {!hasMore && searchResults.length > 0 && !loadingMore && 'Đã hiển thị tất cả kết quả'}
+                      {searchResults.length > 0 && `Hiển thị ${searchResults.length} kết quả`}
                     </div>
                   )
                 }}
@@ -424,10 +273,7 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Sentinel div removed due to virtual scrolling */}
       </div>
     </div>
   )
 }
-
-/* NOTE: Virtual scrolling implemented with react-virtuoso */

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Map } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export default function Navbar() {
     const pathname = usePathname()
     const isSearchPage = pathname === '/'
+    const isMapPage = pathname === '/map'
     const isAddStorePage = pathname === '/store/create'
 
     return (
@@ -35,6 +36,19 @@ export default function Navbar() {
                                 </svg>
                                 <span className="inline text-xs sm:text-sm">Tìm kiếm</span>
                             </div>
+                        </Link>
+                    </Button>
+                    {/* Map */}
+                    <Button
+                        asChild
+                        size="sm"
+                        variant={isMapPage ? 'default' : 'ghost'}
+                        className="flex items-center gap-1.5 px-2.5 sm:px-3 border border-gray-300 dark:border-gray-700 text-xs sm:text-sm"
+                        aria-current={isMapPage ? 'page' : undefined}
+                    >
+                        <Link href="/map" aria-label="Bản đồ">
+                            <Map className="h-4 w-4" />
+                            <span className="inline text-xs sm:text-sm">Bản đồ</span>
                         </Link>
                     </Button>
                     {/* Add Store */}
