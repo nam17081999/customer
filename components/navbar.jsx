@@ -12,7 +12,7 @@ export default function Navbar() {
     const isAddStorePage = pathname === '/store/create'
 
     return (
-        <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
+        <nav className="border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
             <div className="mx-auto flex h-14 w-full max-w-screen-md items-center px-3 sm:px-4 gap-2 sm:gap-3">
                 {/* Brand / Logo */}
                 <Link href="/" className="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base">
