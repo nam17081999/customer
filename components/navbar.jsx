@@ -4,20 +4,21 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus, Map } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { useOnlineStatus } from "@/helper/useOnlineStatus";
 
 export default function Navbar() {
     const pathname = usePathname()
+    const { isOnline } = useOnlineStatus()
     const isSearchPage = pathname === '/'
     const isMapPage = pathname === '/map'
     const isAddStorePage = pathname === '/store/create'
 
     return (
-        <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
+        <nav className="border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
             <div className="mx-auto flex h-14 w-full max-w-screen-md items-center px-3 sm:px-4 gap-2 sm:gap-3">
                 {/* Brand / Logo */}
                 <Link href="/" className="flex items-center gap-2 font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base">
                     <span className="text-primary">StoreVis</span>
-                    <span className="hidden sm:inline text-[10px] font-normal text-gray-500 dark:text-gray-400">Beta</span>
                 </Link>
                 {/* Right aligned actions */}
                 <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
@@ -38,7 +39,8 @@ export default function Navbar() {
                             </div>
                         </Link>
                     </Button>
-                    {/* Map */}
+                    {/* Map — hidden when offline */}
+                    {isOnline && (
                     <Button
                         asChild
                         size="sm"
@@ -51,7 +53,9 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Bản đồ</span>
                         </Link>
                     </Button>
-                    {/* Add Store */}
+                    )}
+                    {/* Add Store — hidden when offline */}
+                    {isOnline && (
                     <Button
                         asChild
                         size="sm"
@@ -64,6 +68,7 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Thêm</span>
                         </Link>
                     </Button>
+                    )}
                 </div>
             </div>
         </nav>

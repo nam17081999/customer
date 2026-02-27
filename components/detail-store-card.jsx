@@ -6,16 +6,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getFullImageUrl } from '@/helper/imageUtils'
 import { formatAddressParts } from '@/lib/utils'
+import { formatDistance } from '@/helper/validation'
 
 export function DetailStoreModalContent({ store, showEdit = true }) {
   if (!store) return null
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
   const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
-  const formatDistance = (d) => {
-    if (d === null || d === undefined) return ''
-    return d < 1 ? `${(d * 1000).toFixed(0)} m` : `${d.toFixed(1)} km`
-  }
 
   const ActionSection = () => (
     <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-200 dark:border-gray-700 mt-4 md:mt-6">
@@ -157,10 +154,6 @@ export default function DetailStoreCard({
   const storeData = s || item
   const hasCoords = typeof storeData.latitude === 'number' && typeof storeData.longitude === 'number'
   const addressText = formatAddressParts(storeData)
-  const formatDistance = (d) => {
-    if (d === null || d === undefined) return ''
-    return d < 1 ? `${(d * 1000).toFixed(0)} m` : `${d.toFixed(1)} km`
-  }
 
   return (
     <Dialog>
