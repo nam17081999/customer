@@ -15,56 +15,20 @@ import {
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { haversineKm } from '@/helper/distance'
 import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { invalidateStoreCache, getOrRefreshStores, appendStoreToCache } from '@/lib/storeCache'
+import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
+import { enqueueStore } from '@/lib/offlineQueue'
+import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import {
+  NAME_SUGGESTIONS,
+  findNearbySimilarStores,
+  findGlobalExactNameMatches,
+  mergeDuplicateCandidates,
+} from '@/helper/duplicateCheck'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
-
-const IGNORED_NAME_TERMS = [
-  'cửa hàng',
-  'tạp hoá',
-  'quán nước',
-  'giải khát',
-  'nhà nghỉ',
-  'nhà hàng',
-  'cyber cà phê',
-  'cafe',
-  'lẩu',
-  'siêu thị',
-  'quán',
-  'gym',
-  'đại lý',
-  'cơm',
-  'phở',
-  'bún',
-  'shop',
-  'kok',
-  'karaoke',
-  'bi-a',
-  'bia',
-  'net',
-  'game',
-  'internet',
-  'beer',
-  'coffee',
-  'mart',
-  'store',
-  'minimart'
-]
-
-const NAME_SUGGESTIONS = [
-  'Cửa hàng',
-  'Tạp hoá',
-  'Quán nước',
-  'Karaoke',
-  'Nhà hàng',
-  'Quán',
-  'Cafe',
-  'Siêu thị'
-]
 
 export default function AddStore() {
   const router = useRouter()
@@ -106,7 +70,6 @@ export default function AddStore() {
   const duplicateCheckTimerRef = useRef(null)
   const duplicateCheckSeqRef = useRef(0)
   const duplicateGeoRequestedRef = useRef(false)
-  const DUPLICATE_RADIUS_KM = 0.1
 
   // Map states
   const [pickedLat, setPickedLat] = useState(null)
@@ -177,7 +140,7 @@ export default function AddStore() {
 
       // Also try compass once on refresh (user gesture)
       compassOnceRef.current = false
-      requestCompassHeadingOnce()
+      refreshCompassHeading()
 
       // Reset edited flag since this is a fresh GPS load
       setUserHasEditedMap(false)
@@ -192,129 +155,16 @@ export default function AddStore() {
     }
   }, [])
 
-  // Improved GPS location with progressive timeout and maxWaitTime
-  async function getBestPosition({
-    attempts = 4,
-    timeout = 5000,        // Giảm từ 10s → 5s
-    maxWaitTime = 10000,   // Tổng thời gian tối đa 10s
-    desiredAccuracy = 25,  // Mục tiêu 25m
-    skipCache = false,
-  } = {}) {
-    if (!navigator.geolocation) {
-      return { coords: null, error: new Error('Geolocation not supported') }
-    }
-
-    const samples = []
-    const startTime = Date.now()
-    let lastError = null
-
-    if (!skipCache) {
-      // Try to get cached position first (< 30 seconds old)
-      try {
-        const cached = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            resolve,
-            reject,
-            {
-              enableHighAccuracy: true, // Changed to true to get heading
-              timeout: 1000,
-              maximumAge: 30000 // Accept 30s old
-            }
-          )
-        })
-        if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
-          console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
-          return { coords: cached.coords, error: null }
-        }
-      } catch (err) {
-        // No cache, continue to get fresh location
-        lastError = err
-      }
-    }
-
-    for (let i = 0; i < attempts; i++) {
-      // Check total elapsed time
-      const elapsed = Date.now() - startTime
-      if (elapsed > maxWaitTime) {
-        console.log('⏱️ Đã hết thời gian chờ tối đa:', elapsed + 'ms')
-        break
-      }
-
-      try {
-        // Progressive timeout: 5s → 4s → 3s → 2s
-        const dynamicTimeout = Math.max(2000, timeout - (i * 1000))
-        const remainingTime = maxWaitTime - elapsed
-        const actualTimeout = Math.min(dynamicTimeout, remainingTime)
-
-        if (actualTimeout < 1000) break // Too little time left
-
-        const pos = await new Promise((resolve, reject) => {
-          const timeoutId = setTimeout(() => reject(new Error('Timeout')), actualTimeout)
-          navigator.geolocation.getCurrentPosition(
-            (result) => {
-              clearTimeout(timeoutId)
-              resolve(result)
-            },
-            (err) => {
-              clearTimeout(timeoutId)
-              reject(err)
-            },
-            {
-              enableHighAccuracy: true,
-              timeout: actualTimeout,
-              maximumAge: 0
-            }
-          )
-        })
-
-        if (pos?.coords) {
-          samples.push(pos.coords)
-          console.log(`📍 Sample ${i+1}: ${pos.coords.accuracy?.toFixed(1) || '?'}m, heading: ${pos.coords.heading || 'N/A'} (${Date.now() - startTime}ms)`)
-
-          // Early exit if good enough
-          if (pos.coords.accuracy && pos.coords.accuracy <= desiredAccuracy) {
-            console.log('✅ Đạt độ chính xác mong muốn')
-            return { coords: pos.coords, error: null }
-          }
-        }
-      } catch (err) {
-        console.warn(`⚠️ Attempt ${i+1} failed:`, err.message)
-        lastError = err
-      }
-    }
-
-    if (samples.length === 0) {
-      const e = new Error('Không lấy được vị trí sau nhiều lần thử')
-      e.cause = lastError || undefined
-      return { coords: null, error: e }
-    }
-
-    // Return best sample
-    samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
-    console.log(`📊 Chọn sample tốt nhất: ${samples[0].accuracy?.toFixed(1) || '?'}m`)
-    return { coords: samples[0], error: null }
-  }
-
-  function getGeoErrorMessage(err) {
-    const base = 'Không lấy được vị trí. Vui lòng bật định vị và mở cài đặt quyền vị trí của trình duyệt để cho phép.'
-    const code = err?.code ?? err?.cause?.code
-    if (code === 1) {
-      return 'Bạn đã từ chối quyền định vị. Vui lòng mở cài đặt quyền vị trí của trình duyệt để cho phép và thử lại.'
-    }
-    if (code === 2) {
-      return 'Không xác định được vị trí. Hãy bật GPS, kiểm tra tín hiệu hoặc thử lại.'
-    }
-    if (code === 3) {
-      return 'Lấy vị trí quá lâu. Vui lòng kiểm tra GPS/mạng và thử lại.'
-    }
-    const msg = (err?.message || err?.cause?.message || '').toLowerCase()
-    if (msg.includes('not supported')) {
-      return 'Thiết bị hoặc trình duyệt không hỗ trợ định vị. Vui lòng dùng thiết bị khác.'
-    }
-    if (msg.includes('timeout')) {
-      return 'Lấy vị trí quá lâu. Vui lòng kiểm tra GPS/mạng và thử lại.'
-    }
-    return base
+  // Compass heading helper — delegates to extracted module
+  async function refreshCompassHeading() {
+    if (compassOnceRef.current) return
+    compassOnceRef.current = true
+    setCompassError('')
+    try {
+      const { heading: h, error: e } = await requestCompassHeading()
+      if (e) setCompassError(e)
+      if (h != null) setHeading(h)
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
@@ -399,120 +249,6 @@ export default function AddStore() {
     }
   }
 
-  function normalizeNameForMatch(raw) {
-    const base = removeVietnameseTones(String(raw || ''))
-    return base
-      .replace(/[^a-z0-9]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-
-  function stripIgnoredPhrases(normalized) {
-    const ignoredList = IGNORED_NAME_TERMS
-      .map((t) => normalizeNameForMatch(t))
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length)
-    let out = ` ${normalized} `
-    for (const phrase of ignoredList) {
-      if (!phrase) continue
-      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const re = new RegExp(`\\b${escaped}\\b`, 'g')
-      out = out.replace(re, ' ')
-    }
-    return out.replace(/\s+/g, ' ').trim()
-  }
-
-  function extractWords(normalized) {
-    const cleaned = stripIgnoredPhrases(normalized)
-    return cleaned
-      .split(' ')
-      .map((w) => w.trim())
-      .filter((w) => w.length >= 2)
-  }
-
-  function isSimilarNameByWords(inputWords, storeName, storeNameSearch) {
-    const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
-    if (!storeNorm || inputWords.length === 0) return false
-    const storeWords = extractWords(storeNorm)
-    if (storeWords.length === 0) return false
-    const storeSet = new Set(storeWords)
-    for (const w of inputWords) {
-      if (storeSet.has(w)) return true
-    }
-    return false
-  }
-
-  function containsAllInputWords(inputWords, storeName, storeNameSearch) {
-    if (!Array.isArray(inputWords) || inputWords.length === 0) return false
-    const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
-    if (!storeNorm) return false
-    const storeWords = extractWords(storeNorm)
-    if (storeWords.length === 0) return false
-    const storeSet = new Set(storeWords)
-    for (const w of inputWords) {
-      if (!storeSet.has(w)) return false
-    }
-    return true
-  }
-
-  async function findNearbySimilarStores(lat, lng, inputName) {
-    const inputNorm = normalizeNameForMatch(inputName)
-    if (!inputNorm || lat == null || lng == null) return []
-    const inputWords = extractWords(inputNorm)
-    if (inputWords.length === 0) return []
-
-    const allStores = await getOrRefreshStores()
-
-    const matches = allStores
-      .filter((s) => isFinite(s?.latitude) && isFinite(s?.longitude))
-      .map((s) => ({
-        ...s,
-        distance: haversineKm(lat, lng, s.latitude, s.longitude)
-      }))
-      .filter((s) => s.distance <= DUPLICATE_RADIUS_KM && isSimilarNameByWords(inputWords, s.name, s.name_search))
-      .sort((a, b) => a.distance - b.distance)
-
-    return matches
-  }
-
-  async function findGlobalExactNameMatches(inputName) {
-    const inputNorm = normalizeNameForMatch(inputName)
-    if (!inputNorm) return []
-
-    const inputWords = extractWords(inputNorm)
-    if (inputWords.length === 0) return []
-
-    const allStores = await getOrRefreshStores()
-
-    return allStores
-      .filter((s) => containsAllInputWords(inputWords, s.name, s.name_search))
-      .sort((a, b) => (a.name || '').localeCompare((b.name || ''), 'vi'))
-  }
-
-  function mergeDuplicateCandidates(nearbyMatches = [], globalMatches = []) {
-    const byId = new Map()
-    globalMatches.forEach((s) => {
-      byId.set(s.id, { ...s, matchScope: 'global' })
-    })
-    nearbyMatches.forEach((s) => {
-      const existing = byId.get(s.id)
-      byId.set(s.id, {
-        ...(existing || {}),
-        ...s,
-        matchScope: existing ? 'nearby+global' : 'nearby'
-      })
-    })
-
-    return Array.from(byId.values()).sort((a, b) => {
-      const aHasDistance = typeof a.distance === 'number'
-      const bHasDistance = typeof b.distance === 'number'
-      if (aHasDistance && bHasDistance) return a.distance - b.distance
-      if (aHasDistance) return -1
-      if (bHasDistance) return 1
-      return (a.name || '').localeCompare((b.name || ''), 'vi')
-    })
-  }
-
   // Auto-fetch location when entering step 3
   useEffect(() => {
     if (currentStep !== 3) return
@@ -528,81 +264,9 @@ export default function AddStore() {
     setStep2Key((k) => k + 1) // force remount map
     if (!resolvingAddr) handleFillAddress()
     compassOnceRef.current = false
-    requestCompassHeadingOnce()
+    refreshCompassHeading()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
-
-
-
-  async function requestCompassHeadingOnce() {
-    if (compassOnceRef.current) return
-    compassOnceRef.current = true
-    setCompassError('')
-    try {
-      if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) return
-      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const res = await DeviceOrientationEvent.requestPermission()
-          if (res !== 'granted') {
-            setCompassError('Cần cho phép la bàn để xoay bản đồ theo hướng')
-            return
-          }
-        } catch {
-          setCompassError('Không thể xin quyền la bàn')
-          return
-        }
-      }
-
-      await new Promise((resolve) => {
-        const samples = []
-        let done = false
-
-        const pushSample = (deg) => {
-          const v = ((deg % 360) + 360) % 360
-          samples.push(v)
-          if (samples.length >= 5) {
-            done = true
-            window.removeEventListener('deviceorientation', handler, true)
-            // circular mean
-            const rad = samples.map((d) => (d * Math.PI) / 180)
-            const sinSum = rad.reduce((a, r) => a + Math.sin(r), 0)
-            const cosSum = rad.reduce((a, r) => a + Math.cos(r), 0)
-            const mean = Math.atan2(sinSum / rad.length, cosSum / rad.length)
-            const meanDeg = ((mean * 180) / Math.PI + 360) % 360
-            setHeading(meanDeg)
-            resolve()
-          }
-        }
-
-        const handler = (event) => {
-          if (done) return
-          if (typeof event.webkitCompassHeading === 'number') {
-            pushSample(event.webkitCompassHeading)
-            return
-          }
-          if (typeof event.alpha === 'number') {
-            const h = (360 - event.alpha) % 360
-            pushSample(h)
-          }
-        }
-        window.addEventListener('deviceorientation', handler, true)
-        setTimeout(() => {
-          if (!done) {
-            window.removeEventListener('deviceorientation', handler, true)
-            if (samples.length > 0) {
-              const rad = samples.map((d) => (d * Math.PI) / 180)
-              const sinSum = rad.reduce((a, r) => a + Math.sin(r), 0)
-              const cosSum = rad.reduce((a, r) => a + Math.cos(r), 0)
-              const mean = Math.atan2(sinSum / rad.length, cosSum / rad.length)
-              const meanDeg = ((mean * 180) / Math.PI + 360) % 360
-              setHeading(meanDeg)
-            }
-            resolve()
-          }
-        }, 1200)
-      })
-    } catch {}
-  }
 
   useEffect(() => {
     if (!name.trim()) {
@@ -910,6 +574,67 @@ export default function AddStore() {
     if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
       setLoading(false)
       showMessage('error', 'Thiếu thông tin vị trí. Vui lòng bật "Địa chỉ tự động" hoặc dán link Google Maps hoặc mở khóa bản đồ và chọn vị trí')
+      return
+    }
+
+    // ── Offline path: queue store for later sync ───────────────────
+    if (!navigator.onLine) {
+      try {
+        setLoading(true)
+        const normalizedDetail = toTitleCaseVI(addressDetail.trim())
+        const normalizedWard = toTitleCaseVI(ward.trim())
+        const normalizedDistrict = toTitleCaseVI(district.trim())
+
+        // Compress image to ArrayBuffer for IDB storage (if any)
+        let imageBuffer = null
+        let imageName = null
+        if (imageFile) {
+          const options = {
+            maxSizeMB: 0.5,
+            maxWidthOrHeight: 1200,
+            useWebWorker: true,
+            initialQuality: 0.7,
+            fileType: 'image/jpeg',
+          }
+          let fileToStore = imageFile
+          try {
+            const { default: imageCompression } = await import('browser-image-compression')
+            fileToStore = await imageCompression(imageFile, options)
+          } catch { /* use original */ }
+          imageBuffer = await fileToStore.arrayBuffer()
+          imageName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`
+        }
+
+        await enqueueStore({
+          name: normalizedName,
+          name_search: removeVietnameseTones(normalizedName),
+          address_detail: normalizedDetail,
+          ward: normalizedWard,
+          district: normalizedDistrict,
+          note,
+          phone,
+          latitude,
+          longitude,
+          imageBuffer,
+          imageName,
+        })
+
+        showMessage('success', '📥 Đã lưu offline — sẽ tự đồng bộ khi có mạng', 4000)
+
+        // Reset form
+        e.target.reset()
+        setName(''); setAddressDetail(''); setWard(''); setDistrict('')
+        setPhone(''); setNote(''); setImageFile(null)
+        setPickedLat(null); setPickedLng(null)
+        setMapEditable(false); setUserHasEditedMap(false)
+        setInitialGPSLat(null); setInitialGPSLng(null)
+        setCurrentStep(1)
+      } catch (offErr) {
+        console.error('Offline queue error:', offErr)
+        showMessage('error', 'Không thể lưu offline. Vui lòng thử lại.')
+      } finally {
+        setLoading(false)
+      }
       return
     }
 

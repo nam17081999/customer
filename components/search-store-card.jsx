@@ -7,17 +7,13 @@ import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
+import { formatDistance } from '@/helper/validation'
 
 export default function SearchStoreCard({ store, distance, searchTerm }) {
   const [imageError, setImageError] = useState(false)
 
   const handleImageError = () => {
     setImageError(true)
-  }
-
-  const formatDistance = (d) => {
-    if (d === null || d === undefined) return ''
-    return d < 1 ? `${(d * 1000).toFixed(0)}m` : `${d.toFixed(1)}km`
   }
 
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
