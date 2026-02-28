@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { getFullImageUrl } from '@/helper/imageUtils'
 import { getOrRefreshStores } from '@/lib/storeCache'
+import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 
 const DEFAULT_CENTER = [106.70098, 10.7769]
 
@@ -14,8 +14,31 @@ function normalizeText(value = '') {
   return removeVietnameseTones(String(value).toLowerCase()).trim()
 }
 
+/**
+ * Get the first meaningful word of a store name,
+ * skipping leading words that match IGNORED_NAME_TERMS.
+ * E.g. "Cửa Hàng Anh Dũng" → "Anh"
+ */
 function getFirstWord(name = '') {
-  const first = String(name).trim().split(/\s+/)[0] || '?'
+  let remaining = String(name).trim().toLowerCase()
+  // Sort ignored terms by length (longest first) so multi-word terms
+  // like "cửa hàng" are stripped before single-word "cửa".
+  const sorted = [...IGNORED_NAME_TERMS].sort((a, b) => b.length - a.length)
+  let stripped = true
+  while (stripped) {
+    stripped = false
+    for (const term of sorted) {
+      if (remaining.startsWith(term)) {
+        remaining = remaining.slice(term.length).trimStart()
+        stripped = true
+        break
+      }
+    }
+  }
+  // Restore original casing by matching position in original string
+  const offset = String(name).trim().length - remaining.length
+  const meaningful = String(name).trim().slice(offset).trimStart()
+  const first = meaningful.split(/\s+/)[0] || String(name).trim().split(/\s+/)[0] || '?'
   return first.slice(0, 12)
 }
 
@@ -217,31 +240,10 @@ export default function MapPage() {
       markerAvatar.className = 'store-marker-avatar'
 
       const fallbackWord = getFirstWord(store.name)
-      const imageSrc = store.image_url ? getFullImageUrl(store.image_url) : ''
-
-      if (imageSrc) {
-        const img = document.createElement('img')
-        img.src = imageSrc
-        img.alt = store.name || 'Store'
-        img.className = 'store-marker-img'
-
-        const fallback = document.createElement('span')
-        fallback.className = 'store-marker-text hidden'
-        fallback.textContent = fallbackWord
-
-        img.onerror = () => {
-          img.remove()
-          fallback.classList.remove('hidden')
-        }
-
-        markerAvatar.appendChild(img)
-        markerAvatar.appendChild(fallback)
-      } else {
-        const text = document.createElement('span')
-        text.className = 'store-marker-text'
-        text.textContent = fallbackWord
-        markerAvatar.appendChild(text)
-      }
+      const text = document.createElement('span')
+      text.className = 'store-marker-text'
+      text.textContent = fallbackWord
+      markerAvatar.appendChild(text)
 
       markerEl.appendChild(markerAvatar)
 
