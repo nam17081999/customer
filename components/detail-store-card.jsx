@@ -1,40 +1,58 @@
-import React, { memo } from 'react'
+import React, { memo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import Image from 'next/image'
-import Link from 'next/link'
 import { getFullImageUrl } from '@/helper/imageUtils'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 
-export function DetailStoreModalContent({ store, showEdit = true }) {
+export function DetailStoreModalContent({ store }) {
+  const [copied, setCopied] = useState(false)
   if (!store) return null
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
   const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
 
+  const handleShare = async () => {
+    const lines = [`Tên: ${store.name}`]
+    if (addressText) lines.push(`Địa chỉ: ${addressText}`)
+    if (hasCoords) lines.push(`Vị trí: https://www.google.com/maps?q=${store.latitude},${store.longitude}`)
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* fallback ignored */ }
+  }
+
   const ActionSection = () => (
     <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-200 dark:border-gray-700 mt-4 md:mt-6">
-      {/* Mobile (2 buttons per row) */}
+      {/* Mobile */}
       <div className="sm:hidden">
         <div className="grid grid-cols-2 gap-2">
           {hasCoords && (
             <Button asChild variant="outline" className="w-full h-11 text-sm">
-              <a href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}&travelmode=driving`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
+              <a href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" /></svg>
                 Bản đồ
               </a>
             </Button>
           )}
-          {showEdit && (
-            <Button asChild variant="outline" className="w-full h-11 text-sm">
-              <Link href={`/store/${store.id}`} className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Sửa
-              </Link>
-            </Button>
-          )}
+          <Button variant="outline" className="w-full h-11 text-sm" onClick={handleShare}>
+            <div className="flex items-center justify-center gap-2">
+              {copied ? (
+                <>
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Đã copy
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                  Chia sẻ
+                </>
+              )}
+            </div>
+          </Button>
           <DialogClose asChild>
             <Button variant="outline" className="w-full h-11 text-sm">
               <div className="flex items-center justify-center gap-2">
@@ -50,7 +68,7 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
         {hasCoords && (
           <Button asChild variant="outline" className="flex-1 h-12">
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}&travelmode=driving`}
+              href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`}
               target="_blank" rel="noopener noreferrer"
               className="flex items-center justify-center gap-3"
             >
@@ -59,14 +77,21 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
             </a>
           </Button>
         )}
-        {showEdit && (
-          <Button asChild variant="outline" className="flex-1 h-12">
-            <Link href={`/store/${store.id}`} className="flex items-center justify-center gap-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Sửa
-            </Link>
-          </Button>
-        )}
+        <Button variant="outline" className="flex-1 h-12" onClick={handleShare}>
+          <div className="flex items-center justify-center gap-3">
+            {copied ? (
+              <>
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Đã copy
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                Chia sẻ
+              </>
+            )}
+          </div>
+        </Button>
         <DialogClose asChild>
           <Button variant="outline" className="flex-1 h-12">
             <div className="flex items-center justify-center gap-3">
@@ -229,7 +254,7 @@ export default function DetailStoreCard({
                   className="h-8 w-8 p-0 shrink-0"
                 >
                   <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${storeData.latitude},${storeData.longitude}&travelmode=driving`}
+                    href={`https://www.google.com/maps?q=${storeData.latitude},${storeData.longitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Chỉ đường"

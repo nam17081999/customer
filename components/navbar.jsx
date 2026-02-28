@@ -4,11 +4,9 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus, Map } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useOnlineStatus } from "@/helper/useOnlineStatus";
 
 export default function Navbar() {
     const pathname = usePathname()
-    const { isOnline } = useOnlineStatus()
     const isSearchPage = pathname === '/'
     const isMapPage = pathname === '/map'
     const isAddStorePage = pathname === '/store/create'
@@ -39,8 +37,7 @@ export default function Navbar() {
                             </div>
                         </Link>
                     </Button>
-                    {/* Map — hidden when offline */}
-                    {isOnline && (
+                    {/* Map */}
                     <Button
                         asChild
                         size="sm"
@@ -53,9 +50,7 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Bản đồ</span>
                         </Link>
                     </Button>
-                    )}
-                    {/* Add Store — hidden when offline */}
-                    {isOnline && (
+                    {/* Add Store */}
                     <Button
                         asChild
                         size="sm"
@@ -68,7 +63,6 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Thêm</span>
                         </Link>
                     </Button>
-                    )}
                 </div>
             </div>
         </nav>

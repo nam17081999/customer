@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { supabase } from '@/lib/supabaseClient'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
+
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -107,11 +107,9 @@ export default function HomePage() {
     // Text search
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase()
-      const termNorm = removeVietnameseTones(term)
       results = results.filter((s) => {
         const name = (s.name || '').toLowerCase()
-        const nameSearch = (s.name_search || '').toLowerCase()
-        return name.includes(term) || nameSearch.includes(termNorm)
+        return name.includes(term)
       })
     }
 

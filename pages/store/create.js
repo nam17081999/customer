@@ -19,7 +19,6 @@ import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
-import { enqueueStore } from '@/lib/offlineQueue'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   NAME_SUGGESTIONS,
@@ -28,7 +27,10 @@ import {
   mergeDuplicateCandidates,
 } from '@/helper/duplicateCheck'
 
-const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
+const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-md" style={{ height: '65vh' }}><span className="text-sm text-gray-500 animate-pulse">Đang tải bản đồ…</span></div>,
+})
 
 export default function AddStore() {
   const router = useRouter()
@@ -437,7 +439,7 @@ export default function AddStore() {
                   </Card>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-                  <DetailStoreModalContent store={s} context="search" showEdit={false} />
+                  <DetailStoreModalContent store={s} context="search" />
                 </DialogContent>
               </Dialog>
             ))}
@@ -577,67 +579,6 @@ export default function AddStore() {
       return
     }
 
-    // ── Offline path: queue store for later sync ───────────────────
-    if (!navigator.onLine) {
-      try {
-        setLoading(true)
-        const normalizedDetail = toTitleCaseVI(addressDetail.trim())
-        const normalizedWard = toTitleCaseVI(ward.trim())
-        const normalizedDistrict = toTitleCaseVI(district.trim())
-
-        // Compress image to ArrayBuffer for IDB storage (if any)
-        let imageBuffer = null
-        let imageName = null
-        if (imageFile) {
-          const options = {
-            maxSizeMB: 0.5,
-            maxWidthOrHeight: 1200,
-            useWebWorker: true,
-            initialQuality: 0.7,
-            fileType: 'image/jpeg',
-          }
-          let fileToStore = imageFile
-          try {
-            const { default: imageCompression } = await import('browser-image-compression')
-            fileToStore = await imageCompression(imageFile, options)
-          } catch { /* use original */ }
-          imageBuffer = await fileToStore.arrayBuffer()
-          imageName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`
-        }
-
-        await enqueueStore({
-          name: normalizedName,
-          name_search: removeVietnameseTones(normalizedName),
-          address_detail: normalizedDetail,
-          ward: normalizedWard,
-          district: normalizedDistrict,
-          note,
-          phone,
-          latitude,
-          longitude,
-          imageBuffer,
-          imageName,
-        })
-
-        showMessage('success', '📥 Đã lưu offline — sẽ tự đồng bộ khi có mạng', 4000)
-
-        // Reset form
-        e.target.reset()
-        setName(''); setAddressDetail(''); setWard(''); setDistrict('')
-        setPhone(''); setNote(''); setImageFile(null)
-        setPickedLat(null); setPickedLng(null)
-        setMapEditable(false); setUserHasEditedMap(false)
-        setInitialGPSLat(null); setInitialGPSLng(null)
-        setCurrentStep(1)
-      } catch (offErr) {
-        console.error('Offline queue error:', offErr)
-        showMessage('error', 'Không thể lưu offline. Vui lòng thử lại.')
-      } finally {
-        setLoading(false)
-      }
-      return
-    }
-
     try {
       setLoading(true)
 
@@ -703,8 +644,6 @@ export default function AddStore() {
         imageFilename = uploadResult.name
       }
 
-      const nameSearch = removeVietnameseTones(normalizedName)
-
       const normalizedDetail = toTitleCaseVI(addressDetail.trim())
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
@@ -712,7 +651,6 @@ export default function AddStore() {
       const { data: insertedRows, error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
-          name_search: nameSearch,
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,

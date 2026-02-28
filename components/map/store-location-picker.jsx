@@ -1,7 +1,5 @@
-import dynamic from 'next/dynamic'
+import LocationPicker from '@/components/map/location-picker'
 import { Button } from '@/components/ui/button'
-
-const LocationPicker = dynamic(() => import('@/components/map/location-picker'), { ssr: false })
 
 /**
  * StoreLocationPicker - Reusable map picker for store create/edit pages
