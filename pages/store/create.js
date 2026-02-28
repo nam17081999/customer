@@ -27,7 +27,10 @@ import {
   mergeDuplicateCandidates,
 } from '@/helper/duplicateCheck'
 
-const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), { ssr: false })
+const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-md" style={{ height: '65vh' }}><span className="text-sm text-gray-500 animate-pulse">Đang tải bản đồ…</span></div>,
+})
 
 export default function AddStore() {
   const router = useRouter()
