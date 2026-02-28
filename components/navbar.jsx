@@ -4,23 +4,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus, Map } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useOnlineStatus } from "@/helper/useOnlineStatus";
-import { useState, useEffect } from "react";
 
 export default function Navbar() {
     const pathname = usePathname()
-    const { isOnline } = useOnlineStatus()
-    const [mounted, setMounted] = useState(false)
     const isSearchPage = pathname === '/'
     const isMapPage = pathname === '/map'
     const isAddStorePage = pathname === '/store/create'
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
-
-    // Before hydration, show all buttons (matches SSR output)
-    const showAll = !mounted || isOnline
 
     return (
         <nav className="border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
@@ -48,8 +37,7 @@ export default function Navbar() {
                             </div>
                         </Link>
                     </Button>
-                    {/* Map — hidden when offline */}
-                    {showAll && (
+                    {/* Map */}
                     <Button
                         asChild
                         size="sm"
@@ -62,9 +50,7 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Bản đồ</span>
                         </Link>
                     </Button>
-                    )}
-                    {/* Add Store — hidden when offline */}
-                    {showAll && (
+                    {/* Add Store */}
                     <Button
                         asChild
                         size="sm"
@@ -77,7 +63,6 @@ export default function Navbar() {
                             <span className="inline text-xs sm:text-sm">Thêm</span>
                         </Link>
                     </Button>
-                    )}
                 </div>
             </div>
         </nav>

@@ -19,7 +19,6 @@ import { formatDistance } from '@/helper/validation'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
-import { enqueueStore } from '@/lib/offlineQueue'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   NAME_SUGGESTIONS,
@@ -574,66 +573,6 @@ export default function AddStore() {
     if (latitude == null || longitude == null || !isFinite(latitude) || !isFinite(longitude)) {
       setLoading(false)
       showMessage('error', 'Thiếu thông tin vị trí. Vui lòng bật "Địa chỉ tự động" hoặc dán link Google Maps hoặc mở khóa bản đồ và chọn vị trí')
-      return
-    }
-
-    // ── Offline path: queue store for later sync ───────────────────
-    if (!navigator.onLine) {
-      try {
-        setLoading(true)
-        const normalizedDetail = toTitleCaseVI(addressDetail.trim())
-        const normalizedWard = toTitleCaseVI(ward.trim())
-        const normalizedDistrict = toTitleCaseVI(district.trim())
-
-        // Compress image to ArrayBuffer for IDB storage (if any)
-        let imageBuffer = null
-        let imageName = null
-        if (imageFile) {
-          const options = {
-            maxSizeMB: 0.5,
-            maxWidthOrHeight: 1200,
-            useWebWorker: true,
-            initialQuality: 0.7,
-            fileType: 'image/jpeg',
-          }
-          let fileToStore = imageFile
-          try {
-            const { default: imageCompression } = await import('browser-image-compression')
-            fileToStore = await imageCompression(imageFile, options)
-          } catch { /* use original */ }
-          imageBuffer = await fileToStore.arrayBuffer()
-          imageName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`
-        }
-
-        await enqueueStore({
-          name: normalizedName,
-          address_detail: normalizedDetail,
-          ward: normalizedWard,
-          district: normalizedDistrict,
-          note,
-          phone,
-          latitude,
-          longitude,
-          imageBuffer,
-          imageName,
-        })
-
-        showMessage('success', '📥 Đã lưu offline — sẽ tự đồng bộ khi có mạng', 4000)
-
-        // Reset form
-        e.target.reset()
-        setName(''); setAddressDetail(''); setWard(''); setDistrict('')
-        setPhone(''); setNote(''); setImageFile(null)
-        setPickedLat(null); setPickedLng(null)
-        setMapEditable(false); setUserHasEditedMap(false)
-        setInitialGPSLat(null); setInitialGPSLng(null)
-        setCurrentStep(1)
-      } catch (offErr) {
-        console.error('Offline queue error:', offErr)
-        showMessage('error', 'Không thể lưu offline. Vui lòng thử lại.')
-      } finally {
-        setLoading(false)
-      }
       return
     }
 
