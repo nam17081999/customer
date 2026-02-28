@@ -40,6 +40,12 @@ export const IGNORED_NAME_TERMS = [
   'mart',
   'store',
   'minimart',
+  'thực phẩm',
+  'cơm bình dân',
+  'ăn vặt',
+  'ăn nhanh',
+  'quán nước',
+  'quán ăn',
 ]
 
 /** Quick-pick labels shown on the create-store form. */

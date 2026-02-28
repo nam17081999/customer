@@ -5,13 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Plus, Map } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useOnlineStatus } from "@/helper/useOnlineStatus";
+import { useState, useEffect } from "react";
 
 export default function Navbar() {
     const pathname = usePathname()
     const { isOnline } = useOnlineStatus()
+    const [mounted, setMounted] = useState(false)
     const isSearchPage = pathname === '/'
     const isMapPage = pathname === '/map'
     const isAddStorePage = pathname === '/store/create'
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
+    // Before hydration, show all buttons (matches SSR output)
+    const showAll = !mounted || isOnline
 
     return (
         <nav className="border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
@@ -40,7 +49,7 @@ export default function Navbar() {
                         </Link>
                     </Button>
                     {/* Map — hidden when offline */}
-                    {isOnline && (
+                    {showAll && (
                     <Button
                         asChild
                         size="sm"
@@ -55,7 +64,7 @@ export default function Navbar() {
                     </Button>
                     )}
                     {/* Add Store — hidden when offline */}
-                    {isOnline && (
+                    {showAll && (
                     <Button
                         asChild
                         size="sm"
