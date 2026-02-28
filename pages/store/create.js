@@ -437,7 +437,7 @@ export default function AddStore() {
                   </Card>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-                  <DetailStoreModalContent store={s} context="search" showEdit={false} />
+                  <DetailStoreModalContent store={s} context="search" />
                 </DialogContent>
               </Dialog>
             ))}
@@ -607,7 +607,6 @@ export default function AddStore() {
 
         await enqueueStore({
           name: normalizedName,
-          name_search: removeVietnameseTones(normalizedName),
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,
@@ -703,8 +702,6 @@ export default function AddStore() {
         imageFilename = uploadResult.name
       }
 
-      const nameSearch = removeVietnameseTones(normalizedName)
-
       const normalizedDetail = toTitleCaseVI(addressDetail.trim())
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
@@ -712,7 +709,6 @@ export default function AddStore() {
       const { data: insertedRows, error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
-          name_search: nameSearch,
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,

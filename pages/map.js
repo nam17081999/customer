@@ -4,15 +4,10 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 
 const DEFAULT_CENTER = [106.70098, 10.7769]
-
-function normalizeText(value = '') {
-  return removeVietnameseTones(String(value).toLowerCase()).trim()
-}
 
 /**
  * Get the first meaningful word of a store name,
@@ -286,12 +281,12 @@ export default function MapPage() {
   }, [storesWithCoords, mapReady, clearMarkers, applyMarkerStyleByZoom])
 
   const handleSearch = useCallback(() => {
-    const query = normalizeText(searchTerm)
+    const query = searchTerm.trim().toLowerCase()
     if (!query) return
 
     const matched = storesWithCoords.find((store) => {
-      const normalizedName = normalizeText(store.name)
-      return normalizedName === query || normalizedName.includes(query)
+      const name = (store.name || '').toLowerCase()
+      return name === query || name.includes(query)
     })
 
     if (!matched) return
@@ -338,7 +333,7 @@ export default function MapPage() {
       <Dialog open={!!selectedStore} onOpenChange={(open) => { if (!open) setSelectedStore(null) }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
           <DialogTitle className="sr-only">{selectedStore?.name || 'Chi tiết cửa hàng'}</DialogTitle>
-          <DetailStoreModalContent store={selectedStore} showEdit={true} />
+          <DetailStoreModalContent store={selectedStore} />
         </DialogContent>
       </Dialog>
 

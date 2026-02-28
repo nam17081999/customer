@@ -3,12 +3,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import Image from 'next/image'
-import Link from 'next/link'
 import { getFullImageUrl } from '@/helper/imageUtils'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 
-export function DetailStoreModalContent({ store, showEdit = true }) {
+export function DetailStoreModalContent({ store }) {
   if (!store) return null
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
   const isActive = Boolean(store.active)
@@ -16,7 +15,7 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
 
   const ActionSection = () => (
     <div className="flex-shrink-0 pt-4 md:pt-6 border-t border-gray-200 dark:border-gray-700 mt-4 md:mt-6">
-      {/* Mobile (2 buttons per row) */}
+      {/* Mobile */}
       <div className="sm:hidden">
         <div className="grid grid-cols-2 gap-2">
           {hasCoords && (
@@ -25,14 +24,6 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" /></svg>
                 Bản đồ
               </a>
-            </Button>
-          )}
-          {showEdit && (
-            <Button asChild variant="outline" className="w-full h-11 text-sm">
-              <Link href={`/store/${store.id}`} className="flex items-center justify-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Sửa
-              </Link>
             </Button>
           )}
           <DialogClose asChild>
@@ -57,14 +48,6 @@ export function DetailStoreModalContent({ store, showEdit = true }) {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" /></svg>
               Bản đồ
             </a>
-          </Button>
-        )}
-        {showEdit && (
-          <Button asChild variant="outline" className="flex-1 h-12">
-            <Link href={`/store/${store.id}`} className="flex items-center justify-center gap-3">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Sửa
-            </Link>
           </Button>
         )}
         <DialogClose asChild>

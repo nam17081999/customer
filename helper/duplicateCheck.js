@@ -5,7 +5,6 @@
  * and compares remaining keywords to find nearby or global duplicates.
  */
 
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { haversineKm } from '@/helper/distance'
 import { getOrRefreshStores } from '@/lib/storeCache'
 
@@ -63,9 +62,9 @@ export const NAME_SUGGESTIONS = [
 // ── Internal helpers ────────────────────────────────────────────────────
 
 export function normalizeNameForMatch(raw) {
-  const base = removeVietnameseTones(String(raw || ''))
-  return base
-    .replace(/[^a-z0-9]+/g, ' ')
+  return String(raw || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -78,9 +77,10 @@ export function stripIgnoredPhrases(normalized) {
   let out = ` ${normalized} `
   for (const phrase of ignoredList) {
     if (!phrase) continue
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const re = new RegExp(`\\b${escaped}\\b`, 'g')
-    out = out.replace(re, ' ')
+    // Use space boundaries instead of \b for Vietnamese diacritics compatibility
+    while (out.includes(` ${phrase} `)) {
+      out = out.replace(` ${phrase} `, ' ')
+    }
   }
   return out.replace(/\s+/g, ' ').trim()
 }
@@ -96,8 +96,8 @@ export function extractWords(normalized) {
 // ── Comparison functions ────────────────────────────────────────────────
 
 /** Returns true if *any* keyword from `inputWords` appears in the store name. */
-export function isSimilarNameByWords(inputWords, storeName, storeNameSearch) {
-  const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
+export function isSimilarNameByWords(inputWords, storeName) {
+  const storeNorm = normalizeNameForMatch(storeName || '')
   if (!storeNorm || inputWords.length === 0) return false
   const storeWords = extractWords(storeNorm)
   if (storeWords.length === 0) return false
@@ -109,9 +109,9 @@ export function isSimilarNameByWords(inputWords, storeName, storeNameSearch) {
 }
 
 /** Returns true if *all* keywords from `inputWords` appear in the store name. */
-export function containsAllInputWords(inputWords, storeName, storeNameSearch) {
+export function containsAllInputWords(inputWords, storeName) {
   if (!Array.isArray(inputWords) || inputWords.length === 0) return false
-  const storeNorm = normalizeNameForMatch(storeNameSearch || storeName || '')
+  const storeNorm = normalizeNameForMatch(storeName || '')
   if (!storeNorm) return false
   const storeWords = extractWords(storeNorm)
   if (storeWords.length === 0) return false
@@ -138,7 +138,7 @@ export async function findNearbySimilarStores(lat, lng, inputName, radiusKm = 0.
   return allStores
     .filter((s) => isFinite(s?.latitude) && isFinite(s?.longitude))
     .map((s) => ({ ...s, distance: haversineKm(lat, lng, s.latitude, s.longitude) }))
-    .filter((s) => s.distance <= radiusKm && isSimilarNameByWords(inputWords, s.name, s.name_search))
+    .filter((s) => s.distance <= radiusKm && isSimilarNameByWords(inputWords, s.name))
     .sort((a, b) => a.distance - b.distance)
 }
 
@@ -155,7 +155,7 @@ export async function findGlobalExactNameMatches(inputName) {
   const allStores = await getOrRefreshStores()
 
   return allStores
-    .filter((s) => containsAllInputWords(inputWords, s.name, s.name_search))
+    .filter((s) => containsAllInputWords(inputWords, s.name))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
 }
 
