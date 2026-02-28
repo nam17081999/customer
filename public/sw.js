@@ -9,7 +9,7 @@
  *   - Offline fallback page for navigation requests
  */
 
-const CACHE_VERSION = 'v1'
+const CACHE_VERSION = 'v2'
 const APP_CACHE = `storevis-app-${CACHE_VERSION}`
 const DATA_CACHE = `storevis-data-${CACHE_VERSION}`
 const IMG_CACHE = `storevis-img-${CACHE_VERSION}`
