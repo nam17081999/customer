@@ -79,6 +79,7 @@ export default function MapPage() {
   const maplibreRef = useRef(null)
   const markersRef = useRef([])
   const markerByStoreIdRef = useRef(new Map())
+  const highlightedRef = useRef(null)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -300,6 +301,27 @@ export default function MapPage() {
     const map = mapRef.current
     if (!map) return
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
+
+    // Reset previous highlighted marker
+    if (highlightedRef.current) {
+      const prev = highlightedRef.current
+      if (prev.wrapper) prev.wrapper.style.setProperty('z-index', prev.originalZ)
+      prev.marker.getElement()?.classList.remove('store-marker-highlight')
+      highlightedRef.current = null
+    }
+
+    // Highlight the searched marker
+    const marker = markerByStoreIdRef.current.get(store.id)
+    if (marker) {
+      const el = marker.getElement()
+      const wrapper = el?.parentElement?.classList?.contains('maplibregl-marker')
+        ? el.parentElement : el
+      const originalZ = wrapper?.style.zIndex || '0'
+      if (wrapper) wrapper.style.setProperty('z-index', '999999', 'important')
+      el?.classList.add('store-marker-highlight')
+      highlightedRef.current = { marker, originalZ, wrapper }
+    }
+
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
@@ -530,6 +552,11 @@ export default function MapPage() {
 
         .hidden {
           display: none;
+        }
+
+        .store-marker-highlight .store-marker-avatar {
+          border-color: #38bdf8;
+          box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 8px 18px rgba(0, 0, 0, 0.25);
         }
       `}</style>
     </div>
