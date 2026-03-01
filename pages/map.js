@@ -6,6 +6,13 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
+function formatShortAddress(store) {
+  if (!store) return ''
+  const parts = []
+  if (store.ward) parts.push(store.ward)
+  if (store.district) parts.push(store.district)
+  return parts.join(', ')
+}
 
 const DEFAULT_CENTER = [106.70098, 10.7769]
 
@@ -79,6 +86,12 @@ export default function MapPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStore, setSelectedStore] = useState(null)
   const [mapReady, setMapReady] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeSuggestion, setActiveSuggestion] = useState(-1)
+  const [canScrollDown, setCanScrollDown] = useState(false)
+  const searchWrapperRef = useRef(null)
+  const inputRef = useRef(null)
+  const suggestionsRef = useRef(null)
 
   const storesWithCoords = useMemo(() => {
     return stores
@@ -86,9 +99,11 @@ export default function MapPage() {
       .filter((store) => store.coords)
   }, [stores])
 
-  const storeNames = useMemo(() => {
-    return storesWithCoords.map((store) => store.name).filter(Boolean)
-  }, [storesWithCoords])
+  const suggestions = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase()
+    if (!q) return []
+    return storesWithCoords.filter((s) => (s.name || '').toLowerCase().includes(q))
+  }, [searchTerm, storesWithCoords])
 
   const clearMarkers = useCallback(() => {
     markersRef.current.forEach((marker) => marker.remove())
@@ -280,6 +295,16 @@ export default function MapPage() {
     applyMarkerStyleByZoom()
   }, [storesWithCoords, mapReady, clearMarkers, applyMarkerStyleByZoom])
 
+  const flyToStore = useCallback((store) => {
+    if (!store?.coords) return
+    const map = mapRef.current
+    if (!map) return
+    map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
+    setShowSuggestions(false)
+    setSearchTerm(store.name || '')
+    inputRef.current?.blur()
+  }, [])
+
   const handleSearch = useCallback(() => {
     const query = searchTerm.trim().toLowerCase()
     if (!query) return
@@ -289,44 +314,115 @@ export default function MapPage() {
       return name === query || name.includes(query)
     })
 
-    if (!matched) return
+    if (matched) flyToStore(matched)
+    setShowSuggestions(false)
+  }, [searchTerm, storesWithCoords, flyToStore])
 
-    const map = mapRef.current
-    if (!map) return
+  // Close suggestions on outside click
+  useEffect(() => {
+    function onPointerDown(e) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [])
 
-    map.flyTo({ center: [matched.coords.lng, matched.coords.lat], zoom: 16, duration: 900 })
-  }, [searchTerm, storesWithCoords])
+  // Recalculate scroll indicator when suggestions change
+  useEffect(() => {
+    const el = suggestionsRef.current
+    if (el) {
+      setCanScrollDown(el.scrollHeight > el.clientHeight + 2)
+    } else {
+      setCanScrollDown(false)
+    }
+  }, [suggestions])
 
   return (
     <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100">
       <div ref={mapContainerRef} className="absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
-        <div className="pointer-events-auto mx-auto w-full max-w-md rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
-          <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
-            <Input
-              list="store-name-options"
-              placeholder="Tìm cửa hàng..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSearch()
-              }}
-              className="h-9 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-[16px] sm:text-sm text-slate-100 placeholder:text-slate-400"
-            />
-            <datalist id="store-name-options">
-              {storeNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-            <Button
-              onClick={handleSearch}
-              className="h-9 rounded-lg bg-sky-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
-              disabled={loading || Boolean(error)}
-            >
-              Tìm
-            </Button>
+        <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md">
+          <div className="rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
+            <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
+              <Input
+                ref={inputRef}
+                placeholder="Tìm cửa hàng..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value)
+                  setShowSuggestions(true)
+                  setActiveSuggestion(-1)
+                }}
+                onFocus={() => { if (searchTerm.trim()) setShowSuggestions(true) }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1))
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setActiveSuggestion((i) => Math.max(i - 1, -1))
+                  } else if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+                      flyToStore(suggestions[activeSuggestion])
+                    } else {
+                      handleSearch()
+                    }
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false)
+                    inputRef.current?.blur()
+                  }
+                }}
+                className="h-9 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-[16px] sm:text-sm text-slate-100 placeholder:text-slate-400"
+              />
+              <Button
+                onClick={handleSearch}
+                className="h-9 rounded-lg bg-sky-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
+                disabled={loading || Boolean(error)}
+              >
+                Tìm
+              </Button>
+            </div>
           </div>
+
+          {/* Suggestions dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="relative mt-1 rounded-xl bg-slate-900/95 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
+              <div
+                ref={suggestionsRef}
+                className="max-h-64 overflow-y-auto"
+                onScroll={(e) => {
+                  const el = e.currentTarget
+                  setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2)
+                }}
+              >
+                {suggestions.map((store, idx) => (
+                  <button
+                    key={store.id}
+                    type="button"
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${
+                      idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-slate-800/80'
+                    } border-b border-slate-700/50`}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => flyToStore(store)}
+                  >
+                    <span className="min-w-0 truncate text-sm font-medium text-slate-100">{store.name}</span>
+                    <span className="shrink-0 max-w-[45%] truncate text-right text-xs text-slate-400">{formatShortAddress(store)}</span>
+                  </button>
+                ))}
+              </div>
+              {canScrollDown && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-slate-900/90 to-transparent pb-1 pt-4">
+                  <svg width="14" height="8" viewBox="0 0 14 8" className="text-slate-400">
+                    <path d="M1 1l6 6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
