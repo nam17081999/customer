@@ -1,15 +1,59 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { useLoadScript, GoogleMap } from '@react-google-maps/api'
+import { loadGoogleMaps, isGoogleMapsLoaded } from '@/lib/googleMaps'
 
 // A lightweight Google Maps location picker that mirrors the center-overlay UX.
 // Props: initialLat, initialLng, onChange(lat,lng), editable (boolean), className, onToggleEditable, height
 export default function GoogleLocationPicker({ initialLat, initialLng, onChange, editable = true, className, onToggleEditable, height = 320 }) {
   const defaultCenter = { lat: initialLat || 10.7769, lng: initialLng || 106.70098 }
   const [center, setCenter] = useState(defaultCenter)
+  const [loaded, setLoaded] = useState(isGoogleMapsLoaded())
+  const [loadError, setLoadError] = useState(null)
   const mapRef = useRef(null)
+  const mapContainerRef = useRef(null)
   const centerRef = useRef(center)
 
   useEffect(() => { centerRef.current = center }, [center])
+
+  // Load Google Maps
+  useEffect(() => {
+    if (loaded) return
+    loadGoogleMaps()
+      .then(() => setLoaded(true))
+      .catch((err) => setLoadError(err.message))
+  }, [loaded])
+
+  // Init map once loaded
+  useEffect(() => {
+    if (!loaded || !mapContainerRef.current || mapRef.current) return
+    const map = new window.google.maps.Map(mapContainerRef.current, {
+      center: centerRef.current,
+      zoom: 18,
+      disableDefaultUI: true,
+      gestureHandling: editable ? 'greedy' : 'none',
+      draggable: !!editable,
+      clickableIcons: false,
+    })
+    mapRef.current = map
+
+    // Emit center on idle
+    map.addListener('idle', () => {
+      const c = map.getCenter()
+      if (!c) return
+      const lat = c.lat()
+      const lng = c.lng()
+      setCenter({ lat, lng })
+      if (editable && onChange) onChange(lat, lng)
+    })
+  }, [loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update editable state
+  useEffect(() => {
+    if (!mapRef.current) return
+    mapRef.current.setOptions({
+      gestureHandling: editable ? 'greedy' : 'none',
+      draggable: !!editable,
+    })
+  }, [editable])
 
   useEffect(() => {
     if (initialLat && initialLng) {
@@ -21,48 +65,15 @@ export default function GoogleLocationPicker({ initialLat, initialLng, onChange,
     }
   }, [initialLat, initialLng])
 
-  const libs = ['places']
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey, libraries: libs })
-
-  const onMapLoad = useCallback((map) => {
-    mapRef.current = map
-  }, [])
-
-  // Emit center updates on idle (after move/zoom) when editable
-  const onIdle = useCallback(() => {
-    if (!mapRef.current) return
-    const c = mapRef.current.getCenter()
-    if (!c) return
-    const lat = c.lat()
-    const lng = c.lng()
-    setCenter({ lat, lng })
-    if (editable && onChange) onChange(lat, lng)
-  }, [editable, onChange])
-
   if (loadError) return <div>Không tải được bản đồ Google</div>
-  if (!isLoaded) return <div>Đang nạp bản đồ…</div>
+  if (!loaded) return <div>Đang nạp bản đồ…</div>
 
   // Parse height - support both number and string like "60vh"
-  const mapHeight = typeof height === 'number' ? height : height
+  const mapHeight = typeof height === 'number' ? `${height}px` : height
 
   return (
     <div className={className} style={{ position: 'relative' }}>
-      <GoogleMap
-        mapContainerStyle={{ width: '100%', height: mapHeight }}
-        center={center}
-        zoom={18}
-        options={{
-          disableDefaultUI: true,
-          gestureHandling: editable ? 'greedy' : 'none',
-          draggable: !!editable,
-          clickableIcons: false,
-        }}
-        onLoad={onMapLoad}
-        onIdle={onIdle}
-      >
-        {/* Intentionally empty children — we rely on center overlay */}
-      </GoogleMap>
+      <div ref={mapContainerRef} style={{ width: '100%', height: mapHeight }} />
 
       {/* dim overlay when locked - blocks interactions */}
       {!editable && (

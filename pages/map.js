@@ -1,4 +1,3 @@
-import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -6,6 +5,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
+import { loadGoogleMaps } from '@/lib/googleMaps'
+
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -14,7 +15,66 @@ function formatShortAddress(store) {
   return parts.join(', ')
 }
 
-const DEFAULT_CENTER = [106.70098, 10.7769]
+const DEFAULT_CENTER = { lat: 10.7769, lng: 106.70098 }
+
+// Lazy-initialized custom OverlayView class for HTML markers
+let _HtmlMarkerOverlay = null
+function getHtmlMarkerOverlayClass() {
+  if (_HtmlMarkerOverlay) return _HtmlMarkerOverlay
+
+  class HtmlMarkerOverlay extends window.google.maps.OverlayView {
+    constructor(position, content, zIndex, onClick) {
+      super()
+      this.position = position
+      this.content = content
+      this.zIndex_ = zIndex
+      this.onClick = onClick
+      this.div = null
+    }
+
+    onAdd() {
+      this.div = document.createElement('div')
+      this.div.style.position = 'absolute'
+      this.div.style.zIndex = this.zIndex_
+      this.div.style.cursor = 'pointer'
+      this.div.appendChild(this.content)
+      if (this.onClick) {
+        this.div.addEventListener('click', (e) => {
+          e.stopPropagation()
+          this.onClick()
+        })
+      }
+      const panes = this.getPanes()
+      panes.overlayMouseTarget.appendChild(this.div)
+    }
+
+    draw() {
+      if (!this.div) return
+      const projection = this.getProjection()
+      if (!projection) return
+      const pos = projection.fromLatLngToDivPixel(this.position)
+      if (pos) {
+        this.div.style.left = pos.x + 'px'
+        this.div.style.top = pos.y + 'px'
+        this.div.style.transform = 'translate(-50%, -50%)'
+      }
+    }
+
+    onRemove() {
+      if (this.div?.parentNode) {
+        this.div.parentNode.removeChild(this.div)
+        this.div = null
+      }
+    }
+
+    getElement() {
+      return this.content
+    }
+  }
+
+  _HtmlMarkerOverlay = HtmlMarkerOverlay
+  return _HtmlMarkerOverlay
+}
 
 /**
  * Get the first meaningful word of a store name,
@@ -76,7 +136,6 @@ function buildAddress(store) {
 export default function MapPage() {
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
-  const maplibreRef = useRef(null)
   const markersRef = useRef([])
   const markerByStoreIdRef = useRef(new Map())
   const highlightedRef = useRef(null)
@@ -87,12 +146,56 @@ export default function MapPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedStore, setSelectedStore] = useState(null)
   const [mapReady, setMapReady] = useState(false)
+  const [gmapsError, setGmapsError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState(-1)
   const [canScrollDown, setCanScrollDown] = useState(false)
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+
+  // Init Google Maps
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return
+    let cancelled = false
+
+    loadGoogleMaps()
+      .then(() => {
+        if (cancelled || !mapContainerRef.current) return
+        const map = new window.google.maps.Map(mapContainerRef.current, {
+          center: DEFAULT_CENTER,
+          zoom: 13,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          gestureHandling: 'greedy',
+          styles: [{ featureType: 'poi', stylers: [{ visibility: 'off' }] }],
+        })
+        mapRef.current = map
+        setMapReady(true)
+
+        // Try to center on user location
+        if (navigator.geolocation) {
+          const panToPos = (pos) => {
+            try { map.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }) } catch {}
+          }
+          navigator.geolocation.getCurrentPosition(panToPos, () => {
+            navigator.geolocation.getCurrentPosition(panToPos, () => {}, {
+              enableHighAccuracy: false, timeout: 10000, maximumAge: 300000,
+            })
+          }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 })
+        }
+      })
+      .catch((err) => {
+        console.error('Google Maps load error:', err)
+        if (!cancelled) setGmapsError(err.message || 'Không thể tải Google Maps')
+      })
+
+    return () => { cancelled = true }
+  }, [])
 
   const storesWithCoords = useMemo(() => {
     return stores
@@ -107,109 +210,20 @@ export default function MapPage() {
   }, [searchTerm, storesWithCoords])
 
   const clearMarkers = useCallback(() => {
-    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.forEach((m) => {
+      if (m.setMap) m.setMap(null)
+      if (m.map) m.map = null
+    })
     markersRef.current = []
     markerByStoreIdRef.current.clear()
   }, [])
 
-  const applyMarkerStyleByZoom = useCallback(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const zoom = map.getZoom()
-    const size = zoom < 7 ? 20 : zoom < 8 ? 24 : zoom < 9 ? 30 : zoom < 11 ? 40 : 56
-
-    const showName = zoom >= 11
-
-    markersRef.current.forEach((marker) => {
-      const el = marker.getElement()
-      if (!el) return
-      el.style.setProperty('--marker-size', `${size}px`)
-      const nameEl = el.querySelector('.store-marker-name')
-      if (nameEl) nameEl.style.display = showName ? 'block' : 'none'
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return
-
-    let cancelled = false
-    let activeMap = null
-
-    const initMap = async () => {
-      const maplibreModule = await import('maplibre-gl')
-      if (cancelled || !mapContainerRef.current) return
-
-      const maplibregl = maplibreModule.default
-      maplibreRef.current = maplibregl
-
-      const map = new maplibregl.Map({
-        container: mapContainerRef.current,
-        style: {
-          version: 8,
-          sources: {
-            osm: {
-              type: 'raster',
-              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-              tileSize: 256,
-              attribution: '© OpenStreetMap'
-            }
-          },
-          layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
-        },
-        center: DEFAULT_CENTER,
-        zoom: 13,
-        minZoom: 3,
-        maxZoom: 20,
-        attributionControl: true
-      })
-
-      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
-      map.on('zoom', applyMarkerStyleByZoom)
-
-      // Try to center on user location
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (!cancelled) {
-              map.flyTo({
-                center: [pos.coords.longitude, pos.coords.latitude],
-                zoom: 13,
-                duration: 1200
-              })
-            }
-          },
-          () => { /* ignore error, keep default center */ },
-          { enableHighAccuracy: true, timeout: 8000 }
-        )
-      }
-
-      mapRef.current = map
-      activeMap = map
-      setMapReady(true)
-    }
-
-    initMap().catch((e) => {
-      console.error(e)
-      setError('Không thể khởi tạo bản đồ. Vui lòng tải lại trang.')
-    })
-
-    return () => {
-      cancelled = true
-      clearMarkers()
-      if (activeMap) activeMap.remove()
-      mapRef.current = null
-      setMapReady(false)
-    }
-  }, [clearMarkers, applyMarkerStyleByZoom])
-
+  // Fetch stores
   useEffect(() => {
     let active = true
-
     const fetchAllStores = async () => {
       setLoading(true)
       setError('')
-
       try {
         const data = await getOrRefreshStores()
         if (active) setStores(data)
@@ -222,26 +236,23 @@ export default function MapPage() {
         if (active) setLoading(false)
       }
     }
-
     fetchAllStores()
-
-    return () => {
-      active = false
-    }
+    return () => { active = false }
   }, [])
 
+  // Place markers when stores or map is ready
   useEffect(() => {
     const map = mapRef.current
-    const maplibregl = maplibreRef.current
-    if (!map || !maplibregl || !mapReady) return
+    if (!map || !mapReady) return
 
     clearMarkers()
-
     if (storesWithCoords.length === 0) return
 
     storesWithCoords.forEach((store) => {
       const { lat, lng } = store.coords
+      const fallbackWord = getFirstWord(store.name)
 
+      // Create custom marker element
       const markerEl = document.createElement('button')
       markerEl.type = 'button'
       markerEl.className = 'store-marker'
@@ -250,17 +261,14 @@ export default function MapPage() {
       const markerAvatar = document.createElement('span')
       markerAvatar.className = 'store-marker-avatar'
 
-      const fallbackWord = getFirstWord(store.name)
       const text = document.createElement('span')
       text.className = 'store-marker-text'
       text.textContent = fallbackWord
       markerAvatar.appendChild(text)
-
       markerEl.appendChild(markerAvatar)
 
       const nameLabel = document.createElement('span')
       nameLabel.className = 'store-marker-name'
-      // Show 3 words per line, wrap rest to next line
       const rawName = store.name || 'Cửa hàng'
       const words = rawName.split(/\s+/)
       if (words.length <= 3) {
@@ -274,52 +282,67 @@ export default function MapPage() {
       }
       markerEl.appendChild(nameLabel)
 
-      const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(map)
-
-      // z-index: stores lower on screen (smaller lat) render on top
-      const wrapperEl = marker.getElement()?.parentElement || marker.getElement()
-      if (wrapperEl?.classList?.contains('maplibregl-marker')) {
-        wrapperEl.style.zIndex = Math.round((90 - lat) * 1000)
-      }
-
-      markerEl.addEventListener('click', (e) => {
-        e.stopPropagation()
-        map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 })
-        setSelectedStore(store)
-      })
+      const HtmlMarkerOverlay = getHtmlMarkerOverlayClass()
+      const marker = new HtmlMarkerOverlay(
+        new window.google.maps.LatLng(lat, lng),
+        markerEl,
+        Math.round((90 - lat) * 1000),
+        () => {
+          map.panTo({ lat, lng })
+          map.setZoom(Math.max(map.getZoom(), 16))
+          setSelectedStore(store)
+        }
+      )
+      marker.setMap(map)
 
       markersRef.current.push(marker)
       markerByStoreIdRef.current.set(store.id, marker)
     })
-    applyMarkerStyleByZoom()
-  }, [storesWithCoords, mapReady, clearMarkers, applyMarkerStyleByZoom])
+
+    // Update marker sizes on zoom change
+    const updateMarkerSizes = () => {
+      const zoom = map.getZoom()
+      const size = zoom < 7 ? 20 : zoom < 8 ? 24 : zoom < 9 ? 30 : zoom < 11 ? 40 : 56
+      const showName = zoom >= 11
+
+      markersRef.current.forEach((marker) => {
+        const el = marker.getElement?.()
+        if (!el) return
+        el.style.setProperty('--marker-size', `${size}px`)
+        const nameEl = el.querySelector('.store-marker-name')
+        if (nameEl) nameEl.style.display = showName ? 'block' : 'none'
+      })
+    }
+
+    const listener = map.addListener('zoom_changed', updateMarkerSizes)
+    updateMarkerSizes()
+
+    return () => {
+      if (listener) window.google.maps.event.removeListener(listener)
+    }
+  }, [storesWithCoords, mapReady, clearMarkers])
 
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
     const map = mapRef.current
     if (!map) return
-    map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
+    map.panTo({ lat: store.coords.lat, lng: store.coords.lng })
+    map.setZoom(16)
 
     // Reset previous highlighted marker
     if (highlightedRef.current) {
       const prev = highlightedRef.current
-      if (prev.wrapper) prev.wrapper.style.setProperty('z-index', prev.originalZ)
-      prev.marker.getElement()?.classList.remove('store-marker-highlight')
+      const el = prev.marker.getElement?.()
+      el?.classList.remove('store-marker-highlight')
       highlightedRef.current = null
     }
 
     // Highlight the searched marker
     const marker = markerByStoreIdRef.current.get(store.id)
     if (marker) {
-      const el = marker.getElement()
-      const wrapper = el?.parentElement?.classList?.contains('maplibregl-marker')
-        ? el.parentElement : el
-      const originalZ = wrapper?.style.zIndex || '0'
-      if (wrapper) wrapper.style.setProperty('z-index', '999999', 'important')
+      const el = marker.getElement?.()
       el?.classList.add('store-marker-highlight')
-      highlightedRef.current = { marker, originalZ, wrapper }
+      highlightedRef.current = { marker }
     }
 
     setShowSuggestions(false)
@@ -360,6 +383,23 @@ export default function MapPage() {
       setCanScrollDown(false)
     }
   }, [suggestions])
+
+  if (gmapsError) return (
+    <div className="flex flex-col items-center justify-center h-screen gap-4 px-6 text-center">
+      <div className="text-red-500 text-lg font-semibold">Không tải được bản đồ Google Maps</div>
+      <div className="text-sm text-gray-500 max-w-md">
+        Vui lòng kiểm tra:
+        <ul className="mt-2 text-left list-disc list-inside space-y-1">
+          <li>Tắt trình chặn quảng cáo (uBlock Origin, AdBlock...) cho trang này</li>
+          <li>Kiểm tra kết nối mạng</li>
+          <li>API key Google Maps đã được bật Maps JavaScript API</li>
+        </ul>
+      </div>
+      <button onClick={() => window.location.reload()} className="mt-2 px-4 py-2 bg-sky-500 text-sm text-white rounded-lg hover:bg-sky-400">
+        Tải lại trang
+      </button>
+    </div>
+  )
 
   return (
     <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100">
@@ -456,27 +496,6 @@ export default function MapPage() {
       </Dialog>
 
       <style jsx global>{`
-        .maplibregl-map {
-          position: absolute;
-          inset: 0;
-          width: 100%;
-          height: 100%;
-          background: #e5e7eb;
-        }
-
-        .maplibregl-canvas-container,
-        .maplibregl-canvas {
-          width: 100% !important;
-          height: 100% !important;
-        }
-
-        .maplibregl-marker {
-          position: absolute !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          overflow: visible !important;
-        }
-
         .store-marker {
           width: var(--marker-size, 56px);
           height: var(--marker-size, 56px);

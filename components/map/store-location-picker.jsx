@@ -1,4 +1,4 @@
-import LocationPicker from '@/components/map/location-picker'
+import GoogleLocationPicker from '@/components/map/google-location-picker'
 import { Button } from '@/components/ui/button'
 
 /**
@@ -121,7 +121,7 @@ export default function StoreLocationPicker({
 
       {/* Map */}
       <div className="relative">
-        <LocationPicker
+        <GoogleLocationPicker
           key={mapKey}
           initialLat={initialLat}
           initialLng={initialLng}
@@ -129,7 +129,6 @@ export default function StoreLocationPicker({
           className={`rounded-md overflow-hidden ${geoBlocked ? 'blur-sm pointer-events-none select-none' : ''}`}
           editable={editable}
           onToggleEditable={onToggleEditable}
-          heading={heading}
           height={height}
         />
 
