@@ -86,6 +86,10 @@ export default function AddStore() {
   const mapWrapperRef = useRef(null)
   const [geoBlocked, setGeoBlocked] = useState(false)
   const [step2Key, setStep2Key] = useState(0)
+  const [mapsLink, setMapsLink] = useState('')
+  const [mapsLinkLoading, setMapsLinkLoading] = useState(false)
+  const [mapsLinkError, setMapsLinkError] = useState('')
+  const [showMapsLinkInput, setShowMapsLinkInput] = useState(false)
   const hasUnsavedChanges = useMemo(() => {
     if (loading) return false
     return Boolean(
@@ -102,6 +106,87 @@ export default function AddStore() {
     )
   }, [name, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading])
 
+
+  // Extract lat/lng from a Google Maps URL
+  function extractCoordsFromUrl(url) {
+    // Pattern: @lat,lng or !3dlat!4dlng or q=lat,lng or ll=lat,lng or center=lat,lng
+    const patterns = [
+      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]center=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /\/place\/[^/]*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ]
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match) {
+        const lat = parseFloat(match[1])
+        const lng = parseFloat(match[2])
+        if (isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng }
+        }
+      }
+    }
+    return null
+  }
+
+  async function handleMapsLink(link) {
+    const trimmed = (link || '').trim()
+    setMapsLink(trimmed)
+    setMapsLinkError('')
+    if (!trimmed) return
+
+    // Try extract directly first
+    let coords = extractCoordsFromUrl(trimmed)
+    if (coords) {
+      applyMapsLinkCoords(coords.lat, coords.lng)
+      return
+    }
+
+    // If short link, expand it via API
+    const isShortLink = /goo\.gl|maps\.app\.goo\.gl/i.test(trimmed)
+    if (!isShortLink) {
+      setMapsLinkError('Không tìm thấy tọa độ trong link')
+      return
+    }
+
+    try {
+      setMapsLinkLoading(true)
+      const res = await fetch('/api/expand-maps-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: trimmed }),
+      })
+      const data = await res.json()
+      if (!data.success || !data.finalUrl) {
+        setMapsLinkError('Không mở được link')
+        return
+      }
+      coords = extractCoordsFromUrl(data.finalUrl)
+      if (coords) {
+        applyMapsLinkCoords(coords.lat, coords.lng)
+      } else {
+        setMapsLinkError('Không tìm thấy tọa độ từ link')
+      }
+    } catch {
+      setMapsLinkError('Lỗi khi xử lý link')
+    } finally {
+      setMapsLinkLoading(false)
+    }
+  }
+
+  function applyMapsLinkCoords(lat, lng) {
+    setPickedLat(lat)
+    setPickedLng(lng)
+    setInitialGPSLat(lat)
+    setInitialGPSLng(lng)
+    setUserHasEditedMap(true)
+    setGeoBlocked(false)
+    setStep2Key((k) => k + 1)
+    setMapsLinkError('')
+    showMessage('success', `Đã lấy vị trí: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+  }
 
   // Stable handler for LocationPicker - track manual edits
   const handleLocationChange = useCallback((lat, lng) => {
@@ -240,6 +325,9 @@ export default function AddStore() {
     compassOnceRef.current = false
     setGeoBlocked(false)
     setStep2Key((k) => k + 1)
+    setMapsLink('')
+    setMapsLinkError('')
+    setShowMapsLinkInput(false)
     setFieldErrors({})
     if (router.query?.name) {
       try {
@@ -987,7 +1075,7 @@ export default function AddStore() {
           {currentStep === 3 && (
             <>
               {/* Map Picker */}
-              <div className="pt-1" ref={mapWrapperRef}>
+              <div ref={mapWrapperRef}>
                 <StoreLocationPicker
                   mapKey={`step2-${step2Key}`}
                   initialLat={pickedLat}
@@ -1004,6 +1092,34 @@ export default function AddStore() {
                   resolvingAddr={resolvingAddr}
                 />
               </div>
+
+          {/* Maps link input - desktop only, always visible */}
+          <div className="hidden md:block pt-2 space-y-1.5">
+            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
+            <div className="flex gap-2">
+              <Input
+                value={mapsLink}
+                onChange={(e) => setMapsLink(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMapsLink(mapsLink) } }}
+                placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
+                className="text-base sm:text-base flex-1 min-w-0"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mapsLinkLoading || !mapsLink.trim()}
+                onClick={() => handleMapsLink(mapsLink)}
+                className="shrink-0 px-3 text-sm whitespace-nowrap"
+              >
+                {mapsLinkLoading ? (
+                  <svg className="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                ) : null}
+                {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
+              </Button>
+            </div>
+            {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
+            <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
+          </div>
 
           {/* Back and Submit buttons for step 3 */}
           <div className="pt-2 flex gap-2">

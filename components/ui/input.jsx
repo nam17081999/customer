@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const Input = React.forwardRef(({ className, type = 'text', value, onChange, ...props }, ref) => {
   const showClear = type === 'text' && typeof value === 'string' && value.length > 0 && typeof onChange === 'function'
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <input
         type={type}
         className={cn(

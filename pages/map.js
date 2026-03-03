@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DetailStoreModalContent } from '@/components/detail-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
+import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -14,7 +15,7 @@ function formatShortAddress(store) {
   return parts.join(', ')
 }
 
-const DEFAULT_CENTER = [106.70098, 10.7769]
+const DEFAULT_CENTER = [105.6955684, 21.0768617]
 
 /**
  * Get the first meaningful word of a store name,
@@ -90,15 +91,85 @@ export default function MapPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState(-1)
   const [canScrollDown, setCanScrollDown] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [selectedDistricts, setSelectedDistricts] = useState([])
+  const [selectedWards, setSelectedWards] = useState([])
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+
+  // Detect desktop via pointer capability (not screen width)
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)')
+    setIsDesktop(mq.matches)
+    const handler = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const storesWithCoords = useMemo(() => {
     return stores
       .map((store) => ({ ...store, coords: toLatLng(store) }))
       .filter((store) => store.coords)
   }, [stores])
+
+  // Filtered stores based on district/ward selection
+  // Rule: must select ward(s) to show stores — selecting district alone only reveals ward options
+  const filteredStores = useMemo(() => {
+    if (selectedWards.length === 0) return storesWithCoords
+    return storesWithCoords.filter((store) => {
+      const w = (store.ward || '').trim()
+      return selectedWards.includes(w)
+    })
+  }, [storesWithCoords, selectedWards])
+
+  // Available wards based on selected districts
+  const availableWards = useMemo(() => {
+    if (selectedDistricts.length === 0) return []
+    const wards = []
+    for (const d of selectedDistricts) {
+      if (DISTRICT_WARD_SUGGESTIONS[d]) wards.push(...DISTRICT_WARD_SUGGESTIONS[d])
+    }
+    return wards
+  }, [selectedDistricts])
+
+  // Count stores per district and ward for display
+  const storeCounts = useMemo(() => {
+    const districtCounts = {}
+    const wardCounts = {}
+    for (const store of storesWithCoords) {
+      const d = (store.district || '').trim()
+      const w = (store.ward || '').trim()
+      if (d) districtCounts[d] = (districtCounts[d] || 0) + 1
+      if (w) wardCounts[w] = (wardCounts[w] || 0) + 1
+    }
+    return { districtCounts, wardCounts }
+  }, [storesWithCoords])
+
+  const toggleDistrict = useCallback((district) => {
+    setSelectedDistricts(prev => {
+      if (prev.includes(district)) {
+        const next = prev.filter(d => d !== district)
+        // Also remove wards belonging to unselected district
+        const removedWards = DISTRICT_WARD_SUGGESTIONS[district] || []
+        setSelectedWards(w => w.filter(x => !removedWards.includes(x)))
+        return next
+      }
+      return [...prev, district]
+    })
+  }, [])
+
+  const toggleWard = useCallback((ward) => {
+    setSelectedWards(prev =>
+      prev.includes(ward) ? prev.filter(w => w !== ward) : [...prev, ward]
+    )
+  }, [])
+
+  const clearFilters = useCallback(() => {
+    setSelectedDistricts([])
+    setSelectedWards([])
+  }, [])
 
   const suggestions = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -167,23 +238,6 @@ export default function MapPage() {
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
       map.on('zoom', applyMarkerStyleByZoom)
 
-      // Try to center on user location
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            if (!cancelled) {
-              map.flyTo({
-                center: [pos.coords.longitude, pos.coords.latitude],
-                zoom: 13,
-                duration: 1200
-              })
-            }
-          },
-          () => { /* ignore error, keep default center */ },
-          { enableHighAccuracy: true, timeout: 8000 }
-        )
-      }
-
       mapRef.current = map
       activeMap = map
       setMapReady(true)
@@ -239,7 +293,7 @@ export default function MapPage() {
 
     if (storesWithCoords.length === 0) return
 
-    storesWithCoords.forEach((store) => {
+    filteredStores.forEach((store) => {
       const { lat, lng } = store.coords
 
       const markerEl = document.createElement('button')
@@ -274,6 +328,22 @@ export default function MapPage() {
       }
       markerEl.appendChild(nameLabel)
 
+      // Hover tooltip with name + address (desktop only)
+      const tooltip = document.createElement('div')
+      tooltip.className = 'store-marker-tooltip'
+      const tooltipName = document.createElement('div')
+      tooltipName.className = 'store-marker-tooltip-name'
+      tooltipName.textContent = store.name || 'Cửa hàng'
+      tooltip.appendChild(tooltipName)
+      const addr = buildAddress(store)
+      if (addr) {
+        const tooltipAddr = document.createElement('div')
+        tooltipAddr.className = 'store-marker-tooltip-addr'
+        tooltipAddr.textContent = addr
+        tooltip.appendChild(tooltipAddr)
+      }
+      markerEl.appendChild(tooltip)
+
       const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
         .setLngLat([lng, lat])
         .addTo(map)
@@ -294,7 +364,7 @@ export default function MapPage() {
       markerByStoreIdRef.current.set(store.id, marker)
     })
     applyMarkerStyleByZoom()
-  }, [storesWithCoords, mapReady, clearMarkers, applyMarkerStyleByZoom])
+  }, [filteredStores, mapReady, clearMarkers, applyMarkerStyleByZoom])
 
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
@@ -362,11 +432,13 @@ export default function MapPage() {
   }, [suggestions])
 
   return (
-    <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100">
-      <div ref={mapContainerRef} className="absolute inset-0" />
+    <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100 flex">
+      {/* Map area */}
+      <div className="relative flex-1 h-full">
+        <div ref={mapContainerRef} className="absolute inset-0" />
 
       <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
-        <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md">
+        <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
           <div className="rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
             <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
               <Input
@@ -447,6 +519,100 @@ export default function MapPage() {
           )}
         </div>
       </div>
+
+      </div>
+
+      {/* Right Sidebar - desktop only (detected via pointer capability) */}
+      {isDesktop && (
+      <div className="flex flex-col w-[320px] h-full bg-slate-900 border-l border-slate-700/60 shrink-0">
+        {/* Sidebar header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
+          <h2 className="text-sm font-semibold text-slate-100">Bộ lọc khu vực</h2>
+          <div className="flex items-center gap-2">
+            {(selectedDistricts.length > 0 || selectedWards.length > 0) && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-sky-400 hover:text-sky-300"
+              >
+                Xóa lọc
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter count */}
+        <div className="px-4 py-2 text-xs text-slate-400 border-b border-slate-700/40">
+          Hiển thị <span className="font-semibold text-slate-200">{filteredStores.length}</span> / {storesWithCoords.length} cửa hàng
+        </div>
+
+        {/* Scrollable filter content */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          {/* District section */}
+          <div>
+            <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.keys(DISTRICT_WARD_SUGGESTIONS).map((district) => {
+                const active = selectedDistricts.includes(district)
+                const count = storeCounts.districtCounts[district] || 0
+                return (
+                  <button
+                    key={district}
+                    type="button"
+                    onClick={() => toggleDistrict(district)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      active
+                        ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-600/40'
+                    }`}
+                  >
+                    {district}
+                    {count > 0 && <span className={`text-[10px] ${active ? 'text-sky-400' : 'text-slate-500'}`}>({count})</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Ward section - only show when districts selected */}
+          {selectedDistricts.length > 0 && availableWards.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-slate-500">(chọn để hiển thị)</span></h3>
+              {selectedDistricts.map((district) => {
+                const wards = DISTRICT_WARD_SUGGESTIONS[district] || []
+                if (wards.length === 0) return null
+                return (
+                  <div key={district} className="mb-3">
+                    <div className="text-[11px] font-medium text-slate-400 mb-1.5">{district}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {wards.map((ward) => {
+                        const active = selectedWards.includes(ward)
+                        const count = storeCounts.wardCounts[ward] || 0
+                        return (
+                          <button
+                            key={ward}
+                            type="button"
+                            onClick={() => toggleWard(ward)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                              active
+                                ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 ring-1 ring-slate-600/30'
+                            }`}
+                          >
+                            {ward}
+                            {count > 0 && <span className={`text-[10px] ${active ? 'text-emerald-400' : 'text-slate-500'}`}>({count})</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      )}
 
       <Dialog open={!!selectedStore} onOpenChange={(open) => { if (!open) setSelectedStore(null) }}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
@@ -557,6 +723,59 @@ export default function MapPage() {
         .store-marker-highlight .store-marker-avatar {
           border-color: #38bdf8;
           box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 8px 18px rgba(0, 0, 0, 0.25);
+        }
+
+        /* Hover tooltip - desktop only */
+        .store-marker-tooltip {
+          display: none;
+          position: absolute;
+          bottom: calc(100% + 8px);
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(15, 23, 42, 0.95);
+          color: #f1f5f9;
+          padding: 6px 10px;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+          pointer-events: none;
+          z-index: 10;
+          white-space: nowrap;
+        }
+
+        .store-marker-tooltip::after {
+          content: '';
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          border: 5px solid transparent;
+          border-top-color: rgba(15, 23, 42, 0.95);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          .store-marker:hover .store-marker-tooltip {
+            display: block;
+          }
+        }
+
+        .store-marker-tooltip-name {
+          font-size: 13px;
+          font-weight: 600;
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 300px;
+        }
+
+        .store-marker-tooltip-addr {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 300px;
         }
       `}</style>
     </div>

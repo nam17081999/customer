@@ -67,36 +67,38 @@ export default function StoreLocationPicker({
               {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
             </button>
           )}
-          
-          {/* Lock/Unlock button */}
-          {onToggleEditable && (
-            <button
-              type="button"
-              onClick={onToggleEditable}
-              className={`border rounded-lg px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium ${
-                editable 
-                  ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600' 
-                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
-              title={editable ? 'Khóa bản đồ' : 'Mở khóa để chỉnh vị trí'}
-            >
-              {editable ? (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Khóa
-                </>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                  </svg>
-                  Mở khóa
-                </>
-              )}
-            </button>
-          )}
+        </div>
+      )}
+
+      {/* Lock/Unlock button - top center inside map */}
+      {showControls && onToggleEditable && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100]">
+          <button
+            type="button"
+            onClick={onToggleEditable}
+            className={`border rounded-lg px-3 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium ${
+              editable 
+                ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600' 
+                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+            title={editable ? 'Khóa bản đồ' : 'Mở khóa để chỉnh vị trí'}
+          >
+            {editable ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                Khóa
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+                Mở khóa
+              </>
+            )}
+          </button>
         </div>
       )}
 
