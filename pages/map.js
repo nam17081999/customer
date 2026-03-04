@@ -74,6 +74,112 @@ function buildAddress(store) {
   return [store.address_detail, store.ward, store.district].filter(Boolean).join(', ')
 }
 
+/**
+ * Pre-render house icon + store name into a single canvas image.
+ * Returns { width, height, data, dpr, anchorY } for MapLibre addImage.
+ */
+function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
+
+  // ── House icon dimensions ──
+  const iconSize = Math.round(38 * dpr) // circle diameter
+  const iconPad = Math.round(2 * dpr)   // space around circle
+  const gap = Math.round(3 * dpr)       // gap between icon and label
+
+  // ── Label dimensions ──
+  const scaledFont = Math.round(fontSize * dpr)
+  const maxPxWidth = Math.round(maxWidthEm * fontSize * dpr)
+  const paddingX = Math.round(7 * dpr)
+  const paddingY = Math.round(3 * dpr)
+  const lineHeight = Math.round(scaledFont * 1.3)
+  const radius = Math.round(5 * dpr)
+
+  // Measure & word-wrap label text
+  const measure = document.createElement('canvas').getContext('2d')
+  measure.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
+  const words = text.split(/\s+/)
+  const lines = []
+  let cur = ''
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w
+    if (measure.measureText(test).width > maxPxWidth && cur) {
+      lines.push(cur)
+      cur = w
+    } else {
+      cur = test
+    }
+  }
+  if (cur) lines.push(cur)
+
+  const textW = Math.max(...lines.map((l) => Math.ceil(measure.measureText(l).width)))
+  const labelW = textW + paddingX * 2
+  const labelH = lines.length * lineHeight + paddingY * 2
+
+  // ── Combined canvas ──
+  const totalW = Math.max(iconSize + iconPad * 2, labelW)
+  const totalH = iconSize + iconPad * 2 + gap + labelH
+  const canvas = document.createElement('canvas')
+  canvas.width = totalW
+  canvas.height = totalH
+  const ctx = canvas.getContext('2d')
+
+  // Draw house icon (centered horizontally)
+  const iconCX = totalW / 2
+  const iconCY = iconPad + iconSize / 2
+  const r = iconSize / 2 - iconPad
+
+  // Circle bg
+  ctx.beginPath()
+  ctx.arc(iconCX, iconCY, r, 0, Math.PI * 2)
+  ctx.fillStyle = '#1f2937'
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1.5 * dpr
+  ctx.stroke()
+
+  // House shape inside circle
+  const s = r * 0.52
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 0.8 * dpr
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  // Roof
+  ctx.beginPath()
+  ctx.moveTo(iconCX, iconCY - s * 0.9)
+  ctx.lineTo(iconCX - s, iconCY - s * 0.05)
+  ctx.lineTo(iconCX + s, iconCY - s * 0.05)
+  ctx.closePath()
+  ctx.fill()
+  // Body
+  ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
+  // Door
+  ctx.fillStyle = '#1f2937'
+  ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
+
+  // Draw label background (centered horizontally)
+  const lx = (totalW - labelW) / 2
+  const ly = iconSize + iconPad * 2 + gap
+  ctx.beginPath()
+  ctx.roundRect(lx, ly, labelW, labelH, radius)
+  ctx.fillStyle = 'rgba(255,255,255,0.94)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.13)'
+  ctx.lineWidth = dpr
+  ctx.stroke()
+
+  // Draw label text
+  ctx.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
+  ctx.fillStyle = '#0f172a'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], totalW / 2, ly + paddingY + i * lineHeight)
+  }
+
+  return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
+}
+
 export default function MapPage() {
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
@@ -215,66 +321,27 @@ export default function MapPage() {
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
-      // Add GeoJSON source with clustering
+      // Add GeoJSON source
       map.on('load', () => {
         if (cancelled) return
-
-        // Create house icon via canvas
-        const size = 48
-        const canvas = document.createElement('canvas')
-        canvas.width = size
-        canvas.height = size
-        const ctx = canvas.getContext('2d')
-
-        // Circular background
-        ctx.beginPath()
-        ctx.arc(size / 2, size / 2, size / 2 - 2, 0, Math.PI * 2)
-        ctx.fillStyle = '#1f2937'
-        ctx.fill()
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 2.5
-        ctx.stroke()
-
-        // House icon (centered)
-        const cx = size / 2
-        const cy = size / 2
-        const s = 11 // scale
-        ctx.fillStyle = '#ffffff'
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 1.5
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
-        // Roof triangle
-        ctx.beginPath()
-        ctx.moveTo(cx, cy - s * 0.8)
-        ctx.lineTo(cx - s, cy - s * 0.05)
-        ctx.lineTo(cx + s, cy - s * 0.05)
-        ctx.closePath()
-        ctx.fill()
-        // House body
-        ctx.fillRect(cx - s * 0.7, cy - s * 0.05, s * 1.4, s * 0.95)
-        // Door
-        ctx.fillStyle = '#1f2937'
-        ctx.fillRect(cx - s * 0.2, cy + s * 0.25, s * 0.4, s * 0.65)
-
-        map.addImage('house-icon', { width: size, height: size, data: ctx.getImageData(0, 0, size, size).data })
 
         map.addSource('stores', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         })
 
-        // Store markers (house icon)
+        // Combined marker: house icon + name label in one image per store
         map.addLayer({
-          id: 'unclustered-point',
+          id: 'store-marker',
           type: 'symbol',
           source: 'stores',
           layout: {
-            'icon-image': 'house-icon',
-            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.35, 10, 0.5, 14, 0.7, 17, 0.9],
+            'icon-image': ['concat', 'sm-', ['get', 'storeId']],
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
+            'icon-anchor': 'top',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
-          }
+          },
         })
 
         // Highlighted store ring
@@ -291,33 +358,9 @@ export default function MapPage() {
           }
         })
 
-        // Store name label below marker — always visible from zoom 10+
-        map.addLayer({
-          id: 'store-name',
-          type: 'symbol',
-          source: 'stores',
-          minzoom: 10,
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': ['interpolate', ['linear'], ['zoom'], 10, 11, 14, 13, 17, 15],
-            'text-font': ['Open Sans Bold'],
-            'text-offset': [0, 1.4],
-            'text-anchor': 'top',
-            'text-max-width': 9,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-          },
-          paint: {
-            'text-color': '#0f172a',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2.5,
-            'text-halo-blur': 0.5,
-          }
-        })
-
-        // Click on individual store → open dialog
-        map.on('click', 'unclustered-point', (e) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] })
+        // Click on store marker → open dialog
+        map.on('click', 'store-marker', (e) => {
+          const features = map.queryRenderedFeatures(e.point, { layers: ['store-marker'] })
           if (!features.length) return
           const f = features[0]
           const storeId = f.properties.storeId
@@ -339,7 +382,7 @@ export default function MapPage() {
         })
         popupRef.current = popup
 
-        map.on('mousemove', 'unclustered-point', (e) => {
+        map.on('mousemove', 'store-marker', (e) => {
           if (!e.features?.length) return
           map.getCanvas().style.cursor = 'pointer'
           const f = e.features[0]
@@ -353,7 +396,7 @@ export default function MapPage() {
             .addTo(map)
         })
 
-        map.on('mouseleave', 'unclustered-point', () => {
+        map.on('mouseleave', 'store-marker', () => {
           map.getCanvas().style.cursor = ''
           popup.remove()
         })
@@ -429,6 +472,15 @@ export default function MapPage() {
         address: buildAddress(store),
       },
     }))
+
+    // Generate combined marker images (house icon + label in one canvas)
+    for (const f of features) {
+      const imgId = `sm-${f.properties.storeId}`
+      if (!map.hasImage(imgId)) {
+        const img = createStoreMarker(f.properties.name)
+        map.addImage(imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+      }
+    }
 
     source.setData({ type: 'FeatureCollection', features })
   }, [filteredStores, mapReady])
