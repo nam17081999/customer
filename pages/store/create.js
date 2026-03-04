@@ -204,10 +204,8 @@ export default function AddStore() {
       setResolvingAddr(true)
 
       const { coords, error } = await getBestPosition({
-        attempts: 3,
-        timeout: 4000,
-        maxWaitTime: 8000,
-        desiredAccuracy: 25,
+        maxWaitTime: 2000,
+        desiredAccuracy: 15,
         skipCache: true,
       })
       if (!coords) {
@@ -404,10 +402,8 @@ export default function AddStore() {
       try {
         setDuplicateCheckLoading(true)
         const { coords, error } = await getBestPosition({
-          attempts: 2,
-          timeout: 3000,
-          maxWaitTime: 6000,
-          desiredAccuracy: 50
+          maxWaitTime: 2000,
+          desiredAccuracy: 50,
         })
         if (!coords) {
           setDuplicateCheckError(getGeoErrorMessage(error))
@@ -567,10 +563,8 @@ export default function AddStore() {
 
       // Get GPS coordinates with improved logic
     const { coords, error } = await getBestPosition({
-      attempts: 3,           // Giảm từ 4 → 3
-      timeout: 4000,         // 4s thay vì 10s
-      maxWaitTime: 8000,     // Tổng tối đa 8s
-      desiredAccuracy: 25
+      maxWaitTime: 2000,
+      desiredAccuracy: 15,
     })
       if (!coords) {
         setGeoBlocked(true)
@@ -643,7 +637,7 @@ export default function AddStore() {
     } else {
       // Last resort: get current GPS
       try {
-        const { coords, error } = await getBestPosition({ attempts: 4, timeout: 10000, desiredAccuracy: 25 })
+        const { coords, error } = await getBestPosition({ maxWaitTime: 3000, desiredAccuracy: 15 })
         if (!coords) {
           setGeoBlocked(true)
           showMessage('error', getGeoErrorMessage(error))
