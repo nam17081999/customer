@@ -74,13 +74,118 @@ function buildAddress(store) {
   return [store.address_detail, store.ward, store.district].filter(Boolean).join(', ')
 }
 
+/**
+ * Pre-render house icon + store name into a single canvas image.
+ * Returns { width, height, data, dpr, anchorY } for MapLibre addImage.
+ */
+function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
+
+  // ── House icon dimensions ──
+  const iconSize = Math.round(38 * dpr) // circle diameter
+  const iconPad = Math.round(2 * dpr)   // space around circle
+  const gap = Math.round(3 * dpr)       // gap between icon and label
+
+  // ── Label dimensions ──
+  const scaledFont = Math.round(fontSize * dpr)
+  const maxPxWidth = Math.round(maxWidthEm * fontSize * dpr)
+  const paddingX = Math.round(7 * dpr)
+  const paddingY = Math.round(3 * dpr)
+  const lineHeight = Math.round(scaledFont * 1.3)
+  const radius = Math.round(5 * dpr)
+
+  // Measure & word-wrap label text
+  const measure = document.createElement('canvas').getContext('2d')
+  measure.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
+  const words = text.split(/\s+/)
+  const lines = []
+  let cur = ''
+  for (const w of words) {
+    const test = cur ? `${cur} ${w}` : w
+    if (measure.measureText(test).width > maxPxWidth && cur) {
+      lines.push(cur)
+      cur = w
+    } else {
+      cur = test
+    }
+  }
+  if (cur) lines.push(cur)
+
+  const textW = Math.max(...lines.map((l) => Math.ceil(measure.measureText(l).width)))
+  const labelW = textW + paddingX * 2
+  const labelH = lines.length * lineHeight + paddingY * 2
+
+  // ── Combined canvas ──
+  const totalW = Math.max(iconSize + iconPad * 2, labelW)
+  const totalH = iconSize + iconPad * 2 + gap + labelH
+  const canvas = document.createElement('canvas')
+  canvas.width = totalW
+  canvas.height = totalH
+  const ctx = canvas.getContext('2d')
+
+  // Draw house icon (centered horizontally)
+  const iconCX = totalW / 2
+  const iconCY = iconPad + iconSize / 2
+  const r = iconSize / 2 - iconPad
+
+  // Circle bg
+  ctx.beginPath()
+  ctx.arc(iconCX, iconCY, r, 0, Math.PI * 2)
+  ctx.fillStyle = '#1f2937'
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 1.5 * dpr
+  ctx.stroke()
+
+  // House shape inside circle
+  const s = r * 0.52
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 0.8 * dpr
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  // Roof
+  ctx.beginPath()
+  ctx.moveTo(iconCX, iconCY - s * 0.9)
+  ctx.lineTo(iconCX - s, iconCY - s * 0.05)
+  ctx.lineTo(iconCX + s, iconCY - s * 0.05)
+  ctx.closePath()
+  ctx.fill()
+  // Body
+  ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
+  // Door
+  ctx.fillStyle = '#1f2937'
+  ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
+
+  // Draw label background (centered horizontally)
+  const lx = (totalW - labelW) / 2
+  const ly = iconSize + iconPad * 2 + gap
+  ctx.beginPath()
+  ctx.roundRect(lx, ly, labelW, labelH, radius)
+  ctx.fillStyle = 'rgba(255,255,255,0.94)'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.13)'
+  ctx.lineWidth = dpr
+  ctx.stroke()
+
+  // Draw label text
+  ctx.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
+  ctx.fillStyle = '#0f172a'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], totalW / 2, ly + paddingY + i * lineHeight)
+  }
+
+  return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
+}
+
 export default function MapPage() {
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const maplibreRef = useRef(null)
-  const markersRef = useRef([])
-  const markerByStoreIdRef = useRef(new Map())
-  const highlightedRef = useRef(null)
+  const popupRef = useRef(null)
+  const highlightedStoreIdRef = useRef(null)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -177,29 +282,7 @@ export default function MapPage() {
     return storesWithCoords.filter((s) => (s.name || '').toLowerCase().includes(q))
   }, [searchTerm, storesWithCoords])
 
-  const clearMarkers = useCallback(() => {
-    markersRef.current.forEach((marker) => marker.remove())
-    markersRef.current = []
-    markerByStoreIdRef.current.clear()
-  }, [])
-
-  const applyMarkerStyleByZoom = useCallback(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const zoom = map.getZoom()
-    const size = zoom < 7 ? 20 : zoom < 8 ? 24 : zoom < 9 ? 30 : zoom < 11 ? 40 : 56
-
-    const showName = zoom >= 11
-
-    markersRef.current.forEach((marker) => {
-      const el = marker.getElement()
-      if (!el) return
-      el.style.setProperty('--marker-size', `${size}px`)
-      const nameEl = el.querySelector('.store-marker-name')
-      if (nameEl) nameEl.style.display = showName ? 'block' : 'none'
-    })
-  }, [])
+  const storeMapRef = useRef(new Map()) // storeId → store data for quick lookup
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -218,6 +301,7 @@ export default function MapPage() {
         container: mapContainerRef.current,
         style: {
           version: 8,
+          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
           sources: {
             osm: {
               type: 'raster',
@@ -236,11 +320,92 @@ export default function MapPage() {
       })
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
-      map.on('zoom', applyMarkerStyleByZoom)
+
+      // Add GeoJSON source
+      map.on('load', () => {
+        if (cancelled) return
+
+        map.addSource('stores', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+
+        // Combined marker: house icon + name label in one image per store
+        map.addLayer({
+          id: 'store-marker',
+          type: 'symbol',
+          source: 'stores',
+          layout: {
+            'icon-image': ['concat', 'sm-', ['get', 'storeId']],
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
+            'icon-anchor': 'top',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+        })
+
+        // Highlighted store ring
+        map.addLayer({
+          id: 'highlight-ring',
+          type: 'circle',
+          source: 'stores',
+          filter: ['==', ['get', 'storeId'], '___none___'],
+          paint: {
+            'circle-color': 'transparent',
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 10, 10, 14, 14, 20, 17, 26],
+            'circle-stroke-width': 3,
+            'circle-stroke-color': '#38bdf8',
+          }
+        })
+
+        // Click on store marker → open dialog
+        map.on('click', 'store-marker', (e) => {
+          const features = map.queryRenderedFeatures(e.point, { layers: ['store-marker'] })
+          if (!features.length) return
+          const f = features[0]
+          const storeId = f.properties.storeId
+          const store = storeMapRef.current.get(storeId)
+          if (store) {
+            const [lng, lat] = f.geometry.coordinates
+            map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 })
+            setSelectedStore(store)
+          }
+        })
+
+        // Hover tooltip (desktop only) using Popup
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          className: 'store-hover-popup',
+          offset: 14,
+          maxWidth: '320px',
+        })
+        popupRef.current = popup
+
+        map.on('mousemove', 'store-marker', (e) => {
+          if (!e.features?.length) return
+          map.getCanvas().style.cursor = 'pointer'
+          const f = e.features[0]
+          const name = f.properties.name || 'Cửa hàng'
+          const addr = f.properties.address || ''
+          popup.setLngLat(f.geometry.coordinates)
+            .setHTML(
+              `<div style="font-size:13px;font-weight:600;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name.replace(/</g, '&lt;')}</div>` +
+              (addr ? `<div style="font-size:11px;color:#94a3b8;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr.replace(/</g, '&lt;')}</div>` : '')
+            )
+            .addTo(map)
+        })
+
+        map.on('mouseleave', 'store-marker', () => {
+          map.getCanvas().style.cursor = ''
+          popup.remove()
+        })
+
+        setMapReady(true)
+      })
 
       mapRef.current = map
       activeMap = map
-      setMapReady(true)
     }
 
     initMap().catch((e) => {
@@ -250,12 +415,12 @@ export default function MapPage() {
 
     return () => {
       cancelled = true
-      clearMarkers()
+      if (popupRef.current) popupRef.current.remove()
       if (activeMap) activeMap.remove()
       mapRef.current = null
       setMapReady(false)
     }
-  }, [clearMarkers, applyMarkerStyleByZoom])
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -284,87 +449,41 @@ export default function MapPage() {
     }
   }, [])
 
+  // Update GeoJSON source when filtered stores change
   useEffect(() => {
     const map = mapRef.current
-    const maplibregl = maplibreRef.current
-    if (!map || !maplibregl || !mapReady) return
+    if (!map || !mapReady) return
 
-    clearMarkers()
+    // Build lookup map for click handler
+    const lookup = new Map()
+    filteredStores.forEach((store) => { lookup.set(String(store.id), store) })
+    storeMapRef.current = lookup
 
-    if (storesWithCoords.length === 0) return
+    const source = map.getSource('stores')
+    if (!source) return
 
-    filteredStores.forEach((store) => {
-      const { lat, lng } = store.coords
+    const features = filteredStores.map((store) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [store.coords.lng, store.coords.lat] },
+      properties: {
+        storeId: String(store.id),
+        name: store.name || 'Cửa hàng',
+        shortName: getFirstWord(store.name),
+        address: buildAddress(store),
+      },
+    }))
 
-      const markerEl = document.createElement('button')
-      markerEl.type = 'button'
-      markerEl.className = 'store-marker'
-      markerEl.setAttribute('aria-label', store.name || 'Store marker')
-
-      const markerAvatar = document.createElement('span')
-      markerAvatar.className = 'store-marker-avatar'
-
-      const fallbackWord = getFirstWord(store.name)
-      const text = document.createElement('span')
-      text.className = 'store-marker-text'
-      text.textContent = fallbackWord
-      markerAvatar.appendChild(text)
-
-      markerEl.appendChild(markerAvatar)
-
-      const nameLabel = document.createElement('span')
-      nameLabel.className = 'store-marker-name'
-      // Show 3 words per line, wrap rest to next line
-      const rawName = store.name || 'Cửa hàng'
-      const words = rawName.split(/\s+/)
-      if (words.length <= 3) {
-        nameLabel.textContent = rawName
-      } else {
-        const lines = []
-        for (let i = 0; i < words.length; i += 3) {
-          lines.push(words.slice(i, i + 3).join(' '))
-        }
-        nameLabel.innerHTML = lines.map(l => l.replace(/</g, '&lt;')).join('<br>')
+    // Generate combined marker images (house icon + label in one canvas)
+    for (const f of features) {
+      const imgId = `sm-${f.properties.storeId}`
+      if (!map.hasImage(imgId)) {
+        const img = createStoreMarker(f.properties.name)
+        map.addImage(imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
       }
-      markerEl.appendChild(nameLabel)
+    }
 
-      // Hover tooltip with name + address (desktop only)
-      const tooltip = document.createElement('div')
-      tooltip.className = 'store-marker-tooltip'
-      const tooltipName = document.createElement('div')
-      tooltipName.className = 'store-marker-tooltip-name'
-      tooltipName.textContent = store.name || 'Cửa hàng'
-      tooltip.appendChild(tooltipName)
-      const addr = buildAddress(store)
-      if (addr) {
-        const tooltipAddr = document.createElement('div')
-        tooltipAddr.className = 'store-marker-tooltip-addr'
-        tooltipAddr.textContent = addr
-        tooltip.appendChild(tooltipAddr)
-      }
-      markerEl.appendChild(tooltip)
-
-      const marker = new maplibregl.Marker({ element: markerEl, anchor: 'center' })
-        .setLngLat([lng, lat])
-        .addTo(map)
-
-      // z-index: stores lower on screen (smaller lat) render on top
-      const wrapperEl = marker.getElement()?.parentElement || marker.getElement()
-      if (wrapperEl?.classList?.contains('maplibregl-marker')) {
-        wrapperEl.style.zIndex = Math.round((90 - lat) * 1000)
-      }
-
-      markerEl.addEventListener('click', (e) => {
-        e.stopPropagation()
-        map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 })
-        setSelectedStore(store)
-      })
-
-      markersRef.current.push(marker)
-      markerByStoreIdRef.current.set(store.id, marker)
-    })
-    applyMarkerStyleByZoom()
-  }, [filteredStores, mapReady, clearMarkers, applyMarkerStyleByZoom])
+    source.setData({ type: 'FeatureCollection', features })
+  }, [filteredStores, mapReady])
 
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
@@ -372,24 +491,10 @@ export default function MapPage() {
     if (!map) return
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
 
-    // Reset previous highlighted marker
-    if (highlightedRef.current) {
-      const prev = highlightedRef.current
-      if (prev.wrapper) prev.wrapper.style.setProperty('z-index', prev.originalZ)
-      prev.marker.getElement()?.classList.remove('store-marker-highlight')
-      highlightedRef.current = null
-    }
-
-    // Highlight the searched marker
-    const marker = markerByStoreIdRef.current.get(store.id)
-    if (marker) {
-      const el = marker.getElement()
-      const wrapper = el?.parentElement?.classList?.contains('maplibregl-marker')
-        ? el.parentElement : el
-      const originalZ = wrapper?.style.zIndex || '0'
-      if (wrapper) wrapper.style.setProperty('z-index', '999999', 'important')
-      el?.classList.add('store-marker-highlight')
-      highlightedRef.current = { marker, originalZ, wrapper }
+    // Highlight via filter on the highlight-ring layer
+    highlightedStoreIdRef.current = String(store.id)
+    if (map.getLayer('highlight-ring')) {
+      map.setFilter('highlight-ring', ['==', ['get', 'storeId'], String(store.id)])
     }
 
     setShowSuggestions(false)
@@ -636,146 +741,18 @@ export default function MapPage() {
           height: 100% !important;
         }
 
-        .maplibregl-marker {
-          position: absolute !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          overflow: visible !important;
-        }
-
-        .store-marker {
-          width: var(--marker-size, 56px);
-          height: var(--marker-size, 56px);
-          border: 0;
-          background: transparent;
-          padding: 0;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: transform 0.15s ease;
-          overflow: visible;
-        }
-
-        .store-marker:hover {
-          transform: scale(1.06);
-        }
-
-        .store-marker-avatar {
-          width: var(--marker-size, 56px);
-          height: var(--marker-size, 56px);
-          border-radius: 9999px;
-          border: 3px solid #ffffff;
-          background: #1f2937;
-          overflow: hidden;
-          box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        .store-marker-img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-        }
-
-        .store-marker-text {
-          font-size: 11px;
-          line-height: 1;
-          font-weight: 700;
-          color: #ffffff;
-          text-transform: uppercase;
-          text-align: center;
-          padding: 0 6px;
-          white-space: nowrap;
-          text-overflow: ellipsis;
-          overflow: hidden;
-          width: 100%;
-        }
-
-        .store-marker-name {
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          margin-top: 2px;
-          font-size: 11px;
-          font-weight: 600;
-          color: #1e293b;
-          background: rgba(255, 255, 255, 0.92);
-          padding: 2px 6px;
-          border-radius: 4px;
-          white-space: nowrap;
-          text-align: center;
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-          line-height: 1.4;
-          pointer-events: none;
-        }
-
-        .hidden {
-          display: none;
-        }
-
-        .store-marker-highlight .store-marker-avatar {
-          border-color: #38bdf8;
-          box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.4), 0 8px 18px rgba(0, 0, 0, 0.25);
-        }
-
-        /* Hover tooltip - desktop only */
-        .store-marker-tooltip {
-          display: none;
-          position: absolute;
-          bottom: calc(100% + 8px);
-          left: 50%;
-          transform: translateX(-50%);
+        /* Hover popup styling */
+        .store-hover-popup .maplibregl-popup-content {
           background: rgba(15, 23, 42, 0.95);
           color: #f1f5f9;
           padding: 6px 10px;
           border-radius: 8px;
           box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
           pointer-events: none;
-          z-index: 10;
-          white-space: nowrap;
         }
 
-        .store-marker-tooltip::after {
-          content: '';
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border: 5px solid transparent;
+        .store-hover-popup .maplibregl-popup-tip {
           border-top-color: rgba(15, 23, 42, 0.95);
-        }
-
-        @media (hover: hover) and (pointer: fine) {
-          .store-marker:hover .store-marker-tooltip {
-            display: block;
-          }
-        }
-
-        .store-marker-tooltip-name {
-          font-size: 13px;
-          font-weight: 600;
-          line-height: 1.3;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 300px;
-        }
-
-        .store-marker-tooltip-addr {
-          font-size: 11px;
-          color: #94a3b8;
-          line-height: 1.3;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 300px;
         }
       `}</style>
     </div>

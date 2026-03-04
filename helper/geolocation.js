@@ -1,101 +1,117 @@
 /**
- * Geolocation utilities — GPS sampling with progressive timeout,
+ * Geolocation utilities — GPS with watchPosition for progressive accuracy,
  * user-friendly error messages, and compass heading.
  */
 
 /**
- * Get the best GPS position with multiple attempts, progressive timeouts,
- * and optional cached-position shortcut.
+ * Get the best GPS position using watchPosition for progressive accuracy.
+ * Returns the first position that meets desiredAccuracy, or the best one
+ * collected within maxWaitTime.
+ *
+ * Strategy:
+ * 1. Start watchPosition immediately (gets coarse → fine updates)
+ * 2. If a cached position (<60s) with acceptable accuracy exists, return it fast
+ * 3. As watch updates arrive, keep the best sample
+ * 4. Early-exit as soon as desiredAccuracy is met
+ * 5. After maxWaitTime, return the best sample collected
  *
  * @param {Object} options
- * @param {number} options.attempts       — max sampling rounds (default 4)
- * @param {number} options.timeout        — initial per-attempt timeout in ms (default 5000)
- * @param {number} options.maxWaitTime    — total wall-clock budget in ms (default 10000)
- * @param {number} options.desiredAccuracy — early-exit threshold in metres (default 25)
- * @param {boolean} options.skipCache     — skip the 30 s maximumAge shortcut (default false)
+ * @param {number} options.maxWaitTime    — total budget in ms (default 2000)
+ * @param {number} options.desiredAccuracy — early-exit threshold in metres (default 20)
+ * @param {boolean} options.skipCache     — skip cached position shortcut (default false)
  * @returns {Promise<{coords: GeolocationCoordinates|null, error: Error|null}>}
  */
 export async function getBestPosition({
-  attempts = 4,
-  timeout = 5000,
-  maxWaitTime = 10000,
-  desiredAccuracy = 25,
+  maxWaitTime = 2000,
+  desiredAccuracy = 20,
   skipCache = false,
+  // Legacy params — ignored but accepted to avoid breaking callers
+  attempts,
+  timeout,
 } = {}) {
   if (!navigator.geolocation) {
     return { coords: null, error: new Error('Geolocation not supported') }
   }
 
-  const samples = []
-  const startTime = Date.now()
-  let lastError = null
+  return new Promise((resolve) => {
+    let best = null
+    let watchId = null
+    let resolved = false
+    const startTime = Date.now()
 
-  if (!skipCache) {
-    // Try cached position first (< 30 s old)
-    try {
-      const cached = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 1000,
-          maximumAge: 30000,
-        })
-      })
-      if (cached?.coords?.accuracy && cached.coords.accuracy <= desiredAccuracy * 1.5) {
-        console.log('✅ Dùng vị trí cache:', cached.coords.accuracy + 'm')
-        return { coords: cached.coords, error: null }
+    function finish() {
+      if (resolved) return
+      resolved = true
+      if (watchId != null) {
+        navigator.geolocation.clearWatch(watchId)
+        watchId = null
       }
-    } catch (err) {
-      lastError = err
-    }
-  }
-
-  for (let i = 0; i < attempts; i++) {
-    const elapsed = Date.now() - startTime
-    if (elapsed > maxWaitTime) {
-      console.log('⏱️ Đã hết thời gian chờ tối đa:', elapsed + 'ms')
-      break
-    }
-
-    try {
-      const dynamicTimeout = Math.max(2000, timeout - i * 1000)
-      const remainingTime = maxWaitTime - elapsed
-      const actualTimeout = Math.min(dynamicTimeout, remainingTime)
-      if (actualTimeout < 1000) break
-
-      const pos = await new Promise((resolve, reject) => {
-        const tid = setTimeout(() => reject(new Error('Timeout')), actualTimeout)
-        navigator.geolocation.getCurrentPosition(
-          (result) => { clearTimeout(tid); resolve(result) },
-          (err) => { clearTimeout(tid); reject(err) },
-          { enableHighAccuracy: true, timeout: actualTimeout, maximumAge: 0 },
-        )
-      })
-
-      if (pos?.coords) {
-        samples.push(pos.coords)
-        console.log(
-          `📍 Sample ${i + 1}: ${pos.coords.accuracy?.toFixed(1) || '?'}m, heading: ${pos.coords.heading || 'N/A'} (${Date.now() - startTime}ms)`,
-        )
-        if (pos.coords.accuracy && pos.coords.accuracy <= desiredAccuracy) {
-          console.log('✅ Đạt độ chính xác mong muốn')
-          return { coords: pos.coords, error: null }
-        }
+      if (best) {
+        console.log(`📊 GPS final: ${best.accuracy?.toFixed(1) || '?'}m in ${Date.now() - startTime}ms`)
+        resolve({ coords: best, error: null })
+      } else {
+        resolve({ coords: null, error: new Error('Không lấy được vị trí') })
       }
-    } catch (err) {
-      console.warn(`⚠️ Attempt ${i + 1} failed:`, err.message)
-      lastError = err
     }
-  }
 
-  if (samples.length === 0) {
-    const e = new Error('Không lấy được vị trí sau nhiều lần thử')
-    e.cause = lastError || undefined
-    return { coords: null, error: e }
-  }
+    function onPosition(pos) {
+      if (resolved) return
+      const coords = pos?.coords
+      if (!coords) return
 
-  samples.sort((a, b) => (a.accuracy || Infinity) - (b.accuracy || Infinity))
-  console.log(`📊 Chọn sample tốt nhất: ${samples[0].accuracy?.toFixed(1) || '?'}m`)
-  return { coords: samples[0], error: null }
+      const acc = coords.accuracy || Infinity
+      const bestAcc = best?.accuracy || Infinity
+
+      if (acc < bestAcc) {
+        best = coords
+        console.log(`📍 GPS update: ${acc.toFixed(1)}m (${Date.now() - startTime}ms)`)
+      }
+
+      // Early exit if accuracy is good enough
+      if (acc <= desiredAccuracy) {
+        console.log('✅ Đạt độ chính xác mong muốn:', acc.toFixed(1) + 'm')
+        finish()
+      }
+    }
+
+    function onError(err) {
+      console.warn('⚠️ GPS error:', err.message || err.code)
+      // Don't resolve yet — wait for timeout, watchPosition may recover
+    }
+
+    // Start continuous watch immediately
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+      enableHighAccuracy: true,
+      timeout: maxWaitTime,
+      maximumAge: 0,
+    })
+
+    // Also try a quick cached position in parallel
+    if (!skipCache) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (resolved) return
+          const coords = pos?.coords
+          if (coords?.accuracy && coords.accuracy <= desiredAccuracy * 1.5) {
+            const bestAcc = best?.accuracy || Infinity
+            if (coords.accuracy < bestAcc) {
+              best = coords
+              console.log('⚡ Cache hit:', coords.accuracy.toFixed(1) + 'm')
+            }
+            // If cache is excellent, finish early
+            if (coords.accuracy <= desiredAccuracy) {
+              finish()
+            }
+          }
+        },
+        () => { /* ignore cache error */ },
+        { enableHighAccuracy: true, timeout: 500, maximumAge: 60000 },
+      )
+    }
+
+    // Hard deadline
+    setTimeout(finish, maxWaitTime)
+  })
 }
 
 /**
