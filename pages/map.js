@@ -78,12 +78,13 @@ function buildAddress(store) {
  * Pre-render house icon + store name into a single canvas image.
  * Returns { width, height, data, dpr, anchorY } for MapLibre addImage.
  */
-function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
+function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = false) {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
 
   // ── House icon dimensions ──
   const iconSize = Math.round(38 * dpr) // circle diameter
   const iconPad = Math.round(2 * dpr)   // space around circle
+  const hlPad = highlighted ? Math.round(5 * dpr) : 0 // extra space for highlight ring
   const gap = Math.round(3 * dpr)       // gap between icon and label
 
   // ── Label dimensions ──
@@ -116,8 +117,8 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
   const labelH = lines.length * lineHeight + paddingY * 2
 
   // ── Combined canvas ──
-  const totalW = Math.max(iconSize + iconPad * 2, labelW)
-  const totalH = iconSize + iconPad * 2 + gap + labelH
+  const totalW = Math.max(iconSize + iconPad * 2 + hlPad * 2, labelW)
+  const totalH = iconSize + iconPad * 2 + hlPad * 2 + gap + labelH
   const canvas = document.createElement('canvas')
   canvas.width = totalW
   canvas.height = totalH
@@ -125,8 +126,17 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
 
   // Draw house icon (centered horizontally)
   const iconCX = totalW / 2
-  const iconCY = iconPad + iconSize / 2
+  const iconCY = hlPad + iconPad + iconSize / 2
   const r = iconSize / 2 - iconPad
+
+  // Highlight ring (if selected)
+  if (highlighted) {
+    ctx.beginPath()
+    ctx.arc(iconCX, iconCY, r + hlPad, 0, Math.PI * 2)
+    ctx.strokeStyle = '#38bdf8'
+    ctx.lineWidth = 3 * dpr
+    ctx.stroke()
+  }
 
   // Circle bg
   ctx.beginPath()
@@ -159,7 +169,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9) {
 
   // Draw label background (centered horizontally)
   const lx = (totalW - labelW) / 2
-  const ly = iconSize + iconPad * 2 + gap
+  const ly = iconSize + iconPad * 2 + hlPad * 2 + gap
   ctx.beginPath()
   ctx.roundRect(lx, ly, labelW, labelH, radius)
   ctx.fillStyle = 'rgba(255,255,255,0.94)'
@@ -336,26 +346,17 @@ export default function MapPage() {
           type: 'symbol',
           source: 'stores',
           layout: {
-            'icon-image': ['concat', 'sm-', ['get', 'storeId']],
+            'icon-image': ['case',
+              ['==', ['get', 'highlighted'], 'yes'], ['concat', 'smh-', ['get', 'storeId']],
+              ['concat', 'sm-', ['get', 'storeId']]
+            ],
             'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
             'icon-anchor': 'top',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
+            'symbol-sort-key': ['case', ['==', ['get', 'highlighted'], 'yes'], 999, 0],
+            'symbol-z-order': 'auto',
           },
-        })
-
-        // Highlighted store ring
-        map.addLayer({
-          id: 'highlight-ring',
-          type: 'circle',
-          source: 'stores',
-          filter: ['==', ['get', 'storeId'], '___none___'],
-          paint: {
-            'circle-color': 'transparent',
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 7, 10, 10, 14, 14, 20, 17, 26],
-            'circle-stroke-width': 3,
-            'circle-stroke-color': '#38bdf8',
-          }
         })
 
         // Click on store marker → open dialog
@@ -491,16 +492,42 @@ export default function MapPage() {
     if (!map) return
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
 
-    // Highlight via filter on the highlight-ring layer
+    // Generate highlighted image if not already cached
+    const hlId = `smh-${store.id}`
+    if (!map.hasImage(hlId)) {
+      const img = createStoreMarker(store.name || 'Cửa hàng', 13, 9, true)
+      map.addImage(hlId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+    }
+
+    // Update features: set highlighted property and move highlighted store to end (renders on top)
     highlightedStoreIdRef.current = String(store.id)
-    if (map.getLayer('highlight-ring')) {
-      map.setFilter('highlight-ring', ['==', ['get', 'storeId'], String(store.id)])
+    const source = map.getSource('stores')
+    if (source) {
+      const storeId = String(store.id)
+      const features = filteredStores.map((s) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [s.coords.lng, s.coords.lat] },
+        properties: {
+          storeId: String(s.id),
+          name: s.name || 'Cửa hàng',
+          shortName: getFirstWord(s.name),
+          address: buildAddress(s),
+          highlighted: String(s.id) === storeId ? 'yes' : 'no',
+        },
+      }))
+      // Move highlighted to end so it renders on top
+      const hlIdx = features.findIndex((f) => f.properties.storeId === storeId)
+      if (hlIdx >= 0) {
+        const [hl] = features.splice(hlIdx, 1)
+        features.push(hl)
+      }
+      source.setData({ type: 'FeatureCollection', features })
     }
 
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [])
+  }, [filteredStores])
 
   const handleSearch = useCallback(() => {
     const query = searchTerm.trim().toLowerCase()

@@ -877,7 +877,7 @@ export default function AddStore() {
                     }}
                     className="w-full text-sm sm:text-base"
                   >
-                    {duplicateCheckDone ? 'Tiếp theo →' : 'Kiểm tra tên'}
+                    Tiếp theo
                   </Button>
                 </div>
               ) : null}
