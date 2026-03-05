@@ -2,12 +2,11 @@ import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
-import { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { DetailStoreModalContent } from '@/components/detail-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatDistance } from '@/helper/validation'
+import StoreDetailModal from '@/components/store-detail-modal'
 
 export default function SearchStoreCard({ store, distance, searchTerm, compact }) {
   const [imageError, setImageError] = useState(false)
@@ -55,86 +54,77 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
 
   // ── Compact horizontal layout ──
   if (compact) {
-    return (
-      <Dialog>
-        <DialogTrigger asChild>
-          <Card className="overflow-hidden rounded-xl bg-white dark:bg-black hover:shadow-md transition duration-200 border border-gray-200 dark:border-gray-700 cursor-pointer">
-            <CardContent className="p-0">
-              <div className="flex gap-3 p-3">
-                {/* Thumbnail */}
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
-                  <Image
-                    src={imageSrc}
-                    alt={store.name || 'store image'}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                    onError={handleImageError}
-                  />
-                  {store.active && (
-                    <div className="absolute top-1 left-1">
-                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white">
-                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {/* Info */}
-                <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight line-clamp-1">
-                    {renderHighlightedName(store.name, searchTerm)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{addressText}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {distance !== null && distance !== undefined && (
-                      <span className="inline-flex items-center gap-0.5 text-[11px] text-gray-500 dark:text-gray-400">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        {formatDistance(distance)}
-                      </span>
-                    )}
-                    {store.phone && (
-                      <a
-                        href={`tel:${store.phone.replace(/\s+/g,'')}`}
-                        className="inline-flex items-center gap-0.5 text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
-                        {store.phone}
-                      </a>
-                    )}
-                  </div>
-                </div>
-                {/* Map button */}
-                {store.latitude && store.longitude && (
-                  <div className="flex-shrink-0 flex items-center">
-                    <button
-                      type="button"
-                      className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition"
-                      onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
-                      aria-label="Mở bản đồ"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    </button>
+    const compactCard = (
+        <Card className="overflow-hidden rounded-xl bg-white dark:bg-black hover:shadow-md transition duration-200 border border-gray-200 dark:border-gray-700 cursor-pointer">
+          <CardContent className="p-0">
+            <div className="flex gap-3 p-3">
+              {/* Thumbnail */}
+              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 flex-shrink-0">
+                <Image
+                  src={imageSrc}
+                  alt={store.name || 'store image'}
+                  fill
+                  className="object-cover"
+                  sizes="80px"
+                  onError={handleImageError}
+                />
+                {store.active && (
+                  <div className="absolute top-1 left-1">
+                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white">
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </span>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </DialogTrigger>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-          <DialogTitle className="sr-only">{store.name || 'Chi tiết cửa hàng'}</DialogTitle>
-          <DetailStoreModalContent store={{ ...store, distance }} context="search" />
-        </DialogContent>
-      </Dialog>
+              {/* Info */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight line-clamp-1">
+                  {renderHighlightedName(store.name, searchTerm)}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{addressText}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {distance !== null && distance !== undefined && (
+                    <span className="inline-flex items-center gap-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      {formatDistance(distance)}
+                    </span>
+                  )}
+                  {store.phone && (
+                    <a
+                      href={`tel:${store.phone.replace(/\s+/g,'')}`}
+                      className="inline-flex items-center gap-0.5 text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
+                      {store.phone}
+                    </a>
+                  )}
+                </div>
+              </div>
+              {/* Map button */}
+              {store.latitude && store.longitude && (
+                <div className="flex-shrink-0 flex items-center">
+                  <button
+                    type="button"
+                    className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
+                    aria-label="Mở bản đồ"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
     )
+    return <StoreDetailModal store={store} trigger={compactCard} />
   }
 
   // ── Full (original) layout ──
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Card className="overflow-hidden rounded-xl bg-white dark:bg-black hover:shadow-lg transition duration-200 border border-gray-200 dark:border-gray-700 cursor-pointer">
-          <CardContent className="p-0">
+  const fullCard = (
+      <Card className="overflow-hidden rounded-xl bg-white dark:bg-black hover:shadow-lg transition duration-200 border border-gray-200 dark:border-gray-700 cursor-pointer">
+        <CardContent className="p-0">
             {/* Image Top */}
             <div className="relative w-full h-56 sm:h-64 bg-gray-100 dark:bg-gray-800">
               <Image
@@ -212,11 +202,6 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
             </div>
           </CardContent>
         </Card>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        <DialogTitle className="sr-only">{store.name || 'Chi tiết cửa hàng'}</DialogTitle>
-        <DetailStoreModalContent store={{ ...store, distance }} context="search" />
-      </DialogContent>
-    </Dialog>
   )
+  return <StoreDetailModal store={store} trigger={fullCard} />
 }

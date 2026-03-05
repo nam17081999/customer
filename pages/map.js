@@ -2,8 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { DetailStoreModalContent } from '@/components/detail-store-card'
+import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
@@ -746,12 +745,7 @@ export default function MapPage() {
       </div>
       )}
 
-      <Dialog open={!!selectedStore} onOpenChange={(open) => { if (!open) setSelectedStore(null) }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-          <DialogTitle className="sr-only">{selectedStore?.name || 'Chi tiết cửa hàng'}</DialogTitle>
-          <DetailStoreModalContent store={selectedStore} />
-        </DialogContent>
-      </Dialog>
+
 
       <style jsx global>{`
         .maplibregl-map {
@@ -782,6 +776,12 @@ export default function MapPage() {
           border-top-color: rgba(15, 23, 42, 0.95);
         }
       `}</style>
+
+      <StoreDetailModal
+        store={selectedStore}
+        open={!!selectedStore}
+        onOpenChange={(open) => { if (!open) setSelectedStore(null) }}
+      />
     </div>
   )
 }
