@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useRouter } from 'next/router'
 import { Virtuoso } from 'react-virtuoso'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -21,6 +22,7 @@ const ALL_WARDS = Array.from(
 ).sort((a, b) => a.localeCompare(b, 'vi'))
 
 export default function HomePage() {
+  const router = useRouter()
   const [allStores, setAllStores] = useState([])
   const [storesLoaded, setStoresLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -30,7 +32,30 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const [sortByDistance, setSortByDistance] = useState(false)
   const searchInputRef = useRef(null)
+  const initializedFromQuery = useRef(false)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
+
+  // Restore state from URL query params on mount (for back-navigation)
+  useEffect(() => {
+    if (initializedFromQuery.current || !router.isReady) return
+    initializedFromQuery.current = true
+    const { q, district, ward, sort } = router.query
+    if (q) setSearchTerm(q)
+    if (district) setSelectedDistrict(district)
+    if (ward) setSelectedWard(ward)
+    if (sort === 'distance') setSortByDistance(true)
+  }, [router.isReady, router.query])
+
+  // Sync state to URL query params (shallow, no navigation)
+  useEffect(() => {
+    if (!initializedFromQuery.current) return
+    const query = {}
+    if (searchTerm.trim()) query.q = searchTerm.trim()
+    if (selectedDistrict) query.district = selectedDistrict
+    if (selectedWard) query.ward = selectedWard
+    if (sortByDistance) query.sort = 'distance'
+    router.replace({ pathname: '/', query }, undefined, { shallow: true })
+  }, [searchTerm, selectedDistrict, selectedWard, sortByDistance])
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
   const wardOptions = selectedDistrict

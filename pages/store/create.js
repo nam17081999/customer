@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog'
 import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
 import {
   DISTRICT_WARD_SUGGESTIONS,
@@ -16,7 +15,7 @@ import {
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { formatDistance } from '@/helper/validation'
-import { DetailStoreModalContent } from '@/components/detail-store-card'
+import SearchStoreCard from '@/components/search-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
@@ -475,58 +474,18 @@ export default function AddStore() {
 
     return (
       <>
-        <div className="rounded-lg border border-gray-800 bg-gray-900/80 p-3 space-y-3 text-gray-100">
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-semibold text-sm">
-              Phát hiện cửa hàng có thể đã được tạo
-            </div>
-          </div>
-          <div className="space-y-2">
-            {duplicateCandidates.map((s) => (
-              <Dialog key={s.id}>
-                <DialogTrigger asChild>
-                  <Card className="border border-gray-800 bg-black/60 cursor-pointer hover:bg-gray-900/80 transition-colors">
-                    <CardContent className="p-3 flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-gray-100">
-                          {s.name || 'Cửa hàng chưa đặt tên'}
-                        </div>
-                        <div className="mt-1 text-[11px] text-gray-400 line-clamp-2 flex items-start gap-1.5">
-                          <svg className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
-                          </svg>
-                          <span className="line-clamp-2 break-words">{formatAddressParts(s) || 'Không có địa chỉ'}</span>
-                        </div>
-                        {s.phone && (
-                          <div className="mt-1 text-[11px] text-gray-300 truncate flex items-center gap-1.5">
-                            <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                            </svg>
-                            <span>{s.phone}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="shrink-0">
-                        {typeof s.distance === 'number' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-800 text-gray-200">
-                            {formatDistance(s.distance)}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-900/60 text-amber-200">
-                            Trùng tên toàn hệ thống
-                          </span>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-                  <DetailStoreModalContent store={s} context="search" />
-                </DialogContent>
-              </Dialog>
-            ))}
-          </div>
+        <div className="font-semibold text-sm text-gray-100 my-2">
+          Phát hiện cửa hàng có thể đã được tạo
+        </div>
+        <div className="space-y-2">
+          {duplicateCandidates.map((s) => (
+            <SearchStoreCard
+              key={s.id}
+              store={s}
+              distance={s.distance}
+              compact
+            />
+          ))}
         </div>
         <div className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
           Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
@@ -877,29 +836,6 @@ export default function AddStore() {
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}
-                <div className="text-xs text-gray-400 dark:text-gray-500 pl-0.5">Gợi ý:</div>
-                <div className="flex flex-wrap gap-2">
-                  {NAME_SUGGESTIONS.map((label) => (
-                    <button
-                      key={label}
-                      type="button"
-                      className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-3 py-1 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onClick={() => {
-                        setName((prev) => {
-                          const base = (prev || '').trim()
-                          if (!base) return `${label} `
-                          const norm = removeVietnameseTones(base).toLowerCase()
-                          const normLabel = removeVietnameseTones(label).toLowerCase()
-                          if (norm.includes(normLabel)) return prev
-                          return `${base} ${label} `
-                        })
-                        try { nameInputRef.current?.focus() } catch {}
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
                 {duplicateCheckLoading && (
                   <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
                     Đang kiểm tra trùng tên gần đây và toàn hệ thống…

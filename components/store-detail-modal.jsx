@@ -1,0 +1,195 @@
+import { useState } from 'react'
+import Image from 'next/image'
+import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
+import { formatAddressParts } from '@/lib/utils'
+import { formatDistance } from '@/helper/validation'
+
+export default function StoreDetailModal({ store, trigger, open, onOpenChange }) {
+  const [copied, setCopied] = useState(false)
+  const [imageError, setImageError] = useState(false)
+
+  if (!store) return trigger || null
+
+  const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
+  const isActive = Boolean(store.active)
+  const addressText = formatAddressParts(store)
+  const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
+
+  const handleShare = async (e) => {
+    e.stopPropagation()
+    const lines = [`Tên: ${store.name}`]
+    if (addressText) lines.push(`Địa chỉ: ${addressText}`)
+    if (hasCoords) lines.push(`Vị trí: https://www.google.com/maps?q=${store.latitude},${store.longitude}`)
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: store.name, text: lines.join('\n') })
+        return
+      } catch { /* user cancelled */ }
+    }
+    try {
+      await navigator.clipboard.writeText(lines.join('\n'))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* ignored */ }
+  }
+
+  const handleCall = (e) => {
+    e.stopPropagation()
+    if (store.phone) {
+      window.location.href = `tel:${String(store.phone).replace(/[^0-9+]/g, '')}`
+    }
+  }
+
+  const content = (
+    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-2xl p-0 overflow-hidden max-h-[90vh]">
+      <div className="flex flex-col max-h-[90vh] overflow-y-auto">
+        {/* Image */}
+        <div className="relative w-full h-48 sm:h-56 bg-gray-100 dark:bg-gray-900 flex-shrink-0">
+          <Image
+            src={imageSrc}
+            alt={store.name}
+            fill
+            className="object-contain"
+            sizes="(max-width:448px) 100vw, 448px"
+            onError={() => setImageError(true)}
+          />
+          {/* Badges */}
+          <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+            {isActive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-500/90 text-white backdrop-blur-sm shadow-sm">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                Xác thực
+              </span>
+            )}
+          </div>
+          {/* Close */}
+          <DialogClose className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </DialogClose>
+        </div>
+
+        {/* Info */}
+        <div className="px-4 pt-4 pb-2 space-y-3">
+          {/* Name + distance */}
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight break-words min-w-0 flex-1">
+              {store.name}
+            </h3>
+            {typeof store.distance === 'number' && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex-shrink-0 whitespace-nowrap">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                {formatDistance(store.distance)}
+              </span>
+            )}
+          </div>
+
+          {/* Address */}
+          {addressText && (
+            <div className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
+              <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="break-words leading-relaxed">{addressText}</span>
+            </div>
+          )}
+
+          {/* Phone */}
+          {store.phone && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <svg className="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+              </svg>
+              <button onClick={handleCall} className="text-blue-600 dark:text-blue-400 hover:underline break-all text-left">
+                {store.phone}
+              </button>
+            </div>
+          )}
+
+          {/* Note */}
+          {store.note && (
+            <div className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
+              <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="break-words leading-relaxed">{store.note}</span>
+            </div>
+          )}
+
+          {/* Created at */}
+          {store.created_at && (
+            <div className="flex items-center gap-2.5 text-xs text-gray-400 dark:text-gray-500">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{new Date(store.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-4 pb-4 pt-2 flex gap-2">
+          {hasCoords && (
+            <Button asChild variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl">
+              <a
+                href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Chỉ đường
+              </a>
+            </Button>
+          )}
+          {store.phone && (
+            <Button variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl" onClick={handleCall}>
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                Gọi điện
+              </div>
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl" onClick={handleShare}>
+            <div className="flex items-center justify-center gap-2">
+              {copied ? (
+                <>
+                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  Đã copy
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                  Chia sẻ
+                </>
+              )}
+            </div>
+          </Button>
+        </div>
+      </div>
+    </DialogContent>
+  )
+
+  // Controlled mode (open/onOpenChange from parent — e.g. map.js)
+  if (open !== undefined) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {content}
+      </Dialog>
+    )
+  }
+
+  // Uncontrolled mode (trigger child — e.g. search cards)
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        {trigger}
+      </DialogTrigger>
+      {content}
+    </Dialog>
+  )
+}

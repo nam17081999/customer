@@ -1,6 +1,6 @@
 import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants';
 
-export const STORE_PLACEHOLDER_IMAGE = '/store-placeholder.svg'
+export const STORE_PLACEHOLDER_IMAGE = '/store-placeholder.jpg'
 
 /**
  * Get full image URL from filename using ImageKit.io
