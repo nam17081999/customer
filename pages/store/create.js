@@ -59,8 +59,8 @@ export default function AddStore() {
   }, [previewUrl])
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
+  const [showSuccess, setShowSuccess] = useState(false)
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
@@ -91,7 +91,7 @@ export default function AddStore() {
   const [mapsLinkError, setMapsLinkError] = useState('')
   const [showMapsLinkInput, setShowMapsLinkInput] = useState(false)
   const hasUnsavedChanges = useMemo(() => {
-    if (loading) return false
+    if (loading || showSuccess) return false
     return Boolean(
       name.trim() ||
       addressDetail.trim() ||
@@ -104,7 +104,7 @@ export default function AddStore() {
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading])
+  }, [name, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -303,7 +303,6 @@ export default function AddStore() {
     setPhone('')
     setNote('')
     setImageFile(null)
-    setShowAdvanced(false)
     setAllowDuplicate(false)
     setDuplicateCandidates([])
     setDuplicateCheckError('')
@@ -771,34 +770,8 @@ export default function AddStore() {
         await invalidateStoreCache()
       }
 
-      // Success
-      showMessage('success', 'Lưu thành công', 2500)
-      e.target.reset()
-      setName('')
-      setAddressDetail('')
-      setWard('')
-      setDistrict('')
-      setPhone('')
-      setNote('')
-      setImageFile(null)
-      // Reset map states
-      setPickedLat(null)
-      setPickedLng(null)
-      setMapEditable(false)
-      setUserHasEditedMap(false)
-      setInitialGPSLat(null)
-      setInitialGPSLng(null)
-      // Reset to step 1
-      setCurrentStep(1)
-      // Clear ?name from URL so it does not persist on next visit
-      if (router.query?.name) {
-        try {
-          const { name: _discard, ...rest } = router.query
-          router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true })
-        } catch {
-          router.replace(router.pathname)
-        }
-      }
+      // Success — show success screen
+      setShowSuccess(true)
     } catch (err) {
       console.error(err)
       showMessage('error', 'Đã xảy ra lỗi khi tạo cửa hàng')
@@ -809,17 +782,87 @@ export default function AddStore() {
 
   
 
+  // Success screen
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center px-6 py-10 space-y-5 max-w-sm mx-auto">
+          <div className="text-6xl">✅</div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tạo cửa hàng thành công!</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Cửa hàng đã được lưu vào hệ thống.</p>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              className="w-full h-12 text-base"
+              onClick={() => {
+                setShowSuccess(false)
+                resetCreateForm()
+              }}
+            >
+              Tạo cửa hàng khác
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-12 text-base"
+              onClick={() => router.push('/map')}
+            >
+              Xem bản đồ
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full h-10 text-sm text-gray-500"
+              onClick={() => router.push('/')}
+            >
+              Về trang chủ
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Step indicator labels
+  const steps = [
+    { num: 1, label: 'Tên' },
+    { num: 2, label: 'Thông tin' },
+    { num: 3, label: 'Vị trí' },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
       <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-1 pb-1">
+          {steps.map((s, i) => (
+            <div key={s.num} className="flex items-center">
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                currentStep === s.num
+                  ? 'bg-blue-600 text-white'
+                  : currentStep > s.num
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+              }`}>
+                {currentStep > s.num ? (
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <span>{s.num}</span>
+                )}
+                <span>{s.label}</span>
+              </div>
+              {i < steps.length - 1 && (
+                <div className={`w-6 h-0.5 mx-1 rounded ${currentStep > s.num ? 'bg-green-400 dark:bg-green-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
+              )}
+            </div>
+          ))}
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-3">
           {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
               <div className="space-y-1.5">
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng (bắt buộc)</Label>
+                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng</Label>
                 <Input
                   ref={nameInputRef}
                   id="name"
@@ -828,13 +871,14 @@ export default function AddStore() {
                     setName(e.target.value)
                     if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
                   }}
-                  placeholder="Cửa hàng Tạp Hóa Minh Anh"
+                  placeholder="VD: Tạp Hóa Minh Anh"
                   className="text-base sm:text-base"
                 />
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}
-                <div className="flex flex-wrap gap-2 py-1">
+                <div className="text-xs text-gray-400 dark:text-gray-500 pl-0.5">Gợi ý:</div>
+                <div className="flex flex-wrap gap-2">
                   {NAME_SUGGESTIONS.map((label) => (
                     <button
                       key={label}
@@ -884,92 +928,85 @@ export default function AddStore() {
             </>
           )}
 
-          {/* Step 2: Address + Image */}
+          {/* Step 2: Address + Image + Optional info */}
           {currentStep === 2 && (
             <>
-              {/* Địa chỉ */}
+              {/* Quận/Huyện */}
               <div className="space-y-1.5">
-                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ (bắt buộc)</Label>
-                <div className="grid gap-2">
-                  <Input
-                    id="district"
-                    value={district}
-                    onChange={(e) => {
-                      setDistrict(e.target.value)
-                      if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
-                    }}
-                    onBlur={() => { if (district) setDistrict(toTitleCaseVI(district.trim())) }}
-                    placeholder="Quận / Huyện"
-                    className="text-base sm:text-base"
-                  />
-                  {!(DISTRICT_SUGGESTIONS.some((d) => removeVietnameseTones(d).toLowerCase() === removeVietnameseTones(district || '').toLowerCase())) && (
-                    <div className="flex flex-wrap gap-2">
-                      {DISTRICT_SUGGESTIONS.map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          onClick={() => {
-                            setDistrict(d)
-                            setWard('')
-                          }}
-                        >
-                          {d}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {fieldErrors.district && (
-                    <div className="text-xs text-red-600">{fieldErrors.district}</div>
-                  )}
-                  <Input
-                    id="ward"
-                    value={ward}
-                    onChange={(e) => {
-                      setWard(e.target.value)
-                      if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
-                    }}
-                    onBlur={() => { if (ward) setWard(toTitleCaseVI(ward.trim())) }}
-                    placeholder="Xã / Phường"
-                    className="text-base sm:text-base"
-                  />
+                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Quận / Huyện</Label>
+                <div className="flex flex-wrap gap-2">
+                  {DISTRICT_SUGGESTIONS.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                        removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(d).toLowerCase()
+                          ? 'bg-blue-600 text-white border border-blue-600'
+                          : 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      }`}
+                      onClick={() => {
+                        setDistrict(d)
+                        setWard('')
+                        if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
+                      }}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                {fieldErrors.district && (
+                  <div className="text-xs text-red-600">{fieldErrors.district}</div>
+                )}
+              </div>
+
+              {/* Xã/Phường — only show when district is selected */}
+              {district && (DISTRICT_WARD_SUGGESTIONS[district] || []).length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(DISTRICT_WARD_SUGGESTIONS[district] || []).map((w) => (
+                      <button
+                        key={w}
+                        type="button"
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                          removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(w).toLowerCase()
+                            ? 'bg-blue-600 text-white border border-blue-600'
+                            : 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                        onClick={() => {
+                          setWard(w)
+                          if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
+                        }}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
                   {fieldErrors.ward && (
                     <div className="text-xs text-red-600">{fieldErrors.ward}</div>
                   )}
-                  {district && !(DISTRICT_WARD_SUGGESTIONS[district] || []).some((w) => removeVietnameseTones(w).toLowerCase() === removeVietnameseTones(ward || '').toLowerCase()) && (
-                    <div className="flex flex-wrap gap-2">
-                      {(DISTRICT_WARD_SUGGESTIONS[district] || []).map((w) => (
-                        <button
-                          key={w}
-                          type="button"
-                          className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-900 px-2 py-0.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                          onClick={() => setWard(w)}
-                        >
-                          {w}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <Input
-                    id="address_detail"
-                    value={addressDetail}
-                    onChange={(e) => {
-                      setAddressDetail(e.target.value)
-                      if (fieldErrors.address_detail) setFieldErrors((prev) => ({ ...prev, address_detail: '' }))
-                    }}
-                    onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
-                    placeholder="Địa chỉ cụ thể (số nhà, đường, thôn/xóm/đội...)"
-                    className="text-base sm:text-base"
-                  />
-                  {fieldErrors.address_detail && (
-                    <div className="text-xs text-red-600">{fieldErrors.address_detail}</div>
-                  )}
                 </div>
+              )}
+
+              {/* Địa chỉ chi tiết */}
+              <div className="space-y-1.5">
+                <Label htmlFor="address_detail" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
+                <Input
+                  id="address_detail"
+                  value={addressDetail}
+                  onChange={(e) => {
+                    setAddressDetail(e.target.value)
+                    if (fieldErrors.address_detail) setFieldErrors((prev) => ({ ...prev, address_detail: '' }))
+                  }}
+                  onBlur={() => { if (addressDetail) setAddressDetail(toTitleCaseVI(addressDetail.trim())) }}
+                  placeholder="Số nhà, đường, thôn/xóm/đội..."
+                  className="text-base sm:text-base"
+                />
               </div>
 
               {/* Ảnh */}
               <div className="space-y-1.5">
-                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng (không bắt buộc)</Label>
+                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
                 <div className="relative w-full">
                   {imageFile ? (
                     <div className="relative group w-full">
@@ -988,9 +1025,9 @@ export default function AddStore() {
                       </button>
                     </div>
                   ) : (
-                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
-                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4a1 1 0 011-1h8a1 1 0 011 1v12m-4 4h-4a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1z" /></svg>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Chụp ảnh</span>
+                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">📸 Chụp hoặc chọn ảnh</span>
                       <input
                         id="image"
                         type="file"
@@ -1007,59 +1044,40 @@ export default function AddStore() {
                 </div>
               </div>
 
-              {/* Toggle optional */}
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAdvanced(v => !v)}
-                  className="h-7 px-2 text-sm sm:text-xs text-gray-600 dark:text-gray-300"
-                >
-                  {showAdvanced ? 'Ẩn bớt thông tin' : 'Thêm thông tin khác'}
-                  <span className="ml-1 text-gray-400">{showAdvanced ? '−' : '+'}</span>
-                </Button>
+              {/* Phone & Note — always visible */}
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9+ ]*"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0901 234 567"
+                  className="text-base sm:text-base"
+                />
               </div>
-
-              {showAdvanced && (
-                <div className="grid gap-3 pt-2 animate-fadeIn">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9+ ]*"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0901 234 567"
-                      className="text-base sm:text-base"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú</Label>
-                    <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Bán từ 6:00 - 22:00 (nghỉ trưa 12h-13h)" className="text-base sm:text-base" />
-                  </div>
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
+                <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Bán từ 6:00 - 22:00" className="text-base sm:text-base" />
+              </div>
 
               <div className="pt-2 flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setCurrentStep(1)}
-                  className="w-1/3 text-sm sm:text-base"
+                  className="h-11 px-4 text-sm"
                 >
-                  ← Quay lại
+                  ←
                 </Button>
                 <Button
                   type="button"
-                  onClick={() => {
-                    validateStep2AndGoNext()
-                  }}
-                  className="flex-1 text-sm sm:text-base"
+                  onClick={() => validateStep2AndGoNext()}
+                  className="flex-1 h-11 text-sm sm:text-base"
                 >
-                  Tiếp theo: Xác định vị trí →
+                  Tiếp theo →
                 </Button>
               </div>
             </>
@@ -1068,6 +1086,24 @@ export default function AddStore() {
           {/* Step 3: Location */}
           {currentStep === 3 && (
             <>
+              {/* Guidance text */}
+              {resolvingAddr && (
+                <div className="flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2.5">
+                  <svg className="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
+                </div>
+              )}
+              {!resolvingAddr && pickedLat != null && !geoBlocked && (
+                <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2.5">
+                  <p className="text-sm text-green-700 dark:text-green-300">📍 Đã xác định vị trí. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.</p>
+                </div>
+              )}
+              {geoBlocked && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2.5">
+                  <p className="text-sm text-red-700 dark:text-red-300">❌ Không lấy được vị trí GPS. Hãy bấm <strong>Lấy lại vị trí</strong> hoặc dán link Google Maps bên dưới.</p>
+                </div>
+              )}
+
               {/* Map Picker */}
               <div ref={mapWrapperRef}>
                 <StoreLocationPicker
@@ -1121,16 +1157,21 @@ export default function AddStore() {
               type="button"
               variant="outline"
               onClick={() => setCurrentStep(2)}
-              className="w-1/3 text-sm sm:text-base"
+              className="h-11 px-4 text-sm"
             >
-              ← Quay lại
+              ←
             </Button>
             <Button
               type="submit"
               disabled={loading || resolvingAddr || geoBlocked}
-              className="flex-1 text-sm sm:text-base"
+              className="flex-1 h-11 text-sm sm:text-base"
             >
-              {loading || resolvingAddr ? 'Đang thêm…' : 'Lưu cửa hàng'}
+              {resolvingAddr ? (
+                <span className="flex items-center gap-2">
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  Đang lấy vị trí...
+                </span>
+              ) : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
             </Button>
           </div>
             </>

@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -27,6 +28,7 @@ export default function HomePage() {
   const [selectedWard, setSelectedWard] = useState('')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [sortByDistance, setSortByDistance] = useState(false)
   const searchInputRef = useRef(null)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
 
@@ -104,41 +106,56 @@ export default function HomePage() {
     if (selectedWard) {
       results = results.filter((s) => s.ward === selectedWard)
     }
-    // Text search
+    // Text search (supports Vietnamese without tones)
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase()
+      const normTerm = removeVietnameseTones(term)
       results = results.filter((s) => {
         const name = (s.name || '').toLowerCase()
-        return name.includes(term)
+        const normName = removeVietnameseTones(name)
+        return name.includes(term) || normName.includes(normTerm)
       })
     }
 
-    // Sort: active first, then by created_at desc
+    // Add distance
+    const refLoc = currentLocation
+    results = results.map((s) => ({
+      ...s,
+      distance: computeDistance(s, refLoc)
+    }))
+
+    // Sort
     results = results.slice().sort((a, b) => {
+      // Sort by distance first if enabled and both have distance
+      if (sortByDistance && a.distance != null && b.distance != null) {
+        return a.distance - b.distance
+      }
       if (a.active !== b.active) return a.active ? -1 : 1
       const da = a.created_at || ''
       const db = b.created_at || ''
       return db.localeCompare(da)
     })
 
-    // Add distance
-    const refLoc = currentLocation
-    return results.map((s) => ({
-      ...s,
-      distance: computeDistance(s, refLoc)
-    }))
-  }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance])
+    return results
+  }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance, sortByDistance])
 
   // Search triggers when name or filters change
   // (no longer needs debounced API call — kept for UX smoothness)
   const showSkeleton = hasSearchCriteria && (loading || !storesLoaded)
 
-  // Auto focus search input on mount for faster typing
+  // Auto focus search input on mount — only on desktop (mobile keyboard is annoying)
   useEffect(() => {
-    if (searchInputRef.current) {
+    if (searchInputRef.current && window.innerWidth >= 768) {
       try { searchInputRef.current.focus() } catch {}
     }
   }, [])
+
+  const clearAllFilters = () => {
+    setSearchTerm('')
+    setSelectedDistrict('')
+    setSelectedWard('')
+    setSortByDistance(false)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -149,11 +166,11 @@ export default function HomePage() {
           <Input
             ref={searchInputRef}
             type="text"
-            placeholder="Tìm kiếm cửa hàng..."
+            placeholder="VD: Tạp Hóa Minh Anh"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             autoComplete="off"
-            className="w-full text-base sm:text-base"
+            className="w-full text-base"
           />
           <div className="flex gap-2">
             <div className="flex-1">
@@ -173,44 +190,67 @@ export default function HomePage() {
               <select
                 value={selectedWard}
                 onChange={(e) => setSelectedWard(e.target.value)}
+                disabled={!selectedDistrict}
                 aria-label="Chọn xã/phường"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="">Xã/Phường</option>
+                <option value="">{selectedDistrict ? 'Xã/Phường' : 'Chọn quận trước'}</option>
                 {wardOptions.map((w) => (
                   <option key={w} value={w}>{w}</option>
                 ))}
               </select>
             </div>
           </div>
+          {/* Active filters bar: sort toggle + clear button */}
+          {(hasSearchCriteria || sortByDistance) && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {currentLocation && (
+                <button
+                  type="button"
+                  onClick={() => setSortByDistance(!sortByDistance)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                    sortByDistance
+                      ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-600 dark:text-blue-300'
+                      : 'bg-white border-gray-300 text-gray-600 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Gần nhất
+                </button>
+              )}
+              {hasSearchCriteria && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40 transition"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  Xoá bộ lọc
+                </button>
+              )}
+            </div>
+          )}
         </div>
         {/* Search Results */}
-        <div className="space-y-4">
+        <div className="space-y-3">
+          {/* Result count */}
+          {!showSkeleton && hasSearchCriteria && searchResults.length > 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+              Tìm thấy <span className="font-semibold text-gray-700 dark:text-gray-200">{searchResults.length}</span> cửa hàng
+            </p>
+          )}
+
           {showSkeleton && (
-            <div className="space-y-4" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
-              {[...Array(3)].map((_, i) => (
-                <Card
-                  key={i}
-                  className={`overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 ${loading ? '' : 'opacity-70'}`}
-                >
+            <div className="space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
+              {[...Array(5)].map((_, i) => (
+                <Card key={i} className={`overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
-                    {/* Image area */}
-                    <div className="relative w-full h-56 sm:h-64 bg-gray-200 dark:bg-gray-800 animate-pulse" />
-                    {/* Content area */}
-                    <div className="p-4 flex flex-col gap-3">
-                      {/* Title */}
-                      <div className="h-5 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
-                      {/* Meta lines */}
-                      <div className="space-y-2">
+                    <div className="flex gap-3 p-3">
+                      <div className="w-20 h-20 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0" />
+                      <div className="flex-1 space-y-2 py-1">
+                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
                         <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
-                        <div className="h-3 w-5/6 bg-gray-200 dark:bg-gray-700 rounded" />
-                        <div className="h-3 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
                         <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
-                      </div>
-                      {/* Action buttons */}
-                      <div className="flex gap-3 pt-2">
-                        <div className="h-9 flex-1 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
-                        <div className="h-9 flex-1 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
                       </div>
                     </div>
                   </CardContent>
@@ -220,39 +260,40 @@ export default function HomePage() {
           )}
 
           {!showSkeleton && hasSearchCriteria && searchResults.length === 0 && (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-gray-500 dark:text-gray-400 mb-4">
-                  Không tìm thấy cửa hàng nào
-                </p>
-                <Button asChild>
-                  <Link href="/store/create">
-                    + Tạo cửa hàng mới
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </div>
+              <p className="text-gray-600 dark:text-gray-300 font-medium mb-1">Không tìm thấy cửa hàng</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Thử tìm với từ khác hoặc bớt bộ lọc</p>
+              <Button asChild size="sm">
+                <Link href="/store/create">
+                  + Tạo cửa hàng mới
+                </Link>
+              </Button>
+            </div>
           )}
 
           {searchResults.length > 0 && (
-            <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-250px)]">
+            <div className="h-[calc(100vh-260px)] sm:h-[calc(100vh-290px)]">
               <Virtuoso
                 data={searchResults}
                 computeItemKey={(index, item) => `${item.id}:${item.distance == null ? 'x' : item.distance.toFixed(3)}`}
                 overscan={300}
                 itemContent={(index, store) => (
-                  <div className="mb-4" key={`${store.id}-${store.distance == null ? 'x' : store.distance.toFixed(3)}`}>
+                  <div className="mb-3" key={`${store.id}-${store.distance == null ? 'x' : store.distance.toFixed(3)}`}>
                     <SearchStoreCard
                       store={store}
                       distance={store.distance}
                       searchTerm={searchTerm}
+                      compact
                     />
                   </div>
                 )}
                 components={{
                   Footer: () => (
-                    <div className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                      {searchResults.length > 0 && `Hiển thị ${searchResults.length} kết quả`}
+                    <div className="py-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                      Hết kết quả
                     </div>
                   )
                 }}
@@ -261,13 +302,26 @@ export default function HomePage() {
           )}
 
           {!hasSearchCriteria && (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-gray-500 dark:text-gray-400">
-                  Nhập tên cửa hàng hoặc chọn Quận/Huyện, Xã/Phường để tìm kiếm
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+                <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              </div>
+              <p className="text-gray-700 dark:text-gray-200 font-medium mb-1">Tìm cửa hàng</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-5">Gõ tên hoặc chọn quận bên trên để bắt đầu</p>
+              {/* Quick district chips */}
+              <div className="flex flex-wrap gap-2 justify-center max-w-xs">
+                {DISTRICTS.slice(0, 6).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setSelectedDistrict(d)}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
