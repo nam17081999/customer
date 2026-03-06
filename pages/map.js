@@ -563,7 +563,7 @@ export default function MapPage() {
   }, [suggestions])
 
   return (
-    <div className="relative h-[calc(100vh-56px)] w-full overflow-hidden bg-slate-950 text-slate-100 flex">
+    <div className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-slate-950 text-slate-100 flex">
       {/* Map area */}
       <div className="relative flex-1 h-full">
         <div ref={mapContainerRef} className="absolute inset-0" />

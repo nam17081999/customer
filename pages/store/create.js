@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,8 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
 
 export default function AddStore() {
   const router = useRouter()
+  const { user } = useAuth() || {}
+  const isAdmin = Boolean(user)
   const [name, setName] = useState('')
   const nameInputRef = useRef(null)
   const [addressDetail, setAddressDetail] = useState('')
@@ -694,6 +697,7 @@ export default function AddStore() {
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,
+          active: isAdmin,
           note,
           phone,
           image_url: imageFilename, // nullable when store has no image

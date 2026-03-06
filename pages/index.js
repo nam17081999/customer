@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { Virtuoso } from 'react-virtuoso'
-import { supabase } from '@/lib/supabaseClient'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -96,8 +95,8 @@ export default function HomePage() {
   }, [])
 
   // Load all stores from IndexedDB cache (or fetch if count changed)
-  const loadAllStores = useCallback(async () => {
-    if (storesLoaded) return
+  const loadAllStores = useCallback(async ({ force = false } = {}) => {
+    if (storesLoaded && !force) return
     setLoading(true)
     try {
       const data = await getOrRefreshStores()
@@ -116,6 +115,25 @@ export default function HomePage() {
       loadAllStores()
     }
   }, [hasSearchCriteria, storesLoaded, loadAllStores])
+
+  // Keep results in sync after create/update/delete without full page reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleStoresChanged = async (event) => {
+      const changedId = event?.detail?.id
+      const shouldRefetchAll = Boolean(event?.detail?.shouldRefetchAll)
+      if (changedId) {
+        setAllStores((prev) => prev.filter((store) => store.id !== changedId))
+      }
+      if (shouldRefetchAll && storesLoaded) {
+        await loadAllStores({ force: true })
+      }
+    }
+
+    window.addEventListener('storevis:stores-changed', handleStoresChanged)
+    return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
+  }, [storesLoaded, loadAllStores])
 
   // Local filtering
   const searchResults = useMemo(() => {
@@ -183,10 +201,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="px-3 sm:px-4 py-4 sm:py-6 space-y-3 max-w-screen-md mx-auto">
+    <div className="h-[calc(100dvh-3.5rem)] bg-gray-50 dark:bg-black overflow-hidden">
+      <div className="h-full px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto flex flex-col gap-3">
         {/* Search + Filters */}
-        <div className="flex flex-col gap-2">
+        <div className="flex-shrink-0 flex flex-col gap-2">
           {/* Font >=16px để tránh iOS tự zoom khi focus input */}
           <Input
             ref={searchInputRef}
@@ -257,7 +275,7 @@ export default function HomePage() {
           )}
         </div>
         {/* Search Results */}
-        <div className="space-y-3">
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
           {/* Result count */}
           {!showSkeleton && hasSearchCriteria && searchResults.length > 0 && (
             <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
@@ -266,7 +284,7 @@ export default function HomePage() {
           )}
 
           {showSkeleton && (
-            <div className="space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
               {[...Array(5)].map((_, i) => (
                 <Card key={i} className={`overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
@@ -300,8 +318,9 @@ export default function HomePage() {
           )}
 
           {searchResults.length > 0 && (
-            <div className="h-[calc(100vh-260px)] sm:h-[calc(100vh-290px)]">
+            <div className="flex-1 min-h-0">
               <Virtuoso
+                style={{ height: '100%' }}
                 data={searchResults}
                 computeItemKey={(index, item) => `${item.id}:${item.distance == null ? 'x' : item.distance.toFixed(3)}`}
                 overscan={300}
