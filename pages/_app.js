@@ -1,9 +1,12 @@
 import "../app/globals.css";
+import { useRouter } from "next/router";
 import Navbar from "@/components/navbar";
 import Head from "next/head";
 import ErrorBoundary from "@/components/error-boundary";
+import { AuthProvider } from "@/lib/AuthContext";
 
 export default function App({ Component, pageProps }) {
+  const { pathname } = useRouter()
   return (
     <>
       <Head>
@@ -16,12 +19,17 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </Head>
-      <ErrorBoundary>
-        <div className="sticky top-0 z-50">
-          <Navbar />
-        </div>
-        <Component {...pageProps} />
-      </ErrorBoundary>
+      <AuthProvider>
+        <ErrorBoundary>
+          <div className="sticky top-0 z-50">
+            <Navbar />
+          </div>
+          {/* pb-14 = space for fixed bottom tab bar on mobile */}
+          <div className={pathname === '/map' ? '' : 'pb-14 sm:pb-0'}>
+            <Component {...pageProps} />
+          </div>
+        </ErrorBoundary>
+      </AuthProvider>
     </>
   );
 }

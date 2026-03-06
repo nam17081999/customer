@@ -81,7 +81,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm leading-tight line-clamp-1">
                   {renderHighlightedName(store.name, searchTerm)}
                 </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{addressText}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {distance !== null && distance !== undefined && (
                     <span className="inline-flex items-center gap-0.5 text-[11px] text-gray-500 dark:text-gray-400">

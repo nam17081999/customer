@@ -1,14 +1,22 @@
 import { useState } from 'react'
+import { useRouter } from 'next/router'
 import Image from 'next/image'
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
+import { useAuth } from '@/lib/AuthContext'
+import { supabase } from '@/lib/supabaseClient'
+import { invalidateStoreCache } from '@/lib/storeCache'
 
 export default function StoreDetailModal({ store, trigger, open, onOpenChange }) {
+  const router = useRouter()
+  const { user } = useAuth() || {}
   const [copied, setCopied] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   if (!store) return trigger || null
 
@@ -41,6 +49,28 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     if (store.phone) {
       window.location.href = `tel:${String(store.phone).replace(/[^0-9+]/g, '')}`
     }
+  }
+
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      setTimeout(() => setDeleteConfirm(false), 4000)
+      return
+    }
+    setDeleting(true)
+    const { error } = await supabase.from('stores').delete().eq('id', store.id)
+    if (!error) {
+      invalidateStoreCache()
+      if (onOpenChange) onOpenChange(false)
+      router.reload()
+    }
+    setDeleting(false)
+  }
+
+  const handleEdit = (e) => {
+    e.stopPropagation()
+    router.push(`/store/edit/${store.id}`)
   }
 
   const content = (
@@ -131,45 +161,78 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
         </div>
 
         {/* Action buttons */}
-        <div className="px-4 pb-4 pt-2 flex gap-2">
+        <div className="px-4 pb-2 pt-2 flex gap-2">
           {hasCoords && (
-            <Button asChild variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl">
+            <Button asChild variant="outline" size="sm" className="flex-1 h-10 rounded-xl">
               <a
                 href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="flex items-center justify-center gap-2"
+                className="flex items-center justify-center gap-1.5"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                Chỉ đường
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span className="text-xs">Chỉ đường</span>
               </a>
             </Button>
           )}
           {store.phone && (
-            <Button variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl" onClick={handleCall}>
-              <div className="flex items-center justify-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                Gọi điện
+            <Button variant="outline" size="sm" className="flex-1 h-10 rounded-xl" onClick={handleCall}>
+              <div className="flex items-center justify-center gap-1.5">
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                <span className="text-xs">Gọi điện</span>
               </div>
             </Button>
           )}
-          <Button variant="outline" size="sm" className="flex-1 h-10 text-sm rounded-xl" onClick={handleShare}>
-            <div className="flex items-center justify-center gap-2">
+          <Button variant="outline" size="sm" className="flex-1 h-10 rounded-xl" onClick={handleShare}>
+            <div className="flex items-center justify-center gap-1.5">
               {copied ? (
                 <>
-                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  Đã copy
+                  <svg className="w-4 h-4 shrink-0 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <span className="text-xs">Đã copy</span>
                 </>
               ) : (
                 <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                  Chia sẻ
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                  <span className="text-xs">Chia sẻ</span>
                 </>
               )}
             </div>
           </Button>
         </div>
+
+        {/* Admin actions — visible only when logged in */}
+        {user && (
+          <div className="px-4 pb-4 pt-1 flex gap-2 border-t border-gray-100 dark:border-gray-800 mt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-10 text-sm rounded-xl"
+              onClick={handleEdit}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Sửa
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={deleting}
+              className={`flex-1 h-10 text-sm rounded-xl transition-colors ${deleteConfirm ? 'border-red-500 text-red-500 bg-red-50 dark:bg-red-950/30 hover:bg-red-100' : 'text-red-500 hover:border-red-400'}`}
+              onClick={handleDelete}
+            >
+              <div className="flex items-center justify-center gap-2">
+                {deleting ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                )}
+                {deleteConfirm ? 'Xác nhận xoá?' : 'Xoá'}
+              </div>
+            </Button>
+          </div>
+        )}
       </div>
     </DialogContent>
   )
