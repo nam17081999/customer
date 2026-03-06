@@ -8,11 +8,12 @@ import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabaseClient'
-import { invalidateStoreCache } from '@/lib/storeCache'
+import { invalidateStoreCache, removeStoreFromCache } from '@/lib/storeCache'
 
 export default function StoreDetailModal({ store, trigger, open, onOpenChange }) {
   const router = useRouter()
   const { user } = useAuth() || {}
+  const [internalOpen, setInternalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -61,9 +62,35 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     setDeleting(true)
     const { error } = await supabase.from('stores').delete().eq('id', store.id)
     if (!error) {
-      invalidateStoreCache()
+      // 1) Delete in IndexedDB cache immediately
+      const cacheResult = await removeStoreFromCache(store.id)
+
+      // 2) Compare cache length vs real DB count
+      let shouldRefetchAll = false
+      const { count, error: countError } = await supabase
+        .from('stores')
+        .select('id', { count: 'exact', head: true })
+
+      if (countError) {
+        shouldRefetchAll = true
+      } else if (typeof cacheResult.cacheLength !== 'number' || cacheResult.cacheLength !== count) {
+        shouldRefetchAll = true
+      }
+
+      // 3) If mismatch -> force next screen load to call ALL again
+      if (shouldRefetchAll) {
+        await invalidateStoreCache()
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('storevis:stores-changed', {
+            detail: { type: 'delete', id: store.id, shouldRefetchAll },
+          })
+        )
+      }
       if (onOpenChange) onOpenChange(false)
-      router.reload()
+      else setInternalOpen(false)
     }
     setDeleting(false)
   }
@@ -105,7 +132,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
         <div className="px-4 pt-4 pb-2 space-y-3">
           {/* Name + distance */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 leading-tight break-words min-w-0 flex-1">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight break-words min-w-0 flex-1">
               {store.name}
             </h3>
             {typeof store.distance === 'number' && (
@@ -118,8 +145,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
           {/* Address */}
           {addressText && (
-            <div className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
-              <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start gap-2.5 text-base text-gray-600 dark:text-gray-400">
+              <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -129,11 +156,11 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
           {/* Phone */}
           {store.phone && (
-            <div className="flex items-center gap-2.5 text-sm">
-              <svg className="w-4 h-4 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-2.5 text-base">
+              <svg className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
-              <button onClick={handleCall} className="text-blue-600 dark:text-blue-400 hover:underline break-all text-left">
+              <button onClick={handleCall} className="text-blue-600 dark:text-blue-400 hover:underline break-all text-left font-medium">
                 {store.phone}
               </button>
             </div>
@@ -141,29 +168,21 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
           {/* Note */}
           {store.note && (
-            <div className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
-              <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-start gap-2.5 text-base text-gray-600 dark:text-gray-400">
+              <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
               <span className="break-words leading-relaxed">{store.note}</span>
             </div>
           )}
 
-          {/* Created at */}
-          {store.created_at && (
-            <div className="flex items-center gap-2.5 text-xs text-gray-400 dark:text-gray-500">
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{new Date(store.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
-            </div>
-          )}
+
         </div>
 
         {/* Action buttons */}
-        <div className="px-4 pb-2 pt-2 flex gap-2">
+        <div className="px-4 pb-2 pt-2 flex flex-wrap gap-2">
           {hasCoords && (
-            <Button asChild variant="outline" size="sm" className="flex-1 h-10 rounded-xl">
+            <Button asChild variant="outline" size="sm" className="flex-1 min-w-[80px] h-11 rounded-xl">
               <a
                 href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`}
                 target="_blank"
@@ -177,14 +196,14 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
             </Button>
           )}
           {store.phone && (
-            <Button variant="outline" size="sm" className="flex-1 h-10 rounded-xl" onClick={handleCall}>
+            <Button variant="outline" size="sm" className="flex-1 min-w-[80px] h-11 rounded-xl" onClick={handleCall}>
               <div className="flex items-center justify-center gap-1.5">
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                 <span className="text-xs">Gọi điện</span>
               </div>
             </Button>
           )}
-          <Button variant="outline" size="sm" className="flex-1 h-10 rounded-xl" onClick={handleShare}>
+          <Button variant="outline" size="sm" className="flex-1 min-w-[80px] h-11 rounded-xl" onClick={handleShare}>
             <div className="flex items-center justify-center gap-1.5">
               {copied ? (
                 <>
@@ -237,21 +256,13 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     </DialogContent>
   )
 
-  // Controlled mode (open/onOpenChange from parent — e.g. map.js)
-  if (open !== undefined) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        {content}
-      </Dialog>
-    )
-  }
+  const isControlled = open !== undefined
+  const resolvedOpen = isControlled ? open : internalOpen
+  const resolvedOnOpenChange = isControlled ? onOpenChange : setInternalOpen
 
-  // Uncontrolled mode (trigger child — e.g. search cards)
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        {trigger}
-      </DialogTrigger>
+    <Dialog open={resolvedOpen} onOpenChange={resolvedOnOpenChange}>
+      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
       {content}
     </Dialog>
   )

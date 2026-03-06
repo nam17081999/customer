@@ -21,11 +21,9 @@ export default function App({ Component, pageProps }) {
       </Head>
       <AuthProvider>
         <ErrorBoundary>
-          <div className="sticky top-0 z-50">
-            <Navbar />
-          </div>
-          {/* pb-14 = space for fixed bottom tab bar on mobile */}
-          <div className={pathname === '/map' ? '' : 'pb-14 sm:pb-0'}>
+          <Navbar />
+          {/* pb-16 = space for fixed bottom tab bar on mobile */}
+          <div className={pathname === '/map' ? '' : 'pb-16 sm:pb-0'}>
             <Component {...pageProps} />
           </div>
         </ErrorBoundary>

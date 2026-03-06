@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   // Already logged in
   if (user) {
-    router.replace(router.query.from || '/')
+    router.replace(router.query.from || '/dashboard')
     return null
   }
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
     if (err) {
       setError('Email hoặc mật khẩu không đúng')
     } else {
-      router.replace(router.query.from || '/')
+      router.replace(router.query.from || '/dashboard')
     }
     setLoading(false)
   }

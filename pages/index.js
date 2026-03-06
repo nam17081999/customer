@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { Virtuoso } from 'react-virtuoso'
-import { supabase } from '@/lib/supabaseClient'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -96,8 +95,8 @@ export default function HomePage() {
   }, [])
 
   // Load all stores from IndexedDB cache (or fetch if count changed)
-  const loadAllStores = useCallback(async () => {
-    if (storesLoaded) return
+  const loadAllStores = useCallback(async ({ force = false } = {}) => {
+    if (storesLoaded && !force) return
     setLoading(true)
     try {
       const data = await getOrRefreshStores()
@@ -116,6 +115,25 @@ export default function HomePage() {
       loadAllStores()
     }
   }, [hasSearchCriteria, storesLoaded, loadAllStores])
+
+  // Keep results in sync after create/update/delete without full page reload
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleStoresChanged = async (event) => {
+      const changedId = event?.detail?.id
+      const shouldRefetchAll = Boolean(event?.detail?.shouldRefetchAll)
+      if (changedId) {
+        setAllStores((prev) => prev.filter((store) => store.id !== changedId))
+      }
+      if (shouldRefetchAll && storesLoaded) {
+        await loadAllStores({ force: true })
+      }
+    }
+
+    window.addEventListener('storevis:stores-changed', handleStoresChanged)
+    return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
+  }, [storesLoaded, loadAllStores])
 
   // Local filtering
   const searchResults = useMemo(() => {
