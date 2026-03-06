@@ -30,20 +30,15 @@ const PlusIcon = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
     </svg>
 )
-const LogoutIcon = ({ className }) => (
+const AccountIcon = ({ className }) => (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-    </svg>
-)
-const LoginIcon = ({ className }) => (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
 )
 
 export default function Navbar() {
     const pathname = usePathname()
-    const { user, signOut } = useAuth() || {}
+    const { user } = useAuth() || {}
     const currentPath = pathname || ''
     const navLinks = user
         ? [
@@ -52,20 +47,21 @@ export default function Navbar() {
             { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
             { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
             { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
+            { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
         ]
         : [
             { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
             { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
             { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
+            { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
         ]
 
     const brandHref = user ? '/dashboard' : '/'
-    const topNavButtonClass = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors'
 
     return (
         <>
             {/* ── Top bar ── */}
-            <nav className="sticky top-0 z-50 border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
+            <nav className="hidden sm:block sticky top-0 z-50 border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
                 <div className="mx-auto flex h-14 w-full max-w-screen-md items-center px-3 sm:px-4 gap-2">
                     {/* Brand */}
                     <Link href={brandHref} className="flex items-center font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base shrink-0">
@@ -89,29 +85,6 @@ export default function Navbar() {
                                 <span>{label}</span>
                             </Link>
                         ))}
-                    </div>
-
-                    {/* Auth button — shown on both mobile and desktop */}
-                    <div className="ml-auto sm:ml-1.5 shrink-0">
-                        {user ? (
-                            <button
-                                onClick={() => signOut()}
-                                aria-label="Đăng xuất"
-                                className={`${topNavButtonClass} text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40`}
-                            >
-                                <LogoutIcon className="w-4 h-4 shrink-0" />
-                                <span>Đăng xuất</span>
-                            </button>
-                        ) : (
-                            <Link
-                                href="/login"
-                                aria-label="Đăng nhập"
-                                className={`${topNavButtonClass} text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900`}
-                            >
-                                <LoginIcon className="w-4 h-4 shrink-0" />
-                                <span>Đăng nhập</span>
-                            </Link>
-                        )}
                     </div>
                 </div>
             </nav>

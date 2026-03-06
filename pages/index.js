@@ -201,7 +201,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-7rem)] sm:h-[calc(100dvh-3.5rem)] bg-gray-50 dark:bg-black overflow-hidden">
+    <div className="h-[calc(100dvh-3.5rem)] bg-gray-50 dark:bg-black overflow-hidden">
       <div className="h-full px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto flex flex-col gap-3">
         {/* Search + Filters */}
         <div className="flex-shrink-0 flex flex-col gap-2">
