@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/AuthContext";
 
 export default function App({ Component, pageProps }) {
   const { pathname } = useRouter()
+  const needsBottomPadding = pathname !== '/map' && pathname !== '/'
   return (
     <>
       <Head>
@@ -23,7 +24,7 @@ export default function App({ Component, pageProps }) {
         <ErrorBoundary>
           <Navbar />
           {/* pb-16 = space for fixed bottom tab bar on mobile */}
-          <div className={pathname === '/map' ? '' : 'pb-16 sm:pb-0'}>
+          <div className={needsBottomPadding ? 'pb-16 sm:pb-0' : ''}>
             <Component {...pageProps} />
           </div>
         </ErrorBoundary>
