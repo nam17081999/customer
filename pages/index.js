@@ -146,15 +146,24 @@ export default function HomePage() {
     if (selectedWard) {
       results = results.filter((s) => s.ward === selectedWard)
     }
-    // Text search (supports Vietnamese without tones)
+    // Text search (supports Vietnamese without tones + any word order)
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase()
       const normTerm = removeVietnameseTones(term)
-      results = results.filter((s) => {
-        const name = (s.name || '').toLowerCase()
-        const normName = removeVietnameseTones(name)
-        return name.includes(term) || normName.includes(normTerm)
-      })
+      // Split into individual words for word-order-independent matching
+      const words = normTerm.split(/\s+/).filter(Boolean)
+
+      // Score: 2 = exact substring match, 1 = all words present (any order), 0 = any word present
+      results = results
+        .map((s) => {
+          const name = (s.name || '').toLowerCase()
+          const normName = removeVietnameseTones(name)
+          if (name.includes(term) || normName.includes(normTerm)) return { ...s, _score: 2 }
+          if (words.length > 1 && words.every((w) => normName.includes(w))) return { ...s, _score: 1 }
+          if (words.some((w) => normName.includes(w))) return { ...s, _score: 0 }
+          return null
+        })
+        .filter(Boolean)
     }
 
     // Add distance
@@ -164,9 +173,11 @@ export default function HomePage() {
       distance: computeDistance(s, refLoc)
     }))
 
-    // Sort
+    // Sort: match score first, then distance (if enabled), then active, then newest
     results = results.slice().sort((a, b) => {
-      // Sort by distance first if enabled and both have distance
+      const sa = a._score ?? 2
+      const sb = b._score ?? 2
+      if (sb !== sa) return sb - sa
       if (sortByDistance && a.distance != null && b.distance != null) {
         return a.distance - b.distance
       }
