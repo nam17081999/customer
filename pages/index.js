@@ -343,7 +343,7 @@ export default function HomePage() {
           )}
 
           {!hasSearchCriteria && (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
               <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
                 <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
@@ -356,7 +356,7 @@ export default function HomePage() {
                     key={d}
                     type="button"
                     onClick={() => setSelectedDistrict(d)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
+                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
                   >
                     {d}
                   </button>
