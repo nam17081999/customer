@@ -170,7 +170,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
         </div>
 
         {/* Action buttons */}
-        <div className="px-4 pb-2 pt-2 flex flex-wrap gap-2">
+        <div className="px-4 pb-4 pt-2 flex flex-wrap gap-2">
           {hasCoords && (
             <Button asChild variant="outline" size="sm" className="flex-1 min-w-[80px] h-11 rounded-xl">
               <a
@@ -212,7 +212,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
         {/* Admin actions — visible only when logged in */}
         {user && (
-          <div className="px-4 pb-4 pt-1 flex gap-2 border-t border-gray-100 dark:border-gray-800 mt-1">
+          <div className="px-4 pb-4 pt-0 flex gap-2">
             <Button
               variant="outline"
               size="sm"

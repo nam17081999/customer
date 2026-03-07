@@ -29,7 +29,7 @@ export default function HomePage() {
   const [selectedWard, setSelectedWard] = useState('')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [sortByDistance, setSortByDistance] = useState(false)
+  const [sortByDistance, setSortByDistance] = useState(true)
   const searchInputRef = useRef(null)
   const initializedFromQuery = useRef(false)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
