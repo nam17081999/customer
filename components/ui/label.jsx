@@ -5,7 +5,7 @@ function Label({ className, ...props }) {
   return (
     <label
       className={cn(
-        "text-sm font-medium text-gray-700 dark:text-gray-300",
+        "text-base font-medium text-gray-700 dark:text-gray-300",
         className
       )}
       {...props}

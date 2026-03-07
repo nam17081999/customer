@@ -83,7 +83,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
                 {distance !== null && distance !== undefined && (
-                  <span className="inline-flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="inline-flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400">
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     {formatDistance(distance)}
                   </span>
@@ -91,7 +91,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 {store.phone && (
                   <a
                     href={`tel:${store.phone.replace(/\s+/g,'')}`}
-                    className="inline-flex items-center gap-0.5 text-xs text-blue-600 dark:text-blue-400 hover:underline truncate"
+                    className="inline-flex items-center gap-0.5 text-sm text-blue-600 dark:text-blue-400 hover:underline truncate"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
@@ -155,7 +155,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-lg md:text-xl leading-tight break-words">
                 {renderHighlightedName(store.name, searchTerm)}
               </h3>
-              <div className="text-[13px] leading-snug text-gray-600 dark:text-gray-300 space-y-1 min-w-0">
+              <div className="text-sm leading-snug text-gray-600 dark:text-gray-300 space-y-1 min-w-0">
                 {/* Địa chỉ */}
                 <div className="flex items-center gap-1.5">
                   <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" /></svg>

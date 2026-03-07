@@ -29,7 +29,7 @@ export default function HomePage() {
   const [selectedWard, setSelectedWard] = useState('')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [sortByDistance, setSortByDistance] = useState(false)
+  const [sortByDistance, setSortByDistance] = useState(true)
   const searchInputRef = useRef(null)
   const initializedFromQuery = useRef(false)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
@@ -94,9 +94,8 @@ export default function HomePage() {
     return haversineKm(refLoc.latitude, refLoc.longitude, store.latitude, store.longitude)
   }, [])
 
-  // Load all stores from IndexedDB cache (or fetch if count changed)
-  const loadAllStores = useCallback(async ({ force = false } = {}) => {
-    if (storesLoaded && !force) return
+  // Load all stores — always goes through storeCache (which handles 60s cooldown + dedup)
+  const loadAllStores = useCallback(async () => {
     setLoading(true)
     try {
       const data = await getOrRefreshStores()
@@ -107,14 +106,12 @@ export default function HomePage() {
     } finally {
       setLoading(false)
     }
-  }, [storesLoaded])
+  }, [])
 
-  // Trigger load when user starts typing or selects a filter
+  // Load on mount so data is ready the moment user starts typing
   useEffect(() => {
-    if (hasSearchCriteria && !storesLoaded) {
-      loadAllStores()
-    }
-  }, [hasSearchCriteria, storesLoaded, loadAllStores])
+    loadAllStores()
+  }, [loadAllStores])
 
   // Keep results in sync after create/update/delete without full page reload
   useEffect(() => {
@@ -126,14 +123,14 @@ export default function HomePage() {
       if (changedId) {
         setAllStores((prev) => prev.filter((store) => store.id !== changedId))
       }
-      if (shouldRefetchAll && storesLoaded) {
-        await loadAllStores({ force: true })
+      if (shouldRefetchAll) {
+        await loadAllStores()
       }
     }
 
     window.addEventListener('storevis:stores-changed', handleStoresChanged)
     return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
-  }, [storesLoaded, loadAllStores])
+  }, [loadAllStores])
 
   // Local filtering
   const searchResults = useMemo(() => {
@@ -221,7 +218,7 @@ export default function HomePage() {
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
                 aria-label="Chọn quận/huyện"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 disabled:opacity-60"
               >
                 <option value="">Quận/Huyện</option>
                 {districtOptions.map((d) => (
@@ -235,7 +232,7 @@ export default function HomePage() {
                 onChange={(e) => setSelectedWard(e.target.value)}
                 disabled={!selectedDistrict}
                 aria-label="Chọn xã/phường"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-2 py-2 text-sm text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">{selectedDistrict ? 'Xã/Phường' : 'Chọn quận trước'}</option>
                 {wardOptions.map((w) => (
@@ -277,8 +274,8 @@ export default function HomePage() {
         {/* Search Results */}
         <div className="flex-1 min-h-0 flex flex-col gap-3">
           {/* Result count */}
-          {!showSkeleton && hasSearchCriteria && searchResults.length > 0 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+          {(!showSkeleton && hasSearchCriteria && searchResults.length > 0) && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 px-1">
               Tìm thấy <span className="font-semibold text-gray-700 dark:text-gray-200">{searchResults.length}</span> cửa hàng
             </p>
           )}
@@ -346,7 +343,7 @@ export default function HomePage() {
           )}
 
           {!hasSearchCriteria && (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
               <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
                 <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
@@ -359,7 +356,7 @@ export default function HomePage() {
                     key={d}
                     type="button"
                     onClick={() => setSelectedDistrict(d)}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
+                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
                   >
                     {d}
                   </button>
