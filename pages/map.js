@@ -601,11 +601,11 @@ export default function MapPage() {
                     inputRef.current?.blur()
                   }
                 }}
-                className="h-9 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-[16px] sm:text-sm text-slate-100 placeholder:text-slate-400"
+                className="h-11 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-base text-slate-100 placeholder:text-slate-400"
               />
               <Button
                 onClick={handleSearch}
-                className="h-9 rounded-lg bg-sky-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
+                className="h-11 rounded-lg bg-sky-500 px-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
                 disabled={loading || Boolean(error)}
               >
                 Tìm
@@ -634,8 +634,8 @@ export default function MapPage() {
                     onPointerDown={(e) => e.preventDefault()}
                     onClick={() => flyToStore(store)}
                   >
-                    <span className="min-w-0 truncate text-sm font-medium text-slate-100">{store.name}</span>
-                    <span className="shrink-0 max-w-[45%] truncate text-right text-xs text-slate-400">{formatShortAddress(store)}</span>
+                    <span className="min-w-0 truncate text-base font-medium text-slate-100">{store.name}</span>
+                    <span className="shrink-0 max-w-[45%] truncate text-right text-sm text-slate-400">{formatShortAddress(store)}</span>
                   </button>
                 ))}
               </div>
@@ -658,7 +658,7 @@ export default function MapPage() {
       <div className="flex flex-col w-[320px] h-full bg-slate-900 border-l border-slate-700/60 shrink-0">
         {/* Sidebar header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
-          <h2 className="text-sm font-semibold text-slate-100">Bộ lọc khu vực</h2>
+          <h2 className="text-base font-semibold text-slate-100">Bộ lọc khu vực</h2>
           <div className="flex items-center gap-2">
             {(selectedDistricts.length > 0 || selectedWards.length > 0) && (
               <button
@@ -673,7 +673,7 @@ export default function MapPage() {
         </div>
 
         {/* Filter count */}
-        <div className="px-4 py-2 text-xs text-slate-400 border-b border-slate-700/40">
+        <div className="px-4 py-2 text-sm text-slate-400 border-b border-slate-700/40">
           Hiển thị <span className="font-semibold text-slate-200">{filteredStores.length}</span> / {storesWithCoords.length} cửa hàng
         </div>
 
@@ -681,7 +681,7 @@ export default function MapPage() {
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
           {/* District section */}
           <div>
-            <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
+            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
             <div className="flex flex-wrap gap-1.5">
               {Object.keys(DISTRICT_WARD_SUGGESTIONS).map((district) => {
                 const active = selectedDistricts.includes(district)
@@ -691,7 +691,7 @@ export default function MapPage() {
                     key={district}
                     type="button"
                     onClick={() => toggleDistrict(district)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                       active
                         ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-600/40'
@@ -708,13 +708,13 @@ export default function MapPage() {
           {/* Ward section - only show when districts selected */}
           {selectedDistricts.length > 0 && availableWards.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-slate-500">(chọn để hiển thị)</span></h3>
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-slate-500">(chọn để hiển thị)</span></h3>
               {selectedDistricts.map((district) => {
                 const wards = DISTRICT_WARD_SUGGESTIONS[district] || []
                 if (wards.length === 0) return null
                 return (
                   <div key={district} className="mb-3">
-                    <div className="text-[11px] font-medium text-slate-400 mb-1.5">{district}</div>
+                    <div className="text-xs font-medium text-slate-400 mb-1.5">{district}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {wards.map((ward) => {
                         const active = selectedWards.includes(ward)
@@ -724,7 +724,7 @@ export default function MapPage() {
                             key={ward}
                             type="button"
                             onClick={() => toggleWard(ward)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors ${
                               active
                                 ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
                                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700 ring-1 ring-slate-600/30'

@@ -29,12 +29,21 @@ function hasValidCoordinates(store) {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { user, loading: authLoading, signOut } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [signingOut, setSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    if (!signOut || signingOut) return
+    setSigningOut(true)
+    await signOut()
+    setSigningOut(false)
+    router.replace('/login')
+  }
 
   useEffect(() => {
     if (authLoading) return
@@ -134,11 +143,30 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
           <Card className="rounded-2xl border border-gray-200 dark:border-gray-800">
-            <CardContent className="p-4 sm:p-5 space-y-3">
+            <CardContent className="p-4 sm:p-5 space-y-4">
+
+              {/* Account info row */}
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-100 dark:border-gray-800">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Đăng nhập:</span>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{user?.email}</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSignOut}
+                  disabled={signingOut}
+                  className="shrink-0 text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-950/30"
+                >
+                  {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
+                </Button>
+              </div>
+
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">Màn tổng quan</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Màn tổng quan</h1>
+                  <p className="text-base text-gray-500 dark:text-gray-400">
                     Theo dõi số lượng cửa hàng và trạng thái xác thực
                   </p>
                 </div>
@@ -149,52 +177,52 @@ export default function DashboardPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-blue-600 dark:text-blue-300">Tổng cửa hàng</p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-200">{summary.totalStores}</p>
+                  <p className="text-xs uppercase tracking-wide text-blue-600 dark:text-blue-300">Tổng cửa hàng</p>
+                  <p className="text-3xl font-bold text-blue-700 dark:text-blue-200">{summary.totalStores}</p>
                 </div>
                 <div className="rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-green-600 dark:text-green-300">Đã xác thực</p>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-200">{summary.verifiedStores}</p>
+                  <p className="text-xs uppercase tracking-wide text-green-600 dark:text-green-300">Đã xác thực</p>
+                  <p className="text-3xl font-bold text-green-700 dark:text-green-200">{summary.verifiedStores}</p>
                 </div>
                 <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300">Chưa xác thực</p>
-                  <p className="text-2xl font-bold text-amber-800 dark:text-amber-200">{summary.unverifiedStores}</p>
+                  <p className="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-300">Chưa xác thực</p>
+                  <p className="text-3xl font-bold text-amber-800 dark:text-amber-200">{summary.unverifiedStores}</p>
                 </div>
                 <div className="rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-purple-700 dark:text-purple-300">Tỷ lệ xác thực</p>
-                  <p className="text-2xl font-bold text-purple-800 dark:text-purple-200">{summary.verificationRate}%</p>
+                  <p className="text-xs uppercase tracking-wide text-purple-700 dark:text-purple-300">Tỷ lệ xác thực</p>
+                  <p className="text-3xl font-bold text-purple-800 dark:text-purple-200">{summary.verificationRate}%</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Số huyện có dữ liệu</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{summary.districtCount}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Số huyện có dữ liệu</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{summary.districtCount}</p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Số xã/phường có dữ liệu</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{summary.wardCount}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Số xã/phường có dữ liệu</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{summary.wardCount}</p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Thêm trong 7 ngày</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{summary.last7DaysStores}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Thêm trong 7 ngày</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{summary.last7DaysStores}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Cửa hàng có số điện thoại</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{summary.storesWithPhone}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Cửa hàng có số điện thoại</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{summary.storesWithPhone}</p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Cửa hàng có tọa độ</p>
-                  <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{summary.storesWithLocation}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Cửa hàng có tọa độ</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{summary.storesWithLocation}</p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 bg-white dark:bg-gray-950">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Dữ liệu mới nhất</p>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Dữ liệu mới nhất</p>
+                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
                   {formatDateTime(summary.newestCreatedAt)}
                 </p>
               </div>
@@ -213,22 +241,22 @@ export default function DashboardPage() {
           <Card className="rounded-2xl border border-gray-200 dark:border-gray-800">
             <CardContent className="p-4 sm:p-5">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">Số cửa hàng theo huyện</h2>
-                <span className="text-xs text-gray-500 dark:text-gray-400">{summary.districtRows.length} huyện</span>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">Số cửa hàng theo huyện</h2>
+                <span className="text-sm text-gray-500 dark:text-gray-400">{summary.districtRows.length} huyện</span>
               </div>
 
               {loading && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Đang tải dữ liệu...</p>
+                <p className="text-base text-gray-500 dark:text-gray-400">Đang tải dữ liệu...</p>
               )}
 
               {!loading && error && (
                 <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3">
-                  <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                  <p className="text-base text-red-700 dark:text-red-300">{error}</p>
                 </div>
               )}
 
               {!loading && !error && summary.districtRows.length === 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Chưa có dữ liệu cửa hàng.</p>
+                <p className="text-base text-gray-500 dark:text-gray-400">Chưa có dữ liệu cửa hàng.</p>
               )}
 
               {!loading && !error && summary.districtRows.length > 0 && (
@@ -238,8 +266,8 @@ export default function DashboardPage() {
                     return (
                       <div key={row.district} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3">
                         <div className="flex items-center justify-between gap-2 mb-2">
-                          <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{row.district}</p>
-                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{row.count}</p>
+                          <p className="text-base font-medium text-gray-800 dark:text-gray-100">{row.district}</p>
+                          <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{row.count}</p>
                         </div>
                         <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
                           <div className="h-full rounded-full bg-blue-500" style={{ width: `${widthPercent}%` }} />

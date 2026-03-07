@@ -92,7 +92,7 @@ export default function Navbar() {
             {/* ── Bottom tab bar (mobile only) ── */}
             <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 safe-area-bottom">
                 <div className="flex h-14 max-w-screen-md mx-auto w-full">
-                    {navLinks.map(({ href, active, label, mobileLabel, Icon }) => (
+                    {navLinks.filter(link => !(user && link.href === '/account')).map(({ href, active, label, mobileLabel, Icon }) => (
                         <Link
                             key={href}
                             href={href}

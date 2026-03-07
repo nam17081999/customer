@@ -60,32 +60,22 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
       return
     }
     setDeleting(true)
-    const { error } = await supabase.from('stores').delete().eq('id', store.id)
+    // Soft delete: ghi thời điểm xoá vào deleted_at thay vì xoá dòng khỏi DB
+    const { error } = await supabase
+      .from('stores')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', store.id)
     if (!error) {
-      // 1) Delete in IndexedDB cache immediately
-      const cacheResult = await removeStoreFromCache(store.id)
+      // 1) Xoá khỏi cache local ngay lập tức để UI cập nhật
+      await removeStoreFromCache(store.id)
 
-      // 2) Compare cache length vs real DB count
-      let shouldRefetchAll = false
-      const { count, error: countError } = await supabase
-        .from('stores')
-        .select('id', { count: 'exact', head: true })
-
-      if (countError) {
-        shouldRefetchAll = true
-      } else if (typeof cacheResult.cacheLength !== 'number' || cacheResult.cacheLength !== count) {
-        shouldRefetchAll = true
-      }
-
-      // 3) If mismatch -> force next screen load to call ALL again
-      if (shouldRefetchAll) {
-        await invalidateStoreCache()
-      }
+      // 2) Buộc lần load tiếp theo re-sync với DB
+      await invalidateStoreCache()
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'delete', id: store.id, shouldRefetchAll },
+            detail: { type: 'delete', id: store.id, shouldRefetchAll: true },
           })
         )
       }
