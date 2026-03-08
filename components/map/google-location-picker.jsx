@@ -3,7 +3,7 @@ import { useLoadScript, GoogleMap } from '@react-google-maps/api'
 
 // A lightweight Google Maps location picker that mirrors the center-overlay UX.
 // Props: initialLat, initialLng, onChange(lat,lng), editable (boolean), className, onToggleEditable, height
-export default function GoogleLocationPicker({ initialLat, initialLng, onChange, editable = true, className, onToggleEditable, height = 320 }) {
+export default function GoogleLocationPicker({ initialLat, initialLng, onChange, editable = true, className, onToggleEditable, height = 320, dark = true }) {
   const defaultCenter = { lat: initialLat || 10.7769, lng: initialLng || 106.70098 }
   const [center, setCenter] = useState(defaultCenter)
   const mapRef = useRef(null)
@@ -66,7 +66,7 @@ export default function GoogleLocationPicker({ initialLat, initialLng, onChange,
 
       {/* dim overlay when locked - blocks interactions */}
       {!editable && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.6)', zIndex: 9998, pointerEvents: 'auto', touchAction: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: dark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)', zIndex: 9998, pointerEvents: 'auto', touchAction: 'none' }} />
       )}
 
       {/* Center pin overlay */}
@@ -83,25 +83,25 @@ export default function GoogleLocationPicker({ initialLat, initialLng, onChange,
       <button
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (onToggleEditable) onToggleEditable() }}
         aria-label={editable ? 'Khóa bản đồ' : 'Mở khóa bản đồ'}
-        style={{ position: 'absolute', right: 10, top: 10, zIndex: 10010, background: 'white', borderRadius: 8, padding: 6, boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer' }}
+        style={{ position: 'absolute', right: 10, top: 10, zIndex: 10010, background: '#1e293b', borderRadius: 8, padding: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.4)', border: '1px solid #334155', cursor: 'pointer' }}
       >
         {/* black outline lock/unlock - same as leaflet version */}
         {editable ? (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="black" strokeWidth="1.8" />
-            <path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="white" strokeWidth="1.8" />
+            <path d="M8 10V7a4 4 0 018 0v3" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         ) : (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="black" strokeWidth="1.8" />
-            <path d="M16 10c0-2.2-1.8-4-4-4-1.5 0-2.8.8-3.5 2" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M9.5 14h5" fill="none" stroke="black" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="4" y="10" width="16" height="10" rx="2" fill="none" stroke="white" strokeWidth="1.8" />
+            <path d="M16 10c0-2.2-1.8-4-4-4-1.5 0-2.8.8-3.5 2" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M9.5 14h5" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </button>
 
       <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
-        <div className="bg-white/90 rounded shadow p-1 text-xs">
+        <div className="bg-slate-900/90 rounded shadow p-1 text-[10px] text-slate-300">
           {center.lat.toFixed(6)}, {center.lng.toFixed(6)}
         </div>
       </div>

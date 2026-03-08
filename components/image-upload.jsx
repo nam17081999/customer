@@ -66,7 +66,7 @@ export default function ImageUpload({ onUploadSuccess, folder = '', accept = 'im
   return (
     <div className="space-y-4">
       <div>
-        <label htmlFor="image-upload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+        <label htmlFor="image-upload" className="block text-sm font-medium text-gray-300 mb-2">
           Tải lên hình ảnh
         </label>
         <input
@@ -75,24 +75,24 @@ export default function ImageUpload({ onUploadSuccess, folder = '', accept = 'im
           accept={accept}
           onChange={handleFileSelect}
           disabled={uploading}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
+          className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-800 file:text-gray-200 hover:file:bg-gray-700 disabled:opacity-50 cursor-pointer"
         />
       </div>
 
       {uploading && (
         <div className="flex items-center gap-2">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">Đang tải lên...</span>
+          <span className="text-sm text-gray-400">Đang tải lên...</span>
         </div>
       )}
 
       {error && (
-        <div className="text-sm text-red-600 dark:text-red-400">
+        <div className="text-sm text-red-400">
           Lỗi: {error}
         </div>
       )}
 
-      <div className="text-xs text-gray-500 dark:text-gray-400">
+      <div className="text-xs text-gray-500">
         Hỗ trợ: JPG, PNG, WebP (tối đa 10MB)
       </div>
     </div>

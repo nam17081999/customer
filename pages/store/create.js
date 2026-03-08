@@ -29,7 +29,7 @@ import {
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-md" style={{ height: '65vh' }}><span className="text-sm text-gray-500 animate-pulse">Đang tải bản đồ…</span></div>,
+  loading: () => <div className="flex items-center justify-center bg-gray-900 rounded-md" style={{ height: '65vh' }}><span className="text-sm text-gray-400 animate-pulse">Đang tải bản đồ…</span></div>,
 })
 
 export default function AddStore() {
@@ -490,7 +490,7 @@ export default function AddStore() {
             />
           ))}
         </div>
-        <div className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+        <div className="mt-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
           Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
         </div>
         <div className="flex items-center gap-2 mt-3">
@@ -748,11 +748,11 @@ export default function AddStore() {
   // Success screen
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center px-6 py-10 space-y-5 max-w-sm mx-auto">
           <div className="text-6xl">✅</div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tạo cửa hàng thành công!</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Cửa hàng đã được lưu vào hệ thống.</p>
+          <h2 className="text-xl font-bold text-white">Tạo cửa hàng thành công!</h2>
+          <p className="text-sm text-gray-400">Cửa hàng đã được lưu vào hệ thống.</p>
           <div className="flex flex-col gap-3 pt-2">
             <Button
               className="w-full h-12 text-base"
@@ -772,7 +772,7 @@ export default function AddStore() {
             </Button>
             <Button
               variant="ghost"
-              className="w-full h-10 text-sm text-gray-500"
+              className="w-full h-10 text-sm text-gray-400"
               onClick={() => router.push('/')}
             >
               Về trang chủ
@@ -791,7 +791,7 @@ export default function AddStore() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="min-h-screen bg-black">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
       <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
@@ -802,9 +802,9 @@ export default function AddStore() {
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                 currentStep === s.num
                   ? 'bg-blue-600 text-white'
-                  : currentStep > s.num
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500'
+                   : currentStep > s.num
+                    ? 'bg-green-900/40 text-green-400 border border-green-900/50'
+                    : 'bg-gray-800 border border-gray-700 text-gray-400'
               }`}>
                 {currentStep > s.num ? (
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
@@ -813,8 +813,8 @@ export default function AddStore() {
                 )}
                 <span>{s.label}</span>
               </div>
-              {i < steps.length - 1 && (
-                <div className={`w-6 h-0.5 mx-1 rounded ${currentStep > s.num ? 'bg-green-400 dark:bg-green-600' : 'bg-gray-200 dark:bg-gray-700'}`} />
+               {i < steps.length - 1 && (
+                <div className={`w-6 h-0.5 mx-1 rounded ${currentStep > s.num ? 'bg-green-600' : 'bg-gray-700'}`} />
               )}
             </div>
           ))}
@@ -882,7 +882,7 @@ export default function AddStore() {
                       className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                         removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(d).toLowerCase()
                           ? 'bg-blue-600 text-white border border-blue-600'
-                          : 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                          : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                       }`}
                       onClick={() => {
                         setDistrict(d)
@@ -911,7 +911,7 @@ export default function AddStore() {
                         className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                           removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(w).toLowerCase()
                             ? 'bg-blue-600 text-white border border-blue-600'
-                            : 'border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'
+                            : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                         }`}
                         onClick={() => {
                           setWard(w)
@@ -965,7 +965,7 @@ export default function AddStore() {
                       </button>
                     </div>
                   ) : (
-                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer bg-gray-900 hover:bg-gray-800 transition">
                       <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
                       <span className="text-sm text-gray-500 dark:text-gray-400">📸 Chụp hoặc chọn ảnh</span>
                       <input
@@ -1060,6 +1060,7 @@ export default function AddStore() {
                   geoBlocked={geoBlocked}
                   onReload={() => window.location.reload()}
                   resolvingAddr={resolvingAddr}
+                  dark={false}
                 />
               </div>
 

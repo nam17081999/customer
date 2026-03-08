@@ -143,9 +143,9 @@ export default function VerifyStorePage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-6">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Đang kiểm tra đăng nhập...</p>
+          <p className="text-sm text-gray-400">Đang kiểm tra đăng nhập...</p>
         </div>
       </div>
     )
@@ -161,14 +161,14 @@ export default function VerifyStorePage() {
         <title>Xác thực cửa hàng - StoreVis</title>
       </Head>
 
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
+      <div className="min-h-screen bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
-          <Card className="rounded-2xl border border-gray-200 dark:border-gray-800">
+          <Card className="rounded-2xl border border-gray-800">
             <CardContent className="p-4 sm:p-5 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">Màn xác thực cửa hàng</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                  <h1 className="text-lg sm:text-xl font-bold text-gray-100">Màn xác thực cửa hàng</h1>
+                  <p className="text-sm text-gray-400">
                     Chọn 1 hoặc nhiều cửa hàng để xác thực nhanh
                   </p>
                 </div>
@@ -178,17 +178,17 @@ export default function VerifyStorePage() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300">Chờ xác thực</p>
-                  <p className="text-2xl font-bold text-amber-800 dark:text-amber-200">{stores.length}</p>
+                <div className="rounded-xl bg-amber-950/30 border border-amber-900 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-300">Chờ xác thực</p>
+                  <p className="text-2xl font-bold text-amber-200">{stores.length}</p>
                 </div>
-                <div className="rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-blue-700 dark:text-blue-300">Đang chọn</p>
-                  <p className="text-2xl font-bold text-blue-800 dark:text-blue-200">{selectedIds.size}</p>
+                <div className="rounded-xl bg-blue-950/30 border border-blue-900 p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-blue-300">Đang chọn</p>
+                  <p className="text-2xl font-bold text-blue-200">{selectedIds.size}</p>
                 </div>
-                <div className="rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-100 dark:border-green-900 p-3 col-span-2 sm:col-span-1">
-                  <p className="text-[11px] uppercase tracking-wide text-green-700 dark:text-green-300">Hiển thị sau lọc</p>
-                  <p className="text-2xl font-bold text-green-800 dark:text-green-200">{filteredStores.length}</p>
+                <div className="rounded-xl bg-green-950/30 border border-green-900 p-3 col-span-2 sm:col-span-1">
+                  <p className="text-[11px] uppercase tracking-wide text-green-300">Hiển thị sau lọc</p>
+                  <p className="text-2xl font-bold text-green-200">{filteredStores.length}</p>
                 </div>
               </div>
 
@@ -202,7 +202,7 @@ export default function VerifyStorePage() {
                 <select
                   value={districtFilter}
                   onChange={(e) => setDistrictFilter(e.target.value)}
-                  className="h-10 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 text-sm text-gray-900 dark:text-gray-100"
+                  className="h-10 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-100"
                   aria-label="Lọc theo huyện"
                 >
                   <option value="">Tất cả huyện</option>
@@ -213,14 +213,14 @@ export default function VerifyStorePage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-300">
                   <input
                     ref={selectAllRef}
                     type="checkbox"
                     checked={allVisibleSelected}
                     onChange={toggleSelectAllVisible}
                     disabled={!hasVisibleStores || submitting}
-                    className="h-5 w-5 rounded border-gray-300 dark:border-gray-700"
+                    className="h-5 w-5 rounded border-gray-700"
                   />
                   Chọn tất cả đang hiển thị
                 </label>
@@ -235,14 +235,14 @@ export default function VerifyStorePage() {
               </div>
 
               {message && (
-                <div className="rounded-lg border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/30 p-3">
-                  <p className="text-sm text-green-700 dark:text-green-300">{message}</p>
+                <div className="rounded-lg border border-green-900 bg-green-950/30 p-3">
+                  <p className="text-sm text-green-300">{message}</p>
                 </div>
               )}
 
               {error && (
-                <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3">
-                  <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                <div className="rounded-lg border border-red-900 bg-red-950/30 p-3">
+                  <p className="text-sm text-red-300">{error}</p>
                 </div>
               )}
             </CardContent>
@@ -250,27 +250,27 @@ export default function VerifyStorePage() {
 
           <div className="space-y-3">
             {loading && (
-              <Card className="rounded-xl border border-gray-200 dark:border-gray-800">
+              <Card className="rounded-xl border border-gray-800">
                 <CardContent className="p-4">
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Đang tải danh sách cửa hàng...</p>
+                  <p className="text-sm text-gray-400">Đang tải danh sách cửa hàng...</p>
                 </CardContent>
               </Card>
             )}
 
             {!loading && filteredStores.length === 0 && (
-              <Card className="rounded-xl border border-gray-200 dark:border-gray-800">
+              <Card className="rounded-xl border border-gray-800">
                 <CardContent className="p-5 text-center space-y-2">
                   {stores.length === 0 ? (
                     <>
-                      <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Không còn cửa hàng cần xác thực</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-base font-semibold text-gray-100">Không còn cửa hàng cần xác thực</p>
+                      <p className="text-sm text-gray-400">
                         Sau khi xác thực, cửa hàng sẽ tự động biến mất khỏi màn này.
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="text-base font-semibold text-gray-900 dark:text-gray-100">Không có kết quả phù hợp bộ lọc</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Hãy đổi từ khóa tìm kiếm hoặc bộ lọc huyện.</p>
+                      <p className="text-base font-semibold text-gray-100">Không có kết quả phù hợp bộ lọc</p>
+                      <p className="text-sm text-gray-400">Hãy đổi từ khóa tìm kiếm hoặc bộ lọc huyện.</p>
                     </>
                   )}
                 </CardContent>
@@ -280,7 +280,7 @@ export default function VerifyStorePage() {
             {!loading && filteredStores.map((store) => {
               const addressText = formatAddressParts(store) || 'Chưa có địa chỉ'
               return (
-                <Card key={store.id} className="rounded-xl border border-gray-200 dark:border-gray-800">
+                <Card key={store.id} className="rounded-xl border border-gray-800">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <input
@@ -289,22 +289,22 @@ export default function VerifyStorePage() {
                         onChange={() => toggleOne(store.id)}
                         disabled={submitting}
                         aria-label={`Chọn cửa hàng ${store.name || 'không tên'}`}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 dark:border-gray-700"
+                        className="mt-1 h-5 w-5 rounded border-gray-700"
                       />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-2">
-                          <h3 className="min-w-0 flex-1 text-lg font-semibold text-gray-900 dark:text-gray-100 leading-snug break-words [overflow-wrap:anywhere]">
+                          <h3 className="min-w-0 flex-1 text-lg font-semibold text-gray-100 leading-snug break-words [overflow-wrap:anywhere]">
                             {store.name || 'Cửa hàng chưa đặt tên'}
                           </h3>
-                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-900/40 text-amber-300">
                             Chờ xác thực
                           </span>
                         </div>
 
-                        <p className="text-base text-gray-700 dark:text-gray-300 mt-1 break-words [overflow-wrap:anywhere]">{addressText}</p>
+                        <p className="text-base text-gray-300 mt-1 break-words [overflow-wrap:anywhere]">{addressText}</p>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
                           <span>Huyện: {(store.district || '').trim() || 'Chưa cập nhật'}</span>
                           <span>Thêm lúc: {formatDateTime(store.created_at)}</span>
                           {store.phone && <span>SĐT: {store.phone}</span>}

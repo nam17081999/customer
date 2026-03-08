@@ -136,10 +136,15 @@ if (!user) router.replace('/login?from=/account')
 ❌ text-[11px]        — không dùng
 ```
 
-- **Dark mode**: `dark:` prefix, không dùng `useState` toggle
-- **Input**: font-size ≥ 16px (tránh iOS zoom)
-- **Button height**: tối thiểu `h-10` (40px), prefer `h-11` (44px)
-- **Text phụ tối thiểu**: `text-gray-600 dark:text-gray-400`
+- **Dark mode**: Ứng dụng dùng **Dark Mode duy nhất**. Không dùng `dark:` prefix.
+- **Button**: Variant `default` bắt buộc là màu trắng (`bg-gray-50 text-gray-900`) để nổi bật.
+- **Bản đồ**: 
+  - Trang hiển thị chung (`/map`): Dùng bộ lọc tối (`.dark-map-filter`).
+  - Trang nhập liệu (`create/edit`): Dùng chế độ **Sáng** (`dark={false}`) để nạp tọa độ chính xác.
+- **Steps & Tags**: Sử dụng màu nền tối cố định (`bg-gray-800/90`, `bg-gray-900`), không dùng các class `bg-white` hay `bg-gray-100`.
+- **Input**: font-size ≥ 16px (tránh iOS zoom), nền `bg-gray-900`, text `text-gray-100`.
+- **Button height**: tối thiểu `h-10` (40px), prefer `h-11` (44px).
+- **Màu text mặc định**: chính `text-gray-100`, phụ `text-gray-400`.
 
 ---
 
