@@ -1,0 +1,89 @@
+# 🗄️ Database & Cache - StoreVis
+
+## Supabase (PostgreSQL)
+
+### Bảng `stores` — Bảng duy nhất
+
+| Cột | Kiểu | Nullable | Mô tả |
+|---|---|---|---|
+| `id` | uuid/bigint | NOT NULL | Primary key (auto) |
+| `name` | text | NOT NULL | Tên cửa hàng (Title Case VI) |
+| `address_detail` | text | NULL | Số nhà, tên đường |
+| `ward` | text | NULL | Xã/Phường |
+| `district` | text | NULL | Quận/Huyện |
+| `phone` | text | NULL | SĐT Việt Nam |
+| `note` | text | NULL | Ghi chú |
+| `image_url` | text | NULL | **Tên file** ảnh trên ImageKit (không phải URL đầy đủ) |
+| `latitude` | float8 | NULL | Vĩ độ |
+| `longitude` | float8 | NULL | Kinh độ |
+| `active` | boolean | NOT NULL | `true` = đã xác thực; `false` = chờ duyệt |
+| `created_at` | timestamptz | NOT NULL | Timestamp tạo |
+| `updated_at` | timestamptz | NOT NULL | Timestamp cập nhật |
+| `deleted_at` | timestamptz | NULL | Soft-delete (NULL = đang hoạt động) |
+
+> **Không có cột `name_search`** — không thêm field này khi insert.
+
+> **Soft Delete**: mọi query đọc phải có `.is('deleted_at', null)`.
+
+---
+
+## Auth (Supabase built-in)
+
+- Dùng `auth.users` của Supabase, không có bảng user custom
+- Chỉ `signInWithPassword(email, password)` — không đăng ký
+
+---
+
+## ⚠️ Index Khuyến Nghị
+
+Hiện tại chưa có index tùy chỉnh. Khi data lớn cần:
+```sql
+CREATE INDEX idx_stores_active ON stores(active) WHERE deleted_at IS NULL;
+CREATE INDEX idx_stores_district ON stores(district) WHERE deleted_at IS NULL;
+CREATE INDEX idx_stores_deleted_at ON stores(deleted_at);
+```
+
+---
+
+## ⚠️ Bảo Mật: Cần Verify RLS
+
+Cần kiểm tra Supabase Row Level Security:
+- **Anonymous**: chỉ SELECT (`deleted_at IS NULL`) và INSERT (với `active = false`)
+- **Authenticated (admin)**: full CRUD
+- Nếu chưa bật RLS → user có thể UPDATE `active=true` trực tiếp qua API
+
+---
+
+## Ảnh (ImageKit.io)
+
+- `image_url` chỉ là **tên file**: `1716000000_abc.jpg`
+- Full URL để hiển thị: `NEXT_PUBLIC_IMAGE_BASE_URL + image_url`
+- Upload: server-side POST `/api/upload-image` (dùng private key)
+- Delete: server-side DELETE `/api/upload-image`
+- Nén trước khi upload: max 1MB, 1600px, JPEG 0.8
+
+---
+
+## Cache 3-Layer (`lib/storeCache.js`)
+
+```
+1. In-memory (memCache) — instant, 60s cooldown, dedup concurrent calls
+2. IndexedDB (storevis_cache / map_stores) — persist qua reload
+3. Supabase — fetch khi count hoặc max(updated_at) thay đổi
+```
+
+### SELECT_FIELDS (fields được cache)
+```
+id, name, image_url, latitude, longitude, address_detail,
+ward, district, phone, note, active, created_at, updated_at
+```
+> `deleted_at` **không** được cache. Luôn filter server-side trước khi cache.
+
+### API Cache
+
+| Hàm | Khi dùng |
+|---|---|
+| `getOrRefreshStores()` | Đọc danh sách stores — API duy nhất |
+| `appendStoreToCache(store)` | Sau khi CREATE thành công |
+| `removeStoreFromCache(id)` | Sau khi soft-delete |
+| `invalidateStoreCache()` | Sau khi EDIT (force refetch) |

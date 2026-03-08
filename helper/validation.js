@@ -113,6 +113,23 @@ export function formatDate(date) {
 }
 
 /**
+ * Format date/time as full locale string (dd/mm/yyyy hh:mm)
+ * Dùng cho admin pages cần hiển thị đầy đủ ngày giờ
+ */
+export function formatDateTime(value) {
+  if (!value) return 'Không rõ thời gian'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Không rõ thời gian'
+  return date.toLocaleString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+/**
  * Sanitize input to prevent XSS
  */
 export function sanitizeInput(input) {
