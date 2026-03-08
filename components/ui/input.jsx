@@ -8,7 +8,7 @@ const Input = React.forwardRef(({ className, type = 'text', value, onChange, ...
       <input
         type={type}
         className={cn(
-          "flex h-11 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base ring-offset-background placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus-visible:ring-white",
+          "flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-base ring-offset-background placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-gray-100",
           showClear ? 'pr-9' : '',
           className
         )}
@@ -21,7 +21,7 @@ const Input = React.forwardRef(({ className, type = 'text', value, onChange, ...
         <button
           type="button"
           tabIndex={-1}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none cursor-pointer"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-200 focus:outline-none cursor-pointer"
           onClick={() => onChange({ target: { value: '' } })}
           aria-label="Xoá nhanh"
         >

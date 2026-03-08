@@ -171,15 +171,15 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   const ly = iconSize + iconPad * 2 + hlPad * 2 + gap
   ctx.beginPath()
   ctx.roundRect(lx, ly, labelW, labelH, radius)
-  ctx.fillStyle = 'rgba(255,255,255,0.94)'
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)'
   ctx.fill()
-  ctx.strokeStyle = 'rgba(0,0,0,0.13)'
+  ctx.strokeStyle = 'rgba(255,255,255,0.13)'
   ctx.lineWidth = dpr
   ctx.stroke()
 
   // Draw label text
   ctx.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
-  ctx.fillStyle = '#0f172a'
+  ctx.fillStyle = '#f1f5f9'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   for (let i = 0; i < lines.length; i++) {
@@ -750,7 +750,7 @@ export default function MapPage() {
           inset: 0;
           width: 100%;
           height: 100%;
-          background: #e5e7eb;
+          background: #020617;
         }
 
         .maplibregl-canvas-container,

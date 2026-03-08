@@ -18,7 +18,7 @@
 | H2 section | `text-lg font-semibold` | ~21px |
 | H3 card title | `text-base font-semibold` | 19px ✅ |
 | Body text | `text-base` | 19px ✅ |
-| Text phụ | `text-base text-gray-600 dark:text-gray-400` | 19px ✅ |
+| Text phụ | `text-gray-400` | 19px ✅ |
 | Label nhỏ | `text-sm` | ~16px (min chấp nhận được) |
 | ❌ Không dùng | `text-xs`, `text-[11px]` | <14px — vi phạm |
 
@@ -26,35 +26,32 @@
 
 ---
 
-## Color Palette
+### Color Palette (Default Dark Mode)
 
-### Light Mode
-```
---background: #ffffff
---foreground: #171717
-```
+Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode.
 
-### Dark Mode
-```
---background: #0a0a0a
---foreground: #ededed
+```css
+--background: #0a0a0a;
+--foreground: #ededed;
 ```
 
 ### Màu Semantic
 
-| Mục đích | Light | Dark |
+| Mục đích | Giá trị (Dark) | Mô tả |
 |---|---|---|
-| Background | `bg-gray-50` | `bg-black` |
-| Card surface | `bg-white` | `bg-gray-950` |
-| Border | `border-gray-200` | `border-gray-800` |
-| **Text chính** | `text-gray-900` | `text-gray-100` |
-| **Text phụ (min)** | `text-gray-600` | `text-gray-400` |
-| **⚠️ Không dùng** | `text-gray-400` (light) | dễ bị mờ |
-| Primary action | `bg-gray-900 text-white` | `bg-gray-100 text-gray-900` |
-| Success | `bg-green-50 border-green-100` | `bg-green-950/30` |
-| Warning | `bg-amber-50 border-amber-100` | `bg-amber-950/30` |
-| Error | `bg-red-50 border-red-200 text-red-700` | `bg-red-950/30` |
-| Active nav mobile | `text-blue-600` | `text-blue-400` |
+| Background | `bg-black` | Nền toàn trang |
+| Card surface | `bg-gray-950` | Bề mặt card, modal |
+| Border | `border-gray-800` | Đường viền ngăn cách |
+| **Text chính** | `text-gray-100` | Nội dung quan trọng |
+| **Text phụ (min)** | `text-gray-400` | Chú thích, thông tin phụ |
+| **⚠️ Không dùng** | `text-gray-600` | Quá tối trên nền đen |
+| Primary action | `bg-gray-50 text-gray-900` | Nút bấm nổi bật (mặc định) |
+| Success | `bg-green-950/30` | Thông báo thành công |
+| Warning | `bg-amber-950/30` | Cảnh báo |
+| Error | `bg-red-950/30` | Lỗi |
+| Active nav mobile | `text-blue-400` | Tab đang chọn |
+| Step/Tag active | `bg-blue-600` | Trạng thái đang chọn |
+| Step/Tag inactive | `bg-gray-800 border-gray-700` | Trạng thái chưa chọn (cố định) |
 
 ---
 
@@ -68,41 +65,40 @@
 
 ---
 
-## Navigation
-
 ### Desktop (≥ 640px)
-- Sticky top: `bg-white/70 backdrop-blur-md`
-- Link pill active: `bg-gray-900 text-white border-transparent`
-- Link pill inactive: `text-gray-600 border-gray-300 hover:bg-gray-50`
+- Sticky top: `bg-black/60 backdrop-blur-md`
+- Link pill active: `bg-gray-50 text-gray-900 border-transparent`
+- Link pill inactive: `text-gray-400 border-gray-700 hover:bg-gray-800`
 
 ### Mobile (< 640px)
-- Fixed bottom tab bar: `bg-white/95 backdrop-blur-md border-t`
-- Icon **w-5 h-5** + label `text-[9px]` (chú ý: label nhỏ ở đây là acceptable vì chỉ supplementary)
-- Active: `text-blue-600`
+- Fixed bottom tab bar: `bg-gray-950/95 backdrop-blur-md border-t border-gray-800`
+- Icon **w-5 h-5** + label `text-[9px]`
+- Active: `text-blue-400`
 
 ---
 
-## UI Components (Atoms)
-
 ### Button
 ```
-default: bg-gray-900 text-white h-9 px-4
+default: bg-gray-50 text-gray-900 h-11 px-6 (Nổi bật trên nền tối)
+secondary: bg-gray-800 text-gray-50 h-11 px-6
 sm:      h-7 px-3 text-xs
-lg:      h-11 px-8
-outline: border border-gray-300
-ghost:   hover:bg-gray-100
+lg:      h-12 px-8
+outline: border border-gray-700 text-gray-100 hover:bg-gray-800
+ghost:   hover:bg-gray-800 text-gray-100
+link:    text-gray-50 underline
 ```
+- Nút **Đăng xuất**: `variant="outline" text-red-400 border-red-900/50` (có viền đỏ mảnh).
 - Nút hành động chính trong form: `h-11` (44px) hoặc `h-12` (48px)
 
 ### Input
-- `h-9 rounded-md border border-gray-300 text-base px-3`
+- `h-11 rounded-xl border border-gray-700 bg-gray-900 text-gray-100 px-3`
 - **Font ≥ 16px bắt buộc** để tránh iOS auto-zoom
 
 ### Card
-- `rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950`
+- `rounded-xl border border-gray-800 bg-gray-950`
 
 ### Dialog/Modal
-- Content: `rounded-2xl bg-white dark:bg-gray-950 max-h-[90vh]`
+- Content: `rounded-2xl bg-gray-950 max-h-[90vh] border border-gray-800`
 
 ### Toast/Msg (components/ui/msg.jsx)
 - Fixed top bar, auto-hide sau 2500ms
@@ -119,10 +115,11 @@ Trang map luôn dark (không theo system preference):
 - Filter district active: `bg-sky-500/20 text-sky-300`
 - Filter ward active: `bg-emerald-500/20 text-emerald-300`
 
-### Custom Map Markers (Canvas)
-- Circle bg: `#1f2937` | border: white
-- Label bg: `rgba(255,255,255,0.94)` | text: `#0f172a`
-- Highlighted: ring `#38bdf8` (sky-400)
+### Bản đồ trong Form (Create/Edit) — Light Theme Exception
+Để đảm bảo độ rõ nét khi người dùng chọn vị trí chính xác:
+- Sử dụng prop `dark={false}` cho `StoreLocationPicker` hoặc `LocationPicker`.
+- Bản đồ hiển thị màu sắc nguyên bản (Sáng).
+- Lớp phủ khi khóa bản đồ (Dim overlay) sử dụng màu trắng mờ `rgba(255,255,255,0.55)`.
 
 ---
 

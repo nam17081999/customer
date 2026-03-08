@@ -83,9 +83,9 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 5. **Không có cột `name_search`** trong DB — không thêm field này khi insert
 6. **Pages Router** — file đặt trong `pages/`, không phải `app/`
 7. **TailwindCSS v4** — cú pháp `@import "tailwindcss"` trong globals.css
-8. **Dark mode** tự động qua `prefers-color-scheme`
-9. **MapLibre** phải dynamic import với `ssr: false`
-10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng
+8. **Dark mode**: Ứng dụng chạy **Dark Mode duy nhất**. Không có Light Mode.
+9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
+10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
 
 ---
 

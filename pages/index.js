@@ -205,7 +205,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] bg-gray-50 dark:bg-black overflow-hidden">
+    <div className="h-[calc(100dvh-3.5rem)] bg-black overflow-hidden">
       <div className="h-full px-3 sm:px-4 pt-4 sm:pt-6 max-w-screen-md mx-auto flex flex-col gap-3">
         {/* Search + Filters */}
         <div className="flex-shrink-0 flex flex-col gap-2">
@@ -225,7 +225,7 @@ export default function HomePage() {
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
                 aria-label="Chọn quận/huyện"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2.5 text-base text-gray-100 disabled:opacity-60"
               >
                 <option value="">Quận/Huyện</option>
                 {districtOptions.map((d) => (
@@ -239,7 +239,7 @@ export default function HomePage() {
                 onChange={(e) => setSelectedWard(e.target.value)}
                 disabled={!selectedDistrict}
                 aria-label="Chọn xã/phường"
-                className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-base text-gray-900 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2.5 text-base text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">{selectedDistrict ? 'Xã/Phường' : 'Chọn quận trước'}</option>
                 {wardOptions.map((w) => (
@@ -251,13 +251,13 @@ export default function HomePage() {
           {/* Active filters bar: count + clear button */}
           {hasSearchCriteria && (
             <div className="flex items-center gap-2">
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Tìm thấy <span className="font-semibold text-gray-700 dark:text-gray-200">{searchResults.length}</span> cửa hàng
+              <p className="text-sm text-gray-400">
+                Tìm thấy <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng
               </p>
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40 transition"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-900/20 border border-red-800 text-red-400 hover:bg-red-900/40 transition"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 Xoá bộ lọc
@@ -272,14 +272,14 @@ export default function HomePage() {
           {showSkeleton && (
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
               {[...Array(5)].map((_, i) => (
-                <Card key={i} className={`overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 ${loading ? '' : 'opacity-70'}`}>
+                <Card key={i} className={`overflow-hidden rounded-xl border border-gray-800 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
                     <div className="flex gap-3 p-3">
-                      <div className="w-20 h-20 rounded-lg bg-gray-200 dark:bg-gray-800 animate-pulse flex-shrink-0" />
+                      <div className="w-20 h-20 rounded-lg bg-gray-800 animate-pulse flex-shrink-0" />
                       <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
-                        <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
-                        <div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+                        <div className="h-4 w-3/4 bg-gray-700 rounded" />
+                        <div className="h-3 w-full bg-gray-700 rounded" />
+                        <div className="h-3 w-1/2 bg-gray-700 rounded" />
                       </div>
                     </div>
                   </CardContent>
@@ -290,11 +290,11 @@ export default function HomePage() {
 
           {!showSkeleton && hasSearchCriteria && searchResults.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
-              <p className="text-gray-600 dark:text-gray-300 font-medium mb-1">Không tìm thấy cửa hàng</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Thử tìm với từ khác hoặc bớt bộ lọc</p>
+              <p className="text-gray-300 font-medium mb-1">Không tìm thấy cửa hàng</p>
+              <p className="text-sm text-gray-500 mb-4">Thử tìm với từ khác hoặc bớt bộ lọc</p>
               <Button asChild size="sm">
                 <Link href="/store/create">
                   + Tạo cửa hàng mới
@@ -322,7 +322,7 @@ export default function HomePage() {
                 )}
                 components={{
                   Footer: () => (
-                    <div className="py-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                    <div className="py-4 text-center text-xs text-gray-500">
                       Hết kết quả
                     </div>
                   )
@@ -333,11 +333,11 @@ export default function HomePage() {
 
           {!hasSearchCriteria && (
             <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-              <div className="w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-4">
+              <div className="w-20 h-20 rounded-full bg-blue-900/20 flex items-center justify-center mb-4">
                 <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
-              <p className="text-gray-700 dark:text-gray-200 font-medium mb-1">Tìm cửa hàng</p>
-              <p className="text-sm text-gray-400 dark:text-gray-500 mb-5">Gõ tên hoặc chọn quận bên trên để bắt đầu</p>
+              <p className="text-gray-200 font-medium mb-1">Tìm cửa hàng</p>
+              <p className="text-sm text-gray-500 mb-5">Gõ tên hoặc chọn quận bên trên để bắt đầu</p>
               {/* Quick district chips */}
               <div className="flex flex-wrap gap-2 justify-center max-w-xs">
                 {DISTRICTS.slice(0, 6).map((d) => (
@@ -345,7 +345,7 @@ export default function HomePage() {
                     key={d}
                     type="button"
                     onClick={() => setSelectedDistrict(d)}
-                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:border-blue-600 dark:hover:text-blue-400 transition"
+                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-800 border border-gray-700 text-gray-400 hover:border-blue-600 hover:text-blue-400 transition"
                   >
                     {d}
                   </button>

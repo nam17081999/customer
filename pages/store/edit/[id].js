@@ -18,8 +18,8 @@ const StoreLocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-md" style={{ height: '40vh' }}>
-        <span className="text-sm text-gray-500 animate-pulse">Đang tải bản đồ…</span>
+      <div className="flex items-center justify-center bg-gray-900 rounded-md" style={{ height: '40vh' }}>
+        <span className="text-sm text-gray-400 animate-pulse">Đang tải bản đồ…</span>
       </div>
     ),
   }
@@ -247,9 +247,9 @@ export default function EditStore() {
 
   if (fetchError) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-black flex items-center justify-center p-6">
         <div className="text-center">
-          <p className="text-red-500 mb-4">{fetchError}</p>
+          <p className="text-red-400 mb-4">{fetchError}</p>
           <Button onClick={() => router.back()}>Quay lại</Button>
         </div>
       </div>
@@ -263,19 +263,19 @@ export default function EditStore() {
   const currentImage = imagePreview || (imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url))
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-black">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white/95 dark:bg-gray-950/95 backdrop-blur border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-20 bg-black/95 backdrop-blur border-b border-gray-800 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+          className="p-2 rounded-full hover:bg-gray-800 transition"
         >
           <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
         <div>
-          <h1 className="text-base font-semibold text-gray-900 dark:text-white leading-tight">Sửa cửa hàng</h1>
+          <h1 className="text-base font-semibold text-white leading-tight">Sửa cửa hàng</h1>
           <p className="text-xs text-gray-400 truncate max-w-[200px]">{store.name}</p>
         </div>
       </div>
@@ -283,9 +283,9 @@ export default function EditStore() {
       <form onSubmit={handleSave} className="max-w-lg mx-auto px-4 py-6 space-y-5">
         {/* Image */}
         <div>
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Ảnh cửa hàng</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-2 block">Ảnh cửa hàng</Label>
           <div
-            className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-900 cursor-pointer group border border-gray-200 dark:border-gray-800"
+            className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group border border-gray-800"
             onClick={() => fileInputRef.current?.click()}
           >
             {currentImage ? (
@@ -298,7 +298,7 @@ export default function EditStore() {
               />
             ) : (
               <div className="flex items-center justify-center h-full">
-                <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-12 h-12 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
@@ -321,7 +321,7 @@ export default function EditStore() {
 
         {/* Name */}
         <div>
-          <Label htmlFor="edit-name" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+          <Label htmlFor="edit-name" className="text-sm font-medium text-gray-300 mb-1.5 block">
             Tên cửa hàng <span className="text-red-500">*</span>
           </Label>
           <Input
@@ -335,11 +335,11 @@ export default function EditStore() {
 
         {/* District */}
         <div>
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Huyện / Quận</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-1.5 block">Huyện / Quận</Label>
           <select
             value={district}
             onChange={(e) => { setDistrict(e.target.value); setWard('') }}
-            className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Chọn huyện / quận</option>
             {DISTRICT_SUGGESTIONS.map((d) => (
@@ -350,12 +350,12 @@ export default function EditStore() {
 
         {/* Ward */}
         <div>
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Xã / Phường / Thị trấn</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-1.5 block">Xã / Phường / Thị trấn</Label>
           {wardSuggestions.length > 0 ? (
             <select
               value={ward}
               onChange={(e) => setWard(e.target.value)}
-              className="w-full h-11 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Chọn xã / phường</option>
               {wardSuggestions.map((w) => (
@@ -374,7 +374,7 @@ export default function EditStore() {
 
         {/* Address detail */}
         <div>
-          <Label htmlFor="edit-addr" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Địa chỉ chi tiết</Label>
+          <Label htmlFor="edit-addr" className="text-sm font-medium text-gray-300 mb-1.5 block">Địa chỉ chi tiết</Label>
           <Input
             id="edit-addr"
             value={addressDetail}
@@ -386,7 +386,7 @@ export default function EditStore() {
 
         {/* Phone */}
         <div>
-          <Label htmlFor="edit-phone" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Số điện thoại</Label>
+          <Label htmlFor="edit-phone" className="text-sm font-medium text-gray-300 mb-1.5 block">Số điện thoại</Label>
           <Input
             id="edit-phone"
             type="tel"
@@ -399,35 +399,35 @@ export default function EditStore() {
 
         {/* Note */}
         <div>
-          <Label htmlFor="edit-note" className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Ghi chú</Label>
+          <Label htmlFor="edit-note" className="text-sm font-medium text-gray-300 mb-1.5 block">Ghi chú</Label>
           <textarea
             id="edit-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="VD: Mở cửa từ 6h–11h, chỉ bán thứ 2–7"
             rows={3}
-            className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 py-2.5 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
         </div>
 
         {/* Active toggle */}
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-900 border border-gray-800">
           <button
             type="button"
             onClick={() => setActive((v) => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${active ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${active ? 'bg-green-500' : 'bg-gray-600'}`}
           >
             <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${active ? 'translate-x-6' : 'translate-x-1'}`} />
           </button>
           <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Đã xác minh</span>
+            <span className="text-sm font-medium text-gray-300">Đã xác minh</span>
             <p className="text-xs text-gray-400">Cửa hàng đã được kiểm tra thực tế</p>
           </div>
         </div>
 
         {/* Location */}
         <div>
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Vị trí trên bản đồ</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-2 block">Vị trí trên bản đồ</Label>
 
           {/* Maps link input */}
           <div className="mb-3">
@@ -458,17 +458,18 @@ export default function EditStore() {
           </div>
 
           {pickedLat != null && pickedLng != null && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            <p className="text-xs text-gray-400 mb-2">
               Tọa độ: {pickedLat.toFixed(6)}, {pickedLng.toFixed(6)}
             </p>
           )}
 
-          <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800" style={{ height: '40vh' }}>
+          <div className="rounded-2xl overflow-hidden border border-gray-800" style={{ height: '40vh' }}>
             <StoreLocationPicker
               initialLat={pickedLat}
               initialLng={pickedLng}
               editable={true}
               onChange={(lat, lng) => { setPickedLat(lat); setPickedLng(lng) }}
+              dark={false}
             />
           </div>
         </div>

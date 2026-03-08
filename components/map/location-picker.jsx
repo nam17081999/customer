@@ -10,7 +10,8 @@ export default function LocationPicker({
   editable = true,
   debug = false,
   height = 420,
-  heading = null
+  heading = null,
+  dark = true
 }) {
   const defaultLat = 10.776900
   const defaultLng = 106.700980
@@ -183,6 +184,7 @@ export default function LocationPicker({
     <div className={className} style={{ position: 'relative' }}>
       <div
         ref={mapContainerRef}
+        className={dark ? "dark-map-filter" : ""}
         style={{ height, width: '100%', touchAction: editable ? 'none' : 'manipulation', cursor: editable ? 'grab' : 'default' }}
       />
       {!editable && (
@@ -190,7 +192,8 @@ export default function LocationPicker({
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(255,255,255,0.55)',
+            background: dark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
+            backdropBlur: dark ? '4px' : 'none',
             zIndex: 10,
             pointerEvents: 'none',
             touchAction: 'none',

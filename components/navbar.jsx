@@ -60,10 +60,10 @@ export default function Navbar() {
     return (
         <>
             {/* ── Top bar ── */}
-            <nav className="hidden sm:block sticky top-0 z-50 border-b border-gray-200 bg-white/70 backdrop-blur-md dark:border-gray-800 dark:bg-black/60 supports-[backdrop-filter]:bg-white/50">
+            <nav className="hidden sm:block sticky top-0 z-50 border-b border-gray-800 bg-black/60 backdrop-blur-md supports-[backdrop-filter]:bg-black/50">
                 <div className="mx-auto flex h-14 w-full max-w-screen-md items-center px-3 sm:px-4 gap-2">
                     {/* Brand */}
-                    <Link href={brandHref} className="flex items-center font-semibold text-gray-900 dark:text-gray-100 text-sm sm:text-base shrink-0">
+                    <Link href={brandHref} className="flex items-center font-semibold text-gray-100 text-sm sm:text-base shrink-0">
                         <span className="text-primary">StoreVis</span>
                     </Link>
 
@@ -75,8 +75,8 @@ export default function Navbar() {
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
-                                        ? 'bg-gray-900 text-white border-transparent dark:bg-gray-100 dark:text-gray-900'
-                                        : 'text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
+                                        ? 'bg-gray-100 text-gray-900 border-transparent'
+                                        : 'text-gray-400 border-gray-700 hover:bg-gray-900'
                                     }`}
                             >
                                 <Icon className="w-4 h-4" />
@@ -88,7 +88,7 @@ export default function Navbar() {
             </nav>
 
             {/* ── Bottom tab bar (mobile only) ── */}
-            <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 safe-area-bottom">
+            <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-gray-950/95 backdrop-blur-md border-t border-gray-800 safe-area-bottom">
                 <div className="flex h-14 max-w-screen-md mx-auto w-full">
                     {navLinks.map(({ href, active, label, mobileLabel, Icon }) => (
                         <Link
@@ -96,12 +96,12 @@ export default function Navbar() {
                             href={href}
                             aria-current={active ? 'page' : undefined}
                             className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-gray-400 dark:text-gray-500 active:text-gray-600 dark:active:text-gray-300'
+                                    ? 'text-blue-400'
+                                    : 'text-gray-500 active:text-gray-200'
                                 }`}
                         >
                             <Icon className="w-5 h-5 shrink-0" />
-                            <span className={`w-full truncate text-center whitespace-nowrap text-[9px] font-medium leading-none ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                            <span className={`w-full truncate text-center whitespace-nowrap text-[9px] font-medium leading-none ${active ? 'text-blue-400' : 'text-gray-500'}`}>
                                 {mobileLabel || label}
                             </span>
                         </Link>

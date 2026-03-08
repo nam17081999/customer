@@ -40,6 +40,7 @@ export default function StoreLocationPicker({
   resolvingAddr = false,
   onGetLocation,
   showControls = true,
+  dark = true,
 }) {
   return (
     <div className={`relative ${className}`}>
@@ -52,7 +53,7 @@ export default function StoreLocationPicker({
               type="button"
               onClick={onGetLocation}
               disabled={resolvingAddr}
-              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+              className="bg-gray-800 border border-gray-600 rounded-lg px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-50"
               title="Lấy lại vị trí hiện tại"
             >
               <svg
@@ -79,7 +80,7 @@ export default function StoreLocationPicker({
             className={`border rounded-lg px-3 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium ${
               editable 
                 ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600' 
-                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                : 'bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700'
             }`}
             title={editable ? 'Khóa bản đồ' : 'Mở khóa để chỉnh vị trí'}
           >
@@ -133,11 +134,12 @@ export default function StoreLocationPicker({
           onToggleEditable={onToggleEditable}
           heading={heading}
           height={height}
+          dark={dark}
         />
 
         {/* Compass error - bottom right to avoid control buttons */}
         {compassError && (
-          <div className="absolute bottom-3 right-2 z-[1000] max-w-[200px] rounded-md border border-orange-300 bg-orange-50 px-2 py-1.5 text-[10px] text-orange-800">
+          <div className="absolute bottom-3 right-2 z-[1000] max-w-[200px] rounded-md border border-orange-900 bg-orange-950/30 px-2 py-1.5 text-[10px] text-orange-400">
             {compassError}
           </div>
         )}
@@ -145,14 +147,14 @@ export default function StoreLocationPicker({
         {/* Geo blocked overlay */}
         {geoBlocked && (
           <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-xl border border-red-200 bg-white/95 p-5 text-center shadow-lg">
-              <div className="text-base font-semibold text-red-600">
+            <div className="w-full max-w-md rounded-xl border border-red-900 bg-gray-900/95 p-5 text-center shadow-lg backdrop-blur-md">
+              <div className="text-base font-semibold text-red-500">
                 Không thể lấy vị trí của bạn
               </div>
-              <div className="mt-2 text-sm text-gray-700">
+              <div className="mt-2 text-sm text-gray-300">
                 Vui lòng bật định vị/GPS và cho phép quyền vị trí cho trình duyệt.
               </div>
-              <div className="mt-1 text-xs text-gray-500">
+              <div className="mt-1 text-xs text-gray-400">
                 Mở Cài đặt → Quyền vị trí → cho phép truy cập vị trí, sau đó thử lại.
               </div>
               {onReload && (
@@ -172,9 +174,9 @@ export default function StoreLocationPicker({
 
         {/* Resolving address overlay */}
         {resolvingAddr && (
-          <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-white/70 dark:bg-black/60 backdrop-blur-sm rounded-md">
-            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
-              <span className="inline-block h-2 w-2 rounded-full bg-gray-400 animate-pulse" />
+          <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-md">
+            <div className="flex items-center gap-2 text-sm text-gray-200">
+              <span className="inline-block h-2 w-2 rounded-full bg-gray-600 animate-pulse" />
               Đang lấy vị trí…
             </div>
           </div>
