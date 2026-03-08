@@ -9,19 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
-
-function formatDate(value) {
-  if (!value) return 'Không rõ thời gian'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Không rõ thời gian'
-  return date.toLocaleString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
+import { formatDateTime } from '@/helper/validation'
 
 export default function VerifyStorePage() {
   const router = useRouter()
@@ -148,7 +136,7 @@ export default function VerifyStorePage() {
       ids.forEach((id) => next.delete(id))
       return next
     })
-    invalidateStoreCache()
+    await invalidateStoreCache()
     setMessage(`Đã xác thực ${ids.length} cửa hàng.`)
     setSubmitting(false)
   }
@@ -232,7 +220,7 @@ export default function VerifyStorePage() {
                     checked={allVisibleSelected}
                     onChange={toggleSelectAllVisible}
                     disabled={!hasVisibleStores || submitting}
-                    className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                    className="h-5 w-5 rounded border-gray-300 dark:border-gray-700"
                   />
                   Chọn tất cả đang hiển thị
                 </label>
@@ -301,24 +289,24 @@ export default function VerifyStorePage() {
                         onChange={() => toggleOne(store.id)}
                         disabled={submitting}
                         aria-label={`Chọn cửa hàng ${store.name || 'không tên'}`}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                        className="mt-1 h-5 w-5 rounded border-gray-300 dark:border-gray-700"
                       />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-2">
-                          <h3 className="min-w-0 flex-1 text-base font-semibold text-gray-900 dark:text-gray-100 leading-snug break-words [overflow-wrap:anywhere]">
+                          <h3 className="min-w-0 flex-1 text-lg font-semibold text-gray-900 dark:text-gray-100 leading-snug break-words [overflow-wrap:anywhere]">
                             {store.name || 'Cửa hàng chưa đặt tên'}
                           </h3>
-                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                             Chờ xác thực
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 break-words [overflow-wrap:anywhere]">{addressText}</p>
+                        <p className="text-base text-gray-700 dark:text-gray-300 mt-1 break-words [overflow-wrap:anywhere]">{addressText}</p>
 
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
                           <span>Huyện: {(store.district || '').trim() || 'Chưa cập nhật'}</span>
-                          <span>Thêm lúc: {formatDate(store.created_at)}</span>
+                          <span>Thêm lúc: {formatDateTime(store.created_at)}</span>
                           {store.phone && <span>SĐT: {store.phone}</span>}
                         </div>
 

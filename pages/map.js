@@ -568,181 +568,178 @@ export default function MapPage() {
       <div className="relative flex-1 h-full">
         <div ref={mapContainerRef} className="absolute inset-0" />
 
-      <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
-        <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
-          <div className="rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
-            <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
-              <Input
-                ref={inputRef}
-                placeholder="Tìm cửa hàng..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value)
-                  setShowSuggestions(true)
-                  setActiveSuggestion(-1)
-                }}
-                onFocus={() => { if (searchTerm.trim()) setShowSuggestions(true) }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault()
-                    setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1))
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault()
-                    setActiveSuggestion((i) => Math.max(i - 1, -1))
-                  } else if (e.key === 'Enter') {
-                    e.preventDefault()
-                    if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
-                      flyToStore(suggestions[activeSuggestion])
-                    } else {
-                      handleSearch()
+        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
+          <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
+            <div className="rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
+                <Input
+                  ref={inputRef}
+                  placeholder="Tìm cửa hàng..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value)
+                    setShowSuggestions(true)
+                    setActiveSuggestion(-1)
+                  }}
+                  onFocus={() => { if (searchTerm.trim()) setShowSuggestions(true) }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault()
+                      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1))
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault()
+                      setActiveSuggestion((i) => Math.max(i - 1, -1))
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+                        flyToStore(suggestions[activeSuggestion])
+                      } else {
+                        handleSearch()
+                      }
+                    } else if (e.key === 'Escape') {
+                      setShowSuggestions(false)
+                      inputRef.current?.blur()
                     }
-                  } else if (e.key === 'Escape') {
-                    setShowSuggestions(false)
-                    inputRef.current?.blur()
-                  }
-                }}
-                className="h-11 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-base text-slate-100 placeholder:text-slate-400"
-              />
-              <Button
-                onClick={handleSearch}
-                className="h-11 rounded-lg bg-sky-500 px-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
-                disabled={loading || Boolean(error)}
-              >
-                Tìm
-              </Button>
-            </div>
-          </div>
-
-          {/* Suggestions dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="relative mt-1 rounded-xl bg-slate-900/95 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
-              <div
-                ref={suggestionsRef}
-                className="max-h-64 overflow-y-auto"
-                onScroll={(e) => {
-                  const el = e.currentTarget
-                  setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2)
-                }}
-              >
-                {suggestions.map((store, idx) => (
-                  <button
-                    key={store.id}
-                    type="button"
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${
-                      idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-slate-800/80'
-                    } border-b border-slate-700/50`}
-                    onPointerDown={(e) => e.preventDefault()}
-                    onClick={() => flyToStore(store)}
-                  >
-                    <span className="min-w-0 truncate text-base font-medium text-slate-100">{store.name}</span>
-                    <span className="shrink-0 max-w-[45%] truncate text-right text-sm text-slate-400">{formatShortAddress(store)}</span>
-                  </button>
-                ))}
+                  }}
+                  className="h-11 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-base text-slate-100 placeholder:text-slate-400"
+                />
+                <Button
+                  onClick={handleSearch}
+                  className="h-11 rounded-lg bg-sky-500 px-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
+                  disabled={loading || Boolean(error)}
+                >
+                  Tìm
+                </Button>
               </div>
-              {canScrollDown && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-slate-900/90 to-transparent pb-1 pt-4">
-                  <svg width="14" height="8" viewBox="0 0 14 8" className="text-slate-400">
-                    <path d="M1 1l6 6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
             </div>
-          )}
+
+            {/* Suggestions dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="relative mt-1 rounded-xl bg-slate-900/95 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
+                <div
+                  ref={suggestionsRef}
+                  className="max-h-64 overflow-y-auto"
+                  onScroll={(e) => {
+                    const el = e.currentTarget
+                    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2)
+                  }}
+                >
+                  {suggestions.map((store, idx) => (
+                    <button
+                      key={store.id}
+                      type="button"
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-slate-800/80'
+                        } border-b border-slate-700/50`}
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => flyToStore(store)}
+                    >
+                      <span className="min-w-0 truncate text-base font-medium text-slate-100">{store.name}</span>
+                      <span className="shrink-0 max-w-[45%] truncate text-right text-sm text-slate-400">{formatShortAddress(store)}</span>
+                    </button>
+                  ))}
+                </div>
+                {canScrollDown && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-slate-900/90 to-transparent pb-1 pt-4">
+                    <svg width="14" height="8" viewBox="0 0 14 8" className="text-slate-400">
+                      <path d="M1 1l6 6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
       </div>
 
       {/* Right Sidebar - desktop only (detected via pointer capability) */}
       {isDesktop && (
-      <div className="flex flex-col w-[320px] h-full bg-slate-900 border-l border-slate-700/60 shrink-0">
-        {/* Sidebar header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
-          <h2 className="text-base font-semibold text-slate-100">Bộ lọc khu vực</h2>
-          <div className="flex items-center gap-2">
-            {(selectedDistricts.length > 0 || selectedWards.length > 0) && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-xs text-sky-400 hover:text-sky-300"
-              >
-                Xóa lọc
-              </button>
+        <div className="flex flex-col w-[345px] h-full bg-slate-900 border-l border-slate-700/60 shrink-0">
+          {/* Sidebar header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
+            <h2 className="text-base font-semibold text-slate-100">Bộ lọc khu vực</h2>
+            <div className="flex items-center gap-2">
+              {(selectedDistricts.length > 0 || selectedWards.length > 0) && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-xs text-sky-400 hover:text-sky-300"
+                >
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter count */}
+          <div className="px-4 py-2 text-sm text-slate-400 border-b border-slate-700/40">
+            Hiển thị <span className="font-semibold text-slate-200">{filteredStores.length}</span> / {storesWithCoords.length} cửa hàng
+          </div>
+
+          {/* Scrollable filter content */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+            {/* District section */}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.keys(DISTRICT_WARD_SUGGESTIONS).map((district) => {
+                  const active = selectedDistricts.includes(district)
+                  const count = storeCounts.districtCounts[district] || 0
+                  return (
+                    <button
+                      key={district}
+                      type="button"
+                      onClick={() => toggleDistrict(district)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
+                          ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-600/40'
+                        }`}
+                    >
+                      {district}
+                      {count > 0 && <span className={`text-[10px] ${active ? 'text-sky-400' : 'text-slate-500'}`}>({count})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Ward section - only show when districts selected */}
+            {selectedDistricts.length > 0 && availableWards.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-slate-500">(chọn để hiển thị)</span></h3>
+                {selectedDistricts.map((district) => {
+                  const wards = DISTRICT_WARD_SUGGESTIONS[district] || []
+                  if (wards.length === 0) return null
+                  return (
+                    <div key={district} className="mb-3">
+                      <div className="text-xs font-medium text-slate-400 mb-1.5">{district}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {wards.map((ward) => {
+                          const active = selectedWards.includes(ward)
+                          const count = storeCounts.wardCounts[ward] || 0
+                          return (
+                            <button
+                              key={ward}
+                              type="button"
+                              onClick={() => toggleWard(ward)}
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors ${active
+                                  ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700 ring-1 ring-slate-600/30'
+                                }`}
+                            >
+                              {ward}
+                              {count > 0 && <span className={`text-[10px] ${active ? 'text-emerald-400' : 'text-slate-500'}`}>({count})</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
         </div>
-
-        {/* Filter count */}
-        <div className="px-4 py-2 text-sm text-slate-400 border-b border-slate-700/40">
-          Hiển thị <span className="font-semibold text-slate-200">{filteredStores.length}</span> / {storesWithCoords.length} cửa hàng
-        </div>
-
-        {/* Scrollable filter content */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-          {/* District section */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(DISTRICT_WARD_SUGGESTIONS).map((district) => {
-                const active = selectedDistricts.includes(district)
-                const count = storeCounts.districtCounts[district] || 0
-                return (
-                  <button
-                    key={district}
-                    type="button"
-                    onClick={() => toggleDistrict(district)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      active
-                        ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-600/40'
-                    }`}
-                  >
-                    {district}
-                    {count > 0 && <span className={`text-[10px] ${active ? 'text-sky-400' : 'text-slate-500'}`}>({count})</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Ward section - only show when districts selected */}
-          {selectedDistricts.length > 0 && availableWards.length > 0 && (
-            <div>
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-slate-500">(chọn để hiển thị)</span></h3>
-              {selectedDistricts.map((district) => {
-                const wards = DISTRICT_WARD_SUGGESTIONS[district] || []
-                if (wards.length === 0) return null
-                return (
-                  <div key={district} className="mb-3">
-                    <div className="text-xs font-medium text-slate-400 mb-1.5">{district}</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {wards.map((ward) => {
-                        const active = selectedWards.includes(ward)
-                        const count = storeCounts.wardCounts[ward] || 0
-                        return (
-                          <button
-                            key={ward}
-                            type="button"
-                            onClick={() => toggleWard(ward)}
-                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors ${
-                              active
-                                ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
-                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 ring-1 ring-slate-600/30'
-                            }`}
-                          >
-                            {ward}
-                            {count > 0 && <span className={`text-[10px] ${active ? 'text-emerald-400' : 'text-slate-500'}`}>({count})</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
       )}
 
 

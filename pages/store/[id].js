@@ -30,8 +30,9 @@ export default function StoreDetailPage() {
 
     supabase
       .from('stores')
-      .select('*')
+      .select('id,name,image_url,latitude,longitude,address_detail,ward,district,phone,note,active,created_at')
       .eq('id', id)
+      .is('deleted_at', null)
       .single()
       .then(({ data, error: err }) => {
         if (cancelled) return
@@ -171,9 +172,9 @@ export default function StoreDetailPage() {
           <div className="px-4 py-5 space-y-5">
             {/* Name & status */}
             <div>
-              <h1 className="text-xl font-bold text-gray-100 mb-1">{store.name}</h1>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">{store.name}</h1>
               {!isActive && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-700 text-gray-300">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                   Chưa xác thực
                 </span>
               )}
