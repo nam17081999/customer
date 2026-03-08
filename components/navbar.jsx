@@ -42,9 +42,8 @@ export default function Navbar() {
     const currentPath = pathname || ''
     const navLinks = user
         ? [
-            { href: '/dashboard', active: currentPath === '/dashboard', label: 'Tổng quan', mobileLabel: 'Tổng', Icon: DashboardIcon },
-            { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon },
             { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
+            { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon },
             { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
             { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
             { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
@@ -56,7 +55,7 @@ export default function Navbar() {
             { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
         ]
 
-    const brandHref = user ? '/dashboard' : '/'
+    const brandHref = '/'
 
     return (
         <>
