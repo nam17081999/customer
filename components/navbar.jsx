@@ -74,11 +74,10 @@ export default function Navbar() {
                                 key={href}
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
-                                    active
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
                                         ? 'bg-gray-900 text-white border-transparent dark:bg-gray-100 dark:text-gray-900'
                                         : 'text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900'
-                                }`}
+                                    }`}
                             >
                                 <Icon className="w-4 h-4" />
                                 <span>{label}</span>
@@ -91,16 +90,15 @@ export default function Navbar() {
             {/* ── Bottom tab bar (mobile only) ── */}
             <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-white/95 dark:bg-gray-950/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 safe-area-bottom">
                 <div className="flex h-14 max-w-screen-md mx-auto w-full">
-                    {navLinks.filter(link => !(user && link.href === '/account')).map(({ href, active, label, mobileLabel, Icon }) => (
+                    {navLinks.map(({ href, active, label, mobileLabel, Icon }) => (
                         <Link
                             key={href}
                             href={href}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${
-                                active
+                            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active
                                     ? 'text-blue-600 dark:text-blue-400'
                                     : 'text-gray-400 dark:text-gray-500 active:text-gray-600 dark:active:text-gray-300'
-                            }`}
+                                }`}
                         >
                             <Icon className="w-5 h-5 shrink-0" />
                             <span className={`w-full truncate text-center whitespace-nowrap text-[9px] font-medium leading-none ${active ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>
