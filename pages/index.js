@@ -29,7 +29,6 @@ export default function HomePage() {
   const [selectedWard, setSelectedWard] = useState('')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [sortByDistance, setSortByDistance] = useState(true)
   const searchInputRef = useRef(null)
   const initializedFromQuery = useRef(false)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
@@ -42,7 +41,6 @@ export default function HomePage() {
     if (q) setSearchTerm(q)
     if (district) setSelectedDistrict(district)
     if (ward) setSelectedWard(ward)
-    if (sort === 'distance') setSortByDistance(true)
   }, [router.isReady, router.query])
 
   // Sync state to URL query params (shallow, no navigation)
@@ -52,9 +50,8 @@ export default function HomePage() {
     if (searchTerm.trim()) query.q = searchTerm.trim()
     if (selectedDistrict) query.district = selectedDistrict
     if (selectedWard) query.ward = selectedWard
-    if (sortByDistance) query.sort = 'distance'
     router.replace({ pathname: '/', query }, undefined, { shallow: true })
-  }, [searchTerm, selectedDistrict, selectedWard, sortByDistance])
+  }, [searchTerm, selectedDistrict, selectedWard])
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
   const wardOptions = selectedDistrict
@@ -178,7 +175,7 @@ export default function HomePage() {
       const sa = a._score ?? 2
       const sb = b._score ?? 2
       if (sb !== sa) return sb - sa
-      if (sortByDistance && a.distance != null && b.distance != null) {
+      if (a.distance != null && b.distance != null) {
         return a.distance - b.distance
       }
       if (a.active !== b.active) return a.active ? -1 : 1
@@ -188,7 +185,7 @@ export default function HomePage() {
     })
 
     return results
-  }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance, sortByDistance])
+  }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance])
 
   // Search triggers when name or filters change
   // (no longer needs debounced API call — kept for UX smoothness)
@@ -205,12 +202,11 @@ export default function HomePage() {
     setSearchTerm('')
     setSelectedDistrict('')
     setSelectedWard('')
-    setSortByDistance(false)
   }
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] bg-gray-50 dark:bg-black overflow-hidden">
-      <div className="h-full px-3 sm:px-4 py-4 sm:py-6 max-w-screen-md mx-auto flex flex-col gap-3">
+      <div className="h-full px-3 sm:px-4 pt-4 sm:pt-6 max-w-screen-md mx-auto flex flex-col gap-3">
         {/* Search + Filters */}
         <div className="flex-shrink-0 flex flex-col gap-2">
           {/* Font >=16px để tránh iOS tự zoom khi focus input */}
@@ -252,44 +248,26 @@ export default function HomePage() {
               </select>
             </div>
           </div>
-          {/* Active filters bar: sort toggle + clear button */}
-          {(hasSearchCriteria || sortByDistance) && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {currentLocation && (
-                <button
-                  type="button"
-                  onClick={() => setSortByDistance(!sortByDistance)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition ${
-                    sortByDistance
-                      ? 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-600 dark:text-blue-300'
-                      : 'bg-white border-gray-300 text-gray-600 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-400'
-                  }`}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Gần nhất
-                </button>
-              )}
-              {hasSearchCriteria && (
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40 transition"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  Xoá bộ lọc
-                </button>
-              )}
+          {/* Active filters bar: count + clear button */}
+          {hasSearchCriteria && (
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Tìm thấy <span className="font-semibold text-gray-700 dark:text-gray-200">{searchResults.length}</span> cửa hàng
+              </p>
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/40 transition"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                Xoá bộ lọc
+              </button>
             </div>
           )}
         </div>
         {/* Search Results */}
         <div className="flex-1 min-h-0 flex flex-col gap-3">
-          {/* Result count */}
-          {(!showSkeleton && hasSearchCriteria && searchResults.length > 0) && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 px-1">
-              Tìm thấy <span className="font-semibold text-gray-700 dark:text-gray-200">{searchResults.length}</span> cửa hàng
-            </p>
-          )}
+        
 
           {showSkeleton && (
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
