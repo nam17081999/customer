@@ -148,7 +148,6 @@ export default function AccountPage() {
               {/* Account info row */}
               <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">Đăng nhập:</span>
                   <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{user?.email}</span>
                 </div>
                 <Button
