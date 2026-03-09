@@ -205,17 +205,17 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-[calc(100dvh-5rem)] bg-black overflow-hidden">
+    <div className="h-[calc(100dvh-5rem)] bg-gray-950 overflow-hidden">
       <div className="h-full px-4 sm:px-5 pt-5 sm:pt-6 max-w-screen-md mx-auto flex flex-col gap-4">
-        {/* Tieu de trang - RO RANG */}
-        <div className="flex-shrink-0">
-          <h1 className="text-2xl font-bold text-white mb-1">Tim khach hang</h1>
-          <p className="text-base text-gray-400">Go ten hoac chon quan de tim</p>
+        {/* HEADER NOI BAT - Nen xanh duong dam */}
+        <div className="flex-shrink-0 bg-blue-600 rounded-2xl p-5 shadow-lg">
+          <h1 className="text-2xl font-bold text-white mb-1">TIM KHACH HANG</h1>
+          <p className="text-lg text-blue-100">Go ten hoac chon quan de tim</p>
         </div>
 
-        {/* Search + Filters - LON HON, DE SU DUNG */}
-        <div className="flex-shrink-0 flex flex-col gap-3">
-          {/* O tim kiem LON */}
+        {/* Search + Filters - NEN SANG HON */}
+        <div className="flex-shrink-0 flex flex-col gap-4 bg-gray-800 rounded-2xl p-4">
+          {/* O tim kiem LON - NEN TRANG */}
           <Input
             ref={searchInputRef}
             type="text"
@@ -223,19 +223,19 @@ export default function HomePage() {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             autoComplete="off"
-            className="w-full text-lg h-14"
+            className="w-full text-lg h-14 bg-white text-gray-900 placeholder:text-gray-500 border-2 border-gray-300"
             aria-label="Tim kiem khach hang"
           />
           
           {/* Bo loc - 2 dong tren mobile de de nhan */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
-              <label className="block text-base font-semibold text-gray-300 mb-2">Quan/Huyen</label>
+              <label className="block text-lg font-bold text-yellow-400 mb-2">QUAN/HUYEN</label>
               <select
                 value={selectedDistrict}
                 onChange={(e) => setSelectedDistrict(e.target.value)}
                 aria-label="Chon quan/huyen"
-                className="w-full h-14 rounded-xl border-2 border-gray-600 bg-gray-900 px-4 text-lg text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full h-14 rounded-xl border-2 border-gray-500 bg-gray-700 px-4 text-lg text-white focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400 transition-all"
               >
                 <option value="">-- Tat ca quan --</option>
                 {districtOptions.map((d) => (
@@ -244,13 +244,13 @@ export default function HomePage() {
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-base font-semibold text-gray-300 mb-2">Xa/Phuong</label>
+              <label className="block text-lg font-bold text-yellow-400 mb-2">XA/PHUONG</label>
               <select
                 value={selectedWard}
                 onChange={(e) => setSelectedWard(e.target.value)}
                 disabled={!selectedDistrict}
                 aria-label="Chon xa/phuong"
-                className="w-full h-14 rounded-xl border-2 border-gray-600 bg-gray-900 px-4 text-lg text-white disabled:opacity-50 disabled:cursor-not-allowed focus:border-blue-500 focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full h-14 rounded-xl border-2 border-gray-500 bg-gray-700 px-4 text-lg text-white disabled:opacity-50 disabled:cursor-not-allowed focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400 transition-all"
               >
                 <option value="">{selectedDistrict ? '-- Tat ca xa --' : 'Chon quan truoc'}</option>
                 {wardOptions.map((w) => (
@@ -260,19 +260,19 @@ export default function HomePage() {
             </div>
           </div>
           
-          {/* Thanh ket qua - LON HON, RO HON */}
+          {/* Thanh ket qua - MAU XANH LA NOI BAT */}
           {hasSearchCriteria && (
-            <div className="flex items-center justify-between gap-3 bg-gray-800/50 rounded-xl px-4 py-3">
-              <p className="text-lg text-gray-200">
-                Tim thay <span className="font-bold text-blue-400">{searchResults.length}</span> khach hang
+            <div className="flex items-center justify-between gap-3 bg-green-700 rounded-xl px-4 py-3">
+              <p className="text-lg text-white font-semibold">
+                Tim thay <span className="font-bold text-yellow-300 text-xl">{searchResults.length}</span> khach hang
               </p>
               <button
                 type="button"
                 onClick={clearAllFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-base font-semibold bg-red-900/30 border-2 border-red-700 text-red-400 hover:bg-red-900/50 transition-all min-h-[48px]"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-base font-bold bg-red-600 text-white hover:bg-red-500 transition-all min-h-[48px] shadow-lg"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                Xoa loc
+                XOA LOC
               </button>
             </div>
           )}
@@ -284,15 +284,15 @@ export default function HomePage() {
           {showSkeleton && (
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-4" aria-label={loading ? 'Dang tai ket qua' : 'Dang chuan bi tim kiem'}>
               {[...Array(4)].map((_, i) => (
-                <Card key={i} className={`overflow-hidden rounded-2xl ${loading ? '' : 'opacity-70'}`}>
+                <Card key={i} className={`overflow-hidden rounded-2xl bg-gray-800 border-2 border-gray-600 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
                     <div className="flex gap-4 p-4">
-                      {/* Anh skeleton lon hon */}
-                      <div className="w-24 h-24 rounded-xl bg-gray-700 animate-pulse flex-shrink-0" />
+                      {/* Anh skeleton */}
+                      <div className="w-24 h-24 rounded-xl bg-gray-600 animate-pulse flex-shrink-0" />
                       <div className="flex-1 space-y-3 py-1">
-                        <div className="h-6 w-3/4 bg-gray-700 rounded-lg animate-pulse" />
-                        <div className="h-5 w-full bg-gray-700 rounded-lg animate-pulse" />
-                        <div className="h-5 w-1/2 bg-gray-700 rounded-lg animate-pulse" />
+                        <div className="h-6 w-3/4 bg-gray-600 rounded-lg animate-pulse" />
+                        <div className="h-5 w-full bg-gray-600 rounded-lg animate-pulse" />
+                        <div className="h-5 w-1/2 bg-gray-600 rounded-lg animate-pulse" />
                       </div>
                     </div>
                   </CardContent>
@@ -302,16 +302,16 @@ export default function HomePage() {
           )}
 
           {!showSkeleton && hasSearchCriteria && searchResults.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              {/* Icon lon hon */}
-              <div className="w-24 h-24 rounded-full bg-gray-800 flex items-center justify-center mb-6">
-                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-gray-800 rounded-2xl">
+              {/* Icon lon hon - mau cam */}
+              <div className="w-24 h-24 rounded-full bg-orange-500 flex items-center justify-center mb-6">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
-              <p className="text-xl text-white font-bold mb-2">Khong tim thay</p>
-              <p className="text-lg text-gray-400 mb-6">Thu tim voi ten khac hoac bot bo loc</p>
-              <Button asChild size="lg">
+              <p className="text-2xl text-white font-bold mb-2">KHONG TIM THAY</p>
+              <p className="text-lg text-gray-300 mb-6">Thu tim voi ten khac hoac bot bo loc</p>
+              <Button asChild size="lg" className="bg-green-600 hover:bg-green-500 text-white text-lg font-bold h-14 px-8">
                 <Link href="/store/create">
-                  Them khach hang moi
+                  THEM KHACH HANG MOI
                 </Link>
               </Button>
             </div>
@@ -346,23 +346,23 @@ export default function HomePage() {
           )}
 
           {!hasSearchCriteria && (
-            <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-              {/* Icon lon hon, noi bat hon */}
-              <div className="w-28 h-28 rounded-full bg-blue-500/20 flex items-center justify-center mb-6">
-                <svg className="w-14 h-14 text-blue-400" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <div className="flex flex-col items-center justify-center py-10 px-6 text-center bg-gray-800 rounded-2xl">
+              {/* Icon lon hon - mau xanh duong noi bat */}
+              <div className="w-28 h-28 rounded-full bg-blue-500 flex items-center justify-center mb-6 shadow-lg">
+                <svg className="w-14 h-14 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
-              <p className="text-2xl text-white font-bold mb-2">Tim khach hang</p>
-              <p className="text-lg text-gray-400 mb-6">Go ten hoac chon quan de bat dau</p>
+              <p className="text-2xl text-white font-bold mb-2">TIM KHACH HANG</p>
+              <p className="text-lg text-gray-300 mb-6">Go ten hoac chon quan de bat dau</p>
               
-              {/* Nut chon nhanh quan - LON HON, DE NHAN */}
-              <p className="text-base text-gray-500 mb-4">Chon nhanh quan:</p>
+              {/* Nut chon nhanh quan - MAU SAC NOI BAT */}
+              <p className="text-lg text-yellow-400 font-bold mb-4">CHON NHANH QUAN:</p>
               <div className="flex flex-wrap gap-3 justify-center max-w-md">
                 {DISTRICTS.slice(0, 6).map((d) => (
                   <button
                     key={d}
                     type="button"
                     onClick={() => setSelectedDistrict(d)}
-                    className="px-5 py-3 rounded-xl text-base font-semibold bg-gray-800 border-2 border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400 hover:bg-gray-700 transition-all min-h-[48px]"
+                    className="px-5 py-3 rounded-xl text-lg font-bold bg-blue-600 border-2 border-blue-400 text-white hover:bg-blue-500 hover:scale-105 transition-all min-h-[52px] shadow-md"
                   >
                     {d}
                   </button>

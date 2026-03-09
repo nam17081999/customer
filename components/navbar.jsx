@@ -57,24 +57,24 @@ export default function Navbar() {
 
     return (
         <>
-            {/* ── Top bar - LON HON, DE DOC HON ── */}
-            <nav className="hidden sm:block sticky top-0 z-50 border-b-2 border-gray-700 bg-gray-900">
+            {/* ── Top bar - NEN XANH DUONG NOI BAT ── */}
+            <nav className="hidden sm:block sticky top-0 z-50 bg-blue-700 shadow-lg">
                 <div className="mx-auto flex h-16 w-full max-w-screen-md items-center px-4 gap-3">
                     {/* Brand - Font lon hon */}
-                    <Link href={brandHref} className="flex items-center font-bold text-white text-xl shrink-0">
-                        <span className="text-blue-400">StoreVis</span>
+                    <Link href={brandHref} className="flex items-center font-bold text-white text-2xl shrink-0">
+                        <span className="text-yellow-300">StoreVis</span>
                     </Link>
 
-                    {/* Desktop nav links - NUT LON HON */}
+                    {/* Desktop nav links - NUT LON, MAU NOI BAT */}
                     <div className="ml-auto hidden sm:flex items-center gap-2">
                         {navLinks.map(({ href, active, label, Icon }) => (
                             <Link
                                 key={href}
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-base font-semibold transition-all ${active
-                                        ? 'bg-blue-500 text-white shadow-lg'
-                                        : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-base font-bold transition-all ${active
+                                        ? 'bg-yellow-400 text-blue-900 shadow-lg'
+                                        : 'text-white hover:bg-blue-600'
                                     }`}
                             >
                                 <Icon className="w-5 h-5" />
@@ -85,8 +85,8 @@ export default function Navbar() {
                 </div>
             </nav>
 
-            {/* ── Bottom tab bar - LON HON, DE NHAN HON ── */}
-            <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-gray-900 border-t-2 border-gray-700 safe-area-bottom">
+            {/* ── Bottom tab bar - MAU SAC NOI BAT ── */}
+            <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-blue-800 border-t-4 border-yellow-400 safe-area-bottom">
                 <div className="flex h-20 max-w-screen-md mx-auto w-full">
                     {navLinks.map(({ href, active, label, mobileLabel, Icon }) => (
                         <Link
@@ -94,14 +94,14 @@ export default function Navbar() {
                             href={href}
                             aria-current={active ? 'page' : undefined}
                             className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 px-1 transition-all ${active
-                                    ? 'text-blue-400 bg-blue-500/10'
-                                    : 'text-gray-400 active:text-white active:bg-gray-800'
+                                    ? 'bg-yellow-400 text-blue-900'
+                                    : 'text-white active:bg-blue-700'
                                 }`}
                         >
                             {/* Icon lon hon - 28px */}
-                            <Icon className={`w-7 h-7 shrink-0 ${active ? 'text-blue-400' : ''}`} />
+                            <Icon className={`w-7 h-7 shrink-0 ${active ? 'text-blue-900' : 'text-white'}`} />
                             {/* Text lon hon, de doc hon */}
-                            <span className={`w-full truncate text-center whitespace-nowrap text-sm font-semibold leading-tight ${active ? 'text-blue-400' : 'text-gray-400'}`}>
+                            <span className={`w-full truncate text-center whitespace-nowrap text-sm font-bold leading-tight ${active ? 'text-blue-900' : 'text-white'}`}>
                                 {mobileLabel || label}
                             </span>
                         </Link>
