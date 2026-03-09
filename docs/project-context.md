@@ -74,7 +74,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 
 ---
 
-## 10 Điều Cần Biết Khi Code
+## 11 Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
 2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
@@ -86,6 +86,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 8. **Dark mode**: Ứng dụng chạy **Dark Mode duy nhất**. Không có Light Mode.
 9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
 10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
+11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
 
 ---
 

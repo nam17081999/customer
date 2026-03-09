@@ -194,7 +194,7 @@ export default function HomePage() {
   // Auto focus search input on mount — only on desktop (mobile keyboard is annoying)
   useEffect(() => {
     if (searchInputRef.current && window.innerWidth >= 768) {
-      try { searchInputRef.current.focus() } catch {}
+      try { searchInputRef.current.focus() } catch { }
     }
   }, [])
 
@@ -267,7 +267,7 @@ export default function HomePage() {
         </div>
         {/* Search Results */}
         <div className="flex-1 min-h-0 flex flex-col gap-3">
-        
+
 
           {showSkeleton && (
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>

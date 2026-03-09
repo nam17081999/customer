@@ -203,6 +203,10 @@ export default function AddStore() {
   // Handler for getting fresh GPS location
   const handleGetLocation = useCallback(async () => {
     try {
+      // Yêu cầu quyền la bàn ngay lập tức trước khi await để không bị mất context User Gesture trên iOS
+      compassOnceRef.current = false
+      refreshCompassHeading()
+
       setResolvingAddr(true)
 
       const { coords, error } = await getBestPosition({
@@ -225,10 +229,6 @@ export default function AddStore() {
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
 
-      // Also try compass once on refresh (user gesture)
-      compassOnceRef.current = false
-      refreshCompassHeading()
-
       // Reset edited flag since this is a fresh GPS load
       setUserHasEditedMap(false)
 
@@ -250,7 +250,10 @@ export default function AddStore() {
     try {
       const { heading: h, error: e } = await requestCompassHeading()
       if (e) setCompassError(e)
-      if (h != null) setHeading(h)
+      if (h != null) {
+        // Cộng thêm 1 số rất nhỏ để ép React kích hoạt re-render nếu hướng trùng khớp hoàn toàn với trước đó
+        setHeading((prev) => prev === h ? h + 0.000001 : h)
+      }
     } catch { /* ignore */ }
   }
 
@@ -260,16 +263,16 @@ export default function AddStore() {
   }, [router.query.name])
 
   useEffect(() => {
-    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { }
   }, [])
 
   useEffect(() => {
-    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch {}
+    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { }
   }, [currentStep])
 
   useEffect(() => {
     if (currentStep === 1 && nameInputRef.current) {
-      try { nameInputRef.current.focus() } catch {}
+      try { nameInputRef.current.focus() } catch { }
     }
   }, [currentStep])
 
@@ -352,8 +355,6 @@ export default function AddStore() {
     setHeading(null)
     setStep2Key((k) => k + 1) // force remount map
     if (!resolvingAddr) handleFillAddress()
-    compassOnceRef.current = false
-    refreshCompassHeading()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep])
 
@@ -460,6 +461,11 @@ export default function AddStore() {
       showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
     }
+    
+    // Yêu cầu lấy hướng bàn ngay lập tức tại đây vì requestPermission trên iOS yêu cầu đồng bộ với thao tác click người dùng
+    compassOnceRef.current = false
+    refreshCompassHeading()
+    
     setCurrentStep(3)
     return true
   }
@@ -523,10 +529,10 @@ export default function AddStore() {
       setResolvingAddr(true)
 
       // Get GPS coordinates with improved logic
-    const { coords, error } = await getBestPosition({
-      maxWaitTime: 2000,
-      desiredAccuracy: 15,
-    })
+      const { coords, error } = await getBestPosition({
+        maxWaitTime: 2000,
+        desiredAccuracy: 15,
+      })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
@@ -743,7 +749,7 @@ export default function AddStore() {
     }
   }
 
-  
+
 
   // Success screen
   if (showSuccess) {
@@ -799,13 +805,12 @@ export default function AddStore() {
         <div className="flex items-center justify-center gap-1 pb-1">
           {steps.map((s, i) => (
             <div key={s.num} className="flex items-center">
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                currentStep === s.num
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${currentStep === s.num
                   ? 'bg-blue-600 text-white'
-                   : currentStep > s.num
+                  : currentStep > s.num
                     ? 'bg-green-900/40 text-green-400 border border-green-900/50'
                     : 'bg-gray-800 border border-gray-700 text-gray-400'
-              }`}>
+                }`}>
                 {currentStep > s.num ? (
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                 ) : (
@@ -813,7 +818,7 @@ export default function AddStore() {
                 )}
                 <span>{s.label}</span>
               </div>
-               {i < steps.length - 1 && (
+              {i < steps.length - 1 && (
                 <div className={`w-6 h-0.5 mx-1 rounded ${currentStep > s.num ? 'bg-green-600' : 'bg-gray-700'}`} />
               )}
             </div>
@@ -879,11 +884,10 @@ export default function AddStore() {
                     <button
                       key={d}
                       type="button"
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                        removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(d).toLowerCase()
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(d).toLowerCase()
                           ? 'bg-blue-600 text-white border border-blue-600'
                           : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                      }`}
+                        }`}
                       onClick={() => {
                         setDistrict(d)
                         setWard('')
@@ -908,11 +912,10 @@ export default function AddStore() {
                       <button
                         key={w}
                         type="button"
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                          removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(w).toLowerCase()
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(w).toLowerCase()
                             ? 'bg-blue-600 text-white border border-blue-600'
                             : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                        }`}
+                          }`}
                         onClick={() => {
                           setWard(w)
                           if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
@@ -1063,55 +1066,55 @@ export default function AddStore() {
                 />
               </div>
 
-          {/* Maps link input - desktop only, always visible */}
-          <div className="hidden md:block pt-2 space-y-1.5">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
-            <div className="flex gap-2">
-              <Input
-                value={mapsLink}
-                onChange={(e) => setMapsLink(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMapsLink(mapsLink) } }}
-                placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
-                className="text-base sm:text-base flex-1 min-w-0"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={mapsLinkLoading || !mapsLink.trim()}
-                leftIcon={mapsLinkLoading ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                ) : undefined}
-                onClick={() => handleMapsLink(mapsLink)}
-                className="shrink-0"
-              >
-                {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
-              </Button>
-            </div>
-            {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
-            <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
-          </div>
+              {/* Maps link input - desktop only, always visible */}
+              <div className="hidden md:block pt-2 space-y-1.5">
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={mapsLink}
+                    onChange={(e) => setMapsLink(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMapsLink(mapsLink) } }}
+                    placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
+                    className="text-base sm:text-base flex-1 min-w-0"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={mapsLinkLoading || !mapsLink.trim()}
+                    leftIcon={mapsLinkLoading ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    ) : undefined}
+                    onClick={() => handleMapsLink(mapsLink)}
+                    className="shrink-0"
+                  >
+                    {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
+                  </Button>
+                </div>
+                {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
+                <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
+              </div>
 
-          {/* Back and Submit buttons for step 3 */}
-          <div className="pt-2 flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              icon={<span>←</span>}
-              onClick={() => setCurrentStep(2)}
-            />
-            <Button
-              type="submit"
-              disabled={loading || resolvingAddr || geoBlocked}
-              className="flex-1"
-              leftIcon={(resolvingAddr || loading) ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-              ) : undefined}
-            >
-              {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
-            </Button>
-          </div>
+              {/* Back and Submit buttons for step 3 */}
+              <div className="pt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  icon={<span>←</span>}
+                  onClick={() => setCurrentStep(2)}
+                />
+                <Button
+                  type="submit"
+                  disabled={loading || resolvingAddr || geoBlocked}
+                  className="flex-1"
+                  leftIcon={(resolvingAddr || loading) ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  ) : undefined}
+                >
+                  {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
+                </Button>
+              </div>
             </>
           )}
         </form>

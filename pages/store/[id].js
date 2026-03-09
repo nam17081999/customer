@@ -56,7 +56,7 @@ export default function StoreDetailPage() {
         const d = haversineKm(pos.coords.latitude, pos.coords.longitude, store.latitude, store.longitude)
         setDistance(d)
       },
-      () => {},
+      () => { },
       { enableHighAccuracy: true, timeout: 8000 }
     )
   }, [store])
