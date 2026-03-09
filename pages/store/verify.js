@@ -226,7 +226,6 @@ export default function VerifyStorePage() {
                 </label>
                 <Button
                   type="button"
-                  size="sm"
                   onClick={() => verifyStores(Array.from(selectedIds))}
                   disabled={selectedIds.size === 0 || submitting}
                 >
@@ -313,7 +312,6 @@ export default function VerifyStorePage() {
                         <div className="mt-3">
                           <Button
                             type="button"
-                            size="sm"
                             onClick={() => verifyStores([store.id])}
                             disabled={submitting}
                           >

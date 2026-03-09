@@ -75,8 +75,8 @@ export default function Navbar() {
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
                                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
-                                        ? 'bg-gray-100 text-gray-900 border-transparent'
-                                        : 'text-gray-400 border-gray-700 hover:bg-gray-900'
+                                    ? 'bg-gray-100 text-gray-900 border-transparent'
+                                    : 'text-gray-400 border-gray-700 hover:bg-gray-900'
                                     }`}
                             >
                                 <Icon className="w-4 h-4" />
@@ -96,8 +96,8 @@ export default function Navbar() {
                             href={href}
                             aria-current={active ? 'page' : undefined}
                             className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active
-                                    ? 'text-blue-400'
-                                    : 'text-gray-500 active:text-gray-200'
+                                ? 'text-blue-400'
+                                : 'text-gray-500 active:text-gray-200'
                                 }`}
                         >
                             <Icon className="w-5 h-5 shrink-0" />

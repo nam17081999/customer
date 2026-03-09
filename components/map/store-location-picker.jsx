@@ -53,7 +53,7 @@ export default function StoreLocationPicker({
               type="button"
               onClick={onGetLocation}
               disabled={resolvingAddr}
-              className="bg-gray-800 border border-gray-600 rounded-lg px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-50"
+              className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-50"
               title="Lấy lại vị trí hiện tại"
             >
               <svg
@@ -147,7 +147,7 @@ export default function StoreLocationPicker({
         {/* Geo blocked overlay */}
         {geoBlocked && (
           <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-xl border border-red-900 bg-gray-900/95 p-5 text-center shadow-lg backdrop-blur-md">
+            <div className="w-full max-w-md rounded-md border border-red-900 bg-gray-900/95 p-5 text-center shadow-lg backdrop-blur-md">
               <div className="text-base font-semibold text-red-500">
                 Không thể lấy vị trí của bạn
               </div>

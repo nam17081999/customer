@@ -56,7 +56,7 @@ export default function StoreDetailPage() {
         const d = haversineKm(pos.coords.latitude, pos.coords.longitude, store.latitude, store.longitude)
         setDistance(d)
       },
-      () => {},
+      () => { },
       { enableHighAccuracy: true, timeout: 8000 }
     )
   }, [store])
@@ -143,14 +143,16 @@ export default function StoreDetailPage() {
               priority
             />
             {/* Back button overlay */}
-            <button
-              type="button"
+            <Button
+              size="icon"
+              variant="imageOverlay"
               onClick={() => router.back()}
-              className="absolute top-3 left-3 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition"
               aria-label="Quay lại"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            </button>
+              className="absolute top-3 left-3"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              }
+            />
             {/* Badges */}
             <div className="absolute top-3 right-3 flex gap-2">
               {isActive && (
@@ -235,32 +237,26 @@ export default function StoreDetailPage() {
             {/* Action buttons */}
             <div className="grid grid-cols-2 gap-3 pt-2">
               {hasCoords && (
-                <Button asChild variant="outline" className="h-12 text-sm">
-                  <a
-                    href={`https://www.google.com/maps?q=${store.latitude},${store.longitude}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2"
-                  >
+                <Button
+                  variant="outline"
+                  leftIcon={
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    Chỉ đường
-                  </a>
+                  }
+                  onClick={() => window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank')}
+                >
+                  Chỉ đường
                 </Button>
               )}
-              <Button variant="outline" className="h-12 text-sm" onClick={handleShare}>
-                <div className="flex items-center justify-center gap-2">
-                  {copied ? (
-                    <>
-                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                      Đã copy
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                      Chia sẻ
-                    </>
-                  )}
-                </div>
+              <Button
+                variant="outline"
+                leftIcon={copied ? (
+                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                )}
+                onClick={handleShare}
+              >
+                {copied ? 'Đã copy' : 'Chia sẻ'}
               </Button>
             </div>
           </div>

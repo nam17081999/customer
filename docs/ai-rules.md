@@ -89,10 +89,15 @@ await supabase.from('stores')
 ```js
 import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
 import { haversineKm } from '@/helper/distance'
-import { getBestPosition } from '@/helper/geolocation'
+import { getBestPosition, requestCompassHeading } from '@/helper/geolocation'
 
 // Lấy GPS
 const { coords, error } = await getBestPosition({ maxWaitTime: 2000, desiredAccuracy: 15 })
+
+// Yêu cầu lấy hướng la bàn (Compass / Heading):
+// BẮT BUỘC gọi `requestCompassHeading()` bên trong synchronous block của event trigger (onClick, thao tác người dùng) TRƯỚC các hàm `await` để lấy được quyền hệ thống trên iOS/Safari (User Gesture). Không gọi trong `useEffect`.
+// Khi cập nhật state heading để quay bản đồ, nên công thêm 1 số rất nhỏ (vd: +0.000001) nếu state cũ trùng lặp để ép React trigger re-render:
+//   setHeading((prev) => prev === h ? h + 0.000001 : h)
 ```
 - Validate lat ∈ [-90,90], lng ∈ [-180,180]
 - Không hardcode tên huyện/xã
