@@ -152,11 +152,11 @@ export default function AccountPage() {
                 </div>
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="destructive"
                   size="sm"
                   onClick={handleSignOut}
                   disabled={signingOut}
-                  className="shrink-0 text-red-400 border-red-900/50 hover:bg-red-950/30 hover:border-red-900"
+                  className="shrink-0"
                 >
                   {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
                 </Button>
@@ -172,6 +172,7 @@ export default function AccountPage() {
                 <Button type="button" variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
                   {loading ? 'Đang tải...' : 'Làm mới'}
                 </Button>
+
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -227,10 +228,10 @@ export default function AccountPage() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm">
+                <Button asChild>
                   <Link href="/store/verify">Đi đến màn xác thực</Link>
                 </Button>
-                <Button asChild size="sm" variant="outline">
+                <Button asChild variant="outline">
                   <Link href="/store/create">Thêm cửa hàng mới</Link>
                 </Button>
               </div>

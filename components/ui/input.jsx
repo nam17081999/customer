@@ -8,7 +8,7 @@ const Input = React.forwardRef(({ className, type = 'text', value, onChange, ...
       <input
         type={type}
         className={cn(
-          "flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-base ring-offset-background placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-gray-100",
+          "flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-base placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 text-gray-100",
           showClear ? 'pr-9' : '',
           className
         )}

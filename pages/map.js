@@ -570,8 +570,7 @@ export default function MapPage() {
 
         <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
           <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
-            <div className="rounded-xl bg-slate-900/80 p-1.5 shadow-lg ring-1 ring-white/15 backdrop-blur-md">
-              <div className="grid grid-cols-[1fr_auto] items-center gap-1.5">
+              <div className="grid grid-cols-[1fr_auto] items-center">
                 <Input
                   ref={inputRef}
                   placeholder="Tìm cửa hàng..."
@@ -603,14 +602,6 @@ export default function MapPage() {
                   }}
                   className="h-11 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-base text-slate-100 placeholder:text-slate-400"
                 />
-                <Button
-                  onClick={handleSearch}
-                  className="h-11 rounded-lg bg-sky-500 px-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:px-4"
-                  disabled={loading || Boolean(error)}
-                >
-                  Tìm
-                </Button>
-              </div>
             </div>
 
             {/* Suggestions dropdown */}

@@ -72,7 +72,7 @@ export default function LoginPage() {
             {error && (
               <p className="text-sm text-red-600 dark:text-red-400 text-center">{error}</p>
             )}
-            <Button type="submit" className="w-full h-11" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </Button>
           </form>

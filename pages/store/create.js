@@ -497,14 +497,14 @@ export default function AddStore() {
           <Button
             type="button"
             variant="outline"
-            className="flex-1 h-10 text-sm sm:text-base border-gray-700 text-gray-200 hover:bg-gray-800"
+            className="flex-1"
             onClick={() => resetCreateForm()}
           >
             Quay lại
           </Button>
           <Button
             type="button"
-            className="flex-1 h-10 text-sm sm:text-base"
+            className="flex-1"
             onClick={() => {
               setAllowDuplicate(true)
               setCurrentStep(2)
@@ -755,7 +755,7 @@ export default function AddStore() {
           <p className="text-sm text-gray-400">Cửa hàng đã được lưu vào hệ thống.</p>
           <div className="flex flex-col gap-3 pt-2">
             <Button
-              className="w-full h-12 text-base"
+              className="w-full"
               onClick={() => {
                 setShowSuccess(false)
                 resetCreateForm()
@@ -765,14 +765,14 @@ export default function AddStore() {
             </Button>
             <Button
               variant="outline"
-              className="w-full h-12 text-base"
+              className="w-full"
               onClick={() => router.push('/map')}
             >
               Xem bản đồ
             </Button>
             <Button
               variant="ghost"
-              className="w-full h-10 text-sm text-gray-400"
+              className="w-full"
               onClick={() => router.push('/')}
             >
               Về trang chủ
@@ -859,7 +859,7 @@ export default function AddStore() {
                       }
                       if (nameValid || allowDuplicate) setCurrentStep(2)
                     }}
-                    className="w-full text-sm sm:text-base"
+                    className="w-full"
                   >
                     Tiếp theo
                   </Button>
@@ -1007,15 +1007,14 @@ export default function AddStore() {
                 <Button
                   type="button"
                   variant="outline"
+                  size="icon"
+                  icon={<span>←</span>}
                   onClick={() => setCurrentStep(1)}
-                  className="h-11 px-4 text-sm"
-                >
-                  ←
-                </Button>
+                />
                 <Button
                   type="button"
+                  className="flex-1"
                   onClick={() => validateStep2AndGoNext()}
-                  className="flex-1 h-11 text-sm sm:text-base"
                 >
                   Tiếp theo →
                 </Button>
@@ -1078,13 +1077,14 @@ export default function AddStore() {
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 disabled={mapsLinkLoading || !mapsLink.trim()}
+                leftIcon={mapsLinkLoading ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                ) : undefined}
                 onClick={() => handleMapsLink(mapsLink)}
-                className="shrink-0 px-3 text-sm whitespace-nowrap"
+                className="shrink-0"
               >
-                {mapsLinkLoading ? (
-                  <svg className="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                ) : null}
                 {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
               </Button>
             </div>
@@ -1097,22 +1097,19 @@ export default function AddStore() {
             <Button
               type="button"
               variant="outline"
+              size="icon"
+              icon={<span>←</span>}
               onClick={() => setCurrentStep(2)}
-              className="h-11 px-4 text-sm"
-            >
-              ←
-            </Button>
+            />
             <Button
               type="submit"
               disabled={loading || resolvingAddr || geoBlocked}
-              className="flex-1 h-11 text-sm sm:text-base"
+              className="flex-1"
+              leftIcon={(resolvingAddr || loading) ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              ) : undefined}
             >
-              {resolvingAddr ? (
-                <span className="flex items-center gap-2">
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                  Đang lấy vị trí...
-                </span>
-              ) : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
+              {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
             </Button>
           </div>
             </>

@@ -266,14 +266,16 @@ export default function EditStore() {
     <div className="min-h-screen bg-black">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-black/95 backdrop-blur border-b border-gray-800 px-4 py-3 flex items-center gap-3">
-        <button
+        <Button
+          size="icon"
+          variant="ghost"
           onClick={() => router.back()}
-          className="p-2 rounded-full hover:bg-gray-800 transition"
-        >
-          <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+          icon={
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          }
+        />
         <div>
           <h1 className="text-base font-semibold text-white leading-tight">Sửa cửa hàng</h1>
           <p className="text-xs text-gray-400 truncate max-w-[200px]">{store.name}</p>
@@ -443,15 +445,15 @@ export default function EditStore() {
                 variant="outline"
                 size="sm"
                 disabled={mapsLinkLoading || !mapsLink.trim()}
-                className="h-10 rounded-xl px-3 text-sm whitespace-nowrap"
-                onClick={() => handleMapsLink(mapsLink)}
-              >
-                {mapsLinkLoading ? (
+                leftIcon={mapsLinkLoading ? (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                   </svg>
-                ) : 'Lấy tọa độ'}
+                ) : undefined}
+                onClick={() => handleMapsLink(mapsLink)}
+              >
+                {mapsLinkLoading ? 'Đang lấy...' : 'Lấy tọa độ'}
               </Button>
             </div>
             {mapsLinkError && <p className="text-xs text-red-500 mt-1">{mapsLinkError}</p>}
@@ -485,18 +487,17 @@ export default function EditStore() {
         <div className="pt-2 pb-8">
           <Button
             type="submit"
+            variant="primary"
             disabled={saving}
-            className="w-full h-12 rounded-2xl text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full"
+            leftIcon={saving ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+            ) : undefined}
           >
-            {saving ? (
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                </svg>
-                Đang lưu…
-              </div>
-            ) : 'Lưu thay đổi'}
+            {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
           </Button>
         </div>
       </form>

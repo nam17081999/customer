@@ -295,7 +295,7 @@ export default function HomePage() {
               </div>
               <p className="text-gray-300 font-medium mb-1">Không tìm thấy cửa hàng</p>
               <p className="text-sm text-gray-500 mb-4">Thử tìm với từ khác hoặc bớt bộ lọc</p>
-              <Button asChild size="sm">
+              <Button asChild>
                 <Link href="/store/create">
                   + Tạo cửa hàng mới
                 </Link>

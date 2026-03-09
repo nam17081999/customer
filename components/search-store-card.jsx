@@ -42,7 +42,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
     ranges.forEach(([s, e], i) => {
       if (s > lastEnd) parts.push(text.slice(lastEnd, s))
       parts.push(
-        <mark key={`hl-${i}`} className="bg-yellow-200 dark:bg-yellow-700 rounded px-0.5">
+        <mark key={`hl-${i}`} className="bg-yellow-200 dark:bg-yellow-700 -md px-0.5">
           {text.slice(s, e)}
         </mark>
       )
@@ -55,11 +55,11 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
   // ── Compact horizontal layout ──
   if (compact) {
     const compactCard = (
-        <Card className="overflow-hidden rounded-xl bg-gray-950 hover:shadow-md transition duration-200 border border-gray-800 cursor-pointer">
+        <Card className="overflow-hidden rounded-md bg-gray-950 hover:shadow-md transition duration-200 border border-gray-800 cursor-pointer">
           <CardContent className="p-0">
             <div className="flex gap-3 p-3">
               {/* Thumbnail */}
-              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+              <div className="relative w-20 h-20 rounded-md overflow-hidden bg-gray-800 flex-shrink-0">
                 <Image
                   src={imageSrc}
                   alt={store.name || 'store image'}
@@ -102,14 +102,15 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
               {/* Map button */}
               {store.latitude && store.longitude && (
                 <div className="flex-shrink-0 flex items-center">
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-blue-900/30 transition"
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    icon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    }
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
                     aria-label="Mở bản đồ"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  </button>
+                  />
                 </div>
               )}
             </div>
@@ -121,7 +122,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
 
   // ── Full (original) layout ──
   const fullCard = (
-      <Card className="overflow-hidden rounded-xl bg-gray-950 hover:shadow-lg transition duration-200 border border-gray-800 cursor-pointer">
+      <Card className="overflow-hidden rounded-md bg-gray-950 hover:shadow-lg transition duration-200 border border-gray-800 cursor-pointer">
         <CardContent className="p-0">
             {/* Image Top */}
             <div className="relative w-full h-56 sm:h-64 bg-gray-800">
@@ -136,13 +137,13 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
               {/* Top badges (verified & distance) */}
               <div className="absolute top-2 left-2 flex flex-wrap gap-2">
                 {store.active && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-900/40 text-green-300 backdrop-blur">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-green-900/40 text-green-300 backdrop-blur">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     Đã xác thực
                   </span>
                 )}
                 {distance !== null && distance !== undefined && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-900 text-gray-200 shadow">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-900 text-gray-200 shadow">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                     {formatDistance(distance)}
                   </span>
@@ -187,12 +188,13 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
               <div className="flex gap-3 pt-2">
                 {store.latitude && store.longitude && (
                   <Button
-                    size="sm"
                     variant="outline"
-                    className="flex-1 inline-flex items-center justify-center gap-2 text-sm"
+                    className="flex-1"
+                    leftIcon={
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    }
                     onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 616 0z" /></svg>
                     Bản đồ
                   </Button>
                 )}
