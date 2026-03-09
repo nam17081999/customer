@@ -52,63 +52,70 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
     return parts
   }
 
-  // ── Compact horizontal layout ──
+  // ── Compact horizontal layout - LON HON, DE DOC HON ──
   if (compact) {
     const compactCard = (
-        <Card className="overflow-hidden rounded-xl bg-gray-950 hover:shadow-md transition duration-200 border border-gray-800 cursor-pointer">
+        <Card className="overflow-hidden rounded-2xl bg-gray-900 hover:bg-gray-800 transition duration-200 border-2 border-gray-700 cursor-pointer">
           <CardContent className="p-0">
-            <div className="flex gap-3 p-3">
-              {/* Thumbnail */}
-              <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-gray-800 flex-shrink-0">
+            <div className="flex gap-4 p-4">
+              {/* Thumbnail - LON HON */}
+              <div className="relative w-24 h-24 rounded-xl overflow-hidden bg-gray-800 flex-shrink-0">
                 <Image
                   src={imageSrc}
-                  alt={store.name || 'store image'}
+                  alt={store.name || 'hinh khach hang'}
                   fill
                   className="object-cover"
-                  sizes="80px"
+                  sizes="96px"
                   onError={handleImageError}
                 />
+                {/* Badge da xac thuc - LON HON */}
                 {store.active && (
-                  <div className="absolute top-1 left-1">
-                    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-500 text-white">
-                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  <div className="absolute top-1.5 left-1.5">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white shadow-lg">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     </span>
                   </div>
                 )}
               </div>
-              {/* Info */}
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-                <h3 className="font-semibold text-gray-100 text-base leading-snug line-clamp-1">
+              
+              {/* Info - FONT LON HON */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                <h3 className="font-bold text-white text-lg leading-snug line-clamp-1">
                   {renderHighlightedName(store.name, searchTerm)}
                 </h3>
-                <p className="text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
+                <p className="text-base text-gray-300 line-clamp-2 leading-snug">{addressText}</p>
+                
+                {/* Khoang cach - NOI BAT */}
                 {distance !== null && distance !== undefined && (
-                  <span className="inline-flex items-center gap-0.5 text-base text-gray-400">
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="inline-flex items-center gap-1.5 text-base font-semibold text-blue-400">
+                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                     {formatDistance(distance)}
                   </span>
                 )}
+                
+                {/* Dien thoai - NOI BAT HON */}
                 {store.phone && (
                   <a
                     href={`tel:${store.phone.replace(/\s+/g,'')}`}
-                    className="inline-flex items-center gap-0.5 text-base text-blue-400 hover:underline truncate"
+                    className="inline-flex items-center gap-1.5 text-lg font-semibold text-green-400 hover:underline"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
-                    <span className="truncate">{store.phone}</span>
+                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
+                    <span>{store.phone}</span>
                   </a>
                 )}
               </div>
-              {/* Map button */}
+              
+              {/* Nut ban do - LON HON, DE NHAN */}
               {store.latitude && store.longitude && (
                 <div className="flex-shrink-0 flex items-center">
                   <button
                     type="button"
-                    className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-blue-400 hover:bg-blue-900/30 transition"
+                    className="w-14 h-14 rounded-xl bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white shadow-lg transition-all"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
-                    aria-label="Mở bản đồ"
+                    aria-label="Mo ban do Google"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   </button>
                 </div>
               )}
