@@ -17,7 +17,7 @@
 ## Tên Hệ Thống
 
 - **App name**: StoreVis
-- **Database table**: `stores`
+- **Database table**: `stores`, `store_reports`
 - **IDB cache name**: `storevis_cache`
 
 ---
@@ -28,6 +28,7 @@
 ```
 Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 → Click card → xem chi tiết (modal)
+→ Báo cáo cửa hàng (từ modal)
 → Xem bản đồ (/map)
 → Thêm cửa hàng (/store/create) → chờ duyệt
 ```
@@ -36,6 +37,7 @@ Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 ```
 Đăng nhập (/login)
 → Dashboard (/account) → Duyệt stores (/store/verify)
+→ Duyệt báo cáo cửa hàng (/store/reports)
 → Sửa store (/store/edit/[id])
 → Thêm store → active ngay
 ```
@@ -51,8 +53,10 @@ Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 | `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
 | `helper/geolocation.js` | Lấy GPS, compass |
 | `pages/store/create.js` | Form tạo cửa hàng 3 bước |
+| `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
 | `pages/map.js` | Bản đồ MapLibre, custom markers |
 | `pages/index.js` | Tìm kiếm local với scoring |
+| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo cửa hàng |
 
 ---
 

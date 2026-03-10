@@ -2,7 +2,7 @@
 
 ## Supabase (PostgreSQL)
 
-### Bảng `stores` — Bảng duy nhất
+### Bảng `stores` — Bảng chính
 
 | Cột | Kiểu | Nullable | Mô tả |
 |---|---|---|---|
@@ -27,6 +27,25 @@
 
 ---
 
+### Bảng `store_reports` — Báo cáo người dùng
+
+| Cột | Kiểu | Nullable | Mô tả |
+|---|---|---|---|
+| `id` | uuid | NOT NULL | Primary key |
+| `store_id` | uuid/bigint | NOT NULL | FK → `stores.id` |
+| `report_type` | text | NOT NULL | `edit` hoặc `reason_only` |
+| `reason_codes` | text[] | NULL | Lý do báo cáo (multi-select) |
+| `reason_note` | text | NULL | Ghi chú thêm (tuỳ chọn) |
+| `proposed_changes` | jsonb | NULL | Dữ liệu đề xuất (khi `report_type = edit`) |
+| `status` | text | NOT NULL | `pending` / `approved` / `rejected` |
+| `reporter_id` | uuid | NULL | FK → `auth.users.id` |
+| `created_at` | timestamptz | NOT NULL | Timestamp tạo |
+| `updated_at` | timestamptz | NOT NULL | Timestamp cập nhật |
+
+> **Lưu ý**: kiểu của `store_id` phải **khớp** với kiểu `stores.id`.
+
+---
+
 ## Auth (Supabase built-in)
 
 - Dùng `auth.users` của Supabase, không có bảng user custom
@@ -41,6 +60,8 @@ Hiện tại chưa có index tùy chỉnh. Khi data lớn cần:
 CREATE INDEX idx_stores_active ON stores(active) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_district ON stores(district) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_deleted_at ON stores(deleted_at);
+CREATE INDEX idx_store_reports_status ON store_reports(status);
+CREATE INDEX idx_store_reports_store_id ON store_reports(store_id);
 ```
 
 ---
@@ -51,6 +72,10 @@ Cần kiểm tra Supabase Row Level Security:
 - **Anonymous**: chỉ SELECT (`deleted_at IS NULL`) và INSERT (với `active = false`)
 - **Authenticated (admin)**: full CRUD
 - Nếu chưa bật RLS → user có thể UPDATE `active=true` trực tiếp qua API
+
+RLS cho `store_reports`:
+- **Anonymous + Authenticated**: chỉ **INSERT** báo cáo
+- **Authenticated (admin)**: SELECT + UPDATE trạng thái
 
 ---
 

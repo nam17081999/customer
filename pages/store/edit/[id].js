@@ -214,6 +214,10 @@ export default function EditStore() {
   async function handleSave(e) {
     e.preventDefault()
     if (!name.trim()) { showMessage('error', 'Tên cửa hàng không được để trống'); return }
+    if (!district.trim() || !ward.trim()) {
+      showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+      return
+    }
 
     setSaving(true)
     try {

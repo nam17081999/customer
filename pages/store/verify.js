@@ -24,6 +24,7 @@ export default function VerifyStorePage() {
   const [districtFilter, setDistrictFilter] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [pendingReportCount, setPendingReportCount] = useState(0)
   const selectAllRef = useRef(null)
 
   useEffect(() => {
@@ -52,10 +53,24 @@ export default function VerifyStorePage() {
     setLoading(false)
   }, [])
 
+  const loadPendingReportCount = useCallback(async () => {
+    try {
+      const { count, error: countError } = await supabase
+        .from('store_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      if (countError) throw countError
+      setPendingReportCount(typeof count === 'number' ? count : 0)
+    } catch {
+      setPendingReportCount(0)
+    }
+  }, [])
+
   useEffect(() => {
     if (!pageReady) return
     loadUnverifiedStores()
-  }, [pageReady, loadUnverifiedStores])
+    loadPendingReportCount()
+  }, [pageReady, loadUnverifiedStores, loadPendingReportCount])
 
   const districtOptions = useMemo(() => {
     return Array.from(
@@ -187,7 +202,6 @@ export default function VerifyStorePage() {
                   {loading ? 'Đang tải...' : 'Làm mới'}
                 </Button>
               </div>
-
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl bg-amber-950/30 border border-amber-900 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-amber-300">Chờ xác thực</p>

@@ -69,12 +69,14 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 - Sticky top: `bg-black/60 backdrop-blur-md`
 - Link pill active: `bg-gray-50 text-gray-900 border-transparent`
 - Link pill inactive: `text-gray-400 border-gray-700 hover:bg-gray-800`
+- Admin nav: hiển thị **badge số lượng** cho mục **Xác thực** và **Báo cáo** (pending).
 
 ### Mobile (< 640px)
 - Fixed bottom tab bar: `bg-gray-950/95 backdrop-blur-md border-t border-gray-800`
 - Icon **w-5 h-5** + label `text-[9px]`
 - Active: `text-blue-400`
 - Create/Edit form: nút hành động chính (Tiếp theo/Lưu) dùng **mobile fixed action bar** nằm ngay **trên** bottom tab bar để luôn hiển thị; nội dung form cần `pb-32` để tránh bị che.
+- Admin tab: hiển thị **badge số lượng** (pending) trong tab **Duyệt** và **Báo cáo**.
 
 ---
 
