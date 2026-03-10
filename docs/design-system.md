@@ -121,6 +121,8 @@ Trang map luôn dark (không theo system preference):
 - Sử dụng prop `dark={false}` cho `StoreLocationPicker` hoặc `LocationPicker`.
 - Bản đồ hiển thị màu sắc nguyên bản (Sáng).
 - Lớp phủ khi khóa bản đồ (Dim overlay) sử dụng màu trắng mờ `rgba(255,255,255,0.55)`.
+- Zoom mặc định: `17`.
+- Màn sửa: bản đồ **mặc định khóa**, có nút **Mở khóa/Khóa** và **Lấy lại vị trí**.
 
 ---
 

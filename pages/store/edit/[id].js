@@ -12,6 +12,7 @@ import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { invalidateStoreCache } from '@/lib/storeCache'
 import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
+import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 
 const StoreLocationPicker = dynamic(
   () => import('@/components/map/store-location-picker'),
@@ -44,6 +45,8 @@ export default function EditStore() {
   const [active, setActive] = useState(false)
   const [pickedLat, setPickedLat] = useState(null)
   const [pickedLng, setPickedLng] = useState(null)
+  const [mapEditable, setMapEditable] = useState(false)
+  const [resolvingAddr, setResolvingAddr] = useState(false)
 
   // Image
   const [imageFile, setImageFile] = useState(null)
@@ -182,6 +185,29 @@ export default function EditStore() {
       setMapsLinkError('Lỗi khi xử lý link')
     } finally {
       setMapsLinkLoading(false)
+    }
+  }
+
+  async function handleGetLocation() {
+    try {
+      setResolvingAddr(true)
+      const { coords, error } = await getBestPosition({
+        maxWaitTime: 2000,
+        desiredAccuracy: 15,
+        skipCache: true,
+      })
+      if (!coords) {
+        showMessage('error', getGeoErrorMessage(error))
+        return
+      }
+      setPickedLat(coords.latitude)
+      setPickedLng(coords.longitude)
+      showMessage('success', 'Đã cập nhật vị trí GPS mới')
+    } catch (err) {
+      console.error('Get location error:', err)
+      showMessage('error', getGeoErrorMessage(err))
+    } finally {
+      setResolvingAddr(false)
     }
   }
 
@@ -469,8 +495,11 @@ export default function EditStore() {
             <StoreLocationPicker
               initialLat={pickedLat}
               initialLng={pickedLng}
-              editable={true}
+              editable={mapEditable}
+              onToggleEditable={() => setMapEditable((v) => !v)}
               onChange={(lat, lng) => { setPickedLat(lat); setPickedLng(lng) }}
+              onGetLocation={handleGetLocation}
+              resolvingAddr={resolvingAddr}
               dark={false}
             />
           </div>

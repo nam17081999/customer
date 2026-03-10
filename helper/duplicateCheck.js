@@ -53,18 +53,6 @@ export const IGNORED_NAME_TERMS = [
   'em',
 ]
 
-/** Quick-pick labels shown on the create-store form. */
-export const NAME_SUGGESTIONS = [
-  'Cửa hàng',
-  'Tạp hoá',
-  'Quán nước',
-  'Karaoke',
-  'Nhà hàng',
-  'Quán',
-  'Cafe',
-  'Siêu thị',
-]
-
 // ── Internal helpers ────────────────────────────────────────────────────
 
 export function normalizeNameForMatch(raw) {

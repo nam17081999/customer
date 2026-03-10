@@ -21,7 +21,6 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
-  NAME_SUGGESTIONS,
   findNearbySimilarStores,
   findGlobalExactNameMatches,
   mergeDuplicateCandidates,
