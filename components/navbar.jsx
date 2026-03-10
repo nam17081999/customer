@@ -1,8 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
+import { getOrRefreshStores } from "@/lib/storeCache";
 
 /* SVG icon helpers ─ rendered at configurable size */
 const SearchIcon = ({ className }) => (
@@ -35,15 +38,24 @@ const AccountIcon = ({ className }) => (
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A9 9 0 1118.88 17.8M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
 )
+const ReportIcon = ({ className }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4h10a2 2 0 012 2v12l-3-2-3 2-3-2-3 2V6a2 2 0 012-2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h8M7 12h5" />
+    </svg>
+)
 
 export default function Navbar() {
     const pathname = usePathname()
     const { user } = useAuth() || {}
+    const [pendingStores, setPendingStores] = useState(0)
+    const [pendingReports, setPendingReports] = useState(0)
     const currentPath = pathname || ''
     const navLinks = user
         ? [
             { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
-            { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon },
+            { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon, badge: pendingStores },
+            { href: '/store/reports', active: currentPath === '/store/reports', label: 'Báo cáo', mobileLabel: 'BC', Icon: ReportIcon, badge: pendingReports },
             { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
             { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
             { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
@@ -54,6 +66,47 @@ export default function Navbar() {
             { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
             { href: '/account', active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: AccountIcon },
         ]
+
+    useEffect(() => {
+        let alive = true
+        async function loadCounts() {
+            if (!user) {
+                setPendingStores(0)
+                setPendingReports(0)
+                return
+            }
+            try {
+                const [stores, reportCountRes] = await Promise.all([
+                    getOrRefreshStores(),
+                    supabase
+                        .from('store_reports')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('status', 'pending'),
+                ])
+                if (!alive) return
+                const pendingStoreCount = (stores || []).filter((store) => store.active !== true).length
+                setPendingStores(pendingStoreCount)
+                setPendingReports(typeof reportCountRes.count === 'number' ? reportCountRes.count : 0)
+            } catch {
+                if (!alive) return
+                setPendingStores(0)
+                setPendingReports(0)
+            }
+        }
+        loadCounts()
+        return () => { alive = false }
+    }, [user])
+
+    const renderBadge = (count, opts = {}) => {
+        if (!count || count <= 0) return null
+        const text = count > 99 ? '99+' : String(count)
+        const isMobile = Boolean(opts.mobile)
+        return (
+            <span className={`absolute rounded-full bg-red-500 text-white leading-none flex items-center justify-center shadow ${isMobile ? 'top-1.5 right-1.5 min-w-3.5 h-3.5 px-0.5 text-[9px]' : '-top-1 -right-1 min-w-4 h-4 px-1 text-[10px]'}`}>
+                {text}
+            </span>
+        )
+    }
 
     const brandHref = '/'
 
@@ -69,18 +122,19 @@ export default function Navbar() {
 
                     {/* Desktop nav links (hidden on mobile) */}
                     <div className="ml-auto hidden sm:flex items-center gap-1.5">
-                        {navLinks.map(({ href, active, label, Icon }) => (
+                        {navLinks.map(({ href, active, label, Icon, badge }) => (
                             <Link
                                 key={href}
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
-                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
+                                className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
                                     ? 'bg-gray-100 text-gray-900 border-transparent'
                                     : 'text-gray-400 border-gray-700 hover:bg-gray-900'
                                     }`}
                             >
                                 <Icon className="w-4 h-4" />
                                 <span>{label}</span>
+                                {renderBadge(badge)}
                             </Link>
                         ))}
                     </div>
@@ -90,12 +144,12 @@ export default function Navbar() {
             {/* ── Bottom tab bar (mobile only) ── */}
             <div className="sm:hidden fixed bottom-0 inset-x-0 z-[60] bg-gray-950/95 backdrop-blur-md border-t border-gray-800 safe-area-bottom">
                 <div className="flex h-14 max-w-screen-md mx-auto w-full">
-                    {navLinks.map(({ href, active, label, mobileLabel, Icon }) => (
+                    {navLinks.map(({ href, active, label, mobileLabel, Icon, badge }) => (
                         <Link
                             key={href}
                             href={href}
                             aria-current={active ? 'page' : undefined}
-                            className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active
+                            className={`relative flex flex-1 min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active
                                 ? 'text-blue-400'
                                 : 'text-gray-500 active:text-gray-200'
                                 }`}
@@ -104,6 +158,7 @@ export default function Navbar() {
                             <span className={`w-full truncate text-center whitespace-nowrap text-[9px] font-medium leading-none ${active ? 'text-blue-400' : 'text-gray-500'}`}>
                                 {mobileLabel || label}
                             </span>
+                            {renderBadge(badge, { mobile: true })}
                         </Link>
                     ))}
                 </div>

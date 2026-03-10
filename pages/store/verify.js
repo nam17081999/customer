@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
@@ -24,6 +25,8 @@ export default function VerifyStorePage() {
   const [districtFilter, setDistrictFilter] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const [pendingReportCount, setPendingReportCount] = useState(0)
+  const [confirmVerify, setConfirmVerify] = useState({ open: false, ids: [] })
   const selectAllRef = useRef(null)
 
   useEffect(() => {
@@ -52,10 +55,24 @@ export default function VerifyStorePage() {
     setLoading(false)
   }, [])
 
+  const loadPendingReportCount = useCallback(async () => {
+    try {
+      const { count, error: countError } = await supabase
+        .from('store_reports')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      if (countError) throw countError
+      setPendingReportCount(typeof count === 'number' ? count : 0)
+    } catch {
+      setPendingReportCount(0)
+    }
+  }, [])
+
   useEffect(() => {
     if (!pageReady) return
     loadUnverifiedStores()
-  }, [pageReady, loadUnverifiedStores])
+    loadPendingReportCount()
+  }, [pageReady, loadUnverifiedStores, loadPendingReportCount])
 
   const districtOptions = useMemo(() => {
     return Array.from(
@@ -123,6 +140,15 @@ export default function VerifyStorePage() {
     })
   }
 
+  const openVerifyConfirm = (ids) => {
+    if (!ids || ids.length === 0) return
+    setConfirmVerify({ open: true, ids })
+  }
+
+  const closeVerifyConfirm = () => {
+    setConfirmVerify({ open: false, ids: [] })
+  }
+
   const verifyStores = async (ids) => {
     if (!ids || ids.length === 0) return
     setSubmitting(true)
@@ -187,7 +213,6 @@ export default function VerifyStorePage() {
                   {loading ? 'Đang tải...' : 'Làm mới'}
                 </Button>
               </div>
-
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl bg-amber-950/30 border border-amber-900 p-3">
                   <p className="text-[11px] uppercase tracking-wide text-amber-300">Chờ xác thực</p>
@@ -237,7 +262,7 @@ export default function VerifyStorePage() {
                 </label>
                 <Button
                   type="button"
-                  onClick={() => verifyStores(Array.from(selectedIds))}
+                  onClick={() => openVerifyConfirm(Array.from(selectedIds))}
                   disabled={selectedIds.size === 0 || submitting}
                 >
                   {submitting ? 'Đang xác thực...' : `Xác thực đã chọn (${selectedIds.size})`}
@@ -323,7 +348,7 @@ export default function VerifyStorePage() {
                         <div className="mt-3">
                           <Button
                             type="button"
-                            onClick={() => verifyStores([store.id])}
+                            onClick={() => openVerifyConfirm([store.id])}
                             disabled={submitting}
                           >
                             Xác thực cửa hàng này
@@ -338,6 +363,33 @@ export default function VerifyStorePage() {
           </div>
         </div>
       </div>
+
+      <Dialog open={confirmVerify.open} onOpenChange={(open) => setConfirmVerify((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden">
+          <div className="p-4 space-y-3">
+            <h3 className="text-base font-semibold text-gray-100">Xác nhận xác thực</h3>
+            <p className="text-sm text-gray-400">
+              Bạn chắc chắn muốn xác thực {confirmVerify.ids.length} cửa hàng?
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={closeVerifyConfirm}>
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => {
+                  const ids = confirmVerify.ids
+                  closeVerifyConfirm()
+                  verifyStores(ids)
+                }}
+              >
+                Xác thực
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

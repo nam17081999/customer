@@ -39,6 +39,38 @@
 
 ---
 
+## 2b. Chỉnh sửa & Báo cáo (Edit/Report)
+
+### Chỉnh sửa (Admin)
+- **Bắt buộc**: Quận/Huyện + Xã/Phường khi **chỉnh sửa**.
+- Lưu xong: `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
+
+### Báo cáo (User) — trong `StoreDetailModal`
+User có 2 lựa chọn:
+
+1) **Sửa thông tin** (gửi đề xuất chỉnh sửa)
+   - **Bắt buộc**: Quận/Huyện + Xã/Phường.
+   - Các trường gửi: `name`, `address_detail`, `ward`, `district`, `phone`, `note`, `latitude`, `longitude`.
+   - Chuẩn hóa `toTitleCaseVI()` cho tên + địa chỉ.
+   - Nếu **không có thay đổi** → không cho gửi.
+
+2) **Chỉ báo cáo** (không sửa)
+   - Chọn **một hoặc nhiều lý do**:
+     - Sai địa chỉ
+     - Sai vị trí
+     - Sai số điện thoại
+     - Ảnh không đúng
+   - **Không** yêu cầu ảnh minh chứng.
+
+**Trạng thái báo cáo**: `pending` → `approved` hoặc `rejected`.
+
+### Admin duyệt báo cáo
+- **Báo cáo sửa**: cập nhật `stores` theo `proposed_changes`, sau đó `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
+- **Báo cáo lý do**: chỉ đánh dấu đã xử lý (`approved`), **không** sửa dữ liệu.
+- Nút **Chỉ đường** ở màn admin **chỉ hiện** khi **có thay đổi tọa độ** (lat/lng).
+
+---
+
 ## 3. Tìm Kiếm — Client-side
 
 **Thuật toán scoring** (filter trên `allStores` đã cache):

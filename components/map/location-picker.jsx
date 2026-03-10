@@ -52,7 +52,7 @@ export default function LocationPicker({
         ]
       },
       center: centerRef.current,
-      zoom: 18,
+      zoom: 17,
       minZoom: 3,
       maxZoom: 20,
       attributionControl: true

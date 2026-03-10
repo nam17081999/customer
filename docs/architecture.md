@@ -40,7 +40,7 @@ customer/
 │   └── store/
 │       ├── create.js       # Form tạo store 3 bước
 │       ├── verify.js       # Duyệt store chờ xác thực
-│       ├── [id].js         # Chi tiết store
+│       ├── reports.js      # Duyệt báo cáo cửa hàng
 │       └── edit/[id].js    # Chỉnh sửa store
 ├── pages/api/
 │   ├── upload-image.js     # POST/DELETE ảnh → ImageKit
@@ -103,7 +103,7 @@ customer/
 | `/map` | Bản đồ MapLibre | Public |
 | `/store/create` | Tạo cửa hàng (3 bước) | Public |
 | `/store/verify` | Duyệt cửa hàng chờ | Admin |
-| `/store/[id]` | Chi tiết | Public |
+| `/store/reports` | Duyệt báo cáo cửa hàng | Admin |
 | `/store/edit/[id]` | Chỉnh sửa | Admin |
 | `/account` | Dashboard | Admin |
 | `/login` | Đăng nhập | Public |
