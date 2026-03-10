@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
@@ -46,6 +47,7 @@ export default function StoreReportsPage() {
   const [message, setMessage] = useState('')
   const [actionLoading, setActionLoading] = useState({})
   const [pendingStoreCount, setPendingStoreCount] = useState(0)
+  const [confirmAction, setConfirmAction] = useState({ open: false, type: '', report: null })
 
   useEffect(() => {
     if (authLoading) return
@@ -175,6 +177,22 @@ export default function StoreReportsPage() {
     }
 
     setActionLoading((prev) => ({ ...prev, [reportId]: false }))
+  }
+
+  const openConfirmAction = (type, report) => {
+    setConfirmAction({ open: true, type, report })
+  }
+
+  const closeConfirmAction = () => {
+    setConfirmAction({ open: false, type: '', report: null })
+  }
+
+  const getReportSummary = (report) => {
+    const proposed = report?.proposed_changes || {}
+    const keys = Object.keys(proposed)
+    const hasLocation = keys.includes('latitude') || keys.includes('longitude')
+    const fieldCount = keys.filter((key) => !['latitude', 'longitude'].includes(key)).length + (hasLocation ? 1 : 0)
+    return { hasLocation, fieldCount, proposed }
   }
 
   const pendingCount = reports.length
@@ -335,18 +353,18 @@ export default function StoreReportsPage() {
                           type="button"
                           className="w-full"
                           disabled={isLoading}
-                          onClick={() => handleApproveEdit(report)}
+                          onClick={() => openConfirmAction('edit', report)}
                         >
-                          Duyệt & cập nhật
+                          Cập nhật
                         </Button>
                       ) : (
                         <Button
                           type="button"
                           className="w-full"
                           disabled={isLoading}
-                          onClick={() => handleApproveReason(reportId)}
+                          onClick={() => openConfirmAction('reason', report)}
                         >
-                          Đánh dấu đã xử lý
+                          Đã xử lý
                         </Button>
                       )}
                     </div>
@@ -357,6 +375,60 @@ export default function StoreReportsPage() {
           </div>
         </div>
       </div>
+      <Dialog open={confirmAction.open} onOpenChange={(open) => setConfirmAction((prev) => ({ ...prev, open }))}>
+        <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden">
+          <div className="p-4 space-y-3">
+            <h3 className="text-base font-semibold text-gray-100">Xác nhận duyệt</h3>
+            <p className="text-sm text-gray-400">
+              {confirmAction.type === 'edit'
+                ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
+                : 'Đánh dấu báo cáo này là đã xử lý?'}
+            </p>
+            {confirmAction.report && (
+              <div className="rounded-lg border border-gray-800 bg-gray-950 p-3 space-y-1">
+                <p className="text-sm text-gray-200">
+                  Cửa hàng: {confirmAction.report.store?.name || 'Không rõ'}
+                </p>
+                {confirmAction.type === 'edit' && (() => {
+                  const summary = getReportSummary(confirmAction.report)
+                  const proposed = summary.proposed || {}
+                  const nextLat = proposed.latitude ?? confirmAction.report.store?.latitude
+                  const nextLng = proposed.longitude ?? confirmAction.report.store?.longitude
+                  return (
+                    <>
+                      <p className="text-sm text-gray-400">Số thay đổi: {summary.fieldCount}</p>
+                      {summary.hasLocation && (
+                        <p className="text-sm text-gray-400">
+                          Vị trí mới: {formatValue('latitude', nextLat)}, {formatValue('longitude', nextLng)}
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={closeConfirmAction}>
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => {
+                  const report = confirmAction.report
+                  const type = confirmAction.type
+                  closeConfirmAction()
+                  if (!report) return
+                  if (type === 'edit') handleApproveEdit(report)
+                  if (type === 'reason') handleApproveReason(report.id)
+                }}
+              >
+                Xác nhận
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

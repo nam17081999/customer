@@ -102,7 +102,7 @@ export default function Navbar() {
         const text = count > 99 ? '99+' : String(count)
         const isMobile = Boolean(opts.mobile)
         return (
-            <span className={`absolute rounded-full bg-red-500 text-white leading-none flex items-center justify-center shadow ${isMobile ? 'top-1 right-1 min-w-3.5 h-3.5 px-0.5 text-[9px]' : '-top-1 -right-1 min-w-4 h-4 px-1 text-[10px]'}`}>
+            <span className={`absolute rounded-full bg-red-500 text-white leading-none flex items-center justify-center shadow ${isMobile ? 'top-1.5 right-1.5 min-w-3.5 h-3.5 px-0.5 text-[9px]' : '-top-1 -right-1 min-w-4 h-4 px-1 text-[10px]'}`}>
                 {text}
             </span>
         )

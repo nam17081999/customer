@@ -633,6 +633,25 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
                     Tọa độ: {reportLat.toFixed(6)}, {reportLng.toFixed(6)}
                   </p>
                 )}
+                <div className="flex gap-2 sm:hidden">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    disabled={reportResolving}
+                    onClick={handleReportGetLocation}
+                  >
+                    {reportResolving ? 'Đang lấy...' : 'Lấy lại vị trí'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setReportMapEditable((v) => !v)}
+                  >
+                    {reportMapEditable ? 'Khóa bản đồ' : 'Mở khóa'}
+                  </Button>
+                </div>
                 <div className="rounded-2xl overflow-hidden border border-gray-800" style={{ height: '45vh' }}>
                   <StoreLocationPicker
                     initialLat={reportLat}
