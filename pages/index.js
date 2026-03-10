@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -147,17 +147,32 @@ export default function HomePage() {
     if (searchTerm.trim()) {
       const term = searchTerm.trim().toLowerCase()
       const normTerm = removeVietnameseTones(term)
+      const phoneticTerm = normalizeVietnamesePhonetics(term)
       // Split into individual words for word-order-independent matching
       const words = normTerm.split(/\s+/).filter(Boolean)
+      const phoneticWords = phoneticTerm.split(/\s+/).filter(Boolean)
 
       // Score: 2 = exact substring match, 1 = all words present (any order), 0 = any word present
       results = results
         .map((s) => {
           const name = (s.name || '').toLowerCase()
           const normName = removeVietnameseTones(name)
-          if (name.includes(term) || normName.includes(normTerm)) return { ...s, _score: 2 }
-          if (words.length > 1 && words.every((w) => normName.includes(w))) return { ...s, _score: 1 }
-          if (words.some((w) => normName.includes(w))) return { ...s, _score: 0 }
+          const phoneticName = normalizeVietnamesePhonetics(name)
+
+          const hasExactLike = name.includes(term) || normName.includes(normTerm) || phoneticName.includes(phoneticTerm)
+          if (hasExactLike) return { ...s, _score: 2 }
+
+          const allWordsMatch = words.length > 1 && words.every((w, idx) => {
+            const phoneticWord = phoneticWords[idx] || normalizeVietnamesePhonetics(w)
+            return normName.includes(w) || phoneticName.includes(phoneticWord)
+          })
+          if (allWordsMatch) return { ...s, _score: 1 }
+
+          const anyWordMatch = words.some((w, idx) => {
+            const phoneticWord = phoneticWords[idx] || normalizeVietnamesePhonetics(w)
+            return normName.includes(w) || phoneticName.includes(phoneticWord)
+          })
+          if (anyWordMatch) return { ...s, _score: 0 }
           return null
         })
         .filter(Boolean)

@@ -74,6 +74,7 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 - Fixed bottom tab bar: `bg-gray-950/95 backdrop-blur-md border-t border-gray-800`
 - Icon **w-5 h-5** + label `text-[9px]`
 - Active: `text-blue-400`
+- Create/Edit form: nút hành động chính (Tiếp theo/Lưu) dùng **mobile fixed action bar** nằm ngay **trên** bottom tab bar để luôn hiển thị; nội dung form cần `pb-32` để tránh bị che.
 
 ---
 

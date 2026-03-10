@@ -45,6 +45,12 @@ export const IGNORED_NAME_TERMS = [
   'ăn nhanh',
   'quán nước',
   'quán ăn',
+  'chị',
+  'anh',
+  'cô',
+  'chú',
+  'bác',
+  'em',
 ]
 
 /** Quick-pick labels shown on the create-store form. */
