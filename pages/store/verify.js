@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatAddressParts } from '@/lib/utils'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
@@ -68,15 +68,26 @@ export default function VerifyStorePage() {
   }, [stores])
 
   const filteredStores = useMemo(() => {
-    const term = removeVietnameseTones(searchTerm.trim().toLowerCase())
+    const rawTerm = searchTerm.trim().toLowerCase()
+    const term = removeVietnameseTones(rawTerm)
+    const phoneticTerm = normalizeVietnamesePhonetics(rawTerm)
     return stores.filter((store) => {
       if (districtFilter && (store.district || '').trim() !== districtFilter) return false
-      if (!term) return true
+      if (!term && !phoneticTerm) return true
 
-      const name = removeVietnameseTones((store.name || '').toLowerCase())
-      const address = removeVietnameseTones(formatAddressParts(store).toLowerCase())
+      const name = (store.name || '').toLowerCase()
+      const addressRaw = formatAddressParts(store).toLowerCase()
+
+      const normName = removeVietnameseTones(name)
+      const phoneticName = normalizeVietnamesePhonetics(name)
+      const normAddress = removeVietnameseTones(addressRaw)
+      const phoneticAddress = normalizeVietnamesePhonetics(addressRaw)
       const phone = String(store.phone || '').toLowerCase()
-      return name.includes(term) || address.includes(term) || phone.includes(term)
+      return (
+        name.includes(rawTerm) || normName.includes(term) || phoneticName.includes(phoneticTerm) ||
+        addressRaw.includes(rawTerm) || normAddress.includes(term) || phoneticAddress.includes(phoneticTerm) ||
+        phone.includes(rawTerm)
+      )
     })
   }, [stores, districtFilter, searchTerm])
 

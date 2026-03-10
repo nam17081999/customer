@@ -452,6 +452,14 @@ export default function AddStore() {
     }
   }
 
+  function handleStep1Next() {
+    if (!duplicateCheckDone) {
+      runDuplicateCheckByButton()
+      return
+    }
+    if (nameValid || allowDuplicate) setCurrentStep(2)
+  }
+
   function validateStep2AndGoNext() {
     const errs = {}
     if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
@@ -795,6 +803,11 @@ export default function AddStore() {
     { num: 2, label: 'Thông tin' },
     { num: 3, label: 'Vị trí' },
   ]
+  const showMobileActionBar = (
+    (currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0)) ||
+    currentStep === 2 ||
+    currentStep === 3
+  )
 
   return (
     <div className="min-h-screen bg-black">
@@ -825,7 +838,7 @@ export default function AddStore() {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3 pb-32 sm:pb-0">
           {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
@@ -854,16 +867,10 @@ export default function AddStore() {
               </div>
 
               {(allowDuplicate || duplicateCandidates.length === 0) ? (
-                <div className="pt-2">
+                <div className="pt-2 hidden sm:block">
                   <Button
                     type="button"
-                    onClick={() => {
-                      if (!duplicateCheckDone) {
-                        runDuplicateCheckByButton()
-                        return
-                      }
-                      if (nameValid || allowDuplicate) setCurrentStep(2)
-                    }}
+                    onClick={handleStep1Next}
                     className="w-full"
                   >
                     Tiếp theo
@@ -1006,7 +1013,7 @@ export default function AddStore() {
                 <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Bán từ 6:00 - 22:00" className="text-base sm:text-base" />
               </div>
 
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 hidden sm:flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -1096,7 +1103,7 @@ export default function AddStore() {
               </div>
 
               {/* Back and Submit buttons for step 3 */}
-              <div className="pt-2 flex gap-2">
+              <div className="pt-2 hidden sm:flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -1116,6 +1123,67 @@ export default function AddStore() {
                 </Button>
               </div>
             </>
+          )}
+
+          {/* Mobile fixed action bar */}
+          {showMobileActionBar && (
+            <div
+              className="sm:hidden fixed inset-x-0 z-[55] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md"
+              style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
+            >
+              <div className="mx-auto max-w-screen-md px-3 py-2">
+                {currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0) ? (
+                  <Button
+                    type="button"
+                    onClick={handleStep1Next}
+                    className="w-full"
+                  >
+                    Tiếp theo
+                  </Button>
+                ) : null}
+
+                {currentStep === 2 && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      icon={<span>←</span>}
+                      onClick={() => setCurrentStep(1)}
+                    />
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      onClick={() => validateStep2AndGoNext()}
+                    >
+                      Tiếp theo →
+                    </Button>
+                  </div>
+                )}
+
+                {currentStep === 3 && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      icon={<span>←</span>}
+                      onClick={() => setCurrentStep(2)}
+                    />
+                    <Button
+                      type="submit"
+                      disabled={loading || resolvingAddr || geoBlocked}
+                      className="flex-1"
+                      leftIcon={(resolvingAddr || loading) ? (
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      ) : undefined}
+                    >
+                      {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </form>
       </div>

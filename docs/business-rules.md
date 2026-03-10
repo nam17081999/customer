@@ -54,6 +54,15 @@
 
 **Tiếng Việt không dấu**: dùng `removeVietnameseTones()` để chuẩn hóa cả query lẫn tên store.
 
+**Tương đương phát âm**: khi chuẩn hóa search, coi các cặp/cụm phụ âm sau là tương đương để người dùng gõ sai chính tả vẫn tìm ra kết quả:
+- s ↔ x
+- ch ↔ tr
+- ng ↔ ngh
+- d ↔ gi ↔ r
+- l ↔ n (trừ “ng/nh” để tránh đè lên âm ng/nh)
+
+Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm kiếm và màn xác thực admin).
+
 ---
 
 ## 4. Bản Đồ
