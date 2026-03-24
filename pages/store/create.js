@@ -11,6 +11,8 @@ import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
+  STORE_TYPE_OPTIONS,
+  DEFAULT_STORE_TYPE,
 } from '@/lib/constants'
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
@@ -36,6 +38,7 @@ export default function AddStore() {
   const { user } = useAuth() || {}
   const isAdmin = Boolean(user)
   const [name, setName] = useState('')
+  const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
   const nameInputRef = useRef(null)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
@@ -95,6 +98,7 @@ export default function AddStore() {
     if (loading || showSuccess) return false
     return Boolean(
       name.trim() ||
+      storeType !== DEFAULT_STORE_TYPE ||
       addressDetail.trim() ||
       ward.trim() ||
       district.trim() ||
@@ -105,7 +109,7 @@ export default function AddStore() {
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
+  }, [name, storeType, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -301,6 +305,7 @@ export default function AddStore() {
 
   function resetCreateForm() {
     setName('')
+    setStoreType(DEFAULT_STORE_TYPE)
     setAddressDetail('')
     setWard('')
     setDistrict('')
@@ -586,6 +591,7 @@ export default function AddStore() {
 
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
+    const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
 
     // Determine coordinates based on user actions
     // Priority:
@@ -707,6 +713,7 @@ export default function AddStore() {
       const { data: insertedRows, error: insertError } = await supabase.from('stores').insert([
         {
           name: normalizedName,
+          store_type: normalizedStoreType,
           address_detail: normalizedDetail,
           ward: normalizedWard,
           district: normalizedDistrict,
@@ -842,18 +849,34 @@ export default function AddStore() {
           {currentStep === 1 && (
             <>
               <div className="space-y-1.5">
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng</Label>
-                <Input
-                  ref={nameInputRef}
-                  id="name"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
-                  }}
-                  placeholder="VD: Tạp Hóa Minh Anh"
-                  className="text-base sm:text-base"
-                />
+                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Loại và tên cửa hàng</Label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
+                  <select
+                    id="store_type"
+                    value={storeType}
+                    onChange={(e) => setStoreType(e.target.value || DEFAULT_STORE_TYPE)}
+                    aria-label="Loại cửa hàng"
+                    className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+                  >
+                    {STORE_TYPE_OPTIONS.map((type) => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                  <Input
+                    ref={nameInputRef}
+                    id="name"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
+                    }}
+                    placeholder="VD: Minh Anh"
+                    className="h-11 w-full text-base sm:text-base"
+                  />
+                </div>
+                <p className="text-sm text-gray-400">
+                  Loại đã chọn: <span className="font-medium text-gray-200">{STORE_TYPE_OPTIONS.find((o) => o.value === storeType)?.label}</span>
+                </p>
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}

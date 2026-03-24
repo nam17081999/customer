@@ -5,7 +5,7 @@ import { Virtuoso } from 'react-virtuoso'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { SEARCH_DEBOUNCE_MS, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
+import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
@@ -19,6 +19,7 @@ const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.locale
 const ALL_WARDS = Array.from(
   new Set(Object.values(DISTRICT_WARD_SUGGESTIONS).flat())
 ).sort((a, b) => a.localeCompare(b, 'vi'))
+const DEFAULT_NEARBY_LIMIT = 50
 
 export default function HomePage() {
   const router = useRouter()
@@ -131,9 +132,10 @@ export default function HomePage() {
 
   // Local filtering
   const searchResults = useMemo(() => {
-    if (!hasSearchCriteria || !storesLoaded) return []
+    if (!storesLoaded) return []
 
     let results = allStores
+    const hasTextSearch = Boolean(searchTerm.trim())
 
     // District filter
     if (selectedDistrict) {
@@ -144,7 +146,7 @@ export default function HomePage() {
       results = results.filter((s) => s.ward === selectedWard)
     }
     // Text search (supports Vietnamese without tones + any word order)
-    if (searchTerm.trim()) {
+    if (hasTextSearch) {
       const term = searchTerm.trim().toLowerCase()
       const normTerm = removeVietnameseTones(term)
       const phoneticTerm = normalizeVietnamesePhonetics(term)
@@ -185,26 +187,36 @@ export default function HomePage() {
       distance: computeDistance(s, refLoc)
     }))
 
-    // Sort: match score first, then distance (if enabled), then active, then newest
+    // Sort: match score first (if any), then near-to-far, then active, then newest
     results = results.slice().sort((a, b) => {
-      const sa = a._score ?? 2
-      const sb = b._score ?? 2
-      if (sb !== sa) return sb - sa
-      if (a.distance != null && b.distance != null) {
+      if (hasTextSearch) {
+        const sa = a._score ?? 2
+        const sb = b._score ?? 2
+        if (sb !== sa) return sb - sa
+      }
+
+      const aHasDistance = a.distance != null
+      const bHasDistance = b.distance != null
+      if (aHasDistance && bHasDistance && a.distance !== b.distance) {
         return a.distance - b.distance
       }
+      if (aHasDistance !== bHasDistance) return aHasDistance ? -1 : 1
       if (a.active !== b.active) return a.active ? -1 : 1
       const da = a.created_at || ''
       const db = b.created_at || ''
       return db.localeCompare(da)
     })
 
+    if (!hasSearchCriteria) {
+      return results.slice(0, DEFAULT_NEARBY_LIMIT)
+    }
+
     return results
   }, [allStores, storesLoaded, hasSearchCriteria, searchTerm, selectedDistrict, selectedWard, currentLocation, computeDistance])
 
   // Search triggers when name or filters change
   // (no longer needs debounced API call — kept for UX smoothness)
-  const showSkeleton = hasSearchCriteria && (loading || !storesLoaded)
+  const showSkeleton = loading || !storesLoaded
 
   // Auto focus search input on mount — only on desktop (mobile keyboard is annoying)
   useEffect(() => {
@@ -264,7 +276,7 @@ export default function HomePage() {
             </div>
           </div>
           {/* Active filters bar: count + clear button */}
-          {hasSearchCriteria && (
+          {hasSearchCriteria ? (
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-400">
                 Tìm thấy <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng
@@ -278,6 +290,12 @@ export default function HomePage() {
                 Xoá bộ lọc
               </button>
             </div>
+          ) : (
+            !showSkeleton && (
+              <p className="text-sm text-gray-400">
+                Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
+              </p>
+            )
           )}
         </div>
         {/* Search Results */}
@@ -303,7 +321,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {!showSkeleton && hasSearchCriteria && searchResults.length === 0 && (
+          {!showSkeleton && searchResults.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
               <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
                 <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -346,28 +364,6 @@ export default function HomePage() {
             </div>
           )}
 
-          {!hasSearchCriteria && (
-            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
-              <div className="w-20 h-20 rounded-full bg-blue-900/20 flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </div>
-              <p className="text-gray-200 font-medium mb-1">Tìm cửa hàng</p>
-              <p className="text-sm text-gray-500 mb-5">Gõ tên hoặc chọn quận bên trên để bắt đầu</p>
-              {/* Quick district chips */}
-              <div className="flex flex-wrap gap-2 justify-center max-w-xs">
-                {DISTRICTS.slice(0, 6).map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setSelectedDistrict(d)}
-                    className="px-3 py-1.5 rounded-full text-sm font-medium bg-gray-800 border border-gray-700 text-gray-400 hover:border-blue-600 hover:text-blue-400 transition"
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
       </div>

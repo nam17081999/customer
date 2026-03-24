@@ -60,7 +60,7 @@ customer/
 │   ├── AuthContext.js      # React Context: user, signIn, signOut
 │   ├── storeCache.js       # 3-layer cache (memory → IDB → Supabase)
 │   ├── imagekit.js         # SDK ImageKit server-side
-│   ├── constants.js        # Hằng số, danh sách huyện/xã
+│   ├── constants.js        # Hằng số, danh sách huyện/xã, loại cửa hàng
 │   └── utils.js            # toTitleCaseVI, formatAddressParts, cn
 └── helper/
     ├── distance.js         # haversineKm()
@@ -85,6 +85,7 @@ customer/
   3. Supabase (count + max updated_at check)
   ↕
 [Pages: getOrRefreshStores()] → filter + sort client-side
+  - Mặc định trang tìm kiếm: không có tiêu chí thì render 50 cửa hàng gần nhất
 ```
 
 **Sau mutation:**

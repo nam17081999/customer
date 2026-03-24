@@ -44,6 +44,7 @@ await invalidateStoreCache()            // sau EDIT
 ```js
 await supabase.from('stores').insert([{
   name: toTitleCaseVI(name.trim()),   // ← Title Case bắt buộc
+  store_type: selectedStoreType || 'Tạp hóa', // ← mặc định Cửa hàng
   address_detail, ward, district,      // ← cũng Title Case
   active: Boolean(isAdmin),
   note, phone,
@@ -115,6 +116,15 @@ const [near, global] = await Promise.all([
   findGlobalExactNameMatches(name),
 ])
 const dupes = mergeDuplicateCandidates(near, global)
+```
+
+```js
+// Khi chưa nhập tiêu chí tìm kiếm (q rỗng + chưa chọn quận/xã):
+// hiển thị 50 cửa hàng gần nhất, sort khoảng cách tăng dần
+const defaultNearby = stores
+  .slice()
+  .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
+  .slice(0, 50)
 ```
 
 ---
