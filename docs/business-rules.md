@@ -13,6 +13,9 @@
 ## 2. Tạo Cửa Hàng — 3 Bước
 
 ### Bước 1: Tên
+- Chọn **loại cửa hàng** ở trước ô tên (dropdown)
+- Mặc định loại = `Cửa hàng` nếu người dùng không đổi
+- Giá trị loại lấy từ `STORE_TYPE_OPTIONS` trong `lib/constants.js`
 - Bắt buộc nhập tên
 - Tự động convert sang **Title Case VI** (`toTitleCaseVI()`)
 - **Kiểm tra trùng tên** (bắt buộc trước khi sang bước 2):
@@ -34,7 +37,7 @@
 ### Khi Submit
 1. Duplicate check lần cuối bằng tọa độ final
 2. Upload ảnh → `imageFilename`
-3. INSERT Supabase (`active = isAdmin`)
+3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
 4. `appendStoreToCache(newStore)`
 
 ---
@@ -83,6 +86,10 @@ User có 2 lựa chọn:
 | loại | Không có từ nào |
 
 **Sort**: score desc → khoảng cách asc → active first → created_at desc
+
+**Mặc định khi chưa nhập tiêu chí tìm kiếm**:
+- Nếu `q` rỗng và chưa chọn Quận/Xã → hiển thị **50 cửa hàng gần nhất**
+- Vẫn sắp xếp theo khoảng cách **gần → xa**
 
 **Tiếng Việt không dấu**: dùng `removeVietnameseTones()` để chuẩn hóa cả query lẫn tên store.
 

@@ -84,7 +84,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   const iconSize = Math.round(38 * dpr) // circle diameter
   const iconPad = Math.round(2 * dpr)   // space around circle
   const hlPad = highlighted ? Math.round(5 * dpr) : 0 // extra space for highlight ring
-  const gap = Math.round(3 * dpr)       // gap between icon and label
+  const gap = Math.round(1 * dpr)       // gap between icon and label
 
   // ── Label dimensions ──
   const scaledFont = Math.round(fontSize * dpr)
@@ -117,7 +117,8 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
 
   // ── Combined canvas ──
   const totalW = Math.max(iconSize + iconPad * 2 + hlPad * 2, labelW)
-  const totalH = iconSize + iconPad * 2 + hlPad * 2 + gap + labelH
+  const iconBottom = iconSize + hlPad * 2
+  const totalH = iconBottom + gap + labelH
   const canvas = document.createElement('canvas')
   canvas.width = totalW
   canvas.height = totalH
@@ -168,7 +169,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
 
   // Draw label background (centered horizontally)
   const lx = (totalW - labelW) / 2
-  const ly = iconSize + iconPad * 2 + hlPad * 2 + gap
+  const ly = iconBottom + gap
   ctx.beginPath()
   ctx.roundRect(lx, ly, labelW, labelH, radius)
   ctx.fillStyle = 'rgba(15, 23, 42, 0.94)'
