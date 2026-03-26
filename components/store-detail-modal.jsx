@@ -86,6 +86,17 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     }
   }, [resolvedOpen, store?.id])
 
+  const canPrefetchMap = Boolean(
+    resolvedOpen &&
+    typeof store?.latitude === 'number' &&
+    typeof store?.longitude === 'number'
+  )
+
+  useEffect(() => {
+    if (!canPrefetchMap) return
+    router.prefetch('/map')
+  }, [canPrefetchMap, router])
+
   if (!store) return trigger || null
 
   const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
@@ -436,6 +447,21 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
           >
             {copied ? 'Đã copy' : 'Chia sẻ'}
           </Button>
+          {hasCoords && (
+            <Button
+              variant="outline"
+              className="w-full"
+              leftIcon={
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              }
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/map?storeId=${store.id}&lat=${store.latitude}&lng=${store.longitude}`)
+              }}
+            >
+              Bản đồ
+            </Button>
+          )}
           <Button
             variant="outline"
             className="w-full"

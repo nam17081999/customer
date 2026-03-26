@@ -13,14 +13,16 @@
 ## 2. Tạo Cửa Hàng — 3 Bước
 
 ### Bước 1: Tên
-- Chọn **loại cửa hàng** ở trước ô tên (dropdown)
-- Mặc định loại = `Cửa hàng` nếu người dùng không đổi
+- Chọn **loại cửa hàng** ở một khối riêng phía trên ô tên
+- Loại hiển thị dạng nút chọn, mobile hiển thị **2 loại / 1 hàng**
+- Mặc định loại = `Tạp hóa`
 - Giá trị loại lấy từ `STORE_TYPE_OPTIONS` trong `lib/constants.js`
 - Bắt buộc nhập tên
 - Tự động convert sang **Title Case VI** (`toTitleCaseVI()`)
 - **Kiểm tra trùng tên** (bắt buộc trước khi sang bước 2):
   - `findNearbySimilarStores()`: bán kính 100m, ít nhất 1 từ khóa trùng
   - `findGlobalExactNameMatches()`: toàn hệ thống, tất cả từ khóa trùng
+  - `mergeDuplicateCandidates(near, global, lat, lng)`: gộp 2 nguồn và bổ sung khoảng cách cho cả match toàn hệ thống nếu có tọa độ
   - Nếu có → cảnh báo + cần xác nhận "Vẫn tạo" mới tiếp tục
 
 ### Bước 2: Thông Tin
@@ -114,6 +116,10 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - **Filter sidebar**: Quận → Xã; phải chọn xã mới filter stores
 - Highlight marker khi được chọn: ring `#38bdf8`
 - Auto-fix lat/lng nếu bị reversed (swap khi lat nằm ngoài [-90,90])
+- Từ modal chi tiết, nút **Bản đồ** chuyển sang `/map` kèm `storeId + lat/lng`
+- Khi đi theo luồng này, `/map` mở gần đúng vị trí cửa hàng trước rồi highlight marker sau khi tải dữ liệu
+- Không tự mở modal chi tiết trên `/map`
+- Có nút **về vị trí đang đứng** ở góc phải dưới, dùng GPS hiện tại rồi `flyTo()`
 
 ---
 

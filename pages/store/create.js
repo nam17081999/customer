@@ -436,7 +436,7 @@ export default function AddStore() {
         findNearbySimilarStores(checkLat, checkLng, trimmed),
         findGlobalExactNameMatches(trimmed),
       ])
-      const matches = mergeDuplicateCandidates(nearMatches, globalMatches)
+      const matches = mergeDuplicateCandidates(nearMatches, globalMatches, checkLat, checkLng)
       if (seq !== duplicateCheckSeqRef.current) return
       setDuplicateCandidates(matches)
       setAllowDuplicate(false)
@@ -659,7 +659,7 @@ export default function AddStore() {
         return
       }
 
-      const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes)
+      const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
       if (allDupes.length > 0 && !allowDuplicate) {
         setDuplicateCandidates(allDupes)
         showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
@@ -848,10 +848,35 @@ export default function AddStore() {
           {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
-              <div className="space-y-1.5">
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Loại và tên cửa hàng</Label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[10rem_minmax(0,1fr)]">
-                  <select
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="store_type" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Loại cửa hàng</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {STORE_TYPE_OPTIONS.map((type) => {
+                      const selected = storeType === type.value
+                      return (
+                        <button
+                          key={`top-type-${type.value}`}
+                          type="button"
+                          onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
+                          aria-pressed={selected}
+                          className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
+                            selected
+                              ? 'border-blue-500 bg-blue-500/10 text-blue-100'
+                              : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
+                          }`}
+                        >
+                          {type.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    Loại đã chọn: <span className="font-medium text-gray-200">{STORE_TYPE_OPTIONS.find((o) => o.value === storeType)?.label}</span>
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <select hidden
                     id="store_type"
                     value={storeType}
                     onChange={(e) => setStoreType(e.target.value || DEFAULT_STORE_TYPE)}
@@ -862,6 +887,7 @@ export default function AddStore() {
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
                   </select>
+                  <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng</Label>
                   <Input
                     ref={nameInputRef}
                     id="name"
@@ -874,7 +900,27 @@ export default function AddStore() {
                     className="h-11 w-full text-base sm:text-base"
                   />
                 </div>
-                <p className="text-sm text-gray-400">
+                <div hidden className="grid grid-cols-2 gap-2">
+                  {STORE_TYPE_OPTIONS.map((type) => {
+                    const selected = storeType === type.value
+                    return (
+                      <button
+                        key={`quick-type-${type.value}`}
+                        type="button"
+                        onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
+                        aria-pressed={selected}
+                        className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
+                          selected
+                            ? 'border-blue-500 bg-blue-500/10 text-blue-100'
+                            : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
+                        }`}
+                      >
+                        {type.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p hidden className="text-sm text-gray-400">
                   Loại đã chọn: <span className="font-medium text-gray-200">{STORE_TYPE_OPTIONS.find((o) => o.value === storeType)?.label}</span>
                 </p>
                 {fieldErrors.name && (

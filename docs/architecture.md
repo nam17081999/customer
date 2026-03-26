@@ -49,7 +49,7 @@ customer/
 ├── components/
 │   ├── navbar.jsx          # Top nav (desktop) + bottom tab (mobile)
 │   ├── search-store-card.jsx   # Card store trong danh sách tìm kiếm
-│   ├── store-detail-modal.jsx  # Modal chi tiết (controlled + uncontrolled)
+│   ├── store-detail-modal.jsx  # Modal chi tiết + báo cáo + chuyển sang /map
 │   ├── detail-store-card.jsx
 │   ├── image-upload.jsx
 │   ├── error-boundary.jsx
@@ -119,6 +119,17 @@ customer/
 | `/api/upload-image` | DELETE | Xóa ảnh khỏi ImageKit |
 | `/api/imagekit-auth` | GET | Token auth cho client-side |
 | `/api/expand-maps-link` | POST | Mở rộng Google Maps short URL |
+
+---
+
+## Luồng Bản Đồ Công Khai
+
+- Từ `StoreDetailModal`, người dùng có thể bấm nút **Bản đồ**
+- App chuyển sang `/map?storeId=...&lat=...&lng=...`
+- `/map` khởi tạo bản đồ ngay theo `lat/lng` trong query để giảm độ trễ cảm nhận
+- Sau khi danh sách store tải xong, marker tương ứng sẽ được highlight
+- Không tự mở modal chi tiết khi đi theo luồng này
+- Trang `/map` có nút về vị trí GPS hiện tại ở góc phải dưới
 
 ---
 

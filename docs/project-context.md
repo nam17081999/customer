@@ -54,9 +54,9 @@ Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 | `helper/geolocation.js` | Lấy GPS, compass |
 | `pages/store/create.js` | Form tạo cửa hàng 3 bước |
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
-| `pages/map.js` | Bản đồ MapLibre, custom markers |
+| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS |
 | `pages/index.js` | Tìm kiếm local với scoring |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo cửa hàng |
+| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map |
 
 ---
 

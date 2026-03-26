@@ -72,6 +72,12 @@ customer/
 ### Auto-fill Address
 Tự động lấy địa chỉ từ GPS với độ chính xác cao. Có thể bật/tắt trong trang thêm cửa hàng.
 
+### Store Create Flow
+- Bước 1 tách riêng **Loại cửa hàng** và **Tên cửa hàng**
+- Loại mặc định là **Tạp hóa**
+- Toàn bộ loại cửa hàng hiển thị dạng nút chọn, mobile hiển thị **2 loại / 1 hàng**
+- Danh sách cửa hàng trùng từ gần đây đến toàn hệ thống đều có thể hiển thị khoảng cách nếu lấy được tọa độ
+
 ### Google Maps Integration
 Dán link Google Maps (bao gồm cả short links) để tự động:
 - Trích xuất tọa độ
@@ -80,6 +86,12 @@ Dán link Google Maps (bao gồm cả short links) để tự động:
 
 ### Smart Search
 Tìm kiếm theo tên có hoặc không dấu. Ví dụ: "Ha Noi" sẽ tìm thấy "Hà Nội".
+
+### Map Navigation
+- Từ modal chi tiết có nút **Bản đồ** để sang `/map`
+- `/map` nhận `storeId + lat/lng` để mở ngay gần khu vực cửa hàng và highlight marker tương ứng
+- Không tự mở modal chi tiết khi chuyển trang
+- Có nút **về vị trí đang đứng** ở góc phải dưới của bản đồ
 
 
 ## 🔒 Security
