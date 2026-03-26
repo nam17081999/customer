@@ -7,6 +7,7 @@ import { formatAddressParts } from '@/lib/utils'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatDistance } from '@/helper/validation'
 import StoreDetailModal from '@/components/store-detail-modal'
+import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 
 export default function SearchStoreCard({ store, distance, searchTerm, compact }) {
   const [imageError, setImageError] = useState(false)
@@ -78,9 +79,13 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
             </div>
             {/* Info */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-              <h3 className="font-semibold text-gray-100 text-base leading-snug line-clamp-1">
+              <OverflowMarquee
+                className="max-w-full"
+                textClassName="font-semibold text-gray-100 text-base leading-snug"
+                contentKey={`${store.id}:${store.name}:${searchTerm || ''}`}
+              >
                 {renderHighlightedName(store.name, searchTerm)}
-              </h3>
+              </OverflowMarquee>
               <p className="text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
               {distance !== null && distance !== undefined && (
                 <span className="inline-flex items-center gap-0.5 text-base text-gray-400">

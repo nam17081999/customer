@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+@keyframes store-name-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-1 * var(--overflow-distance, 0px)));
+  }
+}
+
+.store-name-marquee {
+  will-change: transform;
+  animation-name: store-name-marquee;
+  animation-duration: var(--overflow-duration, 8s);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;

@@ -6,11 +6,12 @@ import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { invalidateStoreCache } from '@/lib/storeCache'
-import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
+import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 
@@ -37,6 +38,7 @@ export default function EditStore() {
 
   // Form fields
   const [name, setName] = useState('')
+  const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
@@ -98,6 +100,7 @@ export default function EditStore() {
       }
       setStore(data)
       setName(data.name || '')
+      setStoreType(data.store_type || DEFAULT_STORE_TYPE)
       setAddressDetail(data.address_detail || '')
       setWard(data.ward || '')
       setDistrict(data.district || '')
@@ -248,6 +251,7 @@ export default function EditStore() {
 
       const updates = {
         name: toTitleCaseVI(name.trim()),
+        store_type: storeType || DEFAULT_STORE_TYPE,
         address_detail: addressDetail.trim() || null,
         ward: ward.trim() || null,
         district: district.trim() || null,
@@ -308,11 +312,28 @@ export default function EditStore() {
         />
         <div>
           <h1 className="text-base font-semibold text-white leading-tight">Sửa cửa hàng</h1>
-          <p className="text-xs text-gray-400 truncate max-w-[200px]">{store.name}</p>
+          <OverflowMarquee
+            text={store.name}
+            className="max-w-[200px]"
+            textClassName="text-xs text-gray-400"
+          />
         </div>
       </div>
 
       <form onSubmit={handleSave} className="max-w-lg mx-auto px-4 py-6 space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="store_type" className="text-sm font-medium text-gray-300">Loại cửa hàng</Label>
+          <select
+            id="store_type"
+            value={storeType}
+            onChange={(e) => setStoreType(e.target.value || DEFAULT_STORE_TYPE)}
+            className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-base px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {STORE_TYPE_OPTIONS.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+        </div>
         {/* Image */}
         <div>
           <Label className="text-sm font-medium text-gray-300 mb-2 block">Ảnh cửa hàng</Label>
