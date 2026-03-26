@@ -153,13 +153,36 @@ export async function findGlobalExactNameMatches(inputName) {
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
 }
 
+function attachDistance(store, originLat, originLng) {
+  if (
+    originLat == null ||
+    originLng == null ||
+    !isFinite(originLat) ||
+    !isFinite(originLng) ||
+    !isFinite(store?.latitude) ||
+    !isFinite(store?.longitude)
+  ) {
+    return store
+  }
+
+  return {
+    ...store,
+    distance: haversineKm(originLat, originLng, store.latitude, store.longitude),
+  }
+}
+
 /**
  * Merge nearby + global duplicate candidates, de-duplicate by id, sort by distance first.
  */
-export function mergeDuplicateCandidates(nearbyMatches = [], globalMatches = []) {
+export function mergeDuplicateCandidates(
+  nearbyMatches = [],
+  globalMatches = [],
+  originLat = null,
+  originLng = null
+) {
   const byId = new Map()
   globalMatches.forEach((s) => {
-    byId.set(s.id, { ...s, matchScope: 'global' })
+    byId.set(s.id, { ...attachDistance(s, originLat, originLng), matchScope: 'global' })
   })
   nearbyMatches.forEach((s) => {
     const existing = byId.get(s.id)

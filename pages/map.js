@@ -1,11 +1,13 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
+import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -191,6 +193,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
 }
 
 export default function MapPage() {
+  const router = useRouter()
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const maplibreRef = useRef(null)
@@ -210,9 +213,22 @@ export default function MapPage() {
   const [isDesktop, setIsDesktop] = useState(false)
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [selectedWards, setSelectedWards] = useState([])
+  const [locatingUser, setLocatingUser] = useState(false)
+  const [locationError, setLocationError] = useState('')
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+
+  const initialTarget = useMemo(() => {
+    if (!router.isReady) return null
+    const rawLat = Array.isArray(router.query.lat) ? router.query.lat[0] : router.query.lat
+    const rawLng = Array.isArray(router.query.lng) ? router.query.lng[0] : router.query.lng
+    const lat = parseCoordinate(rawLat)
+    const lng = parseCoordinate(rawLng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+    return { lat, lng }
+  }, [router.isReady, router.query.lat, router.query.lng])
 
   // Detect desktop via pointer capability (not screen width)
   useEffect(() => {
@@ -322,8 +338,8 @@ export default function MapPage() {
           },
           layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
         },
-        center: DEFAULT_CENTER,
-        zoom: 13,
+        center: initialTarget ? [initialTarget.lng, initialTarget.lat] : DEFAULT_CENTER,
+        zoom: initialTarget ? 16 : 13,
         minZoom: 3,
         maxZoom: 20,
         attributionControl: true
@@ -421,7 +437,7 @@ export default function MapPage() {
       mapRef.current = null
       setMapReady(false)
     }
-  }, [])
+  }, [initialTarget])
 
   useEffect(() => {
     let active = true
@@ -542,6 +558,51 @@ export default function MapPage() {
     setShowSuggestions(false)
   }, [searchTerm, storesWithCoords, flyToStore])
 
+  const recenterToUserLocation = useCallback(async () => {
+    if (locatingUser) return
+    setLocatingUser(true)
+    setLocationError('')
+
+    try {
+      const { coords, error } = await getBestPosition({
+        maxWaitTime: 2500,
+        desiredAccuracy: 30,
+      })
+
+      if (!coords) {
+        setLocationError(getGeoErrorMessage(error))
+        return
+      }
+
+      const map = mapRef.current
+      if (!map) return
+
+      setSelectedStore(null)
+      map.flyTo({
+        center: [coords.longitude, coords.latitude],
+        zoom: Math.max(map.getZoom(), 16),
+        duration: 900,
+      })
+    } catch (err) {
+      console.error('Recenter to user failed:', err)
+      setLocationError(getGeoErrorMessage(err))
+    } finally {
+      setLocatingUser(false)
+    }
+  }, [locatingUser])
+
+  useEffect(() => {
+    if (!router.isReady) return
+    const rawStoreId = router.query.storeId
+    const storeId = Array.isArray(rawStoreId) ? rawStoreId[0] : rawStoreId
+    if (!storeId || !mapReady) return
+
+    const matched = storesWithCoords.find((store) => String(store.id) === String(storeId))
+    if (!matched) return
+
+    flyToStore(matched)
+  }, [router.isReady, router.query.storeId, storesWithCoords, mapReady, flyToStore])
+
   // Close suggestions on outside click
   useEffect(() => {
     function onPointerDown(e) {
@@ -639,6 +700,35 @@ export default function MapPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute bottom-3 right-3 z-20">
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {locationError && (
+              <div className="max-w-[260px] rounded-lg border border-red-500/30 bg-slate-950/95 px-3 py-2 text-xs text-red-200 shadow-lg">
+                {locationError}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={recenterToUserLocation}
+              disabled={locatingUser}
+              title="Về vị trí đang đứng"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300 disabled:cursor-wait disabled:opacity-70"
+            >
+              {locatingUser ? (
+                <svg className="h-4.5 w-4.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+              ) : (
+                <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
+                  <circle cx="12" cy="12" r="4" strokeWidth="2" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
 

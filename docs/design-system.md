@@ -92,6 +92,7 @@ link:    text-gray-50 underline
 ```
 - Nút **Đăng xuất**: `variant="outline" text-red-400 border-red-900/50` (có viền đỏ mảnh).
 - Nút hành động chính trong form: `h-11` (44px) hoặc `h-12` (48px)
+- Nút FAB GPS trên bản đồ: `h-10 w-10 rounded-full`
 
 ### Input
 - `h-11 rounded-xl border border-gray-700 bg-gray-900 text-gray-100 px-3`
@@ -117,6 +118,12 @@ Trang map luôn dark (không theo system preference):
 - Search button: `bg-sky-500 text-slate-950`
 - Filter district active: `bg-sky-500/20 text-sky-300`
 - Filter ward active: `bg-emerald-500/20 text-emerald-300`
+- Floating GPS button: góc phải dưới, `bg-slate-950/90`, viền `border-slate-600/70`, hover `sky`
+
+### Form Tạo Cửa Hàng — Loại Cửa Hàng
+- Khối `Loại cửa hàng` tách riêng khỏi `Tên cửa hàng`
+- Dùng grid `2 cột` cả trên mobile để hiển thị nhanh toàn bộ loại
+- Trạng thái đang chọn dùng tông xanh biển (`border-blue-500 bg-blue-500/10 text-blue-100`)
 
 ### Bản đồ trong Form (Create/Edit) — Light Theme Exception
 Để đảm bảo độ rõ nét khi người dùng chọn vị trí chính xác:

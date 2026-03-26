@@ -115,7 +115,7 @@ const [near, global] = await Promise.all([
   findNearbySimilarStores(lat, lng, name),
   findGlobalExactNameMatches(name),
 ])
-const dupes = mergeDuplicateCandidates(near, global)
+const dupes = mergeDuplicateCandidates(near, global, lat, lng)
 ```
 
 ```js
