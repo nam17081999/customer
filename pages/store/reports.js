@@ -11,6 +11,14 @@ import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
+const storeTypeLabelMap = {
+  tap_hoa: 'Tạp hóa',
+  quan_an: 'Quán ăn - Quán cơm',
+  quan_nuoc: 'Quán nước',
+  sieu_thi: 'Siêu thị - Mart - Cửa hàng tiện lợi',
+  kho: 'Kho',
+}
+
 const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
   acc[item.code] = item.label
   return acc
@@ -18,6 +26,7 @@ const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
 
 const EDIT_FIELDS = [
   { key: 'name', label: 'Tên' },
+  { key: 'store_type', label: 'Loại cửa hàng' },
   { key: 'address_detail', label: 'Địa chỉ chi tiết' },
   { key: 'ward', label: 'Xã/Phường' },
   { key: 'district', label: 'Quận/Huyện' },
@@ -29,6 +38,7 @@ const EDIT_FIELDS = [
 
 const formatValue = (key, value) => {
   if (value === null || value === undefined || value === '') return '—'
+  if (key === 'store_type') return storeTypeLabelMap[value] || String(value)
   if (key === 'latitude' || key === 'longitude') {
     const num = Number(value)
     if (!Number.isFinite(num)) return '—'
@@ -66,7 +76,7 @@ export default function StoreReportsPage() {
     try {
       const { data, error: fetchError } = await supabase
         .from('store_reports')
-        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
+        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
         .eq('status', 'pending')
         .is('stores.deleted_at', null)
         .order('created_at', { ascending: false })

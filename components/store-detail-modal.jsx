@@ -6,9 +6,10 @@ import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
-import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS } from '@/lib/constants'
+import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { formatDistance } from '@/helper/validation'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
@@ -44,6 +45,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const [detailNotice, setDetailNotice] = useState('')
   const detailNoticeTimerRef = useRef(null)
   const [reportName, setReportName] = useState('')
+  const [reportStoreType, setReportStoreType] = useState(DEFAULT_STORE_TYPE)
   const [reportAddressDetail, setReportAddressDetail] = useState('')
   const [reportWard, setReportWard] = useState('')
   const [reportDistrict, setReportDistrict] = useState('')
@@ -76,6 +78,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     }
     if (resolvedOpen) {
       setReportName(store.name || '')
+      setReportStoreType(store.store_type || DEFAULT_STORE_TYPE)
       setReportAddressDetail(store.address_detail || '')
       setReportWard(store.ward || '')
       setReportDistrict(store.district || '')
@@ -187,6 +190,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const buildProposedChanges = () => {
     const proposed = {}
     const normalizedName = toTitleCaseVI(reportName.trim())
+    const normalizedStoreType = reportStoreType || DEFAULT_STORE_TYPE
     const normalizedDetail = reportAddressDetail.trim() ? toTitleCaseVI(reportAddressDetail.trim()) : null
     const normalizedWard = reportWard.trim() ? toTitleCaseVI(reportWard.trim()) : null
     const normalizedDistrict = reportDistrict.trim() ? toTitleCaseVI(reportDistrict.trim()) : null
@@ -194,6 +198,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     const normalizedNote = reportNote.trim() || null
 
     if (normalizedName && normalizedName !== (store.name || '')) proposed.name = normalizedName
+    if ((store.store_type || DEFAULT_STORE_TYPE) !== normalizedStoreType) proposed.store_type = normalizedStoreType
     if ((store.address_detail || null) !== normalizedDetail) proposed.address_detail = normalizedDetail
     if ((store.ward || null) !== normalizedWard) proposed.ward = normalizedWard
     if ((store.district || null) !== normalizedDistrict) proposed.district = normalizedDistrict
@@ -507,7 +512,10 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
           />
           <div className="min-w-0">
             <p className="text-sm text-gray-400">Báo cáo cửa hàng</p>
-            <p className="text-base font-semibold text-gray-100 truncate">{store.name}</p>
+            <OverflowMarquee
+              text={store.name}
+              textClassName="text-base font-semibold text-gray-100"
+            />
           </div>
           <DialogClose className="ml-auto w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -576,6 +584,17 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
           {reportMode === 'edit' && (
             <>
               <div className="space-y-1.5">
+                <Label htmlFor="report-store-type" className="text-sm text-gray-300">Loại cửa hàng</Label>
+                <select
+                  id="report-store-type"
+                  value={reportStoreType}
+                  onChange={(e) => setReportStoreType(e.target.value || DEFAULT_STORE_TYPE)}
+                  className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {STORE_TYPE_OPTIONS.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
                 <Label htmlFor="report-name" className="text-sm text-gray-300">Tên cửa hàng</Label>
                 <Input
                   id="report-name"
