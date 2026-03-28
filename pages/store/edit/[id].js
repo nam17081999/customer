@@ -11,7 +11,14 @@ import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { invalidateStoreCache } from '@/lib/storeCache'
-import { DISTRICT_WARD_SUGGESTIONS, DISTRICT_SUGGESTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
+import {
+  DISTRICT_WARD_SUGGESTIONS,
+  DISTRICT_SUGGESTIONS,
+  STORE_TYPE_OPTIONS,
+  DEFAULT_STORE_TYPE,
+  STORE_SIZE_OPTIONS,
+  DEFAULT_STORE_SIZE,
+} from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 
@@ -39,6 +46,7 @@ export default function EditStore() {
   // Form fields
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
+  const [storeSize, setStoreSize] = useState(DEFAULT_STORE_SIZE)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
@@ -101,6 +109,7 @@ export default function EditStore() {
       setStore(data)
       setName(data.name || '')
       setStoreType(data.store_type || DEFAULT_STORE_TYPE)
+      setStoreSize(data.store_size || DEFAULT_STORE_SIZE)
       setAddressDetail(data.address_detail || '')
       setWard(data.ward || '')
       setDistrict(data.district || '')
@@ -252,6 +261,7 @@ export default function EditStore() {
       const updates = {
         name: toTitleCaseVI(name.trim()),
         store_type: storeType || DEFAULT_STORE_TYPE,
+        store_size: storeSize || null,
         address_detail: addressDetail.trim() || null,
         ward: ward.trim() || null,
         district: district.trim() || null,
@@ -331,6 +341,20 @@ export default function EditStore() {
           >
             {STORE_TYPE_OPTIONS.map((type) => (
               <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="store_size" className="text-sm font-medium text-gray-300">Độ lớn cửa hàng</Label>
+          <select
+            id="store_size"
+            value={storeSize}
+            onChange={(e) => setStoreSize(e.target.value || DEFAULT_STORE_SIZE)}
+            className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-base px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Chưa chọn</option>
+            {STORE_SIZE_OPTIONS.map((size) => (
+              <option key={size.value} value={size.value}>{size.label}</option>
             ))}
           </select>
         </div>

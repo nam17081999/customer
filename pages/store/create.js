@@ -13,6 +13,8 @@ import {
   DISTRICT_SUGGESTIONS,
   STORE_TYPE_OPTIONS,
   DEFAULT_STORE_TYPE,
+  STORE_SIZE_OPTIONS,
+  DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
@@ -39,6 +41,7 @@ export default function AddStore() {
   const isAdmin = Boolean(user)
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
+  const [storeSize, setStoreSize] = useState(DEFAULT_STORE_SIZE)
   const nameInputRef = useRef(null)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
@@ -99,6 +102,7 @@ export default function AddStore() {
     return Boolean(
       name.trim() ||
       storeType !== DEFAULT_STORE_TYPE ||
+      storeSize !== DEFAULT_STORE_SIZE ||
       addressDetail.trim() ||
       ward.trim() ||
       district.trim() ||
@@ -109,7 +113,7 @@ export default function AddStore() {
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, storeType, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
+  }, [name, storeType, storeSize, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -306,6 +310,7 @@ export default function AddStore() {
   function resetCreateForm() {
     setName('')
     setStoreType(DEFAULT_STORE_TYPE)
+    setStoreSize(DEFAULT_STORE_SIZE)
     setAddressDetail('')
     setWard('')
     setDistrict('')
@@ -592,6 +597,7 @@ export default function AddStore() {
     // Normalize name to Title Case before saving
     const normalizedName = toTitleCaseVI(name.trim())
     const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
+    const normalizedStoreSize = storeSize || null
 
     // Determine coordinates based on user actions
     // Priority:
@@ -710,21 +716,38 @@ export default function AddStore() {
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
 
-      const { data: insertedRows, error: insertError } = await supabase.from('stores').insert([
-        {
-          name: normalizedName,
-          store_type: normalizedStoreType,
-          address_detail: normalizedDetail,
-          ward: normalizedWard,
-          district: normalizedDistrict,
-          active: isAdmin,
-          note,
-          phone,
-          image_url: imageFilename, // nullable when store has no image
-          latitude,
-          longitude,
-        },
-      ]).select()
+      const insertPayload = {
+        name: normalizedName,
+        store_type: normalizedStoreType,
+        store_size: normalizedStoreSize,
+        address_detail: normalizedDetail,
+        ward: normalizedWard,
+        district: normalizedDistrict,
+        active: isAdmin,
+        note,
+        phone,
+        image_url: imageFilename, // nullable when store has no image
+        latitude,
+        longitude,
+      }
+
+      let insertedRows = null
+      let insertError = null
+
+      ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
+
+      // Backward-compatible fallback when DB schema has not added store_size yet.
+      if (insertError && normalizedStoreSize) {
+        const schemaMessage = `${insertError.message || ''} ${insertError.details || ''} ${insertError.hint || ''}`
+        if (/store_size/i.test(schemaMessage) && /(column|schema|find)/i.test(schemaMessage)) {
+          const fallbackPayload = { ...insertPayload }
+          delete fallbackPayload.store_size
+          ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([fallbackPayload]).select())
+          if (!insertError) {
+            showMessage('warning', 'Đã tạo cửa hàng nhưng chưa lưu được độ lớn vì DB chưa có cột store_size.')
+          }
+        }
+      }
 
       if (insertError) {
         console.error(insertError)
@@ -871,9 +894,29 @@ export default function AddStore() {
                       )
                     })}
                   </div>
-                  <p className="text-sm text-gray-400">
-                    Loại đã chọn: <span className="font-medium text-gray-200">{STORE_TYPE_OPTIONS.find((o) => o.value === storeType)?.label}</span>
-                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="store_size" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Độ lớn cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {STORE_SIZE_OPTIONS.map((sizeOption) => {
+                      const selected = storeSize === sizeOption.value
+                      return (
+                        <button
+                          key={`size-${sizeOption.value}`}
+                          type="button"
+                          onClick={() => setStoreSize((prev) => prev === sizeOption.value ? DEFAULT_STORE_SIZE : sizeOption.value)}
+                          aria-pressed={selected}
+                          className={`min-h-11 rounded-md border px-3 py-2 text-center text-sm transition ${
+                            selected
+                              ? 'border-blue-500 bg-blue-500/10 text-blue-100'
+                              : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
+                          }`}
+                        >
+                          {sizeOption.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <select hidden
