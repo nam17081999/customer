@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
-import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
+import { DISTRICT_WARD_SUGGESTIONS, STORE_SIZE_OPTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 function formatShortAddress(store) {
   if (!store) return ''
@@ -18,6 +18,7 @@ function formatShortAddress(store) {
 
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
+const UNKNOWN_STORE_SIZE_VALUE = '__unknown__'
 
 /**
  * Get the first meaningful word of a store name,
@@ -215,6 +216,8 @@ export default function MapPage() {
   const [isDesktop, setIsDesktop] = useState(false)
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [selectedWards, setSelectedWards] = useState([])
+  const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
+  const [selectedStoreSizes, setSelectedStoreSizes] = useState([])
   const [locatingUser, setLocatingUser] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [userLocation, setUserLocation] = useState(null)
@@ -248,15 +251,23 @@ export default function MapPage() {
       .filter((store) => store.coords)
   }, [stores])
 
-  // Filtered stores based on district/ward selection
-  // Rule: must select ward(s) to show stores — selecting district alone only reveals ward options
-  const filteredStores = useMemo(() => {
+  const storesAfterAreaFilters = useMemo(() => {
     if (selectedWards.length === 0) return storesWithCoords
     return storesWithCoords.filter((store) => {
       const w = (store.ward || '').trim()
       return selectedWards.includes(w)
     })
   }, [storesWithCoords, selectedWards])
+
+  const filteredStores = useMemo(() => {
+    return storesAfterAreaFilters.filter((store) => {
+      const typeMatched = selectedStoreTypes.length === 0 || selectedStoreTypes.includes(store.store_type || '')
+      const normalizedSize = (store.store_size || '').trim()
+      const sizeMatched = selectedStoreSizes.length === 0
+        || selectedStoreSizes.some((size) => size === UNKNOWN_STORE_SIZE_VALUE ? !normalizedSize : normalizedSize === size)
+      return typeMatched && sizeMatched
+    })
+  }, [storesAfterAreaFilters, selectedStoreSizes, selectedStoreTypes])
 
   // Available wards based on selected districts
   const availableWards = useMemo(() => {
@@ -281,6 +292,29 @@ export default function MapPage() {
     return { districtCounts, wardCounts }
   }, [storesWithCoords])
 
+  const storeTypeCounts = useMemo(() => {
+    const counts = {}
+    for (const store of storesAfterAreaFilters) {
+      const key = store.store_type || ''
+      if (!key) continue
+      counts[key] = (counts[key] || 0) + 1
+    }
+    return counts
+  }, [storesAfterAreaFilters])
+
+  const storeSizeCounts = useMemo(() => {
+    const counts = { [UNKNOWN_STORE_SIZE_VALUE]: 0 }
+    for (const store of storesAfterAreaFilters) {
+      const key = (store.store_size || '').trim()
+      if (!key) {
+        counts[UNKNOWN_STORE_SIZE_VALUE] += 1
+        continue
+      }
+      counts[key] = (counts[key] || 0) + 1
+    }
+    return counts
+  }, [storesAfterAreaFilters])
+
   const toggleDistrict = useCallback((district) => {
     setSelectedDistricts(prev => {
       if (prev.includes(district)) {
@@ -300,10 +334,29 @@ export default function MapPage() {
     )
   }, [])
 
+  const toggleStoreType = useCallback((storeType) => {
+    setSelectedStoreTypes((prev) =>
+      prev.includes(storeType) ? prev.filter((value) => value !== storeType) : [...prev, storeType]
+    )
+  }, [])
+
+  const toggleStoreSize = useCallback((storeSize) => {
+    setSelectedStoreSizes((prev) =>
+      prev.includes(storeSize) ? prev.filter((value) => value !== storeSize) : [...prev, storeSize]
+    )
+  }, [])
+
   const clearFilters = useCallback(() => {
     setSelectedDistricts([])
     setSelectedWards([])
+    setSelectedStoreTypes([])
+    setSelectedStoreSizes([])
   }, [])
+
+  const storeSizeFilterOptions = useMemo(() => ([
+    { value: UNKNOWN_STORE_SIZE_VALUE, label: 'Chưa rõ' },
+    ...STORE_SIZE_OPTIONS,
+  ]), [])
 
   const suggestions = useMemo(() => {
     const q = searchTerm.trim().toLowerCase()
@@ -816,7 +869,7 @@ export default function MapPage() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
             <h2 className="text-base font-semibold text-slate-100">Bộ lọc khu vực</h2>
             <div className="flex items-center gap-2">
-              {(selectedDistricts.length > 0 || selectedWards.length > 0) && (
+              {(selectedDistricts.length > 0 || selectedWards.length > 0 || selectedStoreTypes.length > 0 || selectedStoreSizes.length > 0) && (
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -895,6 +948,54 @@ export default function MapPage() {
                 })}
               </div>
             )}
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">Loại cửa hàng</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {STORE_TYPE_OPTIONS.map((storeType) => {
+                  const active = selectedStoreTypes.includes(storeType.value)
+                  const count = storeTypeCounts[storeType.value] || 0
+                  return (
+                    <button
+                      key={storeType.value}
+                      type="button"
+                      onClick={() => toggleStoreType(storeType.value)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${active
+                        ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40'
+                        : 'bg-slate-800 text-slate-300 ring-1 ring-slate-600/40 hover:bg-slate-700'
+                        }`}
+                    >
+                      {storeType.label}
+                      {count > 0 && <span className={`text-[10px] ${active ? 'text-violet-300' : 'text-slate-500'}`}>({count})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">Độ lớn cửa hàng</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {storeSizeFilterOptions.map((storeSize) => {
+                  const active = selectedStoreSizes.includes(storeSize.value)
+                  const count = storeSizeCounts[storeSize.value] || 0
+                  return (
+                    <button
+                      key={storeSize.value}
+                      type="button"
+                      onClick={() => toggleStoreSize(storeSize.value)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${active
+                        ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
+                        : 'bg-slate-800 text-slate-300 ring-1 ring-slate-600/40 hover:bg-slate-700'
+                        }`}
+                    >
+                      {storeSize.label}
+                      {count > 0 && <span className={`text-[10px] ${active ? 'text-amber-300' : 'text-slate-500'}`}>({count})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
