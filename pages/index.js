@@ -20,6 +20,8 @@ const ALL_WARDS = Array.from(
   new Set(Object.values(DISTRICT_WARD_SUGGESTIONS).flat())
 ).sort((a, b) => a.localeCompare(b, 'vi'))
 const DEFAULT_NEARBY_LIMIT = 50
+const LOCATION_REFRESH_INTERVAL_MS = 3 * 60 * 1000
+const LOCATION_REFRESH_COOLDOWN_MS = 5 * 1000
 
 export default function HomePage() {
   const router = useRouter()
@@ -32,6 +34,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false)
   const searchInputRef = useRef(null)
   const initializedFromQuery = useRef(false)
+  const lastLocationRequestAtRef = useRef(0)
   const hasSearchCriteria = Boolean(searchTerm.trim() || selectedDistrict || selectedWard)
 
   // Restore state from URL query params on mount (for back-navigation)
@@ -68,9 +71,14 @@ export default function HomePage() {
       }
     }
   }, [selectedDistrict, selectedWard])
-  // Get current location
-  useEffect(() => {
-    if (!navigator.geolocation) return
+  // Get current location (initial + periodic + when user returns to page)
+  const refreshCurrentLocation = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+
+    const now = Date.now()
+    if (now - lastLocationRequestAtRef.current < LOCATION_REFRESH_COOLDOWN_MS) return
+    lastLocationRequestAtRef.current = now
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setCurrentLocation({
@@ -84,6 +92,45 @@ export default function HomePage() {
       { enableHighAccuracy: true, timeout: 8000 }
     )
   }, [])
+
+  useEffect(() => {
+    refreshCurrentLocation()
+  }, [refreshCurrentLocation])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshCurrentLocation()
+      }
+    }, LOCATION_REFRESH_INTERVAL_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [refreshCurrentLocation])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshCurrentLocation()
+      }
+    }
+    const handleFocus = () => {
+      refreshCurrentLocation()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('pageshow', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('pageshow', handleFocus)
+    }
+  }, [refreshCurrentLocation])
 
   // Helper: compute distance for a store given current reference
   const computeDistance = useCallback((store, refLoc) => {

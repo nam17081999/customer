@@ -719,6 +719,7 @@ export default function AddStore() {
       const insertPayload = {
         name: normalizedName,
         store_type: normalizedStoreType,
+        store_size: normalizedStoreSize,
         address_detail: normalizedDetail,
         ward: normalizedWard,
         district: normalizedDistrict,
@@ -728,10 +729,6 @@ export default function AddStore() {
         image_url: imageFilename, // nullable when store has no image
         latitude,
         longitude,
-      }
-
-      if (normalizedStoreSize) {
-        insertPayload.store_size = normalizedStoreSize
       }
 
       let insertedRows = null

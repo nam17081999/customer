@@ -17,6 +17,7 @@ function formatShortAddress(store) {
 }
 
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 
 /**
  * Get the first meaningful word of a store name,
@@ -199,6 +200,7 @@ export default function MapPage() {
   const maplibreRef = useRef(null)
   const popupRef = useRef(null)
   const highlightedStoreIdRef = useRef(null)
+  const locatingUserRef = useRef(false)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -215,6 +217,7 @@ export default function MapPage() {
   const [selectedWards, setSelectedWards] = useState([])
   const [locatingUser, setLocatingUser] = useState(false)
   const [locationError, setLocationError] = useState('')
+  const [userLocation, setUserLocation] = useState(null)
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
@@ -353,7 +356,12 @@ export default function MapPage() {
 
         map.addSource('stores', {
           type: 'geojson',
-          data: { type: 'FeatureCollection', features: [] },
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        map.addSource('user-location', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
         })
 
         // Combined marker: house icon + name label in one image per store
@@ -372,6 +380,28 @@ export default function MapPage() {
             'icon-ignore-placement': true,
             'symbol-sort-key': ['case', ['==', ['get', 'highlighted'], 'yes'], 999, 0],
             'symbol-z-order': 'auto',
+          },
+        })
+
+        map.addLayer({
+          id: 'user-location-halo',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 9, 12, 12, 16, 16],
+            'circle-color': 'rgba(59, 130, 246, 0.22)',
+          },
+        })
+
+        map.addLayer({
+          id: 'user-location-dot',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 12, 6, 16, 8],
+            'circle-color': '#2563eb',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
           },
         })
 
@@ -502,6 +532,27 @@ export default function MapPage() {
     source.setData({ type: 'FeatureCollection', features })
   }, [filteredStores, mapReady])
 
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const source = map.getSource('user-location')
+    if (!source) return
+
+    const features = userLocation
+      ? [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [userLocation.longitude, userLocation.latitude],
+        },
+        properties: {},
+      }]
+      : []
+
+    source.setData({ type: 'FeatureCollection', features })
+  }, [mapReady, userLocation])
+
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
     const map = mapRef.current
@@ -558,8 +609,10 @@ export default function MapPage() {
     setShowSuggestions(false)
   }, [searchTerm, storesWithCoords, flyToStore])
 
-  const recenterToUserLocation = useCallback(async () => {
-    if (locatingUser) return
+  const refreshUserLocation = useCallback(async ({ shouldRecenter = false } = {}) => {
+    if (locatingUserRef.current) return null
+
+    locatingUserRef.current = true
     setLocatingUser(true)
     setLocationError('')
 
@@ -571,25 +624,47 @@ export default function MapPage() {
 
       if (!coords) {
         setLocationError(getGeoErrorMessage(error))
-        return
+        return null
       }
 
-      const map = mapRef.current
-      if (!map) return
+      const nextLocation = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy ?? null,
+      }
+      setUserLocation(nextLocation)
 
-      setSelectedStore(null)
-      map.flyTo({
-        center: [coords.longitude, coords.latitude],
-        zoom: Math.max(map.getZoom(), 16),
-        duration: 900,
-      })
+      if (shouldRecenter) {
+        const map = mapRef.current
+        if (map) {
+          setSelectedStore(null)
+          map.flyTo({
+            center: [coords.longitude, coords.latitude],
+            zoom: Math.max(map.getZoom(), 16),
+            duration: 900,
+          })
+        }
+      }
+
+      return nextLocation
     } catch (err) {
       console.error('Recenter to user failed:', err)
       setLocationError(getGeoErrorMessage(err))
+      return null
     } finally {
+      locatingUserRef.current = false
       setLocatingUser(false)
     }
-  }, [locatingUser])
+  }, [])
+
+  const recenterToUserLocation = useCallback(() => {
+    return refreshUserLocation({ shouldRecenter: true })
+  }, [refreshUserLocation])
+
+  useEffect(() => {
+    if (!mapReady) return
+    refreshUserLocation()
+  }, [mapReady, refreshUserLocation])
 
   useEffect(() => {
     if (!router.isReady) return
