@@ -27,19 +27,25 @@
 
 ### Bước 2: Thông Tin
 - **Bắt buộc**: Quận/Huyện + Xã/Phường (từ danh sách `DISTRICT_WARD_SUGGESTIONS`)
-- **Tùy chọn**: Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
+- **Tùy chọn**: Độ lớn cửa hàng, Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
+- `store_size` có 4 trạng thái trong UI:
+  - `Chưa rõ`
+  - `Nhỏ`
+  - `Vừa`
+  - `Lớn`
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
 
 ### Bước 3: Vị Trí
 - Auto lấy GPS khi vào bước 3
 - User có thể: kéo map / paste Google Maps link / lấy GPS mới
+- Nếu là admin và đang dùng mobile, phần dán **Google Maps link** hiển thị mặc định ngay dưới bản đồ
 - **Ưu tiên tọa độ**: edited map > GPS ban đầu > GPS hiện tại
 
 ### Khi Submit
 1. Duplicate check lần cuối bằng tọa độ final
 2. Upload ảnh → `imageFilename`
-3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
+3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`, `store_size`)
 4. `appendStoreToCache(newStore)`
 
 ---
@@ -93,6 +99,23 @@ User có 2 lựa chọn:
 - Nếu `q` rỗng và chưa chọn Quận/Xã → hiển thị **50 cửa hàng gần nhất**
 - Vẫn sắp xếp theo khoảng cách **gần → xa**
 
+**Làm mới vị trí người dùng**:
+- Trang `/` tự lấy lại vị trí sau mỗi `3 phút` khi app đang mở
+- Khi người dùng quay lại tab/trang (`visibilitychange`, `focus`, `pageshow`), vị trí cũng được refresh lại
+
+**Bộ lọc chi tiết trên `/`**:
+- Có nút **Lọc** nằm bên phải ô tìm kiếm
+- Có thể kết hợp nhiều bộ lọc cùng lúc
+- `Quận / Huyện`: chọn **1**
+- `Xã / Phường`: chọn **1**
+- `Loại cửa hàng`: chọn nhiều
+- `Độ lớn cửa hàng`: chọn nhiều, gồm `Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`
+- `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Có ảnh`)
+- Trên mobile, panel lọc được rút gọn:
+  - `Quận / Huyện` và `Xã / Phường` dùng `select`
+  - Các nhóm còn lại hiển thị dạng lưới 2 cột
+  - Footer thao tác nằm gọn trong panel, không được làm tràn ngang
+
 **Tiếng Việt không dấu**: dùng `removeVietnameseTones()` để chuẩn hóa cả query lẫn tên store.
 
 **Tương đương phát âm**: khi chuẩn hóa search, coi các cặp/cụm phụ âm sau là tương đương để người dùng gõ sai chính tả vẫn tìm ra kết quả:
@@ -113,13 +136,21 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - Markers: canvas tùy chỉnh (house icon + label)
 - Click marker → `StoreDetailModal`
 - Hover (desktop) → popup tên + địa chỉ
-- **Filter sidebar**: Quận → Xã; phải chọn xã mới filter stores
+- **Filter sidebar**:
+  - Khu vực: Quận → Xã; phải chọn xã mới filter stores
+  - Loại cửa hàng: chọn nhiều
+  - Độ lớn cửa hàng: chọn nhiều (`Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`)
 - Highlight marker khi được chọn: ring `#38bdf8`
 - Auto-fix lat/lng nếu bị reversed (swap khi lat nằm ngoài [-90,90])
 - Từ modal chi tiết, nút **Bản đồ** chuyển sang `/map` kèm `storeId + lat/lng`
 - Khi đi theo luồng này, `/map` mở gần đúng vị trí cửa hàng trước rồi highlight marker sau khi tải dữ liệu
 - Không tự mở modal chi tiết trên `/map`
 - Có nút **về vị trí đang đứng** ở góc phải dưới, dùng GPS hiện tại rồi `flyTo()`
+- Khi vào `/map`, hiển thị thêm **chấm xanh** cho vị trí hiện tại của người dùng
+
+**Thẻ chi tiết cửa hàng**:
+- Trong `StoreDetailModal`, `loại cửa hàng` hiển thị phía trên tên
+- Dùng cỡ chữ nhỏ hơn tên để giữ hierarchy
 
 ---
 
@@ -168,3 +199,12 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 5. Lưu `name` vào DB (image_url)
 6. Nếu insert DB lỗi → DELETE ảnh đã upload (rollback)
 ```
+
+---
+
+## 10. Xuất Dữ Liệu
+
+- Màn export Excel/CSV phải xuất **tất cả cửa hàng đang có** (`deleted_at IS NULL`)
+- File Excel/CSV **không phụ thuộc** cửa hàng có số điện thoại hay không
+- File danh bạ `.vcf` vẫn chỉ xuất các cửa hàng có số điện thoại hợp lệ
+- Khi tải dữ liệu export từ Supabase, cần đọc theo trang để không bị hụt bản ghi khi số lượng store lớn

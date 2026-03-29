@@ -5,8 +5,27 @@ import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { getOrRefreshStores } from '@/lib/storeCache'
+import { supabase } from '@/lib/supabaseClient'
 import { formatAddressParts } from '@/lib/utils'
+
+const EXPORT_STORE_SELECT_FIELDS = [
+  'id',
+  'name',
+  'store_type',
+  'store_size',
+  'image_url',
+  'latitude',
+  'longitude',
+  'address_detail',
+  'ward',
+  'district',
+  'phone',
+  'note',
+  'active',
+  'created_at',
+  'updated_at',
+].join(',')
+const EXPORT_FETCH_PAGE_SIZE = 1000
 
 function sanitizeCsvValue(value) {
   const normalized = value == null ? '' : String(value)
@@ -221,8 +240,28 @@ export function StoreExportScreen({ mode = 'all' }) {
     setLoading(true)
     setError('')
     try {
-      const data = await getOrRefreshStores()
-      setStores(data || [])
+      const allStores = []
+      let from = 0
+
+      while (true) {
+        const to = from + EXPORT_FETCH_PAGE_SIZE - 1
+        const { data, error: loadError } = await supabase
+          .from('stores')
+          .select(EXPORT_STORE_SELECT_FIELDS)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .range(from, to)
+
+        if (loadError) throw loadError
+
+        const pageData = Array.isArray(data) ? data : []
+        allStores.push(...pageData)
+
+        if (pageData.length < EXPORT_FETCH_PAGE_SIZE) break
+        from += EXPORT_FETCH_PAGE_SIZE
+      }
+
+      setStores(allStores)
     } catch {
       setStores([])
       setError('Không tải được dữ liệu cửa hàng. Vui lòng thử lại.')

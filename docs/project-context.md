@@ -5,7 +5,7 @@
 **StoreVis** là ứng dụng web tra cứu và quản lý danh sách **cửa hàng** (tạp hóa, quán nước, quán ăn, v.v.) tại một số huyện ngoại thành Hà Nội.
 
 **Mục tiêu chính:**
-- Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã
+- Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại, độ lớn, và mức độ đầy đủ dữ liệu
 - Hiển thị vị trí cửa hàng trên bản đồ
 - Cho phép bất kỳ ai thêm cửa hàng mới (chờ admin duyệt)
 - Admin duyệt/quản lý danh sách, xem dashboard tổng quan
@@ -26,7 +26,7 @@
 
 ### User thường (không đăng nhập)
 ```
-Trang chủ (/) → Tìm kiếm theo tên/quận/xã
+Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 → Click card → xem chi tiết (modal)
 → Báo cáo cửa hàng (từ modal)
 → Xem bản đồ (/map)
@@ -37,6 +37,7 @@ Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 ```
 Đăng nhập (/login)
 → Dashboard (/account) → Duyệt stores (/store/verify)
+→ Xuất dữ liệu (/store/export)
 → Duyệt báo cáo cửa hàng (/store/reports)
 → Sửa store (/store/edit/[id])
 → Thêm store → active ngay
@@ -53,10 +54,12 @@ Trang chủ (/) → Tìm kiếm theo tên/quận/xã
 | `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
 | `helper/geolocation.js` | Lấy GPS, compass |
 | `pages/store/create.js` | Form tạo cửa hàng 3 bước |
+| `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
-| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS |
-| `pages/index.js` | Tìm kiếm local với scoring |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map |
+| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
+| `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ |
+| `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
+| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên |
 
 ---
 
@@ -78,7 +81,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 
 ---
 
-## 11 Điều Cần Biết Khi Code
+## 16 Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
 2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
@@ -91,6 +94,11 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
 10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
 11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
+12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/độ lớn/có SĐT/có ảnh là multi-select.
+13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
+14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng.
+15. **Trang `/store/export`**: CSV xuất toàn bộ store chưa xóa mềm; VCF mới phụ thuộc số điện thoại.
+16. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
 
 ---
 

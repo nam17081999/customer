@@ -59,16 +59,20 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 
 - **Max-width**: `max-w-screen-md mx-auto` (768px)
 - **Padding**: `px-3 sm:px-4` | `py-3 sm:py-4`
-- **Navbar height**: `h-14` (56px)
+- **Navbar height**:
+  - Desktop top nav: `h-12` (48px)
+  - Mobile bottom tab: `h-14` (56px)
 - **Page content height** (trừ navbar): `h-[calc(100dvh-3.5rem)]`
 - **iOS safe area**: `.safe-area-bottom { padding-bottom: env(safe-area-inset-bottom) }`
+- **Ổn định layout desktop**: dùng `scrollbar-gutter: stable` trên `html` để tránh xê dịch khi đổi trang có/không có scrollbar
 
 ---
 
 ### Desktop (≥ 640px)
-- Sticky top: `bg-black/60 backdrop-blur-md`
-- Link pill active: `bg-gray-50 text-gray-900 border-transparent`
-- Link pill inactive: `text-gray-400 border-gray-700 hover:bg-gray-800`
+- Sticky top: `bg-slate-950/82 backdrop-blur-xl`
+- Brand giữ nguyên bên trái, nav links giữ nguyên bên phải
+- Tab active: chỉ sáng chữ/icon + vạch mảnh phía dưới, không dùng nền nổi bật
+- Tab inactive: `text-slate-300`, hover sáng nhẹ, spacing gọn
 - Admin nav: hiển thị **badge số lượng** cho mục **Xác thực** và **Báo cáo** (pending).
 
 ### Mobile (< 640px)
@@ -98,6 +102,14 @@ link:    text-gray-50 underline
 - `h-11 rounded-xl border border-gray-700 bg-gray-900 text-gray-100 px-3`
 - **Font ≥ 16px bắt buộc** để tránh iOS auto-zoom
 
+### Search Panel (`/`)
+- Nút `Lọc` nằm bên phải ô tìm kiếm
+- Trên mobile, panel lọc ưu tiên gọn:
+  - `Quận / Huyện` và `Xã / Phường` dùng `select` đơn
+  - Các nhóm filter chọn nhiều hiển thị dạng lưới `2 cột`
+  - Panel có `max-height` và tự cuộn bên trong, không được kéo ngang
+  - Footer thao tác (`Xóa lọc`, `Thu gọn`) phải giữ được một hàng chữ trên desktop
+
 ### Card
 - `rounded-xl border border-gray-800 bg-gray-950`
 
@@ -118,12 +130,24 @@ Trang map luôn dark (không theo system preference):
 - Search button: `bg-sky-500 text-slate-950`
 - Filter district active: `bg-sky-500/20 text-sky-300`
 - Filter ward active: `bg-emerald-500/20 text-emerald-300`
+- Filter store type active: `tông violet`
+- Filter store size active: `tông amber`
 - Floating GPS button: góc phải dưới, `bg-slate-950/90`, viền `border-slate-600/70`, hover `sky`
+- Hiển thị thêm chấm xanh vị trí người dùng trên bản đồ
+
+### Store Detail Modal
+- `Loại cửa hàng` hiển thị phía trên `Tên cửa hàng`
+- Dùng `text-sm` hoặc tương đương để hierarchy rõ ràng, không cạnh tranh với title
 
 ### Form Tạo Cửa Hàng — Loại Cửa Hàng
 - Khối `Loại cửa hàng` tách riêng khỏi `Tên cửa hàng`
 - Dùng grid `2 cột` cả trên mobile để hiển thị nhanh toàn bộ loại
 - Trạng thái đang chọn dùng tông xanh biển (`border-blue-500 bg-blue-500/10 text-blue-100`)
+
+### Form Tạo Cửa Hàng — Bước 3 / Google Maps Link
+- Trên mobile, nếu là admin thì phần dán **Google Maps link** hiển thị mặc định ngay dưới bản đồ
+- Không dùng khung bao riêng cho phần này; chỉ giữ label, input, nút hành động và dòng hướng dẫn
+- Trên desktop, phần dán link vẫn hiển thị sẵn dưới bản đồ
 
 ### Bản đồ trong Form (Create/Edit) — Light Theme Exception
 Để đảm bảo độ rõ nét khi người dùng chọn vị trí chính xác:

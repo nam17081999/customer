@@ -113,27 +113,28 @@ export default function Navbar() {
     return (
         <>
             {/* ── Top bar ── */}
-            <nav className="hidden sm:block sticky top-0 z-50 border-b border-gray-800 bg-black/60 backdrop-blur-md supports-[backdrop-filter]:bg-black/50">
-                <div className="mx-auto flex h-14 w-full max-w-screen-md items-center px-3 sm:px-4 gap-2">
+            <nav className="hidden sm:block sticky top-0 z-50 border-b border-white/10 bg-slate-950/82 backdrop-blur-xl">
+                <div className="mx-auto flex h-12 w-full max-w-screen-md items-center gap-1.5 px-3 sm:px-4">
                     {/* Brand */}
-                    <Link href={brandHref} className="flex items-center font-semibold text-gray-100 text-sm sm:text-base shrink-0">
-                        <span className="text-primary">StoreVis</span>
+                    <Link href={brandHref} className="flex items-center font-semibold text-sm text-slate-100 tracking-[0.1em] uppercase shrink-0">
+                        <span>StoreVis</span>
                     </Link>
 
-                    {/* Desktop nav links (hidden on mobile) */}
-                    <div className="ml-auto hidden sm:flex items-center gap-1.5">
+                    {/* Desktop nav links */}
+                    <div className="ml-auto hidden sm:flex items-center gap-1">
                         {navLinks.map(({ href, active, label, Icon, badge }) => (
                             <Link
                                 key={href}
                                 href={href}
                                 aria-current={active ? 'page' : undefined}
-                                className={`relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${active
-                                    ? 'bg-gray-100 text-gray-900 border-transparent'
-                                    : 'text-gray-400 border-gray-700 hover:bg-gray-900'
+                                className={`relative flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${active
+                                    ? 'text-white'
+                                    : 'text-slate-300 hover:text-white'
                                     }`}
                             >
-                                <Icon className="w-4 h-4" />
-                                <span>{label}</span>
+                                <Icon className={`h-3.5 w-3.5 ${active ? 'text-white' : 'text-slate-400'}`} />
+                                <span className="whitespace-nowrap">{label}</span>
+                                {active && <span className="absolute inset-x-2.5 -bottom-0.5 h-0.5 rounded-full bg-sky-300" />}
                                 {renderBadge(badge)}
                             </Link>
                         ))}

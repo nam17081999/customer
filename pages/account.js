@@ -64,9 +64,6 @@ export default function AccountPage() {
 
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Menu nhanh</h1>
-                <p className="text-base text-gray-400">
-                  Tạm thời chỉ hiển thị 3 màn hình: Tổng quan, Xuất dữ liệu, Xuất danh bạ.
-                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

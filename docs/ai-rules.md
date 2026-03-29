@@ -36,6 +36,27 @@ await removeStoreFromCache(storeId)     // sau soft-delete
 await invalidateStoreCache()            // sau EDIT
 ```
 
+**Ngoại lệ duy nhất cho export admin:**
+```js
+// `/store/export` được phép đọc trực tiếp Supabase để lấy đủ toàn bộ store
+// nhưng bắt buộc:
+// 1. filter deleted_at IS NULL
+// 2. fetch theo trang (`range`) nếu số lượng store có thể lớn
+const all = []
+let from = 0
+while (true) {
+  const to = from + 999
+  const { data } = await supabase
+    .from('stores')
+    .select('id,name,...')
+    .is('deleted_at', null)
+    .range(from, to)
+  all.push(...(data || []))
+  if (!data || data.length < 1000) break
+  from += 1000
+}
+```
+
 ---
 
 ## 3. Insert/Update Store
@@ -45,6 +66,7 @@ await invalidateStoreCache()            // sau EDIT
 await supabase.from('stores').insert([{
   name: toTitleCaseVI(name.trim()),   // ← Title Case bắt buộc
   store_type: selectedStoreType || 'Tạp hóa', // ← mặc định Cửa hàng
+  store_size: selectedStoreSize || null,      // ← độ lớn cửa hàng, cho phép null
   address_detail, ward, district,      // ← cũng Title Case
   active: Boolean(isAdmin),
   note, phone,
@@ -127,6 +149,43 @@ const defaultNearby = stores
   .slice(0, 50)
 ```
 
+```js
+// Bộ lọc chi tiết trên `/`
+// Quận/Huyện + Xã/Phường: single-select
+// Loại cửa hàng + Độ lớn + Có SĐT + Có ảnh: multi-select
+const filtered = stores.filter((store) => {
+  if (selectedDistrict && store.district !== selectedDistrict) return false
+  if (selectedWard && store.ward !== selectedWard) return false
+  if (selectedStoreTypes.length && !selectedStoreTypes.includes(store.store_type || '')) return false
+  if (selectedStoreSizes.length) {
+    const size = (store.store_size || '').trim()
+    const matched = selectedStoreSizes.some((value) => value === '__unknown__' ? !size : size === value)
+    if (!matched) return false
+  }
+  if (selectedFlags.includes('has_phone') && !String(store.phone || '').trim()) return false
+  if (selectedFlags.includes('has_image') && !String(store.image_url || '').trim()) return false
+  return true
+})
+```
+
+```js
+// Trang `/` phải chủ động làm mới vị trí
+setInterval(refreshCurrentLocation, 3 * 60 * 1000)
+window.addEventListener('focus', refreshCurrentLocation)
+window.addEventListener('pageshow', refreshCurrentLocation)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshCurrentLocation()
+})
+```
+
+```js
+// Đồng bộ state search/filter của `/` lên URL
+// phải debounce và bỏ qua replace nếu query không đổi
+const syncTimer = window.setTimeout(() => {
+  router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
+}, 250)
+```
+
 ---
 
 ## 7. Auth
@@ -156,10 +215,13 @@ if (!user) router.replace('/login?from=/account')
 - **Bản đồ**: 
   - Trang hiển thị chung (`/map`): Dùng bộ lọc tối (`.dark-map-filter`).
   - Trang nhập liệu (`create/edit`): Dùng chế độ **Sáng** (`dark={false}`) để nạp tọa độ chính xác.
+- `/map` có source/layer riêng cho vị trí người dùng (`user-location`) để hiển thị chấm xanh.
 - **Steps & Tags**: Sử dụng màu nền tối cố định (`bg-gray-800/90`, `bg-gray-900`), không dùng các class `bg-white` hay `bg-gray-100`.
 - **Input**: font-size ≥ 16px (tránh iOS zoom), nền `bg-gray-900`, text `text-gray-100`.
 - **Button height**: tối thiểu `h-10` (40px), prefer `h-11` (44px).
 - **Màu text mặc định**: chính `text-gray-100`, phụ `text-gray-400`.
+- **Desktop navbar**: giữ bố cục cũ (brand trái, nav phải), active state tối giản bằng chữ/icon sáng + underline mảnh; không dùng nền active quá nặng.
+- **Admin mobile step 3**: phần dán Google Maps link hiển thị mặc định ngay dưới bản đồ, không dùng card wrapper riêng.
 
 ---
 
