@@ -39,6 +39,7 @@ customer/
 │   ├── account.js          # Dashboard admin
 │   └── store/
 │       ├── create.js       # Form tạo store 3 bước
+│       ├── export.js       # Xuất CSV/VCF
 │       ├── verify.js       # Duyệt store chờ xác thực
 │       ├── reports.js      # Duyệt báo cáo cửa hàng
 │       └── edit/[id].js    # Chỉnh sửa store
@@ -86,6 +87,14 @@ customer/
   ↕
 [Pages: getOrRefreshStores()] → filter + sort client-side
   - Mặc định trang tìm kiếm: không có tiêu chí thì render 50 cửa hàng gần nhất
+  - Trang `/` có bộ lọc chi tiết: quận/xã (single-select) + loại/độ lớn/chi tiết dữ liệu (multi-select)
+  - Vị trí người dùng ở `/` được refresh định kỳ mỗi 3 phút và khi quay lại tab/trang
+  - Đồng bộ query của `/` lên URL phải có debounce + bỏ qua replace khi query không đổi để tránh flood navigation
+
+[Admin export page: `/store/export`]
+  - Không dùng cache public để xuất dữ liệu
+  - Đọc trực tiếp Supabase với điều kiện `deleted_at IS NULL`
+  - Fetch theo trang (`range`) để lấy đủ toàn bộ store cho CSV/VCF
 ```
 
 **Sau mutation:**
@@ -103,6 +112,7 @@ customer/
 | `/` | Tìm kiếm | Public |
 | `/map` | Bản đồ MapLibre | Public |
 | `/store/create` | Tạo cửa hàng (3 bước) | Public |
+| `/store/export` | Xuất dữ liệu cửa hàng | Admin |
 | `/store/verify` | Duyệt cửa hàng chờ | Admin |
 | `/store/reports` | Duyệt báo cáo cửa hàng | Admin |
 | `/store/edit/[id]` | Chỉnh sửa | Admin |
@@ -130,6 +140,7 @@ customer/
 - Sau khi danh sách store tải xong, marker tương ứng sẽ được highlight
 - Không tự mở modal chi tiết khi đi theo luồng này
 - Trang `/map` có nút về vị trí GPS hiện tại ở góc phải dưới
+- Trang `/map` hiển thị thêm source/layer riêng cho vị trí người dùng (blue dot)
 
 ---
 

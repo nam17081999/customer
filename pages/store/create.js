@@ -96,7 +96,6 @@ export default function AddStore() {
   const [mapsLink, setMapsLink] = useState('')
   const [mapsLinkLoading, setMapsLinkLoading] = useState(false)
   const [mapsLinkError, setMapsLinkError] = useState('')
-  const [showMapsLinkInput, setShowMapsLinkInput] = useState(false)
   const hasUnsavedChanges = useMemo(() => {
     if (loading || showSuccess) return false
     return Boolean(
@@ -195,6 +194,43 @@ export default function AddStore() {
     setStep2Key((k) => k + 1)
     setMapsLinkError('')
     showMessage('success', `Đã lấy vị trí: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+  }
+
+  function renderMapsLinkFields({ mobile = false } = {}) {
+    return (
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
+        <div className={mobile ? 'space-y-2' : 'flex gap-2'}>
+          <Input
+            value={mapsLink}
+            onChange={(e) => setMapsLink(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                handleMapsLink(mapsLink)
+              }
+            }}
+            placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
+            className="text-base sm:text-base flex-1 min-w-0"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={mapsLinkLoading || !mapsLink.trim()}
+            leftIcon={mapsLinkLoading ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : undefined}
+            onClick={() => handleMapsLink(mapsLink)}
+            className={mobile ? 'w-full' : 'shrink-0'}
+          >
+            {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
+          </Button>
+        </div>
+        {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
+        <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
+      </div>
+    )
   }
 
   // Stable handler for LocationPicker - track manual edits
@@ -338,7 +374,6 @@ export default function AddStore() {
     setStep2Key((k) => k + 1)
     setMapsLink('')
     setMapsLinkError('')
-    setShowMapsLinkInput(false)
     setFieldErrors({})
     if (router.query?.name) {
       try {
@@ -365,7 +400,7 @@ export default function AddStore() {
     setStep2Key((k) => k + 1) // force remount map
     if (!resolvingAddr) handleFillAddress()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep])
+  }, [currentStep, isAdmin])
 
   useEffect(() => {
     if (!name.trim()) {
@@ -610,12 +645,10 @@ export default function AddStore() {
       // User unlocked and edited map → use edited position
       latitude = pickedLat
       longitude = pickedLng
-      console.log('✅ Using edited map position:', { latitude, longitude })
     } else if (initialGPSLat != null && initialGPSLng != null) {
       // User did NOT edit map → use initial GPS
       latitude = initialGPSLat
       longitude = initialGPSLng
-      console.log('✅ Using initial GPS position:', { latitude, longitude })
     } else if (pickedLat != null && pickedLng != null) {
       // Fallback: use whatever is on map
       latitude = pickedLat
@@ -1184,33 +1217,15 @@ export default function AddStore() {
                 />
               </div>
 
+              {isAdmin && (
+                <div className="pt-2 md:hidden space-y-2">
+                  {renderMapsLinkFields({ mobile: true })}
+                </div>
+              )}
+
               {/* Maps link input - desktop only, always visible */}
               <div className="hidden md:block pt-2 space-y-1.5">
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={mapsLink}
-                    onChange={(e) => setMapsLink(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMapsLink(mapsLink) } }}
-                    placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
-                    className="text-base sm:text-base flex-1 min-w-0"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={mapsLinkLoading || !mapsLink.trim()}
-                    leftIcon={mapsLinkLoading ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    ) : undefined}
-                    onClick={() => handleMapsLink(mapsLink)}
-                    className="shrink-0"
-                  >
-                    {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
-                  </Button>
-                </div>
-                {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
-                <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
+                {renderMapsLinkFields()}
               </div>
 
               {/* Back and Submit buttons for step 3 */}

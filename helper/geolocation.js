@@ -47,7 +47,6 @@ export async function getBestPosition({
         watchId = null
       }
       if (best) {
-        console.log(`📊 GPS final: ${best.accuracy?.toFixed(1) || '?'}m in ${Date.now() - startTime}ms`)
         resolve({ coords: best, error: null })
       } else {
         resolve({ coords: null, error: new Error('Không lấy được vị trí') })
@@ -64,18 +63,15 @@ export async function getBestPosition({
 
       if (acc < bestAcc) {
         best = coords
-        console.log(`📍 GPS update: ${acc.toFixed(1)}m (${Date.now() - startTime}ms)`)
       }
 
       // Early exit if accuracy is good enough
       if (acc <= desiredAccuracy) {
-        console.log('✅ Đạt độ chính xác mong muốn:', acc.toFixed(1) + 'm')
         finish()
       }
     }
 
-    function onError(err) {
-      console.warn('⚠️ GPS error:', err.message || err.code)
+    function onError() {
       // Don't resolve yet — wait for timeout, watchPosition may recover
     }
 
@@ -96,7 +92,6 @@ export async function getBestPosition({
             const bestAcc = best?.accuracy || Infinity
             if (coords.accuracy < bestAcc) {
               best = coords
-              console.log('⚡ Cache hit:', coords.accuracy.toFixed(1) + 'm')
             }
             // If cache is excellent, finish early
             if (coords.accuracy <= desiredAccuracy) {

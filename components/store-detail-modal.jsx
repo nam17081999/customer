@@ -106,6 +106,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
+  const resolvedStoreType = store.store_type || DEFAULT_STORE_TYPE
+  const storeTypeLabel = STORE_TYPE_OPTIONS.find((option) => option.value === resolvedStoreType)?.label || resolvedStoreType
 
   const handleShare = async (e) => {
     e.stopPropagation()
@@ -332,9 +334,14 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
         <div className="px-4 pt-4 pb-2 space-y-3">
           {/* Name + distance */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-xl font-bold text-gray-100 leading-tight break-words min-w-0 flex-1">
-              {store.name}
-            </h3>
+            <div className="min-w-0 flex-1">
+              <p className="mt-1 text-sm font-medium text-gray-400">
+                {storeTypeLabel}
+              </p>
+              <h3 className="mt-1 text-xl font-bold text-gray-100 leading-tight break-words">
+                {store.name}
+              </h3>
+            </div>
             {typeof store.distance === 'number' && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 flex-shrink-0 whitespace-nowrap">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
