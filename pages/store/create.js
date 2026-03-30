@@ -19,7 +19,7 @@ import {
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { formatDistance } from '@/helper/validation'
+import { formatDistance, isValidPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
@@ -504,13 +504,31 @@ export default function AddStore() {
     if (nameValid || allowDuplicate) setCurrentStep(2)
   }
 
-  function validateStep2AndGoNext() {
+  function validateStep2Fields({ requirePhone = false } = {}) {
     const errs = {}
     if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
     if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
-    setFieldErrors((prev) => ({ ...prev, ...errs }))
+    const normalizedPhone = phone.trim()
+    if (requirePhone && !normalizedPhone) {
+      errs.phone = 'Vui lòng nhập số điện thoại để lưu luôn'
+    } else if (normalizedPhone && !isValidPhone(normalizedPhone)) {
+      errs.phone = 'Số điện thoại không hợp lệ'
+    }
+
+    setFieldErrors((prev) => ({
+      ...prev,
+      district: errs.district || '',
+      ward: errs.ward || '',
+      phone: errs.phone || '',
+    }))
+
+    return errs
+  }
+
+  function validateStep2AndGoNext() {
+    const errs = validateStep2Fields()
     if (Object.keys(errs).length > 0) {
-      showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+      showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
     }
     
@@ -545,6 +563,10 @@ export default function AddStore() {
               store={s}
               distance={s.distance}
               compact
+              compactActionLabel="Bổ sung vị trí"
+              onCompactAction={(store) => {
+                router.push(`/store/edit/${store.id}?mode=location-only`)
+              }}
             />
           ))}
         </div>
@@ -573,6 +595,164 @@ export default function AddStore() {
         </div>
       </>
     )
+  }
+
+  async function persistStore({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) {
+    const normalizedName = toTitleCaseVI(name.trim())
+    const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
+    const normalizedStoreSize = storeSize || null
+
+    try {
+      setLoading(true)
+
+      if (shouldCheckFinalDuplicates) {
+        let nearDupes = []
+        let globalDupes = []
+        try {
+          ;[nearDupes, globalDupes] = await Promise.all([
+            findNearbySimilarStores(latitude, longitude, normalizedName),
+            findGlobalExactNameMatches(normalizedName),
+          ])
+        } catch (dupErr) {
+          console.error('Duplicate check failed:', dupErr)
+          showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
+          setLoading(false)
+          return false
+        }
+
+        const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
+        if (allDupes.length > 0 && !allowDuplicate) {
+          setDuplicateCandidates(allDupes)
+          showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
+          setLoading(false)
+          return false
+        }
+      }
+
+      let uploadResult = null
+      let imageFilename = null
+      if (imageFile) {
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1600,
+          useWebWorker: true,
+          initialQuality: 0.8,
+          fileType: 'image/jpeg',
+        }
+        let fileToUpload = imageFile
+        try {
+          const { default: imageCompression } = await import('browser-image-compression')
+          const compressed = await imageCompression(imageFile, options)
+          fileToUpload = compressed
+        } catch (cmpErr) {
+          console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
+        }
+
+        const formData = new FormData()
+        formData.append('file', fileToUpload)
+        formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
+        formData.append('useUniqueFileName', 'true')
+
+        const uploadResponse = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error('Upload ảnh thất bại')
+        }
+
+        uploadResult = await uploadResponse.json()
+        imageFilename = uploadResult.name
+      }
+
+      const normalizedDetail = toTitleCaseVI(addressDetail.trim())
+      const normalizedWard = toTitleCaseVI(ward.trim())
+      const normalizedDistrict = toTitleCaseVI(district.trim())
+
+      const insertPayload = {
+        name: normalizedName,
+        store_type: normalizedStoreType,
+        store_size: normalizedStoreSize,
+        address_detail: normalizedDetail,
+        ward: normalizedWard,
+        district: normalizedDistrict,
+        active: isAdmin,
+        note,
+        phone,
+        image_url: imageFilename,
+        latitude,
+        longitude,
+      }
+
+      let insertedRows = null
+      let insertError = null
+
+      ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
+
+      if (insertError && normalizedStoreSize) {
+        const schemaMessage = `${insertError.message || ''} ${insertError.details || ''} ${insertError.hint || ''}`
+        if (/store_size/i.test(schemaMessage) && /(column|schema|find)/i.test(schemaMessage)) {
+          const fallbackPayload = { ...insertPayload }
+          delete fallbackPayload.store_size
+          ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([fallbackPayload]).select())
+          if (!insertError) {
+            showMessage('warning', 'Đã tạo cửa hàng nhưng chưa lưu được độ lớn vì DB chưa có cột store_size.')
+          }
+        }
+      }
+
+      if (insertError) {
+        console.error(insertError)
+        if (uploadResult?.fileId) {
+          try {
+            await fetch('/api/upload-image', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fileId: uploadResult.fileId }),
+            })
+          } catch (deleteErr) {
+            console.warn('Could not delete uploaded image:', deleteErr)
+          }
+        }
+        showMessage('error', 'Lỗi khi lưu dữ liệu')
+        setLoading(false)
+        return false
+      }
+
+      const newStore = insertedRows?.[0]
+      if (newStore) {
+        await appendStoreToCache(newStore)
+      } else {
+        await invalidateStoreCache()
+      }
+
+      setShowSuccess(true)
+      return true
+    } catch (err) {
+      console.error(err)
+      showMessage('error', 'Đã xảy ra lỗi khi tạo cửa hàng')
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSaveWithoutLocation() {
+    const errs = validateStep2Fields({ requirePhone: true })
+    if (Object.keys(errs).length > 0) {
+      showMessage('error', errs.phone ? 'Muốn lưu luôn ở bước 2 thì cần số điện thoại hợp lệ.' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
+      return
+    }
+
+    const confirmed = window.confirm('Bạn có muốn lưu cửa hàng này mà không có vị trí không?')
+    if (!confirmed) return
+
+    await persistStore({
+      latitude: null,
+      longitude: null,
+      shouldCheckFinalDuplicates: false,
+    })
   }
 
 
@@ -629,11 +809,6 @@ export default function AddStore() {
       return
     }
 
-    // Normalize name to Title Case before saving
-    const normalizedName = toTitleCaseVI(name.trim())
-    const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
-    const normalizedStoreSize = storeSize || null
-
     // Determine coordinates based on user actions
     // Priority:
     // 1. If user unlocked map and edited → use edited position (pickedLat/Lng)
@@ -680,143 +855,11 @@ export default function AddStore() {
       return
     }
 
-    try {
-      setLoading(true)
-
-      // Final duplicate check right before submit (use final coordinates)
-      let nearDupes = []
-      let globalDupes = []
-      try {
-        ;[nearDupes, globalDupes] = await Promise.all([
-          findNearbySimilarStores(latitude, longitude, normalizedName),
-          findGlobalExactNameMatches(normalizedName),
-        ])
-      } catch (dupErr) {
-        console.error('Duplicate check failed:', dupErr)
-        showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
-        setLoading(false)
-        return
-      }
-
-      const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
-      if (allDupes.length > 0 && !allowDuplicate) {
-        setDuplicateCandidates(allDupes)
-        showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
-        setLoading(false)
-        return
-      }
-
-      let uploadResult = null
-      let imageFilename = null
-      if (imageFile) {
-        // Nén ảnh với cài đặt vừa phải hơn để giữ chất lượng
-        const options = {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1600,
-          useWebWorker: true,
-          initialQuality: 0.8,
-          fileType: 'image/jpeg',
-        }
-        let fileToUpload = imageFile
-        try {
-          const { default: imageCompression } = await import('browser-image-compression')
-          const compressed = await imageCompression(imageFile, options)
-          fileToUpload = compressed
-        } catch (cmpErr) {
-          console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
-        }
-
-        // Upload lên ImageKit nếu có ảnh
-        const formData = new FormData()
-        formData.append('file', fileToUpload)
-        formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
-        formData.append('useUniqueFileName', 'true')
-
-        const uploadResponse = await fetch('/api/upload-image', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!uploadResponse.ok) {
-          throw new Error('Upload ảnh thất bại')
-        }
-
-        uploadResult = await uploadResponse.json()
-        imageFilename = uploadResult.name
-      }
-
-      const normalizedDetail = toTitleCaseVI(addressDetail.trim())
-      const normalizedWard = toTitleCaseVI(ward.trim())
-      const normalizedDistrict = toTitleCaseVI(district.trim())
-
-      const insertPayload = {
-        name: normalizedName,
-        store_type: normalizedStoreType,
-        store_size: normalizedStoreSize,
-        address_detail: normalizedDetail,
-        ward: normalizedWard,
-        district: normalizedDistrict,
-        active: isAdmin,
-        note,
-        phone,
-        image_url: imageFilename, // nullable when store has no image
-        latitude,
-        longitude,
-      }
-
-      let insertedRows = null
-      let insertError = null
-
-      ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
-
-      // Backward-compatible fallback when DB schema has not added store_size yet.
-      if (insertError && normalizedStoreSize) {
-        const schemaMessage = `${insertError.message || ''} ${insertError.details || ''} ${insertError.hint || ''}`
-        if (/store_size/i.test(schemaMessage) && /(column|schema|find)/i.test(schemaMessage)) {
-          const fallbackPayload = { ...insertPayload }
-          delete fallbackPayload.store_size
-          ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([fallbackPayload]).select())
-          if (!insertError) {
-            showMessage('warning', 'Đã tạo cửa hàng nhưng chưa lưu được độ lớn vì DB chưa có cột store_size.')
-          }
-        }
-      }
-
-      if (insertError) {
-        console.error(insertError)
-        // Try to delete uploaded image on error
-        if (uploadResult?.fileId) {
-          try {
-            await fetch('/api/upload-image', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId: uploadResult.fileId }),
-            })
-          } catch (deleteErr) {
-            console.warn('Could not delete uploaded image:', deleteErr)
-          }
-        }
-        showMessage('error', 'Lỗi khi lưu dữ liệu')
-        setLoading(false)
-        return
-      }
-
-      // Append new store to IndexedDB cache (avoid full refetch)
-      const newStore = insertedRows?.[0]
-      if (newStore) {
-        await appendStoreToCache(newStore)
-      } else {
-        await invalidateStoreCache()
-      }
-
-      // Success — show success screen
-      setShowSuccess(true)
-    } catch (err) {
-      console.error(err)
-      showMessage('error', 'Đã xảy ra lỗi khi tạo cửa hàng')
-    } finally {
-      setLoading(false)
-    }
+    await persistStore({
+      latitude,
+      longitude,
+      shouldCheckFinalDuplicates: true,
+    })
   }
 
 
@@ -1140,17 +1183,23 @@ export default function AddStore() {
 
               {/* Phone & Note — always visible */}
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(bắt buộc nếu lưu luôn ở bước 2)</span></Label>
                 <Input
                   id="phone"
                   type="tel"
                   inputMode="numeric"
                   pattern="[0-9+ ]*"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value)
+                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }))
+                  }}
                   placeholder="0901 234 567"
                   className="text-base sm:text-base"
                 />
+                {fieldErrors.phone && (
+                  <div className="text-xs text-red-600">{fieldErrors.phone}</div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
@@ -1165,6 +1214,14 @@ export default function AddStore() {
                   icon={<span>←</span>}
                   onClick={() => setCurrentStep(1)}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleSaveWithoutLocation}
+                >
+                  Lưu luôn
+                </Button>
                 <Button
                   type="button"
                   className="flex-1"
@@ -1277,6 +1334,14 @@ export default function AddStore() {
                       icon={<span>←</span>}
                       onClick={() => setCurrentStep(1)}
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleSaveWithoutLocation}
+                    >
+                      Lưu luôn
+                    </Button>
                     <Button
                       type="button"
                       className="flex-1"

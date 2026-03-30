@@ -87,6 +87,13 @@ export function extractWords(normalized) {
     .filter((w) => w.length >= 2)
 }
 
+function parseCoordinate(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
+  if (typeof value !== 'string') return NaN
+  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 // ── Comparison functions ────────────────────────────────────────────────
 
 /** Returns true if *any* keyword from `inputWords` appears in the store name. */
@@ -130,8 +137,18 @@ export async function findNearbySimilarStores(lat, lng, inputName, radiusKm = 0.
   const allStores = await getOrRefreshStores()
 
   return allStores
-    .filter((s) => isFinite(s?.latitude) && isFinite(s?.longitude))
-    .map((s) => ({ ...s, distance: haversineKm(lat, lng, s.latitude, s.longitude) }))
+    .map((s) => {
+      const storeLat = parseCoordinate(s?.latitude)
+      const storeLng = parseCoordinate(s?.longitude)
+      if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng)) return null
+      return {
+        ...s,
+        latitude: storeLat,
+        longitude: storeLng,
+        distance: haversineKm(lat, lng, storeLat, storeLng),
+      }
+    })
+    .filter(Boolean)
     .filter((s) => s.distance <= radiusKm && isSimilarNameByWords(inputWords, s.name))
     .sort((a, b) => a.distance - b.distance)
 }
@@ -154,20 +171,24 @@ export async function findGlobalExactNameMatches(inputName) {
 }
 
 function attachDistance(store, originLat, originLng) {
+  const storeLat = parseCoordinate(store?.latitude)
+  const storeLng = parseCoordinate(store?.longitude)
   if (
     originLat == null ||
     originLng == null ||
-    !isFinite(originLat) ||
-    !isFinite(originLng) ||
-    !isFinite(store?.latitude) ||
-    !isFinite(store?.longitude)
+    !Number.isFinite(originLat) ||
+    !Number.isFinite(originLng) ||
+    !Number.isFinite(storeLat) ||
+    !Number.isFinite(storeLng)
   ) {
     return store
   }
 
   return {
     ...store,
-    distance: haversineKm(originLat, originLng, store.latitude, store.longitude),
+    latitude: storeLat,
+    longitude: storeLng,
+    distance: haversineKm(originLat, originLng, storeLat, storeLng),
   }
 }
 

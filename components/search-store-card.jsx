@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRouter } from 'next/router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
@@ -9,7 +10,15 @@ import { formatDistance } from '@/helper/validation'
 import StoreDetailModal from '@/components/store-detail-modal'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 
-export default function SearchStoreCard({ store, distance, searchTerm, compact }) {
+export default function SearchStoreCard({
+  store,
+  distance,
+  searchTerm,
+  compact,
+  compactActionLabel = '',
+  onCompactAction,
+}) {
+  const router = useRouter()
   const [imageError, setImageError] = useState(false)
 
   const handleImageError = () => {
@@ -19,6 +28,21 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
 
   const addressText = formatAddressParts(store)
+  const hasCoordinates = (
+    store.latitude !== null
+    && store.latitude !== undefined
+    && store.latitude !== ''
+    && store.longitude !== null
+    && store.longitude !== undefined
+    && store.longitude !== ''
+  )
+  const handleCompactAction = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (typeof onCompactAction === 'function') {
+      onCompactAction(store, router)
+    }
+  }
 
   const renderHighlightedName = (name, term) => {
     const text = name || ''
@@ -87,21 +111,38 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 {renderHighlightedName(store.name, searchTerm)}
               </OverflowMarquee>
               <p className="text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
-              {distance !== null && distance !== undefined && (
+              {distance !== null && distance !== undefined ? (
                 <span className="inline-flex items-center gap-0.5 text-base text-gray-400">
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   {formatDistance(distance)}
                 </span>
-              )}
+              ) : !hasCoordinates ? (
+                <span className="inline-flex items-center gap-0.5 text-base text-amber-400">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
+                  Chưa có vị trí
+                </span>
+              ) : null}
               {store.phone && (
                 <a
                   href={`tel:${store.phone.replace(/\s+/g, '')}`}
-                  className="inline-flex items-center gap-0.5 text-base text-blue-400 hover:underline truncate"
+                  className="inline-flex self-start max-w-full items-center gap-0.5 text-base text-blue-400 hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
-                  <span className="truncate">{store.phone}</span>
+                  <span className="max-w-full truncate">{store.phone}</span>
                 </a>
+              )}
+              {!hasCoordinates && compactActionLabel && typeof onCompactAction === 'function' && (
+                <div className="pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 px-3 text-sm"
+                    onClick={handleCompactAction}
+                  >
+                    {compactActionLabel}
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -133,12 +174,17 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 Đã xác thực
               </span>
             )}
-            {distance !== null && distance !== undefined && (
+            {distance !== null && distance !== undefined ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-900 text-gray-200 shadow">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                 {formatDistance(distance)}
               </span>
-            )}
+            ) : !hasCoordinates ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-amber-950/80 text-amber-200 shadow">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
+                Chưa có vị trí
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -159,7 +205,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
                 <svg className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h2.6a1 1 0 01.95.69l1.12 3.36a1 1 0 01-.46 1.17l-1.6.96a11.04 11.04 0 005.25 5.25l.96-1.6a1 1 0 011.17-.46l3.36 1.12a1 1 0 01.69.95V19a2 2 0 01-2 2h-.5C10.149 21 3 13.851 3 5.5V5z" /></svg>
                 <a
                   href={`tel:${store.phone.replace(/\s+/g, '')}`}
-                  className="font-medium text-gray-200 hover:underline flex-1 break-all cursor-pointer"
+                  className="inline-flex max-w-full font-medium text-gray-200 hover:underline break-all cursor-pointer"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {store.phone}
@@ -177,7 +223,7 @@ export default function SearchStoreCard({ store, distance, searchTerm, compact }
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
-            {store.latitude && store.longitude && (
+            {hasCoordinates && (
               <Button
                 variant="outline"
                 className="flex-1"

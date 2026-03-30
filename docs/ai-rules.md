@@ -76,6 +76,19 @@ await supabase.from('stores').insert([{
 }]).select()
 ```
 
+```js
+// Nhánh "Lưu luôn" ở bước 2 của `/store/create`
+// bắt buộc có phone hợp lệ nhưng cho phép chưa có vị trí
+await supabase.from('stores').insert([{
+  name,
+  ward,
+  district,
+  phone,                 // ← bắt buộc ở nhánh này
+  latitude: null,
+  longitude: null,
+}]).select()
+```
+
 ### Soft Delete đúng
 ```js
 // ✅ ĐÚNG
@@ -141,6 +154,17 @@ const dupes = mergeDuplicateCandidates(near, global, lat, lng)
 ```
 
 ```js
+// Duplicate candidates chỉ được có distance khi store có tọa độ hợp lệ.
+// Không dùng `isFinite(store.latitude)` trực tiếp vì `isFinite(null) === true`.
+function parseCoordinate(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
+  if (typeof value !== 'string') return NaN
+  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+```
+
+```js
 // Khi chưa nhập tiêu chí tìm kiếm (q rỗng + chưa chọn quận/xã):
 // hiển thị 50 cửa hàng gần nhất, sort khoảng cách tăng dần
 const defaultNearby = stores
@@ -152,7 +176,7 @@ const defaultNearby = stores
 ```js
 // Bộ lọc chi tiết trên `/`
 // Quận/Huyện + Xã/Phường: single-select
-// Loại cửa hàng + Độ lớn + Có SĐT + Có ảnh: multi-select
+// Loại cửa hàng + Độ lớn + Có SĐT + Có ảnh + Không có vị trí: multi-select
 const filtered = stores.filter((store) => {
   if (selectedDistrict && store.district !== selectedDistrict) return false
   if (selectedWard && store.ward !== selectedWard) return false
@@ -164,6 +188,10 @@ const filtered = stores.filter((store) => {
   }
   if (selectedFlags.includes('has_phone') && !String(store.phone || '').trim()) return false
   if (selectedFlags.includes('has_image') && !String(store.image_url || '').trim()) return false
+  if (selectedFlags.includes('has_no_location')) {
+    const hasCoords = Number.isFinite(parseCoordinate(store.latitude)) && Number.isFinite(parseCoordinate(store.longitude))
+    if (hasCoords) return false
+  }
   return true
 })
 ```
@@ -216,12 +244,32 @@ if (!user) router.replace('/login?from=/account')
   - Trang hiển thị chung (`/map`): Dùng bộ lọc tối (`.dark-map-filter`).
   - Trang nhập liệu (`create/edit`): Dùng chế độ **Sáng** (`dark={false}`) để nạp tọa độ chính xác.
 - `/map` có source/layer riêng cho vị trí người dùng (`user-location`) để hiển thị chấm xanh.
+- `/map` phải lọc từ đầu để chỉ giữ các store có tọa độ hợp lệ; store không có vị trí không được đẩy vào marker source hay search suggestion.
 - **Steps & Tags**: Sử dụng màu nền tối cố định (`bg-gray-800/90`, `bg-gray-900`), không dùng các class `bg-white` hay `bg-gray-100`.
 - **Input**: font-size ≥ 16px (tránh iOS zoom), nền `bg-gray-900`, text `text-gray-100`.
 - **Button height**: tối thiểu `h-10` (40px), prefer `h-11` (44px).
 - **Màu text mặc định**: chính `text-gray-100`, phụ `text-gray-400`.
 - **Desktop navbar**: giữ bố cục cũ (brand trái, nav phải), active state tối giản bằng chữ/icon sáng + underline mảnh; không dùng nền active quá nặng.
 - **Admin mobile step 3**: phần dán Google Maps link hiển thị mặc định ngay dưới bản đồ, không dùng card wrapper riêng.
+- **Search card phone link**: vùng click gọi điện chỉ ôm đúng số điện thoại, không stretch ra khoảng trống bên phải.
+
+```js
+// Duplicate panel ở `/store/create`
+// nếu candidate chưa có vị trí thì card được phép truyền action phụ:
+<SearchStoreCard
+  compact
+  compactActionLabel="Bổ sung vị trí"
+  onCompactAction={(store) => router.push(`/store/edit/${store.id}?mode=location-only`)}
+/>
+```
+
+```js
+// Trong `/store/edit/[id]?mode=location-only`
+// chỉ render phần vị trí, auto gọi GPS một lần nếu store chưa có tọa độ
+if (isLocationOnlyMode && pickedLat == null && pickedLng == null) {
+  handleGetLocation()
+}
+```
 
 ---
 

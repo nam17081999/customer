@@ -38,6 +38,8 @@ export default function EditStore() {
   const router = useRouter()
   const { id } = router.query
   const { user, loading: authLoading } = useAuth() || {}
+  const rawMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode
+  const isLocationOnlyMode = rawMode === 'location-only'
 
   const [pageReady, setPageReady] = useState(false)
   const [store, setStore] = useState(null)
@@ -73,6 +75,7 @@ export default function EditStore() {
   const [saving, setSaving] = useState(false)
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
+  const autoLocationRequestedRef = useRef(false)
 
   function showMessage(type, text, duration = 3000) {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
@@ -87,7 +90,7 @@ export default function EditStore() {
   useEffect(() => {
     if (authLoading) return
     if (!user) {
-      router.replace(`/login?from=/store/edit/${id || ''}`)
+      router.replace(`/login?from=${encodeURIComponent(router.asPath || `/store/edit/${id || ''}`)}`)
     } else {
       setPageReady(true)
     }
@@ -121,6 +124,15 @@ export default function EditStore() {
     }
     fetchStore()
   }, [id, pageReady])
+
+  useEffect(() => {
+    if (!pageReady || !store || !isLocationOnlyMode) return
+    if (autoLocationRequestedRef.current) return
+    if (pickedLat != null && pickedLng != null) return
+
+    autoLocationRequestedRef.current = true
+    handleGetLocation()
+  }, [pageReady, store, isLocationOnlyMode, pickedLat, pickedLng])
 
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
@@ -225,14 +237,44 @@ export default function EditStore() {
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!name.trim()) { showMessage('error', 'Tên cửa hàng không được để trống'); return }
-    if (!district.trim() || !ward.trim()) {
-      showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
-      return
+    if (isLocationOnlyMode) {
+      if (pickedLat == null || pickedLng == null || !isFinite(pickedLat) || !isFinite(pickedLng)) {
+        showMessage('error', 'Vui lòng thêm vị trí trước khi lưu')
+        return
+      }
+    } else {
+      if (!name.trim()) { showMessage('error', 'Tên cửa hàng không được để trống'); return }
+      if (!district.trim() || !ward.trim()) {
+        showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+        return
+      }
     }
 
     setSaving(true)
     try {
+      if (isLocationOnlyMode) {
+        const { error } = await supabase
+          .from('stores')
+          .update({
+            latitude: pickedLat,
+            longitude: pickedLng,
+          })
+          .eq('id', id)
+        if (error) throw error
+
+        await invalidateStoreCache()
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('storevis:stores-changed', {
+              detail: { type: 'update', id, shouldRefetchAll: true },
+            })
+          )
+        }
+        showMessage('success', 'Đã lưu vị trí!', 1500)
+        setTimeout(() => router.push('/'), 1600)
+        return
+      }
+
       let newImageUrl = store?.image_url || null
 
       // Upload new image if selected
@@ -276,7 +318,14 @@ export default function EditStore() {
       const { error } = await supabase.from('stores').update(updates).eq('id', id)
       if (error) throw error
 
-      invalidateStoreCache()
+      await invalidateStoreCache()
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('storevis:stores-changed', {
+            detail: { type: 'update', id, shouldRefetchAll: true },
+          })
+        )
+      }
       showMessage('success', 'Đã lưu thay đổi!', 1500)
       setTimeout(() => router.push('/'), 1600)
     } catch (err) {
@@ -321,7 +370,7 @@ export default function EditStore() {
           }
         />
         <div>
-          <h1 className="text-base font-semibold text-white leading-tight">Sửa cửa hàng</h1>
+          <h1 className="text-base font-semibold text-white leading-tight">{isLocationOnlyMode ? 'Thêm vị trí cửa hàng' : 'Sửa cửa hàng'}</h1>
           <OverflowMarquee
             text={store.name}
             className="max-w-[200px]"
@@ -331,6 +380,14 @@ export default function EditStore() {
       </div>
 
       <form onSubmit={handleSave} className="max-w-lg mx-auto px-4 py-6 space-y-5">
+        {isLocationOnlyMode && (
+          <div className="rounded-xl border border-blue-900/70 bg-blue-950/30 px-3 py-2.5 text-sm text-blue-200">
+            Chế độ này chỉ dùng để thêm vị trí cho cửa hàng. Bạn không thể sửa thông tin bước 1 hoặc bước 2 ở đây.
+          </div>
+        )}
+
+        {!isLocationOnlyMode && (
+          <>
         <div className="space-y-1.5">
           <Label htmlFor="store_type" className="text-sm font-medium text-gray-300">Loại cửa hàng</Label>
           <select
@@ -501,10 +558,12 @@ export default function EditStore() {
             <p className="text-xs text-gray-400">Cửa hàng đã được kiểm tra thực tế</p>
           </div>
         </div>
+          </>
+        )}
 
         {/* Location */}
         <div>
-          <Label className="text-sm font-medium text-gray-300 mb-2 block">Vị trí trên bản đồ</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-2 block">{isLocationOnlyMode ? 'Bước 3: Thêm vị trí trên bản đồ' : 'Vị trí trên bản đồ'}</Label>
 
           {/* Maps link input */}
           <div className="mb-3">
@@ -575,7 +634,7 @@ export default function EditStore() {
               </svg>
             ) : undefined}
           >
-            {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+            {saving ? 'Đang lưu…' : isLocationOnlyMode ? 'Lưu vị trí' : 'Lưu thay đổi'}
           </Button>
         </div>
       </form>

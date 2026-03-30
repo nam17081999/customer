@@ -40,6 +40,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 → Xuất dữ liệu (/store/export)
 → Duyệt báo cáo cửa hàng (/store/reports)
 → Sửa store (/store/edit/[id])
+→ Thêm vị trí cho store chưa có tọa độ (`/store/edit/[id]?mode=location-only`)
 → Thêm store → active ngay
 ```
 
@@ -54,12 +55,13 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
 | `helper/geolocation.js` | Lấy GPS, compass |
 | `pages/store/create.js` | Form tạo cửa hàng 3 bước |
+| `pages/store/edit/[id].js` | Chỉnh sửa store + chế độ `location-only` chỉ để bổ sung vị trí |
 | `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
 | `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
-| `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ |
+| `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
 | `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên |
+| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Thêm vị trí` |
 
 ---
 
@@ -81,7 +83,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 
 ---
 
-## 16 Điều Cần Biết Khi Code
+## 19 Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
 2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
@@ -94,11 +96,14 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
 10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
 11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
-12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/độ lớn/có SĐT/có ảnh là multi-select.
+12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/độ lớn/có SĐT/có ảnh/không có vị trí là multi-select.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
-14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng.
-15. **Trang `/store/export`**: CSV xuất toàn bộ store chưa xóa mềm; VCF mới phụ thuộc số điện thoại.
-16. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
+14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
+15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
+16. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
+17. **Duplicate panel**: candidate chưa có vị trí có thể có nút `Bổ sung vị trí` để mở `/store/edit/[id]?mode=location-only`.
+18. **`/store/edit/[id]?mode=location-only`**: chỉ dùng để thêm vị trí, không được sửa bước 1 hoặc bước 2, và auto lấy GPS một lần khi mở.
+19. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
 
 ---
 
