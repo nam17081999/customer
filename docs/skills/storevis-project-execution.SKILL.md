@@ -28,11 +28,20 @@ Skill này dùng để AI làm việc đúng “luật dự án”, giảm lỗi
 - Đọc danh sách `stores` qua `getOrRefreshStores()` từ `lib/storeCache.js`.
 - Không hard delete stores, chỉ soft delete bằng `deleted_at`.
 - `image_url` lưu filename, không lưu full URL.
+- File có tiếng Việt phải được giữ UTF-8. Không dùng cách ghi file dễ làm vỡ encoding nếu không thật sự cần.
 - Sau mutation phải sync cache đúng hàm:
 - CREATE: `appendStoreToCache(newStore)`.
 - DELETE mềm: `removeStoreFromCache(id)` và khi cần `invalidateStoreCache()`.
 - EDIT/VERIFY/REPORT apply: `invalidateStoreCache()`.
 - Khi cần đồng bộ liên trang, dispatch event `storevis:stores-changed`.
+
+## Guardrail riêng cho tiếng Việt
+
+- Ưu tiên `apply_patch` hoặc editor ghi UTF-8 ổn định khi sửa file có tiếng Việt.
+- Tránh dùng PowerShell `Set-Content` / `Out-File` để ghi lại cả file trừ khi đã kiểm soát rõ encoding đầu ra.
+- Không tin hoàn toàn vào hiển thị của terminal Windows khi đọc file tiếng Việt; terminal có thể sai codepage dù source vẫn đúng.
+- Khi sửa text tiếng Việt, phải kiểm tra lại bằng `git diff` và ưu tiên xác nhận trên UI/browser nếu có thể.
+- Nếu chỉ cần sửa vài chuỗi, không rewrite toàn file.
 
 ## Flow triển khai chuẩn
 
@@ -77,4 +86,3 @@ Skill này dùng để AI làm việc đúng “luật dự án”, giảm lỗi
 - File nào đã thay đổi.
 - Đã verify bằng cách nào.
 - Rủi ro còn lại hoặc phần chưa verify được.
-

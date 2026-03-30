@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
@@ -33,7 +33,9 @@ export default function VerifyStorePage() {
     if (authLoading) return
     if (!user) {
       setPageReady(false)
-      router.replace('/login?from=/store/verify')
+      void router.replace('/login?from=/store/verify').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to login failed:', err)
+      })
       return
     }
     setPageReady(true)
@@ -367,10 +369,10 @@ export default function VerifyStorePage() {
       <Dialog open={confirmVerify.open} onOpenChange={(open) => setConfirmVerify((prev) => ({ ...prev, open }))}>
         <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden">
           <div className="p-4 space-y-3">
-            <h3 className="text-base font-semibold text-gray-100">Xác nhận xác thực</h3>
-            <p className="text-sm text-gray-400">
+            <DialogTitle className="text-base font-semibold text-gray-100">Xác nhận xác thực</DialogTitle>
+            <DialogDescription className="text-sm text-gray-400">
               Bạn chắc chắn muốn xác thực {confirmVerify.ids.length} cửa hàng?
-            </p>
+            </DialogDescription>
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={closeVerifyConfirm}>
                 Hủy

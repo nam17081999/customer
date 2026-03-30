@@ -16,6 +16,17 @@ Quy tắc bắt buộc khi sinh code cho project StoreVis. Đọc file này trư
 - **Pages Router** — page mới đặt trong `pages/`, không phải `app/`
 - Dynamic import với `{ ssr: false }` cho MapLibre, canvas, browser-only code
 
+## 1b. Encoding & Vietnamese Safety
+
+- Tất cả file source/docs có tiếng Việt phải giữ **UTF-8**.
+- Ưu tiên `apply_patch` khi chỉ sửa một phần file có tiếng Việt.
+- Tránh rewrite cả file bằng PowerShell `Set-Content`, `Out-File`, hoặc pipeline text nếu chưa kiểm soát rõ encoding đầu ra.
+- Khi buộc phải tạo file mới, giữ literal tiếng Việt chuẩn trong source; không chấp nhận mojibake như `Ã`, `Ä`, `áº`, `á»`.
+- Sau khi sửa text tiếng Việt:
+  1. kiểm tra lại `git diff`
+  2. nếu là UI text, ưu tiên reload màn hình để xác nhận
+  3. nếu terminal hiển thị sai dấu nhưng diff/source đúng, coi đó là vấn đề codepage terminal chứ không tự ý rewrite file lần nữa
+
 ---
 
 ## 2. Đọc Stores — Bắt Buộc Qua Cache
@@ -55,6 +66,14 @@ while (true) {
   if (!data || data.length < 1000) break
   from += 1000
 }
+```
+
+**Admin import page vẫn phải đọc qua cache public để so trùng:**
+```js
+// `/store/import` dùng cache hiện có để preview nghi trùng
+import { getOrRefreshStores } from '@/lib/storeCache'
+
+const existingStores = await getOrRefreshStores()
 ```
 
 ---
@@ -151,6 +170,21 @@ const [near, global] = await Promise.all([
   findGlobalExactNameMatches(name),
 ])
 const dupes = mergeDuplicateCandidates(near, global, lat, lng)
+```
+
+```js
+// `/store/import`: parse file mẫu CSV và preview trước khi insert
+const rows = parseCsv(csvText)
+const { headerMap, missingFields } = buildHeaderMap(rows[0])
+if (missingFields.length > 0) {
+  throw new Error('Thiếu cột bắt buộc trong file mẫu')
+}
+
+const previewRows = rows.slice(1).map((row) => ({
+  status: 'ready',          // hoặc 'duplicate' / 'error'
+  issues: [],
+  duplicateMatches: [],
+}))
 ```
 
 ```js
@@ -258,17 +292,41 @@ if (!user) router.replace('/login?from=/account')
 // nếu candidate chưa có vị trí thì card được phép truyền action phụ:
 <SearchStoreCard
   compact
-  compactActionLabel="Bổ sung vị trí"
-  onCompactAction={(store) => router.push(`/store/edit/${store.id}?mode=location-only`)}
+  compactActionLabel="Bổ sung"
+  onCompactAction={(store) => router.push(`/store/edit/${store.id}?mode=supplement`)}
 />
 ```
 
 ```js
-// Trong `/store/edit/[id]?mode=location-only`
-// chỉ render phần vị trí, auto gọi GPS một lần nếu store chưa có tọa độ
-if (isLocationOnlyMode && pickedLat == null && pickedLng == null) {
+// Bulk import thật chỉ lấy các dòng đã pass preview
+const readyRows = previewRows.filter((row) => row.status === 'ready')
+
+for (const chunk of chunkArray(payloads, 100)) {
+  const { error } = await supabase.from('stores').insert(chunk)
+  if (error) throw error
+}
+
+await invalidateStoreCache()
+window.dispatchEvent(new CustomEvent('storevis:stores-changed', {
+  detail: { type: 'bulk-import', shouldRefetchAll: true },
+}))
+```
+
+```js
+// Trong `/store/edit/[id]?mode=supplement`
+// luôn bắt đầu từ bước 1, khóa field đã có, và chỉ khi store thiếu tọa độ
+// mới có bước 3 để bổ sung vị trí
+if (isSupplementMode && currentStep === 3 && pickedLat == null && pickedLng == null) {
   handleGetLocation()
 }
+
+// Nếu chưa đăng nhập, supplement flow không update trực tiếp `stores`
+await supabase.from('store_reports').insert([{
+  store_id: id,
+  report_type: 'edit',
+  proposed_changes: updates,
+  reporter_id: null,
+}])
 ```
 
 ---

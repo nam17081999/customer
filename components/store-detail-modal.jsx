@@ -11,6 +11,7 @@ import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { formatDistance } from '@/helper/validation'
+import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -102,7 +103,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
   if (!store) return trigger || null
 
-  const hasCoords = typeof store.latitude === 'number' && typeof store.longitude === 'number'
+  const hasCoords = hasStoreCoordinates(store)
+  const canSupplement = hasStoreSupplementOpportunity(store)
   const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
@@ -173,9 +175,9 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     router.push(`/store/edit/${store.id}`)
   }
 
-  const handleAddLocation = (e) => {
+  const handleSupplement = (e) => {
     e.stopPropagation()
-    router.push(`/store/edit/${store.id}?mode=location-only`)
+    router.push(`/store/edit/${store.id}?mode=supplement`)
   }
 
   const wardSuggestions = reportDistrict
@@ -406,20 +408,20 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
         {/* Action buttons */}
         <div className="px-4 pb-4 pt-2 grid grid-cols-2 gap-2">
+          {canSupplement && (
+            <Button
+              variant="outline"
+              className="w-full"
+              leftIcon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" /></svg>
+              }
+              onClick={handleSupplement}
+            >
+              Bổ sung
+            </Button>
+          )}
           {user && (
             <>
-              {!hasCoords && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  leftIcon={
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" /></svg>
-                  }
-                  onClick={handleAddLocation}
-                >
-                  Thêm vị trí
-                </Button>
-              )}
               <Button
                 variant="outline"
                 className="w-full"

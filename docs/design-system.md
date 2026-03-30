@@ -110,6 +110,18 @@ link:    text-gray-50 underline
   - Panel có `max-height` và tự cuộn bên trong, không được kéo ngang
   - Footer thao tác (`Xóa lọc`, `Thu gọn`) phải giữ được một hàng chữ trên desktop
 
+### Import Preview (`/store/import`)
+- Dùng bố cục 1 cột, `max-w-screen-md`, giống các màn admin khác
+- Phần đầu màn có 2 CTA rõ ràng:
+  - `Tải file mẫu`
+  - `Chọn file CSV`
+- Preview từng dòng phải dễ quét:
+  - tên store nổi bật bằng `text-base font-semibold`
+  - địa chỉ và metadata dùng `text-sm`
+  - trạng thái dùng badge màu rõ: xanh / vàng / đỏ
+- Danh sách lỗi và nghi trùng phải tách thành từng block riêng, không dồn thành một đoạn dài khó đọc
+- Các số liệu tổng quan (`Tổng dòng`, `Sẵn sàng nhập`, `Nghi trùng`, `Lỗi dữ liệu`) hiển thị dạng card ngắn ở đầu preview
+
 ### Card
 - `rounded-xl border border-gray-800 bg-gray-950`
 
@@ -166,3 +178,22 @@ Trang map luôn dark (không theo system preference):
 | `<640px` | Bottom tab bar, compact padding, no autofocus |
 | `≥640px` | Top navbar, wider padding, autofocus input (desktop only) |
 | Map sidebar | Chỉ khi `(hover: hover) and (pointer: fine)` |
+
+---
+
+## Dialog Accessibility
+
+- Mọi `DialogContent` phải có:
+  - `DialogTitle`
+  - `DialogDescription` hoặc `aria-describedby` được xử lý rõ ràng
+- Không dùng chỉ `h3` / `p` thường cho dialog xác nhận nếu thiếu primitive accessibility của Radix.
+- Với dialog xác nhận admin:
+  - title ngắn, rõ hành động
+  - description giải thích kết quả của thao tác
+  - nút xác nhận/hủy phải dùng tiếng Việt rõ nghĩa
+
+## Vietnamese Copy Safety
+
+- UI copy tiếng Việt phải được lưu trực tiếp bằng `UTF-8`.
+- Nếu có nghi ngờ lỗi dấu, ưu tiên kiểm tra trên browser trước khi rewrite file.
+- `.editorconfig` của repo là một phần của design hygiene để tránh lệch encoding giữa các editor.

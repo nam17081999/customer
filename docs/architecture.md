@@ -30,6 +30,7 @@
 
 ```
 customer/
+├── .editorconfig           # UTF-8 + LF guardrail cho source/docs
 ├── app/                    # layout.js, globals.css (font-size 19px/21px)
 ├── pages/
 │   ├── _app.js             # AuthProvider + Navbar + ErrorBoundary
@@ -39,6 +40,7 @@ customer/
 │   ├── account.js          # Dashboard admin
 │   └── store/
 │       ├── create.js       # Form tạo store 3 bước
+│       ├── import.js       # Nhập nhiều store từ file CSV + preview kiểm tra
 │       ├── export.js       # Xuất CSV/VCF
 │       ├── verify.js       # Duyệt store chờ xác thực
 │       ├── reports.js      # Duyệt báo cáo cửa hàng
@@ -96,6 +98,18 @@ customer/
   - Không dùng cache public để xuất dữ liệu
   - Đọc trực tiếp Supabase với điều kiện `deleted_at IS NULL`
   - Fetch theo trang (`range`) để lấy đủ toàn bộ store cho CSV/VCF
+
+[Admin import page: `/store/import`]
+  - Đọc stores hiện có qua `getOrRefreshStores()` để kiểm tra nghi trùng trước khi nhập
+  - Người dùng tải file mẫu `.csv`, điền đúng các cột chuẩn rồi tải lên lại
+  - File import được parse và kiểm tra ngay trên client:
+    - thiếu cột bắt buộc
+    - sai loại cửa hàng / độ lớn cửa hàng
+    - sai số điện thoại
+    - tọa độ thiếu cặp hoặc không hợp lệ
+    - trùng trong chính file
+    - nghi trùng với hệ thống hiện có
+  - Chỉ các dòng `ready` mới được insert; sau bulk import phải `invalidateStoreCache()` và dispatch `storevis:stores-changed`
 ```
 
 **Sau mutation:**
@@ -113,6 +127,7 @@ customer/
 | `/` | Tìm kiếm | Public |
 | `/map` | Bản đồ MapLibre | Public |
 | `/store/create` | Tạo cửa hàng (3 bước) | Public |
+| `/store/import` | Nhập nhiều cửa hàng từ file mẫu CSV | Admin |
 | `/store/export` | Xuất dữ liệu cửa hàng | Admin |
 | `/store/verify` | Duyệt cửa hàng chờ | Admin |
 | `/store/reports` | Duyệt báo cáo cửa hàng | Admin |
@@ -146,18 +161,21 @@ customer/
 
 ---
 
-## Luồng Bổ Sung Vị Trí
+## Luồng Bổ Sung Dữ Liệu
 
-- Nếu store chưa có tọa độ:
-  - `StoreDetailModal` hiển thị nhãn **Chưa có vị trí**
-  - admin có nút **Thêm vị trí**
-- Nút này điều hướng sang `/store/edit/[id]?mode=location-only`
-- Ở chế độ `location-only`:
-  - header đổi thành "Thêm vị trí cửa hàng"
-  - chỉ render phần bản đồ / Google Maps link / GPS
-  - không render các trường thông tin khác của edit form
-  - khi vào trang sẽ tự gọi GPS một lần nếu store chưa có vị trí
-  - submit chỉ update `latitude`, `longitude`
+- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `store_size`, `address_detail`, `ward`, `district`, `phone`, `image_url`, hoặc vị trí):
+  - `StoreDetailModal` hiển thị nút **Bổ sung**
+  - duplicate panel ở bước 1 của `/store/create` cũng có thể hiển thị nút **Bổ sung**
+- Nút này điều hướng sang `/store/edit/[id]?mode=supplement`
+- Ở chế độ `supplement`:
+  - luôn bắt đầu từ **bước 1**
+  - dữ liệu đã có sẵn bị khóa, không cho chỉnh sửa
+  - chỉ cho nhập phần còn thiếu
+  - nếu store chưa có vị trí thì flow có **3 bước**
+  - nếu store đã có vị trí thì flow chỉ còn **2 bước**, bước 2 hoàn thành luôn
+  - khi vào bước 3 của store chưa có vị trí, trang sẽ tự gọi GPS một lần
+  - admin đã đăng nhập có thể cập nhật trực tiếp `stores`
+  - người chưa đăng nhập vẫn mở được supplement flow nhưng submit sẽ tạo `store_reports` để admin duyệt
 
 ---
 
@@ -169,8 +187,8 @@ customer/
   - bắt buộc thêm `số điện thoại` hợp lệ
   - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`
 - Trong duplicate panel của bước 1:
-  - candidate chưa có vị trí có nhãn **Chưa có vị trí**
-  - có thể hiện nút **Bổ sung vị trí** để chuyển sang `location-only`
+  - candidate còn thiếu dữ liệu có thể hiện nút **Bổ sung**
+  - nút này chuyển sang `/store/edit/[id]?mode=supplement`
 
 ---
 
@@ -192,3 +210,16 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 - `IMAGEKIT_PRIVATE_KEY` chỉ ở server (pages/api)
 - **⚠️ Cần verify RLS Supabase** để user thường không UPDATE/DELETE
 - Soft delete: dùng `deleted_at`, không DELETE SQL
+
+---
+
+## Encoding & Admin Dialogs
+
+- Source/docs có tiếng Việt phải được giữ ở `UTF-8`; repo dùng `.editorconfig` để giảm lỗi encoding giữa editor/tool khác nhau.
+- Khi sửa text tiếng Việt, ưu tiên patch cục bộ thay vì rewrite cả file.
+- Các dialog xác nhận ở màn admin phải dùng đúng primitive accessibility của Radix:
+  - `DialogTitle`
+  - `DialogDescription`
+- Rule này áp dụng rõ cho:
+  - `/store/verify`
+  - `/store/reports`

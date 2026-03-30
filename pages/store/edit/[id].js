@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import StoreSupplementForm from '@/components/store/store-supplement-form'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { invalidateStoreCache } from '@/lib/storeCache'
 import {
@@ -20,7 +21,9 @@ import {
   DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
+import { isValidPhone } from '@/helper/validation'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
+import { hasStoreCoordinates } from '@/helper/storeSupplement'
 
 const StoreLocationPicker = dynamic(
   () => import('@/components/map/store-location-picker'),
@@ -39,7 +42,7 @@ export default function EditStore() {
   const { id } = router.query
   const { user, loading: authLoading } = useAuth() || {}
   const rawMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode
-  const isLocationOnlyMode = rawMode === 'location-only'
+  const isSupplementMode = rawMode === 'supplement' || rawMode === 'location-only'
 
   const [pageReady, setPageReady] = useState(false)
   const [store, setStore] = useState(null)
@@ -73,6 +76,10 @@ export default function EditStore() {
 
   // Submit state
   const [saving, setSaving] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [successMode, setSuccessMode] = useState('')
+  const [supplementLocationOpen, setSupplementLocationOpen] = useState(false)
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
   const autoLocationRequestedRef = useRef(false)
@@ -88,17 +95,17 @@ export default function EditStore() {
 
   // Auth guard
   useEffect(() => {
-    if (authLoading) return
-    if (!user) {
+    if (!router.isReady || authLoading) return
+    if (!user && !isSupplementMode) {
       router.replace(`/login?from=${encodeURIComponent(router.asPath || `/store/edit/${id || ''}`)}`)
     } else {
       setPageReady(true)
     }
-  }, [user, authLoading, id, router])
+  }, [router.isReady, user, authLoading, id, router, isSupplementMode])
 
   // Fetch store
   useEffect(() => {
-    if (!id || !pageReady) return
+    if (!router.isReady || !id || !pageReady) return
     async function fetchStore() {
       const { data, error } = await supabase
         .from('stores')
@@ -121,21 +128,56 @@ export default function EditStore() {
       setActive(Boolean(data.active))
       setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
       setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
+      setCurrentStep(1)
+      setShowSuccess(false)
+      setSuccessMode('')
+      setSupplementLocationOpen(false)
+      autoLocationRequestedRef.current = false
     }
     fetchStore()
-  }, [id, pageReady])
+  }, [router.isReady, id, pageReady])
 
   useEffect(() => {
-    if (!pageReady || !store || !isLocationOnlyMode) return
+    if (!pageReady || !store || !isSupplementMode) return
     if (autoLocationRequestedRef.current) return
+    if (currentStep !== 3) return
+    if (!supplementLocationOpen) return
+    if (hasStoreCoordinates(store)) return
     if (pickedLat != null && pickedLng != null) return
 
     autoLocationRequestedRef.current = true
     handleGetLocation()
-  }, [pageReady, store, isLocationOnlyMode, pickedLat, pickedLng])
+  }, [pageReady, store, isSupplementMode, currentStep, supplementLocationOpen, pickedLat, pickedLng])
 
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
+  const originalHasCoordinates = hasStoreCoordinates(store)
+  const supplementLocks = useMemo(() => ({
+    name: Boolean(String(store?.name || '').trim()),
+    storeType: Boolean(String(store?.store_type || '').trim()),
+    storeSize: Boolean(String(store?.store_size || '').trim()),
+    addressDetail: Boolean(String(store?.address_detail || '').trim()),
+    ward: Boolean(String(store?.ward || '').trim()),
+    district: Boolean(String(store?.district || '').trim()),
+    phone: Boolean(String(store?.phone || '').trim()),
+    note: Boolean(String(store?.note || '').trim()),
+    image: Boolean(String(store?.image_url || '').trim()),
+    location: originalHasCoordinates,
+  }), [store, originalHasCoordinates])
+  const supplementStepCount = originalHasCoordinates ? 2 : 3
+  const supplementSteps = supplementStepCount === 2
+    ? [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+    ]
+    : [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+      { num: 3, label: 'Vị trí' },
+    ]
+  const hasEditableSupplementFields = useMemo(() => (
+    Object.values(supplementLocks).some((value) => value === false)
+  ), [supplementLocks])
 
   // Image file handler
   function handleImageChange(e) {
@@ -235,31 +277,88 @@ export default function EditStore() {
     }
   }
 
-  async function handleSave(e) {
-    e.preventDefault()
-    if (isLocationOnlyMode) {
-      if (pickedLat == null || pickedLng == null || !isFinite(pickedLat) || !isFinite(pickedLng)) {
-        showMessage('error', 'Vui lòng thêm vị trí trước khi lưu')
-        return
-      }
-    } else {
-      if (!name.trim()) { showMessage('error', 'Tên cửa hàng không được để trống'); return }
-      if (!district.trim() || !ward.trim()) {
-        showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
-        return
-      }
+
+
+
+  async function handleSaveSupplement() {
+    if (!hasEditableSupplementFields) {
+      showMessage('error', 'Cửa hàng này không còn dữ liệu nào để bổ sung')
+      return
     }
 
-    setSaving(true)
-    try {
-      if (isLocationOnlyMode) {
-        const { error } = await supabase
-          .from('stores')
-          .update({
-            latitude: pickedLat,
-            longitude: pickedLng,
-          })
-          .eq('id', id)
+    if (!supplementLocks.phone && phone.trim() && !isValidPhone(phone.trim())) {
+      showMessage('error', 'Số điện thoại không hợp lệ')
+      return
+    }
+
+      setSaving(true)
+      try {
+        const updates = {}
+
+      if (!supplementLocks.name) {
+        const normalizedName = toTitleCaseVI(name.trim())
+        if (normalizedName) updates.name = normalizedName
+      }
+      if (!supplementLocks.storeType) {
+        const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
+        if (normalizedStoreType) updates.store_type = normalizedStoreType
+      }
+      if (!supplementLocks.storeSize && storeSize) updates.store_size = storeSize
+      if (!supplementLocks.addressDetail) {
+        const normalizedDetail = addressDetail.trim() ? toTitleCaseVI(addressDetail.trim()) : ''
+        if (normalizedDetail) updates.address_detail = normalizedDetail
+      }
+      if (!supplementLocks.district) {
+        const normalizedDistrict = district.trim() ? toTitleCaseVI(district.trim()) : ''
+        if (normalizedDistrict) updates.district = normalizedDistrict
+      }
+      if (!supplementLocks.ward) {
+        const normalizedWard = ward.trim() ? toTitleCaseVI(ward.trim()) : ''
+        if (normalizedWard) updates.ward = normalizedWard
+      }
+      if (!supplementLocks.phone) {
+        const normalizedPhone = phone.trim()
+        if (normalizedPhone) updates.phone = normalizedPhone
+      }
+      if (!supplementLocks.note) {
+        const normalizedNote = note.trim()
+        if (normalizedNote) updates.note = normalizedNote
+      }
+      if (!supplementLocks.location && Number.isFinite(pickedLat) && Number.isFinite(pickedLng)) {
+        updates.latitude = pickedLat
+        updates.longitude = pickedLng
+      }
+
+      if (imageFile && !supplementLocks.image) {
+        const authRes = await fetch('/api/imagekit-auth')
+        const authData = await authRes.json()
+        if (!authData.token) throw new Error('imagekit-auth thất bại')
+
+        const { IMAGEKIT_URL_ENDPOINT, IMAGEKIT_PUBLIC_KEY } = await import('@/lib/constants')
+        const formData = new FormData()
+        formData.append('file', imageFile)
+        formData.append('fileName', `store-${id}-${Date.now()}`)
+        formData.append('publicKey', IMAGEKIT_PUBLIC_KEY)
+        formData.append('signature', authData.signature)
+        formData.append('expire', authData.expire)
+        formData.append('token', authData.token)
+
+        const ikRes = await fetch(`${IMAGEKIT_URL_ENDPOINT}/api/v1/files/upload`, {
+          method: 'POST',
+          body: formData,
+        })
+        const ikData = await ikRes.json()
+        if (ikData.name) updates.image_url = ikData.name
+      }
+
+      if (Object.keys(updates).length === 0) {
+        showMessage('error', 'Bạn chưa bổ sung thêm thông tin nào')
+        setSaving(false)
+        return
+      }
+
+      if (user) {
+        const { error } = await supabase.from('stores').update(updates).eq('id', id)
         if (error) throw error
 
         await invalidateStoreCache()
@@ -270,14 +369,46 @@ export default function EditStore() {
             })
           )
         }
-        showMessage('success', 'Đã lưu vị trí!', 1500)
-        setTimeout(() => router.push('/'), 1600)
-        return
+        setSuccessMode('supplement-update')
+      } else {
+        const { error } = await supabase.from('store_reports').insert([{
+          store_id: id,
+          report_type: 'edit',
+          reason_codes: null,
+          proposed_changes: updates,
+          reporter_id: null,
+        }])
+        if (error) throw error
+        setSuccessMode('supplement-report')
       }
 
+      setShowSuccess(true)
+      showMessage('success', user ? 'Đã bổ sung thông tin cửa hàng!' : 'Đã gửi đề xuất bổ sung để admin duyệt!', 1500)
+    } catch (err) {
+      console.error(err)
+      showMessage('error', err.message || 'Lưu thất bại, vui lòng thử lại')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    if (isSupplementMode) {
+      await handleSaveSupplement()
+      return
+    }
+
+    if (!name.trim()) { showMessage('error', 'Tên cửa hàng không được để trống'); return }
+    if (!district.trim() || !ward.trim()) {
+      showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+      return
+    }
+
+    setSaving(true)
+    try {
       let newImageUrl = store?.image_url || null
 
-      // Upload new image if selected
       if (imageFile) {
         const authRes = await fetch('/api/imagekit-auth')
         const authData = await authRes.json()
@@ -353,7 +484,94 @@ export default function EditStore() {
     return <FullPageLoading />
   }
 
+  if (showSuccess) {
+    const isSupplementReport = successMode === 'supplement-report'
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center px-6 py-10 space-y-5 max-w-sm mx-auto">
+          <div className="text-6xl">✅</div>
+          <h2 className="text-xl font-bold text-white">
+            {isSupplementReport ? 'Đã gửi đề xuất bổ sung!' : 'Bổ sung dữ liệu thành công!'}
+          </h2>
+          <p className="text-sm text-gray-400">
+            {isSupplementReport
+              ? 'Admin sẽ xem xét và duyệt phần dữ liệu bạn vừa bổ sung.'
+              : 'Thông tin còn thiếu đã được cập nhật vào hệ thống.'}
+          </p>
+          <div className="flex flex-col gap-3 pt-2">
+            {user && (
+              <Button className="w-full" onClick={() => router.push(`/store/edit/${id}`)}>
+                Xem màn sửa đầy đủ
+              </Button>
+            )}
+            <Button variant="outline" className="w-full" onClick={() => router.push('/')}>
+              Về trang chủ
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const hasExistingImage = Boolean(String(store?.image_url || '').trim())
   const currentImage = imagePreview || (imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url))
+  const supplementCurrentImage = hasExistingImage ? currentImage : imagePreview
+
+  if (isSupplementMode) {
+    return (
+      <StoreSupplementForm
+        router={router}
+        user={user}
+        store={store}
+        msgState={msgState}
+        steps={supplementSteps}
+        currentStep={currentStep}
+        setCurrentStep={setCurrentStep}
+        stepCount={supplementStepCount}
+        saving={saving}
+        storeType={storeType}
+        setStoreType={setStoreType}
+        storeSize={storeSize}
+        setStoreSize={setStoreSize}
+        name={name}
+        setName={setName}
+        district={district}
+        setDistrict={setDistrict}
+        ward={ward}
+        setWard={setWard}
+        wardSuggestions={wardSuggestions}
+        addressDetail={addressDetail}
+        setAddressDetail={setAddressDetail}
+        phone={phone}
+        setPhone={setPhone}
+        note={note}
+        setNote={setNote}
+        imageFile={imageFile}
+        setImageFile={setImageFile}
+        imagePreview={imagePreview}
+        setImagePreview={setImagePreview}
+        setImageError={setImageError}
+        currentImage={supplementCurrentImage}
+        fileInputRef={fileInputRef}
+        supplementLocks={supplementLocks}
+        pickedLat={pickedLat}
+        pickedLng={pickedLng}
+        locationSectionOpen={supplementLocationOpen}
+        openLocationSection={() => setSupplementLocationOpen(true)}
+        onLocationChange={(lat, lng) => { setPickedLat(lat); setPickedLng(lng) }}
+        mapEditable={mapEditable}
+        setMapEditable={setMapEditable}
+        resolvingAddr={resolvingAddr}
+        handleGetLocation={handleGetLocation}
+        mapsLink={mapsLink}
+        mapsLinkLoading={mapsLinkLoading}
+        mapsLinkError={mapsLinkError}
+        setMapsLink={setMapsLink}
+        handleMapsLink={handleMapsLink}
+        handleSaveSupplement={handleSaveSupplement}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen bg-black">
@@ -370,7 +588,7 @@ export default function EditStore() {
           }
         />
         <div>
-          <h1 className="text-base font-semibold text-white leading-tight">{isLocationOnlyMode ? 'Thêm vị trí cửa hàng' : 'Sửa cửa hàng'}</h1>
+          <h1 className="text-base font-semibold text-white leading-tight">Sửa cửa hàng</h1>
           <OverflowMarquee
             text={store.name}
             className="max-w-[200px]"
@@ -380,14 +598,7 @@ export default function EditStore() {
       </div>
 
       <form onSubmit={handleSave} className="max-w-lg mx-auto px-4 py-6 space-y-5">
-        {isLocationOnlyMode && (
-          <div className="rounded-xl border border-blue-900/70 bg-blue-950/30 px-3 py-2.5 text-sm text-blue-200">
-            Chế độ này chỉ dùng để thêm vị trí cho cửa hàng. Bạn không thể sửa thông tin bước 1 hoặc bước 2 ở đây.
-          </div>
-        )}
-
-        {!isLocationOnlyMode && (
-          <>
+        <>
         <div className="space-y-1.5">
           <Label htmlFor="store_type" className="text-sm font-medium text-gray-300">Loại cửa hàng</Label>
           <select
@@ -558,12 +769,11 @@ export default function EditStore() {
             <p className="text-xs text-gray-400">Cửa hàng đã được kiểm tra thực tế</p>
           </div>
         </div>
-          </>
-        )}
+        </>
 
         {/* Location */}
         <div>
-          <Label className="text-sm font-medium text-gray-300 mb-2 block">{isLocationOnlyMode ? 'Bước 3: Thêm vị trí trên bản đồ' : 'Vị trí trên bản đồ'}</Label>
+          <Label className="text-sm font-medium text-gray-300 mb-2 block">Vị trí trên bản đồ</Label>
 
           {/* Maps link input */}
           <div className="mb-3">
@@ -634,10 +844,22 @@ export default function EditStore() {
               </svg>
             ) : undefined}
           >
-            {saving ? 'Đang lưu…' : isLocationOnlyMode ? 'Lưu vị trí' : 'Lưu thay đổi'}
+            {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
           </Button>
         </div>
       </form>
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+
+
