@@ -173,6 +173,11 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     router.push(`/store/edit/${store.id}`)
   }
 
+  const handleAddLocation = (e) => {
+    e.stopPropagation()
+    router.push(`/store/edit/${store.id}?mode=location-only`)
+  }
+
   const wardSuggestions = reportDistrict
     ? (DISTRICT_WARD_SUGGESTIONS[reportDistrict] || [])
     : []
@@ -342,12 +347,17 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
                 {store.name}
               </h3>
             </div>
-            {typeof store.distance === 'number' && (
+            {typeof store.distance === 'number' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 flex-shrink-0 whitespace-nowrap">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 {formatDistance(store.distance)}
               </span>
-            )}
+            ) : !hasCoords ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-950/80 text-amber-200 flex-shrink-0 whitespace-nowrap">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
+                Chưa có vị trí
+              </span>
+            ) : null}
           </div>
 
           {/* Address */}
@@ -398,6 +408,18 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
         <div className="px-4 pb-4 pt-2 grid grid-cols-2 gap-2">
           {user && (
             <>
+              {!hasCoords && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  leftIcon={
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" /></svg>
+                  }
+                  onClick={handleAddLocation}
+                >
+                  Thêm vị trí
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="w-full"

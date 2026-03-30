@@ -531,7 +531,8 @@ export default function MapPage() {
 
       try {
         const data = await getOrRefreshStores()
-        if (active) setStores(data)
+        const visibleStores = (data || []).filter((store) => toLatLng(store))
+        if (active) setStores(visibleStores)
       } catch (e) {
         if (active) {
           console.error(e)

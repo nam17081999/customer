@@ -88,6 +88,7 @@ customer/
 [Pages: getOrRefreshStores()] → filter + sort client-side
   - Mặc định trang tìm kiếm: không có tiêu chí thì render 50 cửa hàng gần nhất
   - Trang `/` có bộ lọc chi tiết: quận/xã (single-select) + loại/độ lớn/chi tiết dữ liệu (multi-select)
+  - `Chi tiết dữ liệu` trên `/`: hỗ trợ `Có số điện thoại`, `Có ảnh`, `Không có vị trí`
   - Vị trí người dùng ở `/` được refresh định kỳ mỗi 3 phút và khi quay lại tab/trang
   - Đồng bộ query của `/` lên URL phải có debounce + bỏ qua replace khi query không đổi để tránh flood navigation
 
@@ -141,6 +142,35 @@ customer/
 - Không tự mở modal chi tiết khi đi theo luồng này
 - Trang `/map` có nút về vị trí GPS hiện tại ở góc phải dưới
 - Trang `/map` hiển thị thêm source/layer riêng cho vị trí người dùng (blue dot)
+- Trang `/map` lọc ngay từ lúc nạp dữ liệu: chỉ store có tọa độ hợp lệ mới được đưa vào state hiển thị bản đồ
+
+---
+
+## Luồng Bổ Sung Vị Trí
+
+- Nếu store chưa có tọa độ:
+  - `StoreDetailModal` hiển thị nhãn **Chưa có vị trí**
+  - admin có nút **Thêm vị trí**
+- Nút này điều hướng sang `/store/edit/[id]?mode=location-only`
+- Ở chế độ `location-only`:
+  - header đổi thành "Thêm vị trí cửa hàng"
+  - chỉ render phần bản đồ / Google Maps link / GPS
+  - không render các trường thông tin khác của edit form
+  - khi vào trang sẽ tự gọi GPS một lần nếu store chưa có vị trí
+  - submit chỉ update `latitude`, `longitude`
+
+---
+
+## Create Flow Mở Rộng
+
+- Ở bước 2 của `/store/create` có thêm nhánh **Lưu luôn**
+- Nhánh này dùng cho store chưa có vị trí:
+  - vẫn bắt buộc `quận/huyện`, `xã/phường`
+  - bắt buộc thêm `số điện thoại` hợp lệ
+  - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`
+- Trong duplicate panel của bước 1:
+  - candidate chưa có vị trí có nhãn **Chưa có vị trí**
+  - có thể hiện nút **Bổ sung vị trí** để chuyển sang `location-only`
 
 ---
 

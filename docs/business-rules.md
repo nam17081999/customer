@@ -35,6 +35,11 @@
   - `Lớn`
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
+- Có nút **Lưu luôn** ngay tại bước 2:
+  - vẫn bắt buộc `Quận/Huyện` + `Xã/Phường`
+  - **bắt buộc thêm số điện thoại hợp lệ**
+  - trước khi lưu phải hỏi xác nhận việc lưu cửa hàng **không có vị trí**
+  - khi lưu theo nhánh này, store được tạo với `latitude = null`, `longitude = null`
 
 ### Bước 3: Vị Trí
 - Auto lấy GPS khi vào bước 3
@@ -47,6 +52,7 @@
 2. Upload ảnh → `imageFilename`
 3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`, `store_size`)
 4. `appendStoreToCache(newStore)`
+5. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối theo tọa độ, vì store chưa có vị trí
 
 ---
 
@@ -55,6 +61,11 @@
 ### Chỉnh sửa (Admin)
 - **Bắt buộc**: Quận/Huyện + Xã/Phường khi **chỉnh sửa**.
 - Lưu xong: `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
+- Nếu mở `/store/edit/[id]?mode=location-only`:
+  - chỉ hiện phần tương đương **bước 3**
+  - chỉ được thêm/sửa `latitude`, `longitude`
+  - không cho sửa lại thông tin bước 1 hoặc bước 2
+  - khi vào từ nút **Thêm vị trí**, trang sẽ tự lấy GPS hiện tại một lần
 
 ### Báo cáo (User) — trong `StoreDetailModal`
 User có 2 lựa chọn:
@@ -110,7 +121,7 @@ User có 2 lựa chọn:
 - `Xã / Phường`: chọn **1**
 - `Loại cửa hàng`: chọn nhiều
 - `Độ lớn cửa hàng`: chọn nhiều, gồm `Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`
-- `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Có ảnh`)
+- `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Có ảnh`, `Không có vị trí`)
 - Trên mobile, panel lọc được rút gọn:
   - `Quận / Huyện` và `Xã / Phường` dùng `select`
   - Các nhóm còn lại hiển thị dạng lưới 2 cột
@@ -140,6 +151,7 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
   - Khu vực: Quận → Xã; phải chọn xã mới filter stores
   - Loại cửa hàng: chọn nhiều
   - Độ lớn cửa hàng: chọn nhiều (`Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`)
+- Chỉ hiển thị trên bản đồ các store có tọa độ hợp lệ; store không có vị trí không được render marker hay xuất hiện trong search suggestion của `/map`
 - Highlight marker khi được chọn: ring `#38bdf8`
 - Auto-fix lat/lng nếu bị reversed (swap khi lat nằm ngoài [-90,90])
 - Từ modal chi tiết, nút **Bản đồ** chuyển sang `/map` kèm `storeId + lat/lng`
@@ -151,6 +163,10 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 **Thẻ chi tiết cửa hàng**:
 - Trong `StoreDetailModal`, `loại cửa hàng` hiển thị phía trên tên
 - Dùng cỡ chữ nhỏ hơn tên để giữ hierarchy
+- Nếu store chưa có tọa độ:
+  - hiển thị nhãn **Chưa có vị trí**
+  - nếu là admin thì có nút **Thêm vị trí** để mở `/store/edit/[id]?mode=location-only`
+- Ở màn tạo store, nếu duplicate check tìm ra store chưa có vị trí thì card nghi trùng có nút **Bổ sung vị trí**
 
 ---
 
@@ -169,6 +185,10 @@ Bỏ qua các từ chung khi so sánh (`IGNORED_NAME_TERMS`):
 > "cửa hàng", "tạp hoá", "quán nước", "cafe", "siêu thị", "quán", "shop", "mart", và nhiều loại khác
 
 **Ví dụ**: "Cửa hàng Minh Anh" → từ khóa so sánh là **"Minh Anh"**
+
+**Khoảng cách trong duplicate check**:
+- Chỉ store có `latitude` và `longitude` hợp lệ mới được gắn `distance`
+- Store không có vị trí vẫn có thể xuất hiện trong match toàn hệ thống, nhưng **không được hiển thị khoảng cách giả**
 
 ---
 

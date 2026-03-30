@@ -25,6 +25,18 @@ const LOCATION_REFRESH_COOLDOWN_MS = 5 * 1000
 const UNKNOWN_STORE_SIZE_VALUE = '__unknown__'
 const FILTER_FLAG_HAS_PHONE = 'has_phone'
 const FILTER_FLAG_HAS_IMAGE = 'has_image'
+const FILTER_FLAG_NO_LOCATION = 'has_no_location'
+
+function parseCoordinate(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
+  if (typeof value !== 'string') return NaN
+  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
+function hasStoreCoordinates(store) {
+  return Number.isFinite(parseCoordinate(store?.latitude)) && Number.isFinite(parseCoordinate(store?.longitude))
+}
 
 function parseQueryList(rawValue) {
   if (!rawValue) return []
@@ -307,6 +319,9 @@ export default function HomePage() {
     if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE)) {
       results = results.filter((s) => Boolean(String(s.image_url || '').trim()))
     }
+    if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION)) {
+      results = results.filter((s) => !hasStoreCoordinates(s))
+    }
     // Text search (supports Vietnamese without tones + any word order)
     if (hasTextSearch) {
       const term = searchTerm.trim().toLowerCase()
@@ -530,6 +545,7 @@ export default function HomePage() {
                     {[
                       { value: FILTER_FLAG_HAS_PHONE, label: 'Có số điện thoại' },
                       { value: FILTER_FLAG_HAS_IMAGE, label: 'Có ảnh' },
+                      { value: FILTER_FLAG_NO_LOCATION, label: 'Không có vị trí' },
                     ].map((flag) => {
                       const active = selectedDetailFlags.includes(flag.value)
                       return (
