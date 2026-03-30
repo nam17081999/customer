@@ -37,10 +37,11 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 ```
 Đăng nhập (/login)
 → Dashboard (/account) → Duyệt stores (/store/verify)
+→ Nhập dữ liệu (/store/import)
 → Xuất dữ liệu (/store/export)
 → Duyệt báo cáo cửa hàng (/store/reports)
 → Sửa store (/store/edit/[id])
-→ Thêm vị trí cho store chưa có tọa độ (`/store/edit/[id]?mode=location-only`)
+→ Bổ sung dữ liệu còn thiếu cho store (`/store/edit/[id]?mode=supplement`, public cũng mở được)
 → Thêm store → active ngay
 ```
 
@@ -55,13 +56,14 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
 | `helper/geolocation.js` | Lấy GPS, compass |
 | `pages/store/create.js` | Form tạo cửa hàng 3 bước |
-| `pages/store/edit/[id].js` | Chỉnh sửa store + chế độ `location-only` chỉ để bổ sung vị trí |
+| `pages/store/edit/[id].js` | Chỉnh sửa store + chế độ `supplement` theo step để chỉ bổ sung dữ liệu còn thiếu |
+| `pages/store/import.js` | Nhập nhiều store từ CSV mẫu, preview lỗi và nghi trùng trước khi insert |
 | `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
 | `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
 | `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
 | `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Thêm vị trí` |
+| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Bổ sung` |
 
 ---
 
@@ -83,7 +85,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 
 ---
 
-## 19 Điều Cần Biết Khi Code
+## 21 Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
 2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
@@ -101,9 +103,11 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
 15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
 16. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
-17. **Duplicate panel**: candidate chưa có vị trí có thể có nút `Bổ sung vị trí` để mở `/store/edit/[id]?mode=location-only`.
-18. **`/store/edit/[id]?mode=location-only`**: chỉ dùng để thêm vị trí, không được sửa bước 1 hoặc bước 2, và auto lấy GPS một lần khi mở.
+17. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
+18. **`/store/edit/[id]?mode=supplement`**: luôn bắt đầu từ bước 1, khóa dữ liệu đã có, chỉ cho nhập phần thiếu; nếu store đã có vị trí thì flow chỉ còn 2 bước, nếu chưa có vị trí thì bước 3 sẽ tự lấy GPS một lần; người chưa đăng nhập gửi `store_report`, admin thì cập nhật trực tiếp.
 19. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
+20. **`/store/import`**: dùng file mẫu CSV, parse ở client và preview theo từng dòng trước khi insert; không import thẳng file chưa qua kiểm tra.
+21. **Bulk import**: chỉ insert các dòng `ready`; xong phải `invalidateStoreCache()` và dispatch `storevis:stores-changed`.
 
 ---
 
@@ -117,3 +121,16 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 | File page/lib/helper | kebab-case hoặc camelCase `.js` |
 | Custom event | `storevis:stores-changed` |
 | IDB database (cache) | `storevis_cache` |
+| Editor config | `.editorconfig` (UTF-8, LF) |
+
+---
+
+## Guardrail Tiếng Việt
+
+- Repo có `.editorconfig` để ép mặc định `UTF-8` và `LF`.
+- Khi sửa file có tiếng Việt, ưu tiên patch nhỏ thay vì rewrite cả file.
+- Không dùng cách ghi file dễ làm vỡ encoding nếu chưa kiểm soát rõ đầu ra.
+- Không kết luận file hỏng chỉ vì terminal Windows hiển thị sai dấu; cần đối chiếu thêm bằng `git diff` hoặc UI thực tế.
+- Hai màn admin dễ lộ lỗi tiếng Việt ra UI là:
+  - `/store/verify`
+  - `/store/reports`

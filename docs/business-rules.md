@@ -61,11 +61,14 @@
 ### Chỉnh sửa (Admin)
 - **Bắt buộc**: Quận/Huyện + Xã/Phường khi **chỉnh sửa**.
 - Lưu xong: `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
-- Nếu mở `/store/edit/[id]?mode=location-only`:
-  - chỉ hiện phần tương đương **bước 3**
-  - chỉ được thêm/sửa `latitude`, `longitude`
-  - không cho sửa lại thông tin bước 1 hoặc bước 2
-  - khi vào từ nút **Thêm vị trí**, trang sẽ tự lấy GPS hiện tại một lần
+- Nếu mở `/store/edit/[id]?mode=supplement`:
+  - luôn bắt đầu từ **bước 1**
+  - chỉ cho nhập dữ liệu còn thiếu, dữ liệu đã có thì bị khóa
+  - nếu store chưa có vị trí thì flow có **3 bước**
+  - nếu store đã có vị trí thì flow chỉ có **2 bước**, bước 2 hoàn thành luôn
+  - khi vào **bước 3** của store chưa có vị trí, trang sẽ tự lấy GPS hiện tại một lần
+  - nếu là admin đã đăng nhập thì submit update trực tiếp `stores`
+  - nếu chưa đăng nhập thì submit tạo `store_reports.report_type = 'edit'` để admin duyệt
 
 ### Báo cáo (User) — trong `StoreDetailModal`
 User có 2 lựa chọn:
@@ -163,10 +166,9 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 **Thẻ chi tiết cửa hàng**:
 - Trong `StoreDetailModal`, `loại cửa hàng` hiển thị phía trên tên
 - Dùng cỡ chữ nhỏ hơn tên để giữ hierarchy
-- Nếu store chưa có tọa độ:
-  - hiển thị nhãn **Chưa có vị trí**
-  - nếu là admin thì có nút **Thêm vị trí** để mở `/store/edit/[id]?mode=location-only`
-- Ở màn tạo store, nếu duplicate check tìm ra store chưa có vị trí thì card nghi trùng có nút **Bổ sung vị trí**
+- Nếu store chưa có tọa độ thì hiển thị nhãn **Chưa có vị trí**
+- Nếu store còn thiếu dữ liệu quan trọng thì có nút **Bổ sung** để mở `/store/edit/[id]?mode=supplement`
+- Ở màn tạo store, duplicate panel có thể hiện nút **Bổ sung** để mở supplement flow của store nghi trùng
 
 ---
 
@@ -228,3 +230,59 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 - File Excel/CSV **không phụ thuộc** cửa hàng có số điện thoại hay không
 - File danh bạ `.vcf` vẫn chỉ xuất các cửa hàng có số điện thoại hợp lệ
 - Khi tải dữ liệu export từ Supabase, cần đọc theo trang để không bị hụt bản ghi khi số lượng store lớn
+
+---
+
+## 11. Nhập Dữ Liệu
+
+- `/store/import` là màn admin để nhập nhiều cửa hàng từ file `.csv`
+- Màn này phải có nút tải **file mẫu** để người dùng điền đúng cột
+- Các cột bắt buộc của file mẫu:
+  - `Tên cửa hàng`
+  - `Xã / Phường`
+  - `Quận / Huyện`
+- Các cột tùy chọn:
+  - `Loại cửa hàng`
+  - `Độ lớn cửa hàng`
+  - `Địa chỉ chi tiết`
+  - `Số điện thoại`
+  - `Ghi chú`
+  - `Vĩ độ`
+  - `Kinh độ`
+- Khi tải file lên, UI phải render **preview theo từng dòng** để admin kiểm tra trước khi nhập
+- Mỗi dòng preview cần hiển thị:
+  - dữ liệu đã chuẩn hóa
+  - trạng thái `Sẵn sàng nhập` / `Nghi trùng` / `Lỗi dữ liệu`
+  - danh sách lỗi hoặc cảnh báo
+  - tối đa 3 store nghi trùng trong hệ thống nếu có
+- Logic kiểm tra trên preview:
+  - thiếu cột bắt buộc trong header → chặn import
+  - thiếu `Tên cửa hàng` / `Xã / Phường` / `Quận / Huyện` → lỗi
+  - `Loại cửa hàng` phải khớp `STORE_TYPE_OPTIONS`; để trống thì dùng `DEFAULT_STORE_TYPE`
+  - `Độ lớn cửa hàng` phải khớp `STORE_SIZE_OPTIONS`; để trống hoặc `Chưa rõ` thì lưu `null`
+  - `Số điện thoại` nếu có thì phải đúng format VN
+  - `Vĩ độ` và `Kinh độ` phải đi theo cặp; nếu có thì phải hợp lệ
+  - trùng trong chính file → trạng thái `Nghi trùng`
+  - nghi trùng với hệ thống hiện có → trạng thái `Nghi trùng`
+- Chỉ các dòng `Sẵn sàng nhập` mới được insert vào `stores`
+- Bulk import xong phải:
+  - `invalidateStoreCache()`
+  - dispatch `storevis:stores-changed`
+  - tải lại danh sách store hiện có để các lần import sau so trùng đúng
+
+---
+
+## 12. Quy Tắc Tiếng Việt & Dialog Xác Nhận
+
+- Text tiếng Việt hiển thị cho user/admin phải giữ đúng dấu trong source và trên UI.
+- Nếu terminal hiển thị sai dấu, chưa được coi đó là bằng chứng file source bị hỏng.
+- Khi sửa text tiếng Việt:
+  - ưu tiên patch nhỏ
+  - kiểm tra lại bằng `git diff`
+  - nếu là text trên màn hình thì nên reload màn đó để xác nhận
+- Các dialog xác nhận trong màn admin phải luôn có:
+  - tiêu đề rõ ràng
+  - mô tả ngắn giải thích hành động sắp thực hiện
+- Hai màn áp dụng bắt buộc:
+  - `/store/verify`
+  - `/store/reports`

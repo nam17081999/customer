@@ -66,7 +66,7 @@ export default function AccountPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Menu nhanh</h1>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button asChild>
                   <Link href="/overview">Màn tổng quan</Link>
                 </Button>
@@ -75,6 +75,9 @@ export default function AccountPage() {
                 </Button>
                 <Button asChild variant="outline">
                   <Link href="/store/export-contacts">Màn xuất danh bạ</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/store/import">Màn nhập dữ liệu</Link>
                 </Button>
               </div>
             </CardContent>

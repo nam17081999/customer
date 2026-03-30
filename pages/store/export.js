@@ -230,7 +230,9 @@ export function StoreExportScreen({ mode = 'all' }) {
     if (authLoading) return
     if (!user) {
       setPageReady(false)
-      router.replace('/login?from=/store/export')
+      void router.replace('/login?from=/store/export').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to login failed:', err)
+      })
       return
     }
     setPageReady(true)

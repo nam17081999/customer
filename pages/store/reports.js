@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
@@ -27,11 +27,13 @@ const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
 const EDIT_FIELDS = [
   { key: 'name', label: 'Tên' },
   { key: 'store_type', label: 'Loại cửa hàng' },
+  { key: 'store_size', label: 'Độ lớn cửa hàng' },
   { key: 'address_detail', label: 'Địa chỉ chi tiết' },
   { key: 'ward', label: 'Xã/Phường' },
   { key: 'district', label: 'Quận/Huyện' },
   { key: 'phone', label: 'Số điện thoại' },
   { key: 'note', label: 'Ghi chú' },
+  { key: 'image_url', label: 'Ảnh cửa hàng' },
   { key: 'latitude', label: 'Vĩ độ' },
   { key: 'longitude', label: 'Kinh độ' },
 ]
@@ -39,6 +41,11 @@ const EDIT_FIELDS = [
 const formatValue = (key, value) => {
   if (value === null || value === undefined || value === '') return '—'
   if (key === 'store_type') return storeTypeLabelMap[value] || String(value)
+  if (key === 'store_size') {
+    const sizeLabelMap = { small: 'Nhỏ', medium: 'Vừa', large: 'Lớn' }
+    return sizeLabelMap[value] || String(value)
+  }
+  if (key === 'image_url') return 'Đã gửi ảnh mới'
   if (key === 'latitude' || key === 'longitude') {
     const num = Number(value)
     if (!Number.isFinite(num)) return '—'
@@ -63,7 +70,9 @@ export default function StoreReportsPage() {
     if (authLoading) return
     if (!user) {
       setPageReady(false)
-      router.replace('/login?from=/store/reports')
+      void router.replace('/login?from=/store/reports').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to login failed:', err)
+      })
       return
     }
     setPageReady(true)
@@ -76,7 +85,7 @@ export default function StoreReportsPage() {
     try {
       const { data, error: fetchError } = await supabase
         .from('store_reports')
-        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
+        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, store_size, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
         .eq('status', 'pending')
         .is('stores.deleted_at', null)
         .order('created_at', { ascending: false })
@@ -388,12 +397,12 @@ export default function StoreReportsPage() {
       <Dialog open={confirmAction.open} onOpenChange={(open) => setConfirmAction((prev) => ({ ...prev, open }))}>
         <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden">
           <div className="p-4 space-y-3">
-            <h3 className="text-base font-semibold text-gray-100">Xác nhận duyệt</h3>
-            <p className="text-sm text-gray-400">
+            <DialogTitle className="text-base font-semibold text-gray-100">Xác nhận duyệt</DialogTitle>
+            <DialogDescription className="text-sm text-gray-400">
               {confirmAction.type === 'edit'
                 ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
                 : 'Đánh dấu báo cáo này là đã xử lý?'}
-            </p>
+            </DialogDescription>
             {confirmAction.report && (
               <div className="rounded-lg border border-gray-800 bg-gray-950 p-3 space-y-1">
                 <p className="text-sm text-gray-200">

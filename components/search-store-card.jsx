@@ -7,6 +7,7 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatDistance } from '@/helper/validation'
+import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import StoreDetailModal from '@/components/store-detail-modal'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 
@@ -28,14 +29,7 @@ export default function SearchStoreCard({
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
 
   const addressText = formatAddressParts(store)
-  const hasCoordinates = (
-    store.latitude !== null
-    && store.latitude !== undefined
-    && store.latitude !== ''
-    && store.longitude !== null
-    && store.longitude !== undefined
-    && store.longitude !== ''
-  )
+  const hasCoordinates = hasStoreCoordinates(store)
   const handleCompactAction = (event) => {
     event.preventDefault()
     event.stopPropagation()
@@ -132,7 +126,7 @@ export default function SearchStoreCard({
                   <span className="max-w-full truncate">{store.phone}</span>
                 </a>
               )}
-              {!hasCoordinates && compactActionLabel && typeof onCompactAction === 'function' && (
+              {compactActionLabel && typeof onCompactAction === 'function' && (
                 <div className="pt-1">
                   <Button
                     type="button"

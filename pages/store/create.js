@@ -21,6 +21,8 @@ import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { formatDistance, isValidPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
+import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
+import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
@@ -196,43 +198,6 @@ export default function AddStore() {
     showMessage('success', `Đã lấy vị trí: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)
   }
 
-  function renderMapsLinkFields({ mobile = false } = {}) {
-    return (
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-gray-600 dark:text-gray-300">Dán đường dẫn Google Maps</label>
-        <div className={mobile ? 'space-y-2' : 'flex gap-2'}>
-          <Input
-            value={mapsLink}
-            onChange={(e) => setMapsLink(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                handleMapsLink(mapsLink)
-              }
-            }}
-            placeholder="https://maps.app.goo.gl/... hoặc link Google Maps"
-            className="text-base sm:text-base flex-1 min-w-0"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={mapsLinkLoading || !mapsLink.trim()}
-            leftIcon={mapsLinkLoading ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-            ) : undefined}
-            onClick={() => handleMapsLink(mapsLink)}
-            className={mobile ? 'w-full' : 'shrink-0'}
-          >
-            {mapsLinkLoading ? 'Đang lấy...' : 'Lấy vị trí'}
-          </Button>
-        </div>
-        {mapsLinkError && <div className="text-xs text-red-500">{mapsLinkError}</div>}
-        <div className="text-xs text-gray-400 dark:text-gray-500">Mở Google Maps → chọn vị trí → Chia sẻ → Sao chép link</div>
-      </div>
-    )
-  }
-
   // Stable handler for LocationPicker - track manual edits
   const handleLocationChange = useCallback((lat, lng) => {
     setPickedLat(lat)
@@ -376,12 +341,14 @@ export default function AddStore() {
     setMapsLinkError('')
     setFieldErrors({})
     if (router.query?.name) {
-      try {
-        const { name: _discard, ...rest } = router.query
-        router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true })
-      } catch {
-        router.replace(router.pathname)
-      }
+      const { name: _discard, ...rest } = router.query
+      void router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true }).catch((err) => {
+        if (err?.cancelled) return
+        console.error('Failed to clean create query params:', err)
+        void router.replace(router.pathname).catch((fallbackErr) => {
+          if (!fallbackErr?.cancelled) console.error('Fallback route cleanup failed:', fallbackErr)
+        })
+      })
     }
   }
 
@@ -563,10 +530,6 @@ export default function AddStore() {
               store={s}
               distance={s.distance}
               compact
-              compactActionLabel="Bổ sung vị trí"
-              onCompactAction={(store) => {
-                router.push(`/store/edit/${store.id}?mode=location-only`)
-              }}
             />
           ))}
         </div>
@@ -920,28 +883,7 @@ export default function AddStore() {
       <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
       <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-1 pb-1">
-          {steps.map((s, i) => (
-            <div key={s.num} className="flex items-center">
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${currentStep === s.num
-                  ? 'bg-blue-600 text-white'
-                  : currentStep > s.num
-                    ? 'bg-green-900/40 text-green-400 border border-green-900/50'
-                    : 'bg-gray-800 border border-gray-700 text-gray-400'
-                }`}>
-                {currentStep > s.num ? (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                ) : (
-                  <span>{s.num}</span>
-                )}
-                <span>{s.label}</span>
-              </div>
-              {i < steps.length - 1 && (
-                <div className={`w-6 h-0.5 mx-1 rounded ${currentStep > s.num ? 'bg-green-600' : 'bg-gray-700'}`} />
-              )}
-            </div>
-          ))}
-        </div>
+        <StoreFormStepIndicator steps={steps} currentStep={currentStep} />
 
         <form onSubmit={handleSubmit} className="space-y-3 pb-32 sm:pb-0">
           {/* Step 1: Name */}
@@ -1276,13 +1218,26 @@ export default function AddStore() {
 
               {isAdmin && (
                 <div className="pt-2 md:hidden space-y-2">
-                  {renderMapsLinkFields({ mobile: true })}
+                  <StoreMapsLinkFields
+                    value={mapsLink}
+                    loading={mapsLinkLoading}
+                    error={mapsLinkError}
+                    mobile
+                    onChange={setMapsLink}
+                    onSubmit={() => handleMapsLink(mapsLink)}
+                  />
                 </div>
               )}
 
               {/* Maps link input - desktop only, always visible */}
               <div className="hidden md:block pt-2 space-y-1.5">
-                {renderMapsLinkFields()}
+                <StoreMapsLinkFields
+                  value={mapsLink}
+                  loading={mapsLinkLoading}
+                  error={mapsLinkError}
+                  onChange={setMapsLink}
+                  onSubmit={() => handleMapsLink(mapsLink)}
+                />
               </div>
 
               {/* Back and Submit buttons for step 3 */}
