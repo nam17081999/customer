@@ -19,12 +19,12 @@ import {
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { formatDistance, isValidPhone } from '@/helper/validation'
+import { findDuplicatePhoneStores, formatDistance, validateVietnamPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
 import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { invalidateStoreCache, appendStoreToCache } from '@/lib/storeCache'
+import { invalidateStoreCache, appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   findNearbySimilarStores,
@@ -471,15 +471,37 @@ export default function AddStore() {
     if (nameValid || allowDuplicate) setCurrentStep(2)
   }
 
-  function validateStep2Fields({ requirePhone = false } = {}) {
+  function buildDuplicatePhoneMessage(matches) {
+    const labels = matches.slice(0, 3).map((store) => store.name || 'Cửa hàng')
+    return `Số điện thoại đã tồn tại ở ${labels.join('; ')}`
+  }
+
+  function getBaseStep2Errors({ requirePhone = false } = {}) {
     const errs = {}
     if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
     if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
     const normalizedPhone = phone.trim()
     if (requirePhone && !normalizedPhone) {
       errs.phone = 'Vui lòng nhập số điện thoại để lưu luôn'
-    } else if (normalizedPhone && !isValidPhone(normalizedPhone)) {
-      errs.phone = 'Số điện thoại không hợp lệ'
+    }
+
+    return { errs, normalizedPhone }
+  }
+
+  async function validateStep2Fields({ requirePhone = false } = {}) {
+    const { errs, normalizedPhone } = getBaseStep2Errors({ requirePhone })
+
+    if (!errs.phone && normalizedPhone) {
+      const phoneValidation = validateVietnamPhone(normalizedPhone)
+      if (!phoneValidation.isValid) {
+        errs.phone = phoneValidation.message
+      } else {
+        const stores = await getOrRefreshStores()
+        const duplicatePhoneStores = findDuplicatePhoneStores(stores, phoneValidation.normalized)
+        if (duplicatePhoneStores.length > 0) {
+          errs.phone = buildDuplicatePhoneMessage(duplicatePhoneStores)
+        }
+      }
     }
 
     setFieldErrors((prev) => ({
@@ -489,11 +511,11 @@ export default function AddStore() {
       phone: errs.phone || '',
     }))
 
-    return errs
+    return { errs, normalizedPhone }
   }
 
-  function validateStep2AndGoNext() {
-    const errs = validateStep2Fields()
+  async function validateStep2AndGoNext() {
+    const { errs } = await validateStep2Fields()
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
@@ -564,9 +586,32 @@ export default function AddStore() {
     const normalizedName = toTitleCaseVI(name.trim())
     const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
     const normalizedStoreSize = storeSize || null
+    const rawPhone = phone.trim()
+    let validatedPhone = ''
 
     try {
       setLoading(true)
+
+      if (rawPhone) {
+        const phoneValidation = validateVietnamPhone(rawPhone)
+        if (!phoneValidation.isValid) {
+          setFieldErrors((prev) => ({ ...prev, phone: phoneValidation.message }))
+          showMessage('error', phoneValidation.message)
+          setLoading(false)
+          return false
+        }
+        validatedPhone = phoneValidation.normalized
+
+        const stores = await getOrRefreshStores()
+        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhone)
+        if (duplicatePhoneStores.length > 0) {
+          const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores)
+          setFieldErrors((prev) => ({ ...prev, phone: duplicateMessage }))
+          showMessage('error', duplicateMessage)
+          setLoading(false)
+          return false
+        }
+      }
 
       if (shouldCheckFinalDuplicates) {
         let nearDupes = []
@@ -642,7 +687,7 @@ export default function AddStore() {
         district: normalizedDistrict,
         active: isAdmin,
         note,
-        phone,
+        phone: validatedPhone || null,
         image_url: imageFilename,
         latitude,
         longitude,
@@ -702,7 +747,7 @@ export default function AddStore() {
   }
 
   async function handleSaveWithoutLocation() {
-    const errs = validateStep2Fields({ requirePhone: true })
+    const { errs } = await validateStep2Fields({ requirePhone: true })
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Muốn lưu luôn ở bước 2 thì cần số điện thoại hợp lệ.' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return
@@ -759,7 +804,7 @@ export default function AddStore() {
       if (currentStep === 1) {
         runDuplicateCheckByButton()
       } else if (currentStep === 2) {
-        validateStep2AndGoNext()
+        await validateStep2AndGoNext()
       }
       return
     }
@@ -1083,6 +1128,27 @@ export default function AddStore() {
                 />
               </div>
 
+              {/* Phone & Note — always visible */}
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(bắt buộc nếu lưu luôn ở bước 2)</span></Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9+ ]*"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value)
+                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }))
+                  }}
+                  placeholder="0901 234 567"
+                  className="text-base sm:text-base"
+                />
+                {fieldErrors.phone && (
+                  <div className="text-xs text-red-600">{fieldErrors.phone}</div>
+                )}
+              </div>
+              
               {/* Ảnh */}
               <div className="space-y-1.5">
                 <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
@@ -1123,26 +1189,6 @@ export default function AddStore() {
                 </div>
               </div>
 
-              {/* Phone & Note — always visible */}
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(bắt buộc nếu lưu luôn ở bước 2)</span></Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9+ ]*"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value)
-                    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }))
-                  }}
-                  placeholder="0901 234 567"
-                  className="text-base sm:text-base"
-                />
-                {fieldErrors.phone && (
-                  <div className="text-xs text-red-600">{fieldErrors.phone}</div>
-                )}
-              </div>
               <div className="space-y-1.5">
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
                 <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Bán từ 6:00 - 22:00" className="text-base sm:text-base" />

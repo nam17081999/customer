@@ -7,7 +7,7 @@ import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_SIZE_OPTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
-import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
+import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -194,6 +194,58 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
 }
 
+function createUserHeadingFanImage() {
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
+  const size = 132 * dpr
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext('2d')
+  const center = size / 2
+  const innerRadius = 7 * dpr
+  const outerRadius = 58 * dpr
+  const outerSpread = (32 * Math.PI) / 180
+  const innerSpread = (16 * Math.PI) / 180
+  const startOuter = -Math.PI / 2 - outerSpread
+  const endOuter = -Math.PI / 2 + outerSpread
+  const startInner = -Math.PI / 2 - innerSpread
+  const endInner = -Math.PI / 2 + innerSpread
+
+  ctx.beginPath()
+  ctx.moveTo(center, center)
+  ctx.arc(center, center, outerRadius, startOuter, endOuter)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(59, 130, 246, 0.42)'
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.moveTo(center, center)
+  ctx.arc(center, center, outerRadius, startOuter, endOuter)
+  ctx.closePath()
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.48)'
+  ctx.lineWidth = 2.2 * dpr
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.moveTo(center, center)
+  ctx.arc(center, center, outerRadius * 0.72, startInner, endInner)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(96, 165, 250, 0.5)'
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.arc(center, center, innerRadius, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(37, 99, 235, 0.18)'
+  ctx.fill()
+
+  return {
+    width: size,
+    height: size,
+    data: ctx.getImageData(0, 0, size, size).data,
+    dpr,
+  }
+}
+
 export default function MapPage() {
   const router = useRouter()
   const mapContainerRef = useRef(null)
@@ -214,6 +266,7 @@ export default function MapPage() {
   const [canScrollDown, setCanScrollDown] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [isStandalonePwa, setIsStandalonePwa] = useState(false)
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [selectedWards, setSelectedWards] = useState([])
   const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
@@ -243,6 +296,17 @@ export default function MapPage() {
     const handler = (e) => setIsDesktop(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    const standaloneMq = window.matchMedia('(display-mode: standalone)')
+    const updateStandaloneState = () => {
+      setIsStandalonePwa(Boolean(standaloneMq.matches || window.navigator.standalone === true))
+    }
+
+    updateStandaloneState()
+    standaloneMq.addEventListener('change', updateStandaloneState)
+    return () => standaloneMq.removeEventListener('change', updateStandaloneState)
   }, [])
 
   const storesWithCoords = useMemo(() => {
@@ -446,6 +510,28 @@ export default function MapPage() {
           },
         })
 
+        if (!map.hasImage('user-heading-fan')) {
+          const img = createUserHeadingFanImage()
+          map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+        }
+
+        map.addLayer({
+          id: 'user-location-heading',
+          type: 'symbol',
+          source: 'user-location',
+          layout: {
+            'icon-image': 'user-heading-fan',
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
+            'icon-rotate': ['get', 'heading'],
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
+          },
+        })
+
         map.addLayer({
           id: 'user-location-dot',
           type: 'circle',
@@ -590,8 +676,8 @@ export default function MapPage() {
     const map = mapRef.current
     if (!map || !mapReady) return
 
-    const source = map.getSource('user-location')
-    if (!source) return
+    const pointSource = map.getSource('user-location')
+    if (!pointSource) return
 
     const features = userLocation
       ? [{
@@ -600,11 +686,14 @@ export default function MapPage() {
           type: 'Point',
           coordinates: [userLocation.longitude, userLocation.latitude],
         },
-        properties: {},
+        properties: {
+          heading: userLocation.heading ?? 0,
+          hasHeading: userLocation.heading != null ? 'yes' : 'no',
+        },
       }]
       : []
 
-    source.setData({ type: 'FeatureCollection', features })
+    pointSource.setData({ type: 'FeatureCollection', features })
   }, [mapReady, userLocation])
 
   const flyToStore = useCallback((store) => {
@@ -671,10 +760,18 @@ export default function MapPage() {
     setLocationError('')
 
     try {
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 2500,
-        desiredAccuracy: 30,
-      })
+      const [positionResult, headingResult] = await Promise.all([
+        getBestPosition({
+          maxWaitTime: 2500,
+          desiredAccuracy: 30,
+        }),
+        requestCompassHeading().catch(() => ({ heading: null, error: '' })),
+      ])
+
+      const { coords, error } = positionResult
+      const heading = typeof headingResult?.heading === 'number'
+        ? ((headingResult.heading % 360) + 360) % 360
+        : null
 
       if (!coords) {
         setLocationError(getGeoErrorMessage(error))
@@ -685,6 +782,7 @@ export default function MapPage() {
         latitude: coords.latitude,
         longitude: coords.longitude,
         accuracy: coords.accuracy ?? null,
+        heading,
       }
       setUserLocation(nextLocation)
 
@@ -832,7 +930,10 @@ export default function MapPage() {
           </div>
         </div>
 
-        <div className="pointer-events-none absolute bottom-3 right-3 z-20">
+        <div
+          className="pointer-events-none absolute right-3 sm:bottom-3 z-20"
+          style={!isDesktop ? { bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' } : undefined}
+        >
           <div className="pointer-events-auto flex flex-col items-end gap-2">
             {locationError && (
               <div className="max-w-[260px] rounded-lg border border-red-500/30 bg-slate-950/95 px-3 py-2 text-xs text-red-200 shadow-lg">
