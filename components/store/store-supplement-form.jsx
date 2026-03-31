@@ -317,6 +317,23 @@ export default function StoreSupplementForm({
                 </div>
 
                 <div className="space-y-1.5">
+                  <Label htmlFor="supplement-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Số điện thoại
+                  </Label>
+                  <Input
+                    id="supplement-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9+ ]*"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    disabled={supplementLocks.phone}
+                    placeholder="0901 234 567"
+                    className={`text-base sm:text-base ${lockedInputClass}`}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
                   <Label htmlFor="supplement-image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                     Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span>
                   </Label>
@@ -387,23 +404,6 @@ export default function StoreSupplementForm({
                       </label>
                     )}
                   </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="supplement-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Số điện thoại
-                  </Label>
-                  <Input
-                    id="supplement-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9+ ]*"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={supplementLocks.phone}
-                    placeholder="0901 234 567"
-                    className={`text-base sm:text-base ${lockedInputClass}`}
-                  />
                 </div>
 
                 <div className="space-y-1.5">

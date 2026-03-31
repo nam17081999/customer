@@ -23,7 +23,12 @@ import {
   normalizeNameForMatch,
 } from '@/helper/duplicateCheck'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { formatDistance, isValidPhone } from '@/helper/validation'
+import {
+  findDuplicatePhoneStores,
+  formatDistance,
+  normalizeVietnamPhoneForComparison,
+  validateVietnamPhone,
+} from '@/helper/validation'
 
 const TEMPLATE_HEADERS = [
   'Tên cửa hàng',
@@ -218,10 +223,12 @@ function prepareExistingStores(stores) {
   return (stores || []).map((store) => {
     const lat = parseCoordinate(store.latitude)
     const lng = parseCoordinate(store.longitude)
+    const normalizedPhone = normalizeVietnamPhoneForComparison(store.phone)
     return {
       ...store,
       latitude: Number.isFinite(lat) ? lat : store.latitude,
       longitude: Number.isFinite(lng) ? lng : store.longitude,
+      normalizedPhone,
       hasCoordinates: hasValidCoordinates(lat, lng),
     }
   })
@@ -230,8 +237,13 @@ function prepareExistingStores(stores) {
 function findDuplicateMatches(rowDraft, existingStores) {
   if (!rowDraft.name || rowDraft.inputWords.length === 0) return []
 
+  const normalizedDistrict = normalizeToken(rowDraft.district)
+  const candidateStores = normalizedDistrict
+    ? existingStores.filter((store) => normalizeToken(store.district) === normalizedDistrict)
+    : existingStores
+
   const nearMatches = rowDraft.hasCoordinates
-    ? existingStores
+    ? candidateStores
       .filter((store) => store.hasCoordinates)
       .map((store) => ({
         ...store,
@@ -240,7 +252,7 @@ function findDuplicateMatches(rowDraft, existingStores) {
       .filter((store) => store.distance <= 0.1 && isSimilarNameByWords(rowDraft.inputWords, store.name))
     : []
 
-  const globalMatches = existingStores.filter((store) => containsAllInputWords(rowDraft.inputWords, store.name))
+  const globalMatches = candidateStores.filter((store) => containsAllInputWords(rowDraft.inputWords, store.name))
 
   return mergeDuplicateCandidates(
     nearMatches,
@@ -248,6 +260,25 @@ function findDuplicateMatches(rowDraft, existingStores) {
     rowDraft.hasCoordinates ? rowDraft.latitude : null,
     rowDraft.hasCoordinates ? rowDraft.longitude : null
   )
+}
+
+function buildExactRowDuplicateKey(draft) {
+  return [
+    normalizeToken(draft.name),
+    normalizeToken(draft.storeTypeValue),
+    normalizeToken(draft.storeSizeValue || ''),
+    normalizeToken(draft.addressDetail),
+    normalizeToken(draft.ward),
+    normalizeToken(draft.district),
+    normalizeVietnamPhoneForComparison(draft.phone),
+    normalizeToken(draft.note),
+    draft.latitude == null ? '' : String(draft.latitude),
+    draft.longitude == null ? '' : String(draft.longitude),
+  ].join('|')
+}
+
+function buildPhoneDuplicateSummary(matches) {
+  return matches.slice(0, 3).map((match) => match.name || 'Cửa hàng').join('; ')
 }
 
 function buildRowAddress(values) {
@@ -262,17 +293,50 @@ function chunkArray(items, size) {
   return chunks
 }
 
-function buildDuplicateSummary(matches) {
-  return matches.slice(0, 3).map((match) => {
-    const distanceText = typeof match.distance === 'number' ? ` • ${formatDistance(match.distance)}` : ''
-    return `${match.name || 'Cửa hàng'}${distanceText}`
-  }).join('; ')
-}
-
 function getRowStatusVariant(status) {
   if (status === 'ready') return 'border-green-900/70 bg-green-950/20 text-green-200'
   if (status === 'duplicate') return 'border-amber-900/70 bg-amber-950/20 text-amber-200'
   return 'border-red-900/70 bg-red-950/20 text-red-200'
+}
+
+function finalizePreviewRow(
+  draft,
+  duplicateInFileRows,
+  phoneDuplicateInFileRows,
+  duplicateAccepted = false,
+  duplicateListExpanded = false
+) {
+  const issues = [...draft.errors]
+  const blockingIssues = []
+
+  if (phoneDuplicateInFileRows.length > 0) {
+    blockingIssues.push(`Trùng số điện thoại với dòng ${phoneDuplicateInFileRows.join(', ')} trong file`)
+  }
+  if (draft.phoneDuplicateMatches.length > 0) {
+    blockingIssues.push(`Số điện thoại đã tồn tại trong dữ liệu: ${buildPhoneDuplicateSummary(draft.phoneDuplicateMatches)}`)
+  }
+
+  issues.push(...blockingIssues)
+  if (duplicateInFileRows.length > 0) {
+    issues.push(`Trùng y hệt với dòng ${duplicateInFileRows.join(', ')} trong file`)
+  }
+  if (draft.duplicateMatches.length > 0 && !duplicateAccepted) {
+    issues.push(`Có ${draft.duplicateMatches.length} cửa hàng có thể trùng trong hệ thống`)
+  }
+
+  const status = draft.errors.length > 0 || blockingIssues.length > 0
+    ? 'error'
+    : (duplicateInFileRows.length > 0 || (draft.duplicateMatches.length > 0 && !duplicateAccepted) ? 'duplicate' : 'ready')
+
+  return {
+    ...draft,
+    duplicateInFileRows,
+    phoneDuplicateInFileRows,
+    duplicateAccepted,
+    duplicateListExpanded,
+    issues,
+    status,
+  }
 }
 
 export default function StoreImportPage() {
@@ -390,7 +454,9 @@ export default function StoreImportPage() {
         const normalizedAddressDetail = rawAddressDetail ? toTitleCaseVI(rawAddressDetail) : ''
         const normalizedWard = rawWard ? toTitleCaseVI(rawWard) : ''
         const normalizedDistrict = rawDistrict ? toTitleCaseVI(rawDistrict) : ''
-        const normalizedPhone = rawPhone.trim()
+        const phoneValidation = validateVietnamPhone(rawPhone, { autoRestoreLeadingZero: true })
+        const normalizedPhone = phoneValidation.normalized
+        const hasValidPhone = normalizedPhone && phoneValidation.isValid
         const normalizedNote = rawNote.trim()
 
         const { option: resolvedStoreType, error: storeTypeError } = resolveStoreType(getCsvCell(row, headerMap, 'store_type'))
@@ -408,16 +474,11 @@ export default function StoreImportPage() {
         if (!normalizedWard) errors.push('Thiếu xã / phường')
         if (storeTypeError) errors.push(storeTypeError)
         if (storeSizeError) errors.push(storeSizeError)
-        if (normalizedPhone && !isValidPhone(normalizedPhone)) errors.push('Số điện thoại không hợp lệ')
+        if (normalizedPhone && !hasValidPhone) errors.push(phoneValidation.message)
         if (hasLatCell !== hasLngCell) errors.push('Phải nhập đủ cả vĩ độ và kinh độ')
         if ((hasLatCell || hasLngCell) && !hasCoordinates) errors.push('Tọa độ không hợp lệ')
 
         const inputWords = extractWords(normalizeNameForMatch(normalizedName))
-        const duplicateBaseKey = inputWords.join(' ') || normalizeToken(normalizedName)
-        const duplicateKey = normalizedName && normalizedDistrict && normalizedWard
-          ? `${duplicateBaseKey}|${normalizeToken(normalizedDistrict)}|${normalizeToken(normalizedWard)}`
-          : ''
-
         const draft = {
           rowNumber,
           name: normalizedName,
@@ -434,45 +495,38 @@ export default function StoreImportPage() {
           longitude: hasCoordinates ? longitude : null,
           hasCoordinates,
           inputWords,
-          duplicateKey,
           errors,
         }
 
         return {
           ...draft,
+          exactDuplicateKey: buildExactRowDuplicateKey(draft),
           duplicateMatches: findDuplicateMatches(draft, existingStores),
+          phoneDuplicateMatches: hasValidPhone
+            ? findDuplicatePhoneStores(existingStores, normalizedPhone)
+            : [],
         }
       })
 
       const duplicateRowMap = new Map()
+      const duplicatePhoneRowMap = new Map()
       drafts.forEach((draft) => {
-        if (!draft.duplicateKey) return
-        const rowsForKey = duplicateRowMap.get(draft.duplicateKey) || []
+        if (!draft.exactDuplicateKey) return
+        const rowsForKey = duplicateRowMap.get(draft.exactDuplicateKey) || []
         rowsForKey.push(draft.rowNumber)
-        duplicateRowMap.set(draft.duplicateKey, rowsForKey)
+        duplicateRowMap.set(draft.exactDuplicateKey, rowsForKey)
+      })
+      drafts.forEach((draft) => {
+        if (!draft.phone || !validateVietnamPhone(draft.phone).isValid) return
+        const rowsForPhone = duplicatePhoneRowMap.get(draft.phone) || []
+        rowsForPhone.push(draft.rowNumber)
+        duplicatePhoneRowMap.set(draft.phone, rowsForPhone)
       })
 
       const nextPreviewRows = drafts.map((draft) => {
-        const duplicateInFileRows = (duplicateRowMap.get(draft.duplicateKey) || []).filter((rowNumber) => rowNumber !== draft.rowNumber)
-        const issues = [...draft.errors]
-
-        if (duplicateInFileRows.length > 0) {
-          issues.push(`Trùng với dòng ${duplicateInFileRows.join(', ')} trong file`)
-        }
-        if (draft.duplicateMatches.length > 0) {
-          issues.push(`Nghi trùng hệ thống: ${buildDuplicateSummary(draft.duplicateMatches)}`)
-        }
-
-        const status = draft.errors.length > 0
-          ? 'error'
-          : (duplicateInFileRows.length > 0 || draft.duplicateMatches.length > 0 ? 'duplicate' : 'ready')
-
-        return {
-          ...draft,
-          duplicateInFileRows,
-          issues,
-          status,
-        }
+        const duplicateInFileRows = (duplicateRowMap.get(draft.exactDuplicateKey) || []).filter((rowNumber) => rowNumber !== draft.rowNumber)
+        const phoneDuplicateInFileRows = (duplicatePhoneRowMap.get(draft.phone) || []).filter((rowNumber) => rowNumber !== draft.rowNumber)
+        return finalizePreviewRow(draft, duplicateInFileRows, phoneDuplicateInFileRows)
       })
 
       setPreviewRows(nextPreviewRows)
@@ -497,6 +551,27 @@ export default function StoreImportPage() {
     await parseFileToPreview(file)
     event.target.value = ''
   }, [parseFileToPreview])
+
+  const handleToggleDuplicateList = useCallback((rowNumber) => {
+    setPreviewRows((prev) => prev.map((row) => (
+      row.rowNumber === rowNumber
+        ? { ...row, duplicateListExpanded: !row.duplicateListExpanded }
+        : row
+    )))
+  }, [])
+
+  const handleToggleDuplicateAccepted = useCallback((rowNumber) => {
+    setPreviewRows((prev) => prev.map((row) => {
+      if (row.rowNumber !== rowNumber) return row
+      return finalizePreviewRow(
+        row,
+        row.duplicateInFileRows,
+        row.phoneDuplicateInFileRows || [],
+        !row.duplicateAccepted,
+        row.duplicateListExpanded
+      )
+    }))
+  }, [])
 
   const handleImport = useCallback(async () => {
     const readyRows = previewRows.filter((row) => row.status === 'ready')
@@ -663,7 +738,7 @@ export default function StoreImportPage() {
                     <div>
                       <h2 className="text-lg font-semibold text-gray-100">Xem trước dữ liệu nhập</h2>
                       <p className="text-sm text-gray-400">
-                        Mỗi dòng được kiểm tra lỗi dữ liệu, nghi trùng trong file và nghi trùng với hệ thống hiện có.
+                        Mỗi dòng được kiểm tra lỗi dữ liệu, trùng y hệt trong file và cửa hàng có thể trùng trong hệ thống cùng quận / huyện.
                       </p>
                     </div>
                     <Button
@@ -729,22 +804,63 @@ export default function StoreImportPage() {
 
                         {row.duplicateMatches.length > 0 && (
                           <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/70 p-3">
-                            <p className="text-sm font-medium text-gray-200">Các cửa hàng nghi trùng trong hệ thống</p>
-                            <div className="mt-2 space-y-2">
-                              {row.duplicateMatches.slice(0, 3).map((match) => (
-                                <div key={`${row.rowNumber}-match-${match.id}`} className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2 text-sm text-gray-300">
-                                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                    <span className="font-medium text-gray-100">{match.name || 'Cửa hàng'}</span>
-                                    <span className="text-xs text-gray-400">
-                                      {typeof match.distance === 'number' ? formatDistance(match.distance) : 'Không có vị trí'}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1 text-xs text-gray-400">
-                                    {formatAddressParts(match) || 'Chưa có địa chỉ'}
-                                  </div>
-                                </div>
-                              ))}
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-200">Các cửa hàng có thể trùng trong hệ thống</p>
+                                <p className="mt-1 text-xs text-gray-400">
+                                  Chỉ đối chiếu trong cùng quận / huyện. Bạn có thể mở danh sách để kiểm tra trước khi chấp thuận nhập.
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-9 px-3 text-sm"
+                                  onClick={() => handleToggleDuplicateList(row.rowNumber)}
+                                >
+                                  {row.duplicateListExpanded ? 'Thu gọn' : `Xem ${row.duplicateMatches.length} cửa hàng`}
+                                </Button>
+                                {row.errors.length === 0
+                                  && row.duplicateInFileRows.length === 0
+                                  && (row.phoneDuplicateInFileRows || []).length === 0
+                                  && row.phoneDuplicateMatches.length === 0 && (
+                                  <Button
+                                    type="button"
+                                    variant={row.duplicateAccepted ? 'outline' : 'primary'}
+                                    className="h-9 px-3 text-sm"
+                                    onClick={() => handleToggleDuplicateAccepted(row.rowNumber)}
+                                  >
+                                    {row.duplicateAccepted ? 'Bỏ chấp thuận' : 'Chấp thuận'}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
+                            {row.duplicateAccepted
+                              && row.errors.length === 0
+                              && row.duplicateInFileRows.length === 0
+                              && (row.phoneDuplicateInFileRows || []).length === 0
+                              && row.phoneDuplicateMatches.length === 0 && (
+                              <div className="mt-3 rounded-lg border border-green-900/70 bg-green-950/20 px-3 py-2 text-sm text-green-200">
+                                Dòng này đã được chấp thuận nhập dù có thể trùng với dữ liệu hiện có.
+                              </div>
+                            )}
+                            {row.duplicateListExpanded && (
+                              <div className="mt-3 space-y-2">
+                                {row.duplicateMatches.map((match) => (
+                                  <div key={`${row.rowNumber}-match-${match.id}`} className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2 text-sm text-gray-300">
+                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                      <span className="font-medium text-gray-100">{match.name || 'Cửa hàng'}</span>
+                                      <span className="text-xs text-gray-400">
+                                        {typeof match.distance === 'number' ? formatDistance(match.distance) : 'Không có vị trí'}
+                                      </span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-gray-400">
+                                      {formatAddressParts(match) || 'Chưa có địa chỉ'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

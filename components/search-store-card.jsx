@@ -78,7 +78,7 @@ export default function SearchStoreCard({
         <CardContent className="p-0">
           <div className="flex gap-3 p-3">
             {/* Thumbnail */}
-            <div className="relative h-20 w-20 self-center overflow-hidden rounded-md bg-gray-800 flex-shrink-0">
+            <div className="relative h-18 w-18 self-center overflow-hidden rounded-md bg-gray-800 flex-shrink-0">
               <Image
                 src={imageSrc}
                 alt={store.name || 'store image'}

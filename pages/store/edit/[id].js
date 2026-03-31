@@ -11,7 +11,7 @@ import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import StoreSupplementForm from '@/components/store/store-supplement-form'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
-import { invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
@@ -21,7 +21,7 @@ import {
   DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
-import { isValidPhone } from '@/helper/validation'
+import { findDuplicatePhoneStores, validateVietnamPhone } from '@/helper/validation'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 
@@ -277,6 +277,35 @@ export default function EditStore() {
     }
   }
 
+  function buildDuplicatePhoneMessage(matches) {
+    const labels = matches.slice(0, 3).map((entry) => entry.name || 'Cửa hàng')
+    return `Số điện thoại đã tồn tại ở ${labels.join('; ')}`
+  }
+
+  async function validateCurrentPhone({ skipWhenLocked = false } = {}) {
+    if (skipWhenLocked && supplementLocks.phone) {
+      return { normalizedPhone: store?.phone || '', error: '' }
+    }
+
+    const normalizedPhone = phone.trim()
+    if (!normalizedPhone) {
+      return { normalizedPhone: '', error: '' }
+    }
+
+    const phoneValidation = validateVietnamPhone(normalizedPhone)
+    if (!phoneValidation.isValid) {
+      return { normalizedPhone: '', error: phoneValidation.message }
+    }
+
+    const stores = await getOrRefreshStores()
+    const duplicatePhoneStores = findDuplicatePhoneStores(stores, phoneValidation.normalized, { excludeStoreId: id })
+    if (duplicatePhoneStores.length > 0) {
+      return { normalizedPhone: '', error: buildDuplicatePhoneMessage(duplicatePhoneStores) }
+    }
+
+    return { normalizedPhone: phoneValidation.normalized, error: '' }
+  }
+
 
 
 
@@ -286,8 +315,9 @@ export default function EditStore() {
       return
     }
 
-    if (!supplementLocks.phone && phone.trim() && !isValidPhone(phone.trim())) {
-      showMessage('error', 'Số điện thoại không hợp lệ')
+    const { normalizedPhone: validatedSupplementPhone, error: supplementPhoneError } = await validateCurrentPhone({ skipWhenLocked: true })
+    if (supplementPhoneError) {
+      showMessage('error', supplementPhoneError)
       return
     }
 
@@ -317,8 +347,7 @@ export default function EditStore() {
         if (normalizedWard) updates.ward = normalizedWard
       }
       if (!supplementLocks.phone) {
-        const normalizedPhone = phone.trim()
-        if (normalizedPhone) updates.phone = normalizedPhone
+        if (validatedSupplementPhone) updates.phone = validatedSupplementPhone
       }
       if (!supplementLocks.note) {
         const normalizedNote = note.trim()
@@ -405,6 +434,12 @@ export default function EditStore() {
       return
     }
 
+    const { normalizedPhone: validatedPhone, error: phoneError } = await validateCurrentPhone()
+    if (phoneError) {
+      showMessage('error', phoneError)
+      return
+    }
+
     setSaving(true)
     try {
       let newImageUrl = store?.image_url || null
@@ -438,7 +473,7 @@ export default function EditStore() {
         address_detail: addressDetail.trim() || null,
         ward: ward.trim() || null,
         district: district.trim() || null,
-        phone: phone.trim() || null,
+        phone: validatedPhone || null,
         note: note.trim() || null,
         active,
         latitude: pickedLat,

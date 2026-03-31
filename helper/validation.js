@@ -6,11 +6,143 @@
  * Validate phone number (Vietnamese format)
  */
 export function isValidPhone(phone) {
-  if (!phone) return true // Optional field
-  const cleaned = phone.replace(/\s+/g, '')
-  // Vietnamese phone: starts with 0 or +84, followed by 9-10 digits
-  const phoneRegex = /^(\+84|84|0)[0-9]{9,10}$/
-  return phoneRegex.test(cleaned)
+  return validateVietnamPhone(phone).isValid
+}
+
+export function expandScientificNumber(rawValue) {
+  const normalized = String(rawValue || '').trim()
+  if (!/^\d+(\.\d+)?e[+-]?\d+$/i.test(normalized)) return normalized
+
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) return normalized
+  return parsed.toFixed(0)
+}
+
+export function getVietnamPhoneInfo(rawValue, options = {}) {
+  const { autoRestoreLeadingZero = false } = options
+  const trimmed = String(rawValue || '').trim()
+  if (!trimmed) {
+    return {
+      input: '',
+      compact: '',
+      comparable: '',
+      originalCompact: '',
+      autoAddedLeadingZero: false,
+    }
+  }
+
+  let normalized = trimmed.replace(/^'/, '')
+  normalized = expandScientificNumber(normalized)
+  normalized = normalized.replace(/\.0+$/, '')
+  normalized = normalized.replace(/[\s().-]+/g, '')
+
+  const originalCompact = normalized.startsWith('+')
+    ? `+${normalized.slice(1).replace(/\D+/g, '')}`
+    : normalized.replace(/\D+/g, '')
+
+  const shouldRestoreLeadingZero = autoRestoreLeadingZero
+    && /^\d+$/.test(originalCompact)
+    && !originalCompact.startsWith('0')
+    && !originalCompact.startsWith('84')
+
+  const compact = shouldRestoreLeadingZero ? `0${originalCompact}` : originalCompact
+  const comparable = compact.startsWith('+84')
+    ? `0${compact.slice(3)}`
+    : compact.startsWith('84')
+      ? `0${compact.slice(2)}`
+      : compact
+
+  return {
+    input: trimmed,
+    compact,
+    comparable,
+    originalCompact,
+    autoAddedLeadingZero: shouldRestoreLeadingZero,
+  }
+}
+
+export function normalizeVietnamPhoneForComparison(rawValue, options = {}) {
+  return getVietnamPhoneInfo(rawValue, options).comparable
+}
+
+export function validateVietnamPhone(rawValue, options = {}) {
+  const { required = false, autoRestoreLeadingZero = false } = options
+  const info = getVietnamPhoneInfo(rawValue, { autoRestoreLeadingZero })
+  const normalized = info.comparable
+  const autoFixText = info.autoAddedLeadingZero
+    ? `Đã tự thêm số 0 đầu thành ${normalized}. `
+    : ''
+
+  if (!normalized) {
+    return {
+      isValid: !required,
+      normalized: '',
+      message: required ? 'Vui lòng nhập số điện thoại' : '',
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
+
+  if (!/^0\d+$/.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      message: `${autoFixText}Số điện thoại chỉ được chứa chữ số và phải bắt đầu bằng 0, 84 hoặc +84.`,
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
+
+  if (normalized.startsWith('02')) {
+    if (normalized.length < 10 || normalized.length > 11) {
+      return {
+        isValid: false,
+        normalized,
+        message: `${autoFixText}Số máy bàn phải bắt đầu bằng 02 và có 10 hoặc 11 số.`,
+        autoAddedLeadingZero: info.autoAddedLeadingZero,
+      }
+    }
+    return {
+      isValid: true,
+      normalized,
+      message: '',
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
+
+  if (!/^0[35789]/.test(normalized)) {
+    return {
+      isValid: false,
+      normalized,
+      message: `Đầu số ${normalized.slice(0, 2)} không phải số di động hoặc máy bàn Việt Nam hợp lệ.`,
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
+
+  if (normalized.length !== 10) {
+    return {
+      isValid: false,
+      normalized,
+      message: `${autoFixText}Số di động Việt Nam phải có đúng 10 số.`,
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
+
+  return {
+    isValid: true,
+    normalized,
+    message: '',
+    autoAddedLeadingZero: info.autoAddedLeadingZero,
+  }
+}
+
+export function findDuplicatePhoneStores(stores, rawPhone, options = {}) {
+  const { excludeStoreId = null, autoRestoreLeadingZero = false } = options
+  const normalizedPhone = normalizeVietnamPhoneForComparison(rawPhone, { autoRestoreLeadingZero })
+  if (!normalizedPhone) return []
+
+  return (stores || []).filter((store) => {
+    if (excludeStoreId != null && String(store?.id) === String(excludeStoreId)) return false
+    return normalizeVietnamPhoneForComparison(store?.phone || '') === normalizedPhone
+  })
 }
 
 /**
