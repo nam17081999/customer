@@ -8,9 +8,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { supabase } from '@/lib/supabaseClient'
 import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
 import {
-  DEFAULT_STORE_SIZE,
   DEFAULT_STORE_TYPE,
-  STORE_SIZE_OPTIONS,
   STORE_TYPE_OPTIONS,
 } from '@/lib/constants'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
@@ -33,7 +31,6 @@ import {
 const TEMPLATE_HEADERS = [
   'Tên cửa hàng',
   'Loại cửa hàng',
-  'Độ lớn cửa hàng',
   'Địa chỉ chi tiết',
   'Xã / Phường',
   'Quận / Huyện',
@@ -47,7 +44,6 @@ const REQUIRED_FIELDS = ['name', 'ward', 'district']
 const FIELD_ALIASES = {
   name: ['ten cua hang', 'tên cửa hàng', 'ten', 'name'],
   store_type: ['loai cua hang', 'loại cửa hàng', 'loai', 'store type', 'store_type'],
-  store_size: ['do lon cua hang', 'độ lớn cửa hàng', 'do lon', 'store size', 'store_size'],
   address_detail: ['dia chi chi tiet', 'địa chỉ chi tiết', 'dia chi', 'address detail', 'address_detail'],
   ward: ['xa phuong', 'xã phường', 'xa / phuong', 'xã / phường', 'phuong xa', 'ward'],
   district: ['quan huyen', 'quận huyện', 'quan / huyen', 'quận / huyện', 'huyen quan', 'district'],
@@ -76,7 +72,6 @@ function buildOptionLookup(options) {
 }
 
 const STORE_TYPE_LOOKUP = buildOptionLookup(STORE_TYPE_OPTIONS)
-const STORE_SIZE_LOOKUP = buildOptionLookup(STORE_SIZE_OPTIONS)
 
 function parseCoordinate(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
@@ -204,21 +199,6 @@ function resolveStoreType(rawValue) {
   return { option: matched, error: '' }
 }
 
-function resolveStoreSize(rawValue) {
-  if (!String(rawValue || '').trim()) {
-    return { option: null, error: '' }
-  }
-  const normalized = normalizeToken(rawValue)
-  if (normalized === normalizeToken('Chưa rõ')) {
-    return { option: null, error: '' }
-  }
-  const matched = STORE_SIZE_LOOKUP.get(normalized)
-  if (!matched) {
-    return { option: null, error: 'Độ lớn cửa hàng không hợp lệ' }
-  }
-  return { option: matched, error: '' }
-}
-
 function prepareExistingStores(stores) {
   return (stores || []).map((store) => {
     const lat = parseCoordinate(store.latitude)
@@ -266,7 +246,6 @@ function buildExactRowDuplicateKey(draft) {
   return [
     normalizeToken(draft.name),
     normalizeToken(draft.storeTypeValue),
-    normalizeToken(draft.storeSizeValue || ''),
     normalizeToken(draft.addressDetail),
     normalizeToken(draft.ward),
     normalizeToken(draft.district),
@@ -341,7 +320,7 @@ function finalizePreviewRow(
 
 export default function StoreImportPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
   const fileInputRef = useRef(null)
 
   const [pageReady, setPageReady] = useState(false)
@@ -356,15 +335,22 @@ export default function StoreImportPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       void router.replace('/login?from=/store/import').catch((err) => {
         if (!err?.cancelled) console.error('Redirect to login failed:', err)
       })
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      void router.replace('/account').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to account failed:', err)
+      })
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadExistingStores = useCallback(async () => {
     setLoadingStores(true)
@@ -460,7 +446,6 @@ export default function StoreImportPage() {
         const normalizedNote = rawNote.trim()
 
         const { option: resolvedStoreType, error: storeTypeError } = resolveStoreType(getCsvCell(row, headerMap, 'store_type'))
-        const { option: resolvedStoreSize, error: storeSizeError } = resolveStoreSize(getCsvCell(row, headerMap, 'store_size'))
 
         const latitude = parseCoordinate(rawLat)
         const longitude = parseCoordinate(rawLng)
@@ -473,7 +458,6 @@ export default function StoreImportPage() {
         if (!normalizedDistrict) errors.push('Thiếu quận / huyện')
         if (!normalizedWard) errors.push('Thiếu xã / phường')
         if (storeTypeError) errors.push(storeTypeError)
-        if (storeSizeError) errors.push(storeSizeError)
         if (normalizedPhone && !hasValidPhone) errors.push(phoneValidation.message)
         if (hasLatCell !== hasLngCell) errors.push('Phải nhập đủ cả vĩ độ và kinh độ')
         if ((hasLatCell || hasLngCell) && !hasCoordinates) errors.push('Tọa độ không hợp lệ')
@@ -484,8 +468,6 @@ export default function StoreImportPage() {
           name: normalizedName,
           storeTypeValue: resolvedStoreType?.value || DEFAULT_STORE_TYPE,
           storeTypeLabel: resolvedStoreType?.label || '',
-          storeSizeValue: resolvedStoreSize?.value || DEFAULT_STORE_SIZE,
-          storeSizeLabel: resolvedStoreSize?.label || '',
           addressDetail: normalizedAddressDetail,
           ward: normalizedWard,
           district: normalizedDistrict,
@@ -591,7 +573,6 @@ export default function StoreImportPage() {
       const payloads = readyRows.map((row) => ({
         name: row.name,
         store_type: row.storeTypeValue || DEFAULT_STORE_TYPE,
-        store_size: row.storeSizeValue || null,
         address_detail: row.addressDetail || null,
         ward: row.ward || null,
         district: row.district || null,
@@ -694,9 +675,6 @@ export default function StoreImportPage() {
                   <p className="mt-1 text-sm text-gray-400">
                     Loại: {STORE_TYPE_OPTIONS.map((option) => option.label).join(', ')}
                   </p>
-                  <p className="mt-1 text-sm text-gray-400">
-                    Độ lớn: Chưa rõ, {STORE_SIZE_OPTIONS.map((option) => option.label).join(', ')}
-                  </p>
                 </div>
               </div>
             </CardContent>
@@ -772,9 +750,6 @@ export default function StoreImportPage() {
                         <div className="mt-3 grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
                           <div>
                             <span className="text-gray-500">Loại:</span> {row.storeTypeLabel || 'Không rõ'}
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Độ lớn:</span> {row.storeSizeLabel || 'Chưa rõ'}
                           </div>
                           <div>
                             <span className="text-gray-500">Số điện thoại:</span> {row.phone || 'Không có'}

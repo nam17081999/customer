@@ -9,7 +9,6 @@
 | `id` | uuid/bigint | NOT NULL | Primary key (auto) |
 | `name` | text | NOT NULL | Tên cửa hàng (Title Case VI) |
 | `store_type` | text | NOT NULL | Loại cửa hàng (mặc định `Tạp hóa`) |
-| `store_size` | text | NULL | Độ lớn cửa hàng (`small` / `medium` / `large`, hoặc `NULL` = chưa rõ) |
 | `address_detail` | text | NULL | Số nhà, tên đường |
 | `ward` | text | NULL | Xã/Phường |
 | `district` | text | NULL | Quận/Huyện |
@@ -27,10 +26,6 @@
 
 > `store_type` nên có default `'Cửa hàng'` + CHECK constraint theo danh sách:
 > `Tạp hóa`, `Quán ăn`, `Quán nước`, `Siêu thị`.
-
-> `store_size` nên có CHECK constraint theo danh sách:
-> `small`, `medium`, `large`
-> và cho phép `NULL` để biểu diễn trạng thái `Chưa rõ` trong UI.
 
 > **Soft Delete**: mọi query đọc phải có `.is('deleted_at', null)`.
 
@@ -69,7 +64,6 @@ Hiện tại chưa có index tùy chỉnh. Khi data lớn cần:
 CREATE INDEX idx_stores_active ON stores(active) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_district ON stores(district) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_store_type ON stores(store_type) WHERE deleted_at IS NULL;
-CREATE INDEX idx_stores_store_size ON stores(store_size) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_deleted_at ON stores(deleted_at);
 CREATE INDEX idx_store_reports_status ON store_reports(status);
 CREATE INDEX idx_store_reports_store_id ON store_reports(store_id);
@@ -110,7 +104,7 @@ RLS cho `store_reports`:
 
 ### SELECT_FIELDS (fields được cache)
 ```
-id, name, store_type, store_size, image_url, latitude, longitude, address_detail,
+id, name, store_type, image_url, latitude, longitude, address_detail,
 ward, district, phone, note, active, created_at, updated_at
 ```
 > `deleted_at` **không** được cache. Luôn filter server-side trước khi cache.

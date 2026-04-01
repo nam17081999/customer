@@ -88,8 +88,8 @@ customer/
   3. Supabase (count + max updated_at check)
   ↕
 [Pages: getOrRefreshStores()] → filter + sort client-side
-  - Mặc định trang tìm kiếm: không có tiêu chí thì render 50 cửa hàng gần nhất
-  - Trang `/` có bộ lọc chi tiết: quận/xã (single-select) + loại/độ lớn/chi tiết dữ liệu (multi-select)
+  - Mặc định trang tìm kiếm: không có tiêu chí thì render toàn bộ cửa hàng, sort gần → xa
+  - Trang `/` có bộ lọc chi tiết: quận/xã (single-select) + loại/chi tiết dữ liệu (multi-select)
   - `Chi tiết dữ liệu` trên `/`: hỗ trợ `Có số điện thoại`, `Có ảnh`, `Không có vị trí`
   - Vị trí người dùng ở `/` được refresh định kỳ mỗi 3 phút và khi quay lại tab/trang
   - Đồng bộ query của `/` lên URL phải có debounce + bỏ qua replace khi query không đổi để tránh flood navigation
@@ -104,7 +104,7 @@ customer/
   - Người dùng tải file mẫu `.csv`, điền đúng các cột chuẩn rồi tải lên lại
   - File import được parse và kiểm tra ngay trên client:
     - thiếu cột bắt buộc
-    - sai loại cửa hàng / độ lớn cửa hàng
+    - sai loại cửa hàng
     - sai số điện thoại
     - tọa độ thiếu cặp hoặc không hợp lệ
     - trùng trong chính file
@@ -163,7 +163,7 @@ customer/
 
 ## Luồng Bổ Sung Dữ Liệu
 
-- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `store_size`, `address_detail`, `ward`, `district`, `phone`, `image_url`, hoặc vị trí):
+- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, `image_url`, hoặc vị trí):
   - `StoreDetailModal` hiển thị nút **Bổ sung**
   - duplicate panel ở bước 1 của `/store/create` cũng có thể hiển thị nút **Bổ sung**
 - Nút này điều hướng sang `/store/edit/[id]?mode=supplement`

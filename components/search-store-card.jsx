@@ -139,7 +139,7 @@ export default function SearchStoreCard({
     const compactCard = (
       <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md cursor-pointer">
         <CardContent className="p-0">
-          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 p-3">
+          <div className="grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-1 p-3">
             <div className="flex h-6 w-6 items-center justify-center text-sky-300">
               {typeMeta.icon}
             </div>

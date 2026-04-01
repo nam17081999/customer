@@ -17,8 +17,6 @@ import {
   DISTRICT_SUGGESTIONS,
   STORE_TYPE_OPTIONS,
   DEFAULT_STORE_TYPE,
-  STORE_SIZE_OPTIONS,
-  DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
 import { findDuplicatePhoneStores, validateVietnamPhone } from '@/helper/validation'
@@ -40,7 +38,7 @@ const StoreLocationPicker = dynamic(
 export default function EditStore() {
   const router = useRouter()
   const { id } = router.query
-  const { user, loading: authLoading } = useAuth() || {}
+  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
   const rawMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode
   const isSupplementMode = rawMode === 'supplement' || rawMode === 'location-only'
 
@@ -51,7 +49,6 @@ export default function EditStore() {
   // Form fields
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
-  const [storeSize, setStoreSize] = useState(DEFAULT_STORE_SIZE)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
@@ -96,12 +93,14 @@ export default function EditStore() {
   // Auth guard
   useEffect(() => {
     if (!router.isReady || authLoading) return
-    if (!user && !isSupplementMode) {
+    if (!isAuthenticated && !isSupplementMode) {
       router.replace(`/login?from=${encodeURIComponent(router.asPath || `/store/edit/${id || ''}`)}`)
+    } else if (!isAdmin && !isSupplementMode) {
+      router.replace('/account')
     } else {
       setPageReady(true)
     }
-  }, [router.isReady, user, authLoading, id, router, isSupplementMode])
+  }, [router.isReady, isAuthenticated, isAdmin, authLoading, id, router, isSupplementMode])
 
   // Fetch store
   useEffect(() => {
@@ -119,7 +118,6 @@ export default function EditStore() {
       setStore(data)
       setName(data.name || '')
       setStoreType(data.store_type || DEFAULT_STORE_TYPE)
-      setStoreSize(data.store_size || DEFAULT_STORE_SIZE)
       setAddressDetail(data.address_detail || '')
       setWard(data.ward || '')
       setDistrict(data.district || '')
@@ -155,7 +153,6 @@ export default function EditStore() {
   const supplementLocks = useMemo(() => ({
     name: Boolean(String(store?.name || '').trim()),
     storeType: Boolean(String(store?.store_type || '').trim()),
-    storeSize: Boolean(String(store?.store_size || '').trim()),
     addressDetail: Boolean(String(store?.address_detail || '').trim()),
     ward: Boolean(String(store?.ward || '').trim()),
     district: Boolean(String(store?.district || '').trim()),
@@ -333,7 +330,6 @@ export default function EditStore() {
         const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
         if (normalizedStoreType) updates.store_type = normalizedStoreType
       }
-      if (!supplementLocks.storeSize && storeSize) updates.store_size = storeSize
       if (!supplementLocks.addressDetail) {
         const normalizedDetail = addressDetail.trim() ? toTitleCaseVI(addressDetail.trim()) : ''
         if (normalizedDetail) updates.address_detail = normalizedDetail
@@ -386,7 +382,7 @@ export default function EditStore() {
         return
       }
 
-      if (user) {
+      if (isAdmin) {
         const { error } = await supabase.from('stores').update(updates).eq('id', id)
         if (error) throw error
 
@@ -412,7 +408,7 @@ export default function EditStore() {
       }
 
       setShowSuccess(true)
-      showMessage('success', user ? 'Đã bổ sung thông tin cửa hàng!' : 'Đã gửi đề xuất bổ sung để admin duyệt!', 1500)
+      showMessage('success', isAdmin ? 'Đã bổ sung thông tin cửa hàng!' : 'Đã gửi đề xuất bổ sung để admin duyệt!', 1500)
     } catch (err) {
       console.error(err)
       showMessage('error', err.message || 'Lưu thất bại, vui lòng thử lại')
@@ -469,7 +465,6 @@ export default function EditStore() {
       const updates = {
         name: toTitleCaseVI(name.trim()),
         store_type: storeType || DEFAULT_STORE_TYPE,
-        store_size: storeSize || null,
         address_detail: addressDetail.trim() || null,
         ward: ward.trim() || null,
         district: district.trim() || null,
@@ -534,7 +529,7 @@ export default function EditStore() {
               : 'Thông tin còn thiếu đã được cập nhật vào hệ thống.'}
           </p>
           <div className="flex flex-col gap-3 pt-2">
-            {user && (
+            {isAdmin && (
               <Button className="w-full" onClick={() => router.push(`/store/edit/${id}`)}>
                 Xem màn sửa đầy đủ
               </Button>
@@ -554,9 +549,9 @@ export default function EditStore() {
 
   if (isSupplementMode) {
     return (
-      <StoreSupplementForm
+        <StoreSupplementForm
         router={router}
-        user={user}
+        user={isAdmin ? user : null}
         store={store}
         msgState={msgState}
         steps={supplementSteps}
@@ -564,11 +559,9 @@ export default function EditStore() {
         setCurrentStep={setCurrentStep}
         stepCount={supplementStepCount}
         saving={saving}
-        storeType={storeType}
-        setStoreType={setStoreType}
-        storeSize={storeSize}
-        setStoreSize={setStoreSize}
-        name={name}
+          storeType={storeType}
+          setStoreType={setStoreType}
+          name={name}
         setName={setName}
         district={district}
         setDistrict={setDistrict}
@@ -644,20 +637,6 @@ export default function EditStore() {
           >
             {STORE_TYPE_OPTIONS.map((type) => (
               <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="store_size" className="text-sm font-medium text-gray-300">Độ lớn cửa hàng</Label>
-          <select
-            id="store_size"
-            value={storeSize}
-            onChange={(e) => setStoreSize(e.target.value || DEFAULT_STORE_SIZE)}
-            className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-base px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Chưa chọn</option>
-            {STORE_SIZE_OPTIONS.map((size) => (
-              <option key={size.value} value={size.value}>{size.label}</option>
             ))}
           </select>
         </div>

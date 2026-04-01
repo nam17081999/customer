@@ -9,19 +9,19 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, loading: authLoading, signOut } = useAuth() || {}
+  const { user, role, isAdmin, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
   const [pageReady, setPageReady] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       router.replace('/login?from=/account')
       return
     }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, router])
 
   const handleSignOut = async () => {
     if (!signOut || signingOut) return
@@ -49,6 +49,9 @@ export default function AccountPage() {
                 <div className="min-w-0">
                   <p className="text-sm text-gray-400">Tài khoản đăng nhập</p>
                   <p className="text-base font-semibold text-gray-200 truncate">{user?.email}</p>
+                  <p className="text-sm text-gray-400">
+                    Quyền: {isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'}
+                  </p>
                 </div>
                 <Button
                   type="button"
@@ -66,7 +69,7 @@ export default function AccountPage() {
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Menu nhanh</h1>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {isAdmin && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button asChild>
                   <Link href="/overview">Màn tổng quan</Link>
                 </Button>
@@ -79,7 +82,12 @@ export default function AccountPage() {
                 <Button asChild variant="outline">
                   <Link href="/store/import">Màn nhập dữ liệu</Link>
                 </Button>
-              </div>
+              </div>}
+              {!isAdmin && (
+                <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 text-sm text-gray-300">
+                  Telesale không có quyền vào các màn quản trị dữ liệu.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

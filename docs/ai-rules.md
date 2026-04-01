@@ -85,7 +85,6 @@ const existingStores = await getOrRefreshStores()
 await supabase.from('stores').insert([{
   name: toTitleCaseVI(name.trim()),   // ← Title Case bắt buộc
   store_type: selectedStoreType || 'Tạp hóa', // ← mặc định Cửa hàng
-  store_size: selectedStoreSize || null,      // ← độ lớn cửa hàng, cho phép null
   address_detail, ward, district,      // ← cũng Title Case
   active: Boolean(isAdmin),
   note, phone,
@@ -199,27 +198,21 @@ function parseCoordinate(value) {
 ```
 
 ```js
-// Khi chưa nhập tiêu chí tìm kiếm (q rỗng + chưa chọn quận/xã):
-// hiển thị 50 cửa hàng gần nhất, sort khoảng cách tăng dần
+// Khi chưa nhập tiêu chí tìm kiếm:
+// hiển thị toàn bộ cửa hàng, sort khoảng cách tăng dần
 const defaultNearby = stores
   .slice()
   .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity))
-  .slice(0, 50)
 ```
 
 ```js
 // Bộ lọc chi tiết trên `/`
 // Quận/Huyện + Xã/Phường: single-select
-// Loại cửa hàng + Độ lớn + Có SĐT + Có ảnh + Không có vị trí: multi-select
+// Loại cửa hàng + Có SĐT + Có ảnh + Không có vị trí: multi-select
 const filtered = stores.filter((store) => {
   if (selectedDistrict && store.district !== selectedDistrict) return false
   if (selectedWard && store.ward !== selectedWard) return false
   if (selectedStoreTypes.length && !selectedStoreTypes.includes(store.store_type || '')) return false
-  if (selectedStoreSizes.length) {
-    const size = (store.store_size || '').trim()
-    const matched = selectedStoreSizes.some((value) => value === '__unknown__' ? !size : size === value)
-    if (!matched) return false
-  }
   if (selectedFlags.includes('has_phone') && !String(store.phone || '').trim()) return false
   if (selectedFlags.includes('has_image') && !String(store.image_url || '').trim()) return false
   if (selectedFlags.includes('has_no_location')) {

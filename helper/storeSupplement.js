@@ -29,7 +29,6 @@ export function hasStoreSupplementOpportunity(store) {
   if (!store) return false
   return (
     !hasText(store.store_type) ||
-    !hasText(store.store_size) ||
     !hasText(store.address_detail) ||
     !hasText(store.ward) ||
     !hasText(store.district) ||

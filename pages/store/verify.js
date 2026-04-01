@@ -14,7 +14,7 @@ import { formatDateTime } from '@/helper/validation'
 
 export default function VerifyStorePage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [stores, setStores] = useState([])
@@ -31,15 +31,22 @@ export default function VerifyStorePage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       void router.replace('/login?from=/store/verify').catch((err) => {
         if (!err?.cancelled) console.error('Redirect to login failed:', err)
       })
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      void router.replace('/account').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to account failed:', err)
+      })
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadUnverifiedStores = useCallback(async () => {
     setLoading(true)

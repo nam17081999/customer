@@ -13,8 +13,6 @@ import {
   DISTRICT_SUGGESTIONS,
   STORE_TYPE_OPTIONS,
   DEFAULT_STORE_TYPE,
-  STORE_SIZE_OPTIONS,
-  DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 // browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
@@ -39,11 +37,9 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
 
 export default function AddStore() {
   const router = useRouter()
-  const { user } = useAuth() || {}
-  const isAdmin = Boolean(user)
+  const { isAdmin } = useAuth() || {}
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
-  const [storeSize, setStoreSize] = useState(DEFAULT_STORE_SIZE)
   const nameInputRef = useRef(null)
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
@@ -57,9 +53,14 @@ export default function AddStore() {
     msgTimerRef.current = setTimeout(() => { setMsgState((s) => ({ ...s, show: false })); msgTimerRef.current = null }, duration)
   }
   const [phone, setPhone] = useState('')
+  const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
+  const canShowQuickSave = Boolean(
+    normalizedPhoneForQuickSave && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
+  )
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [imageFile, setImageFile] = useState(null)
+  const [showMoreMobileStep2, setShowMoreMobileStep2] = useState(false)
   const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
   useEffect(() => {
     return () => {
@@ -69,6 +70,9 @@ export default function AddStore() {
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
+  useEffect(() => {
+    if (currentStep !== 2) setShowMoreMobileStep2(false)
+  }, [currentStep])
   const [showSuccess, setShowSuccess] = useState(false)
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
@@ -103,7 +107,6 @@ export default function AddStore() {
     return Boolean(
       name.trim() ||
       storeType !== DEFAULT_STORE_TYPE ||
-      storeSize !== DEFAULT_STORE_SIZE ||
       addressDetail.trim() ||
       ward.trim() ||
       district.trim() ||
@@ -114,7 +117,7 @@ export default function AddStore() {
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, storeType, storeSize, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
+  }, [name, storeType, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -311,7 +314,6 @@ export default function AddStore() {
   function resetCreateForm() {
     setName('')
     setStoreType(DEFAULT_STORE_TYPE)
-    setStoreSize(DEFAULT_STORE_SIZE)
     setAddressDetail('')
     setWard('')
     setDistrict('')
@@ -585,7 +587,6 @@ export default function AddStore() {
   async function persistStore({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) {
     const normalizedName = toTitleCaseVI(name.trim())
     const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
-    const normalizedStoreSize = storeSize || null
     const rawPhone = phone.trim()
     let validatedPhone = ''
 
@@ -681,7 +682,6 @@ export default function AddStore() {
       const insertPayload = {
         name: normalizedName,
         store_type: normalizedStoreType,
-        store_size: normalizedStoreSize,
         address_detail: normalizedDetail,
         ward: normalizedWard,
         district: normalizedDistrict,
@@ -697,18 +697,6 @@ export default function AddStore() {
       let insertError = null
 
       ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
-
-      if (insertError && normalizedStoreSize) {
-        const schemaMessage = `${insertError.message || ''} ${insertError.details || ''} ${insertError.hint || ''}`
-        if (/store_size/i.test(schemaMessage) && /(column|schema|find)/i.test(schemaMessage)) {
-          const fallbackPayload = { ...insertPayload }
-          delete fallbackPayload.store_size
-          ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([fallbackPayload]).select())
-          if (!insertError) {
-            showMessage('warning', 'Đã tạo cửa hàng nhưng chưa lưu được độ lớn vì DB chưa có cột store_size.')
-          }
-        }
-      }
 
       if (insertError) {
         console.error(insertError)
@@ -959,29 +947,6 @@ export default function AddStore() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="store_size" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Độ lớn cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {STORE_SIZE_OPTIONS.map((sizeOption) => {
-                      const selected = storeSize === sizeOption.value
-                      return (
-                        <button
-                          key={`size-${sizeOption.value}`}
-                          type="button"
-                          onClick={() => setStoreSize((prev) => prev === sizeOption.value ? DEFAULT_STORE_SIZE : sizeOption.value)}
-                          aria-pressed={selected}
-                          className={`min-h-11 rounded-md border px-3 py-2 text-center text-sm transition ${
-                            selected
-                              ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                              : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                          }`}
-                        >
-                          {sizeOption.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="space-y-2">
                   <select hidden
                     id="store_type"
                     value={storeType}
@@ -1026,9 +991,6 @@ export default function AddStore() {
                     )
                   })}
                 </div>
-                <p hidden className="text-sm text-gray-400">
-                  Loại đã chọn: <span className="font-medium text-gray-200">{STORE_TYPE_OPTIONS.find((o) => o.value === storeType)?.label}</span>
-                </p>
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}
@@ -1149,6 +1111,30 @@ export default function AddStore() {
                 )}
               </div>
               
+              <div className="sm:hidden">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-xl px-1 py-1.5 text-left transition text-gray-400 hover:text-gray-200"
+                  onClick={() => setShowMoreMobileStep2((v) => !v)}
+                  aria-expanded={showMoreMobileStep2}
+                >
+                  <span className="text-sm">
+                    {showMoreMobileStep2 ? 'Thu gọn phần thêm' : 'Hiển thị thêm ảnh và ghi chú'}
+                  </span>
+                  <span
+                    className={`ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-transform ${
+                      showMoreMobileStep2 ? 'rotate-180' : ''
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                      <path d="M5 7.5 10 12.5 15 7.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+
+              <div className={`${showMoreMobileStep2 ? 'block' : 'hidden'} sm:block space-y-4`}>
               {/* Ảnh */}
               <div className="space-y-1.5">
                 <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
@@ -1193,6 +1179,7 @@ export default function AddStore() {
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
                 <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Bán từ 6:00 - 22:00" className="text-base sm:text-base" />
               </div>
+              </div>
 
               <div className="pt-2 hidden sm:flex gap-2">
                 <Button
@@ -1202,14 +1189,24 @@ export default function AddStore() {
                   icon={<span>←</span>}
                   onClick={() => setCurrentStep(1)}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleSaveWithoutLocation}
-                >
-                  Lưu luôn
-                </Button>
+                {canShowQuickSave && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    icon={
+                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
+                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
+                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
+                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
+                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
+                          </svg>
+                    }
+                    onClick={handleSaveWithoutLocation}
+                    aria-label="Lưu luôn"
+                    title="Lưu luôn"
+                  />
+                )}
                 <Button
                   type="button"
                   className="flex-1"
@@ -1335,14 +1332,24 @@ export default function AddStore() {
                       icon={<span>←</span>}
                       onClick={() => setCurrentStep(1)}
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={handleSaveWithoutLocation}
-                    >
-                      Lưu luôn
-                    </Button>
+                    {canShowQuickSave && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        icon={
+                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
+                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
+                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
+                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
+                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
+                          </svg>
+                        }
+                        onClick={handleSaveWithoutLocation}
+                        aria-label="Lưu luôn"
+                        title="Lưu luôn"
+                      />
+                    )}
                     <Button
                       type="button"
                       className="flex-1"

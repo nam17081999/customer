@@ -5,7 +5,7 @@ import { Virtuoso } from 'react-virtuoso'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { DISTRICT_WARD_SUGGESTIONS, STORE_SIZE_OPTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
+import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
@@ -19,10 +19,8 @@ const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.locale
 const ALL_WARDS = Array.from(
   new Set(Object.values(DISTRICT_WARD_SUGGESTIONS).flat())
 ).sort((a, b) => a.localeCompare(b, 'vi'))
-const DEFAULT_NEARBY_LIMIT = 50
 const LOCATION_REFRESH_INTERVAL_MS = 3 * 60 * 1000
 const LOCATION_REFRESH_COOLDOWN_MS = 5 * 1000
-const UNKNOWN_STORE_SIZE_VALUE = '__unknown__'
 const FILTER_FLAG_HAS_PHONE = 'has_phone'
 const FILTER_FLAG_HAS_IMAGE = 'has_image'
 const FILTER_FLAG_NO_LOCATION = 'has_no_location'
@@ -56,7 +54,6 @@ function buildSearchRouteQuery({
   selectedDistrict,
   selectedWard,
   selectedStoreTypes,
-  selectedStoreSizes,
   selectedDetailFlags,
 }) {
   const query = {}
@@ -64,7 +61,6 @@ function buildSearchRouteQuery({
   if (selectedDistrict) query.district = selectedDistrict
   if (selectedWard) query.ward = selectedWard
   if (selectedStoreTypes.length) query.types = selectedStoreTypes.join(',')
-  if (selectedStoreSizes.length) query.sizes = selectedStoreSizes.join(',')
   if (selectedDetailFlags.length) query.flags = selectedDetailFlags.join(',')
   return query
 }
@@ -88,7 +84,6 @@ export default function HomePage() {
   const [selectedDistrict, setSelectedDistrict] = useState('')
   const [selectedWard, setSelectedWard] = useState('')
   const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
-  const [selectedStoreSizes, setSelectedStoreSizes] = useState([])
   const [selectedDetailFlags, setSelectedDetailFlags] = useState([])
   const [showDetailedFilters, setShowDetailedFilters] = useState(false)
   const [currentLocation, setCurrentLocation] = useState(null)
@@ -101,28 +96,25 @@ export default function HomePage() {
     || selectedDistrict
     || selectedWard
     || selectedStoreTypes.length
-    || selectedStoreSizes.length
     || selectedDetailFlags.length
   )
-  const activeFilterCount = (selectedDistrict ? 1 : 0) + (selectedWard ? 1 : 0) + selectedStoreTypes.length + selectedStoreSizes.length + selectedDetailFlags.length
+  const activeFilterCount = (selectedDistrict ? 1 : 0) + (selectedWard ? 1 : 0) + selectedStoreTypes.length + selectedDetailFlags.length
 
   // Restore state from URL query params on mount (for back-navigation)
   useEffect(() => {
     if (initializedFromQuery.current || !router.isReady) return
     initializedFromQuery.current = true
-    const { q, district, districts, ward, wards, types, sizes, flags } = router.query
+    const { q, district, districts, ward, wards, types, flags } = router.query
     if (q) setSearchTerm(q)
     const restoredDistricts = parseQueryList(districts || district)
     const restoredWards = parseQueryList(wards || ward)
     const restoredTypes = parseQueryList(types)
-    const restoredSizes = parseQueryList(sizes)
     const restoredFlags = parseQueryList(flags)
     if (restoredDistricts.length) setSelectedDistrict(restoredDistricts[0])
     if (restoredWards.length) setSelectedWard(restoredWards[0])
     if (restoredTypes.length) setSelectedStoreTypes(restoredTypes)
-    if (restoredSizes.length) setSelectedStoreSizes(restoredSizes)
     if (restoredFlags.length) setSelectedDetailFlags(restoredFlags)
-    if (restoredDistricts.length || restoredWards.length || restoredTypes.length || restoredSizes.length || restoredFlags.length) {
+    if (restoredDistricts.length || restoredWards.length || restoredTypes.length || restoredFlags.length) {
       setShowDetailedFilters(true)
     }
   }, [router.isReady, router.query])
@@ -136,7 +128,6 @@ export default function HomePage() {
       selectedDistrict,
       selectedWard,
       selectedStoreTypes,
-      selectedStoreSizes,
       selectedDetailFlags,
     })
     const currentQuery = buildSearchRouteQuery({
@@ -144,7 +135,6 @@ export default function HomePage() {
       selectedDistrict: parseQueryList(router.query.districts || router.query.district)[0] || '',
       selectedWard: parseQueryList(router.query.wards || router.query.ward)[0] || '',
       selectedStoreTypes: parseQueryList(router.query.types),
-      selectedStoreSizes: parseQueryList(router.query.sizes),
       selectedDetailFlags: parseQueryList(router.query.flags),
     })
 
@@ -155,7 +145,7 @@ export default function HomePage() {
     }, 250)
 
     return () => window.clearTimeout(syncTimer)
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedStoreSizes, selectedDetailFlags, router.isReady, router.pathname, router.query])
+  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router.isReady, router.pathname, router.query])
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
   const wardOptions = useMemo(() => (
@@ -164,11 +154,6 @@ export default function HomePage() {
       : ALL_WARDS
   ), [selectedDistrict])
   const districtOptions = DISTRICTS
-  const storeSizeOptions = useMemo(() => ([
-    { value: UNKNOWN_STORE_SIZE_VALUE, label: 'Chưa rõ' },
-    ...STORE_SIZE_OPTIONS,
-  ]), [])
-
   useEffect(() => {
     if (!selectedDistrict || !selectedWard) return
     if (!wardOptions.includes(selectedWard)) {
@@ -307,12 +292,6 @@ export default function HomePage() {
     if (selectedStoreTypes.length > 0) {
       results = results.filter((s) => selectedStoreTypes.includes(s.store_type || ''))
     }
-    if (selectedStoreSizes.length > 0) {
-      results = results.filter((s) => {
-        const normalizedSize = (s.store_size || '').trim()
-        return selectedStoreSizes.some((size) => size === UNKNOWN_STORE_SIZE_VALUE ? !normalizedSize : normalizedSize === size)
-      })
-    }
     if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)) {
       results = results.filter((s) => Boolean(String(s.phone || '').trim()))
     }
@@ -384,20 +363,14 @@ export default function HomePage() {
       return db.localeCompare(da)
     })
 
-    if (!hasSearchCriteria) {
-      return results.slice(0, DEFAULT_NEARBY_LIMIT)
-    }
-
     return results
   }, [
     allStores,
     storesLoaded,
-    hasSearchCriteria,
     searchTerm,
     selectedDistrict,
     selectedWard,
     selectedStoreTypes,
-    selectedStoreSizes,
     selectedDetailFlags,
     currentLocation,
     computeDistance,
@@ -419,7 +392,6 @@ export default function HomePage() {
     setSelectedDistrict('')
     setSelectedWard('')
     setSelectedStoreTypes([])
-    setSelectedStoreSizes([])
     setSelectedDetailFlags([])
   }
 
@@ -518,28 +490,6 @@ export default function HomePage() {
                 </div>
 
                 <div>
-                  <div className="mb-1.5 text-sm font-semibold text-gray-200">Độ lớn cửa hàng</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {storeSizeOptions.map((size) => {
-                      const active = selectedStoreSizes.includes(size.value)
-                      return (
-                        <button
-                          key={size.value}
-                          type="button"
-                          onClick={() => toggleFilterValue(setSelectedStoreSizes, size.value)}
-                          className={`rounded-lg border px-2.5 py-2 text-sm font-medium transition ${active
-                            ? 'border-amber-500 bg-amber-500/15 text-amber-100'
-                            : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
-                            }`}
-                        >
-                          {size.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div>
                   <div className="mb-1.5 text-sm font-semibold text-gray-200">Chi tiết dữ liệu</div>
                   <div className="grid grid-cols-2 gap-2">
                     {[
@@ -576,7 +526,6 @@ export default function HomePage() {
                         setSelectedDistrict('')
                         setSelectedWard('')
                         setSelectedStoreTypes([])
-                        setSelectedStoreSizes([])
                         setSelectedDetailFlags([])
                       }}
                       className="w-full whitespace-nowrap rounded-lg border border-gray-700 px-3 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 sm:w-auto"
@@ -629,14 +578,30 @@ export default function HomePage() {
           {showSkeleton && (
             <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3" aria-label={loading ? 'Đang tải kết quả' : 'Đang chuẩn bị tìm kiếm'}>
               {[...Array(5)].map((_, i) => (
-                <Card key={i} className={`overflow-hidden rounded-xl border border-gray-800 ${loading ? '' : 'opacity-70'}`}>
+                <Card key={i} className={`overflow-hidden rounded-md border border-gray-800 bg-gray-950 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
-                    <div className="flex gap-3 p-3">
-                      <div className="w-20 h-20 rounded-lg bg-gray-800 animate-pulse flex-shrink-0" />
-                      <div className="flex-1 space-y-2 py-1">
-                        <div className="h-4 w-3/4 bg-gray-700 rounded" />
-                        <div className="h-3 w-full bg-gray-700 rounded" />
-                        <div className="h-3 w-1/2 bg-gray-700 rounded" />
+                    <div className="grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-2 p-3">
+                      <div className="flex h-6 w-6 items-center justify-center">
+                        <div className="h-4.5 w-4.5 rounded-sm bg-gray-800 animate-pulse" />
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="h-5 w-3/4 rounded bg-gray-700 animate-pulse" />
+                      </div>
+
+                      <div className="row-span-3 flex shrink-0 flex-col justify-center gap-2">
+                        <div className="h-10 w-10 rounded-full border border-gray-800 bg-gray-800 animate-pulse" />
+                        <div className="h-10 w-10 rounded-full border border-gray-800 bg-gray-800 animate-pulse" />
+                      </div>
+
+                      <div className="col-span-2 flex items-center gap-1">
+                        <div className="h-4 w-4 rounded-full bg-gray-800 animate-pulse" />
+                        <div className="h-4 w-16 rounded bg-gray-800 animate-pulse" />
+                      </div>
+
+                      <div className="col-span-2 space-y-2">
+                        <div className="h-4 w-full rounded bg-gray-800 animate-pulse" />
+                        <div className="h-4 w-2/3 rounded bg-gray-800 animate-pulse" />
                       </div>
                     </div>
                   </CardContent>

@@ -12,7 +12,6 @@ const EXPORT_STORE_SELECT_FIELDS = [
   'id',
   'name',
   'store_type',
-  'store_size',
   'image_url',
   'latitude',
   'longitude',
@@ -148,7 +147,6 @@ function buildStoreCsv(stores) {
   const headers = [
     'Ten cua hang',
     'Loai cua hang',
-    'Do lon cua hang',
     'Dia chi',
     'So dien thoai',
     'Trang thai',
@@ -163,7 +161,6 @@ function buildStoreCsv(stores) {
     return [
       store.name || '',
       store.store_type || '',
-      store.store_size || '',
       formatAddressParts(store) || '',
       store.phone || '',
       status,
@@ -219,7 +216,7 @@ function buildContactsVcf(storesWithPhone) {
 
 export function StoreExportScreen({ mode = 'all' }) {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -228,15 +225,22 @@ export function StoreExportScreen({ mode = 'all' }) {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       void router.replace('/login?from=/store/export').catch((err) => {
         if (!err?.cancelled) console.error('Redirect to login failed:', err)
       })
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      void router.replace('/account').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to account failed:', err)
+      })
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadStores = useCallback(async () => {
     setLoading(true)
@@ -376,7 +380,7 @@ export function StoreExportScreen({ mode = 'all' }) {
                   <div>
                     <h2 className="text-lg font-semibold text-gray-100">File Excel (CSV)</h2>
                     <p className="text-sm text-gray-400">
-                      Bao gồm tất cả cửa hàng: tên, loại, độ lớn, địa chỉ, số điện thoại, trạng thái, tọa độ, ngày tạo và ngày cập nhật.
+                      Bao gồm tất cả cửa hàng: tên, loại, địa chỉ, số điện thoại, trạng thái, tọa độ, ngày tạo và ngày cập nhật.
                     </p>
                   </div>
                   <Button type="button" onClick={exportStoresToExcel} disabled={loading || stores.length === 0}>

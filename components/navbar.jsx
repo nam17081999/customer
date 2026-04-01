@@ -47,11 +47,11 @@ const ReportIcon = ({ className }) => (
 
 export default function Navbar() {
     const pathname = usePathname()
-    const { user } = useAuth() || {}
+    const { isAdmin } = useAuth() || {}
     const [pendingStores, setPendingStores] = useState(0)
     const [pendingReports, setPendingReports] = useState(0)
     const currentPath = pathname || ''
-    const navLinks = user
+    const navLinks = isAdmin
         ? [
             { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
             { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon, badge: pendingStores },
@@ -70,7 +70,7 @@ export default function Navbar() {
     useEffect(() => {
         let alive = true
         async function loadCounts() {
-            if (!user) {
+            if (!isAdmin) {
                 setPendingStores(0)
                 setPendingReports(0)
                 return
@@ -95,7 +95,7 @@ export default function Navbar() {
         }
         loadCounts()
         return () => { alive = false }
-    }, [user])
+    }, [isAdmin])
 
     const renderBadge = (count, opts = {}) => {
         if (!count || count <= 0) return null
