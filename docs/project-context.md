@@ -5,7 +5,7 @@
 **StoreVis** là ứng dụng web tra cứu và quản lý danh sách **cửa hàng** (tạp hóa, quán nước, quán ăn, v.v.) tại một số huyện ngoại thành Hà Nội.
 
 **Mục tiêu chính:**
-- Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại, độ lớn, và mức độ đầy đủ dữ liệu
+- Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại và mức độ đầy đủ dữ liệu
 - Hiển thị vị trí cửa hàng trên bản đồ
 - Cho phép bất kỳ ai thêm cửa hàng mới (chờ admin duyệt)
 - Admin duyệt/quản lý danh sách, xem dashboard tổng quan
@@ -98,7 +98,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
 10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
 11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
-12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/độ lớn/có SĐT/có ảnh/không có vị trí là multi-select.
+12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/có SĐT/có ảnh/không có vị trí là multi-select.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
 15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
@@ -134,3 +134,20 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 - Hai màn admin dễ lộ lỗi tiếng Việt ra UI là:
   - `/store/verify`
   - `/store/reports`
+
+---
+
+## Telesale Minimal DB Update
+
+Ban toi gian cho telesale su dung 6 cot tren `stores`:
+
+- `is_potential`
+- `last_called_at`
+- `last_call_result`
+- `last_call_result_at`
+- `last_order_reported_at`
+- `sales_note`
+
+Script SQL cap nhat moi truong duoc luu tai:
+
+- `docs/sql/2026-04-01-add-store-telesale-columns.sql`

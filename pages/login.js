@@ -8,15 +8,15 @@ import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, user } = useAuth()
+  const { signIn, isAuthenticated } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   // Already logged in
-  if (user) {
-    router.replace(router.query.from || '/dashboard')
+  if (isAuthenticated) {
+    router.replace(router.query.from || '/account')
     return null
   }
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
     if (err) {
       setError('Email hoặc mật khẩu không đúng')
     } else {
-      router.replace(router.query.from || '/dashboard')
+      router.replace(router.query.from || '/account')
     }
     setLoading(false)
   }

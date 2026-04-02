@@ -9,12 +9,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
 export default function VerifyStorePage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [stores, setStores] = useState([])
@@ -31,15 +31,22 @@ export default function VerifyStorePage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       void router.replace('/login?from=/store/verify').catch((err) => {
         if (!err?.cancelled) console.error('Redirect to login failed:', err)
       })
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      void router.replace('/account').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to account failed:', err)
+      })
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadUnverifiedStores = useCallback(async () => {
     setLoading(true)
@@ -175,7 +182,14 @@ export default function VerifyStorePage() {
       ids.forEach((id) => next.delete(id))
       return next
     })
-    await invalidateStoreCache()
+    await updateStoresInCache(ids.map((storeId) => ({ id: storeId, active: true })))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('storevis:stores-changed', {
+          detail: { type: 'verify-many', ids },
+        })
+      )
+    }
     setMessage(`Đã xác thực ${ids.length} cửa hàng.`)
     setSubmitting(false)
   }

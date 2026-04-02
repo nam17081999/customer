@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
-import { Dialog, DialogTrigger, DialogContent, DialogClose } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,8 +14,9 @@ import { formatDistance } from '@/helper/validation'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
+import { formatLastCalledText, getTelesaleResultLabel, hasReportedOrder } from '@/helper/telesale'
 import { supabase } from '@/lib/supabaseClient'
-import { invalidateStoreCache, removeStoreFromCache } from '@/lib/storeCache'
+import { removeStoreFromCache, updateStoreInCache } from '@/lib/storeCache'
 
 const StoreLocationPicker = dynamic(
   () => import('@/components/map/store-location-picker'),
@@ -31,7 +32,7 @@ const StoreLocationPicker = dynamic(
 
 export default function StoreDetailModal({ store, trigger, open, onOpenChange }) {
   const router = useRouter()
-  const { user } = useAuth() || {}
+  const { user, isAdmin, isTelesale } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [imageError, setImageError] = useState(false)
@@ -44,6 +45,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const [reportError, setReportError] = useState('')
   const [reportSuccess, setReportSuccess] = useState('')
   const [detailNotice, setDetailNotice] = useState('')
+  const [isPotential, setIsPotential] = useState(false)
+  const [potentialSaving, setPotentialSaving] = useState(false)
   const detailNoticeTimerRef = useRef(null)
   const [reportName, setReportName] = useState('')
   const [reportStoreType, setReportStoreType] = useState(DEFAULT_STORE_TYPE)
@@ -56,10 +59,37 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const [reportLng, setReportLng] = useState(null)
   const [reportMapEditable, setReportMapEditable] = useState(false)
   const [reportResolving, setReportResolving] = useState(false)
+  const suppressNextOpenRef = useRef(false)
 
   const isControlled = open !== undefined
   const resolvedOpen = isControlled ? open : internalOpen
   const resolvedOnOpenChange = isControlled ? onOpenChange : setInternalOpen
+
+  const triggerNode = isValidElement(trigger)
+    ? cloneElement(trigger, {
+      onPointerDownCapture: (event) => {
+        if (event.target?.closest?.('[data-detail-modal-ignore="true"]')) {
+          suppressNextOpenRef.current = true
+        }
+      },
+      onClickCapture: (event) => {
+        if (event.target?.closest?.('[data-detail-modal-ignore="true"]')) {
+          suppressNextOpenRef.current = true
+        }
+      },
+      onClick: (event) => {
+        trigger.props?.onClick?.(event)
+        if (event.defaultPrevented) return
+        if (suppressNextOpenRef.current) {
+          suppressNextOpenRef.current = false
+          return
+        }
+        if (event.target?.closest?.('[data-detail-modal-ignore="true"]')) return
+        resolvedOnOpenChange?.(true)
+      },
+    })
+    : trigger
+
 
   useEffect(() => {
     if (!store) return
@@ -78,6 +108,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
       }
     }
     if (resolvedOpen) {
+      setIsPotential(Boolean(store.is_potential))
       setReportName(store.name || '')
       setReportStoreType(store.store_type || DEFAULT_STORE_TYPE)
       setReportAddressDetail(store.address_detail || '')
@@ -110,31 +141,15 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
   const resolvedStoreType = store.store_type || DEFAULT_STORE_TYPE
   const storeTypeLabel = STORE_TYPE_OPTIONS.find((option) => option.value === resolvedStoreType)?.label || resolvedStoreType
+  const canTrackTelesale = isAdmin || isTelesale
 
-  const handleShare = async (e) => {
-    e.stopPropagation()
-    const lines = [`Tên: ${store.name}`]
-    if (addressText) lines.push(`Địa chỉ: ${addressText}`)
-    if (hasCoords) lines.push(`Vị trí: https://www.google.com/maps?q=${store.latitude},${store.longitude}`)
-
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: store.name, text: lines.join('\n') })
-        return
-      } catch { /* user cancelled */ }
-    }
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { /* ignored */ }
-  }
-
-  const handleCall = (e) => {
-    e.stopPropagation()
-    if (store.phone) {
-      window.location.href = `tel:${String(store.phone).replace(/[^0-9+]/g, '')}`
-    }
+  const showDetailNotice = (message) => {
+    setDetailNotice(message)
+    if (detailNoticeTimerRef.current) clearTimeout(detailNoticeTimerRef.current)
+    detailNoticeTimerRef.current = setTimeout(() => {
+      setDetailNotice('')
+      detailNoticeTimerRef.current = null
+    }, 3000)
   }
 
   const handleDelete = async (e) => {
@@ -145,22 +160,17 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
       return
     }
     setDeleting(true)
-    // Soft delete: ghi thời điểm xoá vào deleted_at thay vì xoá dòng khỏi DB
     const { error } = await supabase
       .from('stores')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', store.id)
     if (!error) {
-      // 1) Xoá khỏi cache local ngay lập tức để UI cập nhật
       await removeStoreFromCache(store.id)
-
-      // 2) Buộc lần load tiếp theo re-sync với DB
-      await invalidateStoreCache()
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'delete', id: store.id, shouldRefetchAll: true },
+            detail: { type: 'delete', id: store.id },
           })
         )
       }
@@ -178,6 +188,38 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const handleSupplement = (e) => {
     e.stopPropagation()
     router.push(`/store/edit/${store.id}?mode=supplement`)
+  }
+
+  const handleTogglePotential = async () => {
+    if (!canTrackTelesale || !store?.id || potentialSaving) return
+
+    const nextPotential = !isPotential
+    setPotentialSaving(true)
+
+    const { error } = await supabase
+      .from('stores')
+      .update({ is_potential: nextPotential })
+      .eq('id', store.id)
+
+    if (error) {
+      console.error(error)
+      showDetailNotice('Không cập nhật được trạng thái tiềm năng.')
+      setPotentialSaving(false)
+      return
+    }
+
+    setIsPotential(nextPotential)
+    const nextStore = { ...store, is_potential: nextPotential }
+    await updateStoreInCache(store.id, { is_potential: nextPotential })
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('storevis:stores-changed', {
+          detail: { type: 'update', id: store.id, store: nextStore },
+        })
+      )
+    }
+    showDetailNotice(nextPotential ? 'Đã chuyển cửa hàng sang tiềm năng.' : 'Đã chuyển cửa hàng về trạng thái thường.')
+    setPotentialSaving(false)
   }
 
   const wardSuggestions = reportDistrict
@@ -294,12 +336,12 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     const { error } = await supabase.from('store_reports').insert([payload])
     if (error) {
       console.error(error)
-      setReportError('Không gửi được báo cáo, vui lòng thử lại')
+      setReportError('Khôgn gửi được báo cáo, vui lòng thử lại')
     } else {
       setReportOpen(false)
       setReportReasons([])
       setReportMode('')
-      setDetailNotice('Đã gửi báo cáo. Admin sẽ xem xét cập nhật.')
+      setDetailNotice('Đã gửi báo cáo. Admin sẽ xem xét và cập nhật.')
       if (detailNoticeTimerRef.current) clearTimeout(detailNoticeTimerRef.current)
       detailNoticeTimerRef.current = setTimeout(() => {
         setDetailNotice('')
@@ -379,9 +421,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
               <svg className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
               </svg>
-              <Button variant="link" onClick={handleCall} className="break-all text-left">
-                {store.phone}
-              </Button>
+              <span className="break-all text-left text-gray-300">{store.phone}</span>
             </div>
           )}
 
@@ -395,115 +435,121 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
             </div>
           )}
 
+          {canTrackTelesale && store.phone && (
+            <div className="rounded-xl border border-gray-800 bg-gray-950/70 p-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-200">Telesale</p>
+                  <p className="text-xs text-gray-400">Cửa hàng tiềm năng</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isPotential}
+                  disabled={potentialSaving}
+                  onClick={handleTogglePotential}
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition ${
+                    isPotential
+                      ? 'border-emerald-500 bg-emerald-500/25'
+                      : 'border-gray-700 bg-gray-900'
+                  } ${potentialSaving ? 'opacity-70' : ''}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                      isPotential ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
 
-        </div>
+              <div className="flex flex-wrap gap-2">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${isPotential ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40' : 'bg-gray-800 text-gray-300 border border-gray-700'}`}>
+                  {isPotential ? 'Tiềm năng' : 'Thông thường'}
+                </span>
+                {isPotential && (
+                  <>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                      Thời gian gọi cuối: {formatLastCalledText(store.last_called_at)}
+                    </span>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+                      Kết quả: {getTelesaleResultLabel(store.last_call_result)}
+                    </span>
+                    {hasReportedOrder(store) && (
+                      <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium bg-sky-500/20 text-sky-200 border border-sky-500/40">
+                        Đã lên đơn
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
 
-        {detailNotice && (
-          <div className="px-4 pb-2">
-            <div className="rounded-lg border border-green-900 bg-green-950/30 px-3 py-2 text-sm text-green-300">
+              {isPotential && store.sales_note ? (
+                <p className="text-sm text-gray-400 break-words">{store.sales_note}</p>
+              ) : null}
+            </div>
+          )}
+
+          {detailNotice && (
+            <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
               {detailNotice}
             </div>
-          </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="px-4 pb-4 pt-2 grid grid-cols-2 gap-2">
-          {canSupplement && (
-            <Button
-              variant="outline"
-              className="w-full"
-              leftIcon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01" /></svg>
-              }
-              onClick={handleSupplement}
-            >
-              Bổ sung
-            </Button>
           )}
-          {user && (
-            <>
+
+          <div className="grid grid-cols-2 gap-2 pt-2">
+            {canSupplement && (
+              <Button variant="outline" className="w-full" onClick={handleSupplement}>
+                Bổ sung
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="outline" className="w-full" onClick={handleEdit}>
+                Chỉnh sửa
+              </Button>
+            )}
+            {hasCoords && (
               <Button
                 variant="outline"
                 className="w-full"
                 leftIcon={
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 }
-                onClick={handleEdit}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/map?storeId=${store.id}&lat=${store.latitude}&lng=${store.longitude}`)
+                }}
               >
-                Sửa
+                Bản đồ
               </Button>
-              <Button
-                variant={deleteConfirm ? 'destructiveConfirm' : 'destructive'}
-                disabled={deleting}
-                className="w-full"
-                leftIcon={deleting ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                )}
-                onClick={handleDelete}
-              >
-                {deleteConfirm ? 'Xác nhận xoá?' : 'Xoá'}
-              </Button>
-            </>
-          )}
-          {hasCoords && (
+            )}
             <Button
               variant="outline"
               className="w-full"
               leftIcon={
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4h10a2 2 0 012 2v12l-3-2-3 2-3-2-3 2V6a2 2 0 012-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h8M7 12h5" />
+                </svg>
               }
-              onClick={(e) => { e.stopPropagation(); window.open(`https://www.google.com/maps?q=${store.latitude},${store.longitude}`, '_blank') }}
-            >
-              Chỉ đường
-            </Button>
-          )}
-          {store.phone && (
-            <Button
-              variant="outline"
-              className="w-full"
-              leftIcon={
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-              }
-              onClick={handleCall}
-            >
-              Gọi điện
-            </Button>
-          )}
-          {hasCoords && (
-            <Button
-              variant="outline"
-              className="w-full"
-              leftIcon={
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              }
-              onClick={(e) => {
-                e.stopPropagation()
-                router.push(`/map?storeId=${store.id}&lat=${store.latitude}&lng=${store.longitude}`)
+              onClick={() => {
+                setReportOpen(true)
+                setReportMode('')
+                setReportError('')
+                setReportSuccess('')
               }}
             >
-              Bản đồ
+              Báo cáo
             </Button>
-          )}
-          <Button
-            variant="outline"
-            className="w-full"
-            leftIcon={
-              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 4h10a2 2 0 012 2v12l-3-2-3 2-3-2-3 2V6a2 2 0 012-2z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h8M7 12h5" />
-              </svg>
-            }
-            onClick={() => {
-              setReportOpen(true)
-              setReportMode('')
-              setReportError('')
-              setReportSuccess('')
-            }}
-          >
-            Báo cáo
-          </Button>
+            {isAdmin && (
+              <Button
+                variant={deleteConfirm ? 'default' : 'outline'}
+                className={`w-full ${deleteConfirm ? 'bg-red-600 hover:bg-red-500 text-white' : 'text-red-300 border-red-900/60 hover:bg-red-950/20'}`}
+                disabled={deleting}
+                onClick={handleDelete}
+              >
+                {deleting ? 'Đang xóa...' : deleteConfirm ? 'Xác nhận xóa' : 'Xóa cửa hàng'}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </DialogContent>
@@ -543,7 +589,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
         <div className="px-4 py-4 space-y-4">
           <div className="rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-300">
-            Báo cáo sẽ được admin duyệt trước khi cập nhật.
+            Báo cáo cửa hàng sẽ được admin duyệt khi cập nhật.
           </div>
 
           {!reportMode && (
@@ -552,7 +598,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
                 Sửa thông tin
               </Button>
               <Button type="button" variant="outline" className="w-full" onClick={() => setReportMode('reason')}>
-                Chỉ báo cáo
+                Chọn báo cáo
               </Button>
             </div>
           )}
@@ -619,7 +665,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
                   id="report-name"
                   value={reportName}
                   onChange={(e) => setReportName(e.target.value)}
-                  placeholder="VD: Tạp Hóa Minh Anh"
+                  placeholder="VD: Tạp hóa Minh Anh"
                 />
               </div>
 
@@ -771,7 +817,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
 
   return (
     <Dialog open={resolvedOpen} onOpenChange={resolvedOnOpenChange}>
-      {trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
+      {triggerNode || null}
       {content}
     </Dialog>
   )

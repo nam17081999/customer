@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useRouter } from 'next/router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import StoreDetailModal from '@/components/store-detail-modal'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { DEFAULT_STORE_TYPE, STORE_TYPE_OPTIONS } from '@/lib/constants'
+import TelesaleCallDialog from '@/components/store/telesale-call-dialog'
 
 function getStoreTypeMeta(storeType) {
   const resolvedType = storeType || DEFAULT_STORE_TYPE
@@ -58,24 +60,51 @@ function getStoreTypeMeta(storeType) {
   }
 }
 
-function CircleIconButton({ href, label, tone = 'sky', children }) {
-  const toneClass = `border-gray-800 bg-gray-800 text-gray-400`
-  const className = `flex h-10 w-10 items-center justify-center rounded-full border transition ${toneClass}`
-  const isExternal = /^https?:/i.test(href)
+function CircleIconButton({ href, label, children, onClick, onPointerDown }) {
+  const className = 'flex h-10 w-10 items-center justify-center rounded-full border border-gray-800 bg-gray-800 text-gray-400 transition'
+  const isLink = Boolean(href)
+  const isExternal = isLink && /^https?:/i.test(href)
+
+  if (isLink) {
+    return (
+      <a
+        href={href}
+        aria-label={label}
+        title={label}
+        className={className}
+        target={isExternal ? '_blank' : undefined}
+        rel={isExternal ? 'noreferrer' : undefined}
+        onPointerDown={(event) => {
+          event.stopPropagation()
+          onPointerDown?.(event)
+        }}
+        onClick={(event) => {
+          event.stopPropagation()
+          onClick?.(event)
+        }}
+      >
+        {children}
+      </a>
+    )
+  }
 
   return (
-    <a
-      href={href}
+    <button
+      type="button"
       aria-label={label}
       title={label}
       className={className}
-      target={isExternal ? '_blank' : undefined}
-      rel={isExternal ? 'noreferrer' : undefined}
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        onPointerDown?.(event)
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick?.(event)
+      }}
     >
       {children}
-    </a>
+    </button>
   )
 }
 
@@ -88,11 +117,11 @@ export default function SearchStoreCard({
   onCompactAction,
 }) {
   const router = useRouter()
+  const [detailOpen, setDetailOpen] = useState(false)
   const addressText = formatAddressParts(store)
   const hasCoordinates = hasStoreCoordinates(store)
   const typeMeta = getStoreTypeMeta(store.store_type)
   const directionHref = hasCoordinates ? `https://www.google.com/maps?q=${store.latitude},${store.longitude}` : ''
-  const phoneHref = store.phone ? `tel:${String(store.phone).replace(/[^0-9+]/g, '')}` : ''
 
   const handleCompactAction = (event) => {
     event.preventDefault()
@@ -100,6 +129,10 @@ export default function SearchStoreCard({
     if (typeof onCompactAction === 'function') {
       onCompactAction(store, router)
     }
+  }
+
+  const handleOpenDetail = () => {
+    setDetailOpen(true)
   }
 
   const renderHighlightedName = (name, term) => {
@@ -136,166 +169,184 @@ export default function SearchStoreCard({
   }
 
   if (compact) {
-    const compactCard = (
-      <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md cursor-pointer">
-        <CardContent className="p-0">
-          <div className="grid grid-cols-[auto_1fr_auto] gap-x-3 gap-y-1 p-3">
-            <div className="flex h-6 w-6 items-center justify-center text-sky-300">
-              {typeMeta.icon}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <OverflowMarquee
-                    className="max-w-full"
-                    textClassName="font-semibold text-gray-100 text-lg leading-snug"
-                    contentKey={`${store.id}:${store.name}:${searchTerm || ''}`}
-                  >
-                    {renderHighlightedName(store.name, searchTerm)}
-                  </OverflowMarquee>
-                </div>
-              </div>
-            </div>
-
-            <div className="row-span-3 flex shrink-0 flex-col justify-center gap-2">
-              {hasCoordinates && (
-                <CircleIconButton href={directionHref} label="Chỉ đường" tone="sky">
-                  <svg className="h-4.5 w-4.5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" id="location">
-                    <g id="Layer_2">
-                      <path d="M96 48c0 34.912-40.615 75.928-42.342 77.657a8.002 8.002 0 0 1-11.314 0C40.615 123.927 0 82.912 0 48a48 48 0 0 1 96 0zM48 72a24 24 0 1 0-24-24 23.999 23.999 0 0 0 24 24z"></path>
-                    </g>
-                  </svg>
-                </CircleIconButton>
-              )}
-              {store.phone && (
-                <CircleIconButton href={phoneHref} label="Gọi điện" tone="emerald">
-                  <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z"></path>
-                  </svg>
-                </CircleIconButton>
-              )}
-            </div>
-
-            {distance !== null && distance !== undefined ? (
-              <span className="col-span-2 inline-flex items-center gap-1 leading-none text-base text-gray-400">
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="leading-none">{formatDistance(distance)}</span>
-              </span>
-            ) : !hasCoordinates ? (
-              <span className="col-span-2 inline-flex items-center gap-1 leading-none text-base text-amber-400">
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
-                </svg>
-                <span className="leading-none">Chưa có vị trí</span>
-              </span>
-            ) : null}
-
-            <p className="col-span-2 text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
-          </div>
-
-          {compactActionLabel && typeof onCompactAction === 'function' && (
-            <div className="px-3 pb-3 pt-0">
-              <Button
+    return (
+      <>
+        <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
+          <CardContent className="p-0">
+            <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
+              <button
                 type="button"
-                variant="outline"
-                className="h-8 px-3 text-sm"
-                onClick={handleCompactAction}
+                className="min-w-0 text-left"
+                onClick={handleOpenDetail}
               >
-                {compactActionLabel}
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    )
+                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+                  <div className="flex h-6 w-6 items-center justify-center text-sky-300">
+                    {typeMeta.icon}
+                  </div>
 
-    return <StoreDetailModal store={store} trigger={compactCard} />
-  }
+                  <div className="min-w-0">
+                    <OverflowMarquee
+                      className="max-w-full"
+                      textClassName="font-semibold text-gray-100 text-lg leading-snug"
+                      contentKey={`${store.id}:${store.name}:${searchTerm || ''}`}
+                    >
+                      {renderHighlightedName(store.name, searchTerm)}
+                    </OverflowMarquee>
+                  </div>
 
-  const fullCard = (
-    <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-lg cursor-pointer">
-      <CardContent className="p-4">
-        <div className="flex gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sky-300">
-            {typeMeta.icon}
-          </div>
+                  <div className="col-span-2 mt-1 space-y-1">
+                    {distance !== null && distance !== undefined ? (
+                      <span className="inline-flex items-center gap-1 leading-none text-base text-gray-400">
+                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="leading-none">{formatDistance(distance)}</span>
+                      </span>
+                    ) : !hasCoordinates ? (
+                      <span className="inline-flex items-center gap-1 leading-none text-base text-amber-400">
+                        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
+                        </svg>
+                        <span className="leading-none">Chưa có vị trí</span>
+                      </span>
+                    ) : null}
 
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-start gap-2">
-                  <h3 className="font-semibold text-gray-100 text-lg md:text-xl leading-tight break-words">
-                    {renderHighlightedName(store.name, searchTerm)}
-                  </h3>
+                    <p className="text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
+                  </div>
                 </div>
-              </div>
+              </button>
 
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-col justify-center gap-2">
                 {hasCoordinates && (
-                  <CircleIconButton href={directionHref} label="Chỉ đường" tone="sky">
-                    <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 100 100" aria-hidden="true">
-                      <path d="m86.3 11.2-74 30.7c-1.7.7-1.6 3.3.3 3.8l34.1 7.7 7.7 34.1c.4 1.9 3 2.1 3.7.3l30.8-74c.6-1.7-1-3.3-2.6-2.6zm-66.8 32 59.1-24.6-30.9 30.9-28.2-6.3zm37.3 37.3-6.4-28.2 30.9-30.9-24.5 59.1z"></path>
+                  <CircleIconButton href={directionHref} label="Chỉ đường">
+                    <svg className="h-4.5 w-4.5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" aria-hidden="true">
+                      <path d="M96 48c0 34.912-40.615 75.928-42.342 77.657a8.002 8.002 0 0 1-11.314 0C40.615 123.927 0 82.912 0 48a48 48 0 0 1 96 0zM48 72a24 24 0 1 0-24-24 23.999 23.999 0 0 0 24 24z"></path>
                     </svg>
                   </CircleIconButton>
                 )}
                 {store.phone && (
-                  <CircleIconButton href={phoneHref} label="Gọi điện" tone="emerald">
-                    <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z"></path>
-                    </svg>
-                  </CircleIconButton>
+                  <TelesaleCallDialog
+                    store={store}
+                    trigger={(
+                      <CircleIconButton label="Gọi điện">
+                        <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z"></path>
+                        </svg>
+                      </CircleIconButton>
+                    )}
+                  />
                 )}
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {distance !== null && distance !== undefined ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-0.5 text-xs font-medium text-gray-200 shadow">
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  {formatDistance(distance)}
-                </span>
-              ) : !hasCoordinates ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-amber-950/80 px-2 py-0.5 text-xs font-medium text-amber-200 shadow">
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
-                  </svg>
-                  Chưa có vị trí
-                </span>
-              ) : null}
-            </div>
+            {compactActionLabel && typeof onCompactAction === 'function' && (
+              <div className="px-3 pb-3 pt-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-sm"
+                  onClick={handleCompactAction}
+                >
+                  {compactActionLabel}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-            <div className="mt-3 space-y-1 text-base leading-snug text-gray-300 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <svg className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
-                </svg>
-                <p className="line-clamp-3 break-words flex-1">{addressText}</p>
+        <StoreDetailModal store={store} open={detailOpen} onOpenChange={setDetailOpen} />
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-lg">
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 gap-4 text-left"
+              onClick={handleOpenDetail}
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center text-sky-300">
+                {typeMeta.icon}
               </div>
 
-              {store.note && (
-                <div className="flex items-center gap-1.5">
-                  <svg className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h5l5 5v7a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 4v6h6" />
-                  </svg>
-                  <p className="line-clamp-3 break-words flex-1">{store.note}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-gray-100 text-lg md:text-xl leading-tight break-words">
+                  {renderHighlightedName(store.name, searchTerm)}
+                </h3>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {distance !== null && distance !== undefined ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-0.5 text-xs font-medium text-gray-200 shadow">
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      {formatDistance(distance)}
+                    </span>
+                  ) : !hasCoordinates ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-950/80 px-2 py-0.5 text-xs font-medium text-amber-200 shadow">
+                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
+                      </svg>
+                      Chưa có vị trí
+                    </span>
+                  ) : null}
                 </div>
+
+                <div className="mt-3 space-y-1 text-base leading-snug text-gray-300 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <svg className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
+                    </svg>
+                    <p className="line-clamp-3 break-words flex-1">{addressText}</p>
+                  </div>
+
+                  {store.note && (
+                    <div className="flex items-center gap-1.5">
+                      <svg className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h5l5 5v7a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 4v6h6" />
+                      </svg>
+                      <p className="line-clamp-3 break-words flex-1">{store.note}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+
+            <div className="flex shrink-0 items-start gap-2">
+              {hasCoordinates && (
+                <CircleIconButton href={directionHref} label="Chỉ đường">
+                  <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 100 100" aria-hidden="true">
+                    <path d="m86.3 11.2-74 30.7c-1.7.7-1.6 3.3.3 3.8l34.1 7.7 7.7 34.1c.4 1.9 3 2.1 3.7.3l30.8-74c.6-1.7-1-3.3-2.6-2.6zm-66.8 32 59.1-24.6-30.9 30.9-28.2-6.3zm37.3 37.3-6.4-28.2 30.9-30.9-24.5 59.1z"></path>
+                  </svg>
+                </CircleIconButton>
+              )}
+              {store.phone && (
+                <TelesaleCallDialog
+                  store={store}
+                  trigger={(
+                    <CircleIconButton label="Gọi điện">
+                      <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z"></path>
+                      </svg>
+                    </CircleIconButton>
+                  )}
+                />
               )}
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+        </CardContent>
+      </Card>
 
-  return <StoreDetailModal store={store} trigger={fullCard} />
+      <StoreDetailModal store={store} open={detailOpen} onOpenChange={setDetailOpen} />
+    </>
+  )
 }

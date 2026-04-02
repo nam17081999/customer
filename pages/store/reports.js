@@ -8,15 +8,15 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
 const storeTypeLabelMap = {
   tap_hoa: 'Tạp hóa',
   quan_an: 'Quán ăn - Quán cơm',
   quan_nuoc: 'Quán nước',
-  sieu_thi: 'Siêu thị - Mart - Cửa hàng tiện lợi',
   kho: 'Kho',
+  karaoke: 'Karaoke',
 }
 
 const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
@@ -27,7 +27,6 @@ const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
 const EDIT_FIELDS = [
   { key: 'name', label: 'Tên' },
   { key: 'store_type', label: 'Loại cửa hàng' },
-  { key: 'store_size', label: 'Độ lớn cửa hàng' },
   { key: 'address_detail', label: 'Địa chỉ chi tiết' },
   { key: 'ward', label: 'Xã/Phường' },
   { key: 'district', label: 'Quận/Huyện' },
@@ -41,10 +40,6 @@ const EDIT_FIELDS = [
 const formatValue = (key, value) => {
   if (value === null || value === undefined || value === '') return '—'
   if (key === 'store_type') return storeTypeLabelMap[value] || String(value)
-  if (key === 'store_size') {
-    const sizeLabelMap = { small: 'Nhỏ', medium: 'Vừa', large: 'Lớn' }
-    return sizeLabelMap[value] || String(value)
-  }
   if (key === 'image_url') return 'Đã gửi ảnh mới'
   if (key === 'latitude' || key === 'longitude') {
     const num = Number(value)
@@ -56,7 +51,7 @@ const formatValue = (key, value) => {
 
 export default function StoreReportsPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
   const [pageReady, setPageReady] = useState(false)
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
@@ -68,15 +63,22 @@ export default function StoreReportsPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       void router.replace('/login?from=/store/reports').catch((err) => {
         if (!err?.cancelled) console.error('Redirect to login failed:', err)
       })
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      void router.replace('/account').catch((err) => {
+        if (!err?.cancelled) console.error('Redirect to account failed:', err)
+      })
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadReports = useCallback(async () => {
     setLoading(true)
@@ -85,7 +87,7 @@ export default function StoreReportsPage() {
     try {
       const { data, error: fetchError } = await supabase
         .from('store_reports')
-        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, store_size, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
+        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
         .eq('status', 'pending')
         .is('stores.deleted_at', null)
         .order('created_at', { ascending: false })
@@ -163,9 +165,12 @@ export default function StoreReportsPage() {
       return
     }
 
+    const updatedAt = new Date().toISOString()
+    const storeUpdates = { ...proposed, updated_at: updatedAt }
+
     const { error: updateStoreError } = await supabase
       .from('stores')
-      .update({ ...proposed, updated_at: new Date().toISOString() })
+      .update(storeUpdates)
       .eq('id', storeId)
 
     if (updateStoreError) {
@@ -185,11 +190,12 @@ export default function StoreReportsPage() {
     } else {
       setReports((prev) => prev.filter((item) => item.id !== reportId))
       setMessage('Đã duyệt cập nhật cửa hàng.')
-      await invalidateStoreCache()
+      const nextStore = { ...(report.store || {}), ...storeUpdates }
+      await updateStoreInCache(storeId, storeUpdates)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { id: storeId, shouldRefetchAll: true },
+            detail: { type: 'update', id: storeId, store: nextStore },
           })
         )
       }

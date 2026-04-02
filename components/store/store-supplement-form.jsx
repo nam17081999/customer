@@ -10,9 +10,7 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import {
   DISTRICT_SUGGESTIONS,
   STORE_TYPE_OPTIONS,
-  STORE_SIZE_OPTIONS,
   DEFAULT_STORE_TYPE,
-  DEFAULT_STORE_SIZE,
 } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
 
@@ -40,8 +38,6 @@ export default function StoreSupplementForm({
   saving,
   storeType,
   setStoreType,
-  storeSize,
-  setStoreSize,
   name,
   setName,
   district,
@@ -79,7 +75,7 @@ export default function StoreSupplementForm({
   handleMapsLink,
   handleSaveSupplement,
 }) {
-  const noEditableFieldsStep1 = supplementLocks.storeType && supplementLocks.storeSize && supplementLocks.name
+  const noEditableFieldsStep1 = supplementLocks.storeType && supplementLocks.name
   const noEditableFieldsStep2 = supplementLocks.district
     && supplementLocks.ward
     && supplementLocks.addressDetail
@@ -113,9 +109,6 @@ export default function StoreSupplementForm({
   const visibleStoreTypes = supplementLocks.storeType && storeType
     ? STORE_TYPE_OPTIONS.filter((type) => type.value === storeType)
     : STORE_TYPE_OPTIONS
-  const visibleStoreSizes = supplementLocks.storeSize && storeSize
-    ? STORE_SIZE_OPTIONS.filter((sizeOption) => sizeOption.value === storeSize)
-    : STORE_SIZE_OPTIONS
   const visibleDistricts = supplementLocks.district && district
     ? DISTRICT_SUGGESTIONS.filter((item) => isSameArea(item, district))
     : DISTRICT_SUGGESTIONS
@@ -177,36 +170,6 @@ export default function StoreSupplementForm({
                           } ${supplementLocks.storeType ? lockedChipClass : ''}`}
                         >
                           {type.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="supplement-store-size" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Độ lớn cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span>
-                  </Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {visibleStoreSizes.map((sizeOption) => {
-                      const selected = storeSize === sizeOption.value
-                      return (
-                        <button
-                          key={`supplement-size-${sizeOption.value}`}
-                          type="button"
-                          onClick={() => {
-                            if (supplementLocks.storeSize) return
-                            setStoreSize((prev) => (prev === sizeOption.value ? DEFAULT_STORE_SIZE : sizeOption.value))
-                          }}
-                          disabled={supplementLocks.storeSize}
-                          aria-pressed={selected}
-                          className={`min-h-11 rounded-md border px-3 py-2 text-center text-sm transition ${
-                            selected
-                              ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                              : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                          } ${supplementLocks.storeSize ? lockedChipClass : ''}`}
-                        >
-                          {sizeOption.label}
                         </button>
                       )
                     })}

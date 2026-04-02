@@ -27,12 +27,7 @@
 
 ### Bước 2: Thông Tin
 - **Bắt buộc**: Quận/Huyện + Xã/Phường (từ danh sách `DISTRICT_WARD_SUGGESTIONS`)
-- **Tùy chọn**: Độ lớn cửa hàng, Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
-- `store_size` có 4 trạng thái trong UI:
-  - `Chưa rõ`
-  - `Nhỏ`
-  - `Vừa`
-  - `Lớn`
+- **Tùy chọn**: Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
 - Có nút **Lưu luôn** ngay tại bước 2:
@@ -50,7 +45,7 @@
 ### Khi Submit
 1. Duplicate check lần cuối bằng tọa độ final
 2. Upload ảnh → `imageFilename`
-3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`, `store_size`)
+3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
 4. `appendStoreToCache(newStore)`
 5. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối theo tọa độ, vì store chưa có vị trí
 
@@ -110,7 +105,7 @@ User có 2 lựa chọn:
 **Sort**: score desc → khoảng cách asc → active first → created_at desc
 
 **Mặc định khi chưa nhập tiêu chí tìm kiếm**:
-- Nếu `q` rỗng và chưa chọn Quận/Xã → hiển thị **50 cửa hàng gần nhất**
+- Nếu `q` rỗng và chưa chọn bộ lọc → hiển thị **toàn bộ cửa hàng**
 - Vẫn sắp xếp theo khoảng cách **gần → xa**
 
 **Làm mới vị trí người dùng**:
@@ -123,7 +118,6 @@ User có 2 lựa chọn:
 - `Quận / Huyện`: chọn **1**
 - `Xã / Phường`: chọn **1**
 - `Loại cửa hàng`: chọn nhiều
-- `Độ lớn cửa hàng`: chọn nhiều, gồm `Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`
 - `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Có ảnh`, `Không có vị trí`)
 - Trên mobile, panel lọc được rút gọn:
   - `Quận / Huyện` và `Xã / Phường` dùng `select`
@@ -153,7 +147,6 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - **Filter sidebar**:
   - Khu vực: Quận → Xã; phải chọn xã mới filter stores
   - Loại cửa hàng: chọn nhiều
-  - Độ lớn cửa hàng: chọn nhiều (`Chưa rõ`, `Nhỏ`, `Vừa`, `Lớn`)
 - Chỉ hiển thị trên bản đồ các store có tọa độ hợp lệ; store không có vị trí không được render marker hay xuất hiện trong search suggestion của `/map`
 - Highlight marker khi được chọn: ring `#38bdf8`
 - Auto-fix lat/lng nếu bị reversed (swap khi lat nằm ngoài [-90,90])
@@ -243,8 +236,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
   - `Quận / Huyện`
 - Các cột tùy chọn:
   - `Loại cửa hàng`
-  - `Độ lớn cửa hàng`
-  - `Địa chỉ chi tiết`
+- `Địa chỉ chi tiết`
   - `Số điện thoại`
   - `Ghi chú`
   - `Vĩ độ`
@@ -259,7 +251,6 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
   - thiếu cột bắt buộc trong header → chặn import
   - thiếu `Tên cửa hàng` / `Xã / Phường` / `Quận / Huyện` → lỗi
   - `Loại cửa hàng` phải khớp `STORE_TYPE_OPTIONS`; để trống thì dùng `DEFAULT_STORE_TYPE`
-  - `Độ lớn cửa hàng` phải khớp `STORE_SIZE_OPTIONS`; để trống hoặc `Chưa rõ` thì lưu `null`
   - `Số điện thoại` nếu có thì phải đúng format VN
   - `Vĩ độ` và `Kinh độ` phải đi theo cặp; nếu có thì phải hợp lệ
   - trùng trong chính file → trạng thái `Nghi trùng`

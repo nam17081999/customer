@@ -28,7 +28,7 @@ function hasValidCoordinates(store) {
 
 export default function OverviewPage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth() || {}
+  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [stores, setStores] = useState([])
@@ -37,13 +37,18 @@ export default function OverviewPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
+    if (!isAuthenticated) {
       setPageReady(false)
       router.replace('/login?from=/overview')
       return
     }
+    if (!isAdmin) {
+      setPageReady(false)
+      router.replace('/account')
+      return
+    }
     setPageReady(true)
-  }, [authLoading, user, router])
+  }, [authLoading, isAuthenticated, isAdmin, router])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
