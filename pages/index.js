@@ -255,16 +255,51 @@ export default function HomePage() {
     loadAllStores()
   }, [loadAllStores])
 
+  const applyStoreChange = useCallback((detail = {}) => {
+    const { type, id, ids, store, stores } = detail
+
+    setAllStores((prev) => {
+      if (type === 'delete' && id != null) {
+        return prev.filter((item) => item.id !== id)
+      }
+
+      if (type === 'verify-many' && Array.isArray(ids) && ids.length > 0) {
+        const idSet = new Set(ids)
+        return prev.map((item) => (
+          idSet.has(item.id) ? { ...item, active: true } : item
+        ))
+      }
+
+      if (type === 'append-many' && Array.isArray(stores) && stores.length > 0) {
+        const byId = new Map(prev.map((item) => [item.id, item]))
+        stores.forEach((item) => {
+          if (item?.id != null) byId.set(item.id, item)
+        })
+        return Array.from(byId.values())
+      }
+
+      if (type === 'update' && store?.id != null) {
+        let found = false
+        const next = prev.map((item) => {
+          if (item.id !== store.id) return item
+          found = true
+          return { ...item, ...store }
+        })
+        return found ? next : [...prev, store]
+      }
+
+      return prev
+    })
+  }, [])
+
   // Keep results in sync after create/update/delete without full page reload
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleStoresChanged = async (event) => {
-      const changedId = event?.detail?.id
+      const detail = event?.detail || {}
       const shouldRefetchAll = Boolean(event?.detail?.shouldRefetchAll)
-      if (changedId) {
-        setAllStores((prev) => prev.filter((store) => store.id !== changedId))
-      }
+      if (!shouldRefetchAll) applyStoreChange(detail)
       if (shouldRefetchAll) {
         await loadAllStores()
       }
@@ -272,7 +307,7 @@ export default function HomePage() {
 
     window.addEventListener('storevis:stores-changed', handleStoresChanged)
     return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
-  }, [loadAllStores])
+  }, [applyStoreChange, loadAllStores])
 
   // Local filtering
   const searchResults = useMemo(() => {

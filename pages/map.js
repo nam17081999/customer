@@ -613,6 +613,71 @@ export default function MapPage() {
     }
   }, [])
 
+  const applyStoreChange = useCallback((detail = {}) => {
+    const { type, id, ids, store, stores } = detail
+
+    setStores((prev) => {
+      if (type === 'delete' && id != null) {
+        return prev.filter((item) => item.id !== id)
+      }
+
+      if (type === 'verify-many' && Array.isArray(ids) && ids.length > 0) {
+        const idSet = new Set(ids)
+        return prev.map((item) => (
+          idSet.has(item.id) ? { ...item, active: true } : item
+        ))
+      }
+
+      if (type === 'append-many' && Array.isArray(stores) && stores.length > 0) {
+        const byId = new Map(prev.map((item) => [item.id, item]))
+        stores.forEach((item) => {
+          if (item?.id == null) return
+          if (!toLatLng(item)) return
+          byId.set(item.id, item)
+        })
+        return Array.from(byId.values())
+      }
+
+      if (type === 'update' && store?.id != null) {
+        const hasCoords = Boolean(toLatLng(store))
+        let found = false
+        const next = prev
+          .map((item) => {
+            if (item.id !== store.id) return item
+            found = true
+            return hasCoords ? { ...item, ...store } : null
+          })
+          .filter(Boolean)
+
+        if (found) return next
+        return hasCoords ? [...next, store] : next
+      }
+
+      return prev
+    })
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleStoresChanged = async (event) => {
+      const detail = event?.detail || {}
+      const shouldRefetchAll = Boolean(detail.shouldRefetchAll)
+      if (!shouldRefetchAll) applyStoreChange(detail)
+      if (shouldRefetchAll) {
+        try {
+          const data = await getOrRefreshStores()
+          setStores((data || []).filter((store) => toLatLng(store)))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+
+    window.addEventListener('storevis:stores-changed', handleStoresChanged)
+    return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
+  }, [applyStoreChange])
+
   // Update GeoJSON source when filtered stores change
   useEffect(() => {
     const map = mapRef.current

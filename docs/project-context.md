@@ -134,3 +134,20 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 - Hai màn admin dễ lộ lỗi tiếng Việt ra UI là:
   - `/store/verify`
   - `/store/reports`
+
+---
+
+## Telesale Minimal DB Update
+
+Ban toi gian cho telesale su dung 6 cot tren `stores`:
+
+- `is_potential`
+- `last_called_at`
+- `last_call_result`
+- `last_call_result_at`
+- `last_order_reported_at`
+- `sales_note`
+
+Script SQL cap nhat moi truong duoc luu tai:
+
+- `docs/sql/2026-04-01-add-store-telesale-columns.sql`

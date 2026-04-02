@@ -21,6 +21,7 @@
 | `created_at` | timestamptz | NOT NULL | Timestamp tạo |
 | `updated_at` | timestamptz | NOT NULL | Timestamp cập nhật |
 | `deleted_at` | timestamptz | NULL | Soft-delete (NULL = đang hoạt động) |
+| `last_call_result_at` | timestamptz | NULL | Thời điểm cập nhật kết quả gọi gần nhất |
 
 > **Không có cột `name_search`** — không thêm field này khi insert.
 
@@ -105,7 +106,9 @@ RLS cho `store_reports`:
 ### SELECT_FIELDS (fields được cache)
 ```
 id, name, store_type, image_url, latitude, longitude, address_detail,
-ward, district, phone, note, active, created_at, updated_at
+ward, district, phone, note, active, created_at, updated_at,
+is_potential, last_called_at, last_call_result, last_call_result_at,
+last_order_reported_at, sales_note
 ```
 > `deleted_at` **không** được cache. Luôn filter server-side trước khi cache.
 
@@ -119,3 +122,32 @@ ward, district, phone, note, active, created_at, updated_at
 | `invalidateStoreCache()` | Sau khi EDIT (force refetch) |
 
 > Ngoại lệ: màn admin `/store/export` được đọc trực tiếp Supabase để lấy đủ toàn bộ store chưa xóa mềm cho file xuất; không dùng cache public.
+
+---
+
+## Telesale Minimal Fields
+
+StoreVis ban toi gian cho telesale them truc tiep 6 cot tren `public.stores`:
+
+```sql
+is_potential boolean not null default false
+last_called_at timestamptz null
+last_call_result text null
+last_call_result_at timestamptz null
+last_order_reported_at timestamptz null
+sales_note text null
+```
+
+Gia tri khuyen nghi cho `last_call_result`:
+
+```text
+khong_nghe_may
+quan_tam
+khong_quan_tam
+goi_lai_sau
+da_bao_don
+```
+
+SQL de ap len moi truong PRD duoc luu tai:
+
+- `docs/sql/2026-04-01-add-store-telesale-columns.sql`

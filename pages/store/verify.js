@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
 export default function VerifyStorePage() {
@@ -182,7 +182,14 @@ export default function VerifyStorePage() {
       ids.forEach((id) => next.delete(id))
       return next
     })
-    await invalidateStoreCache()
+    await updateStoresInCache(ids.map((storeId) => ({ id: storeId, active: true })))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('storevis:stores-changed', {
+          detail: { type: 'verify-many', ids },
+        })
+      )
+    }
     setMessage(`Đã xác thực ${ids.length} cửa hàng.`)
     setSubmitting(false)
   }

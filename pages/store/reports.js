@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
 
 const storeTypeLabelMap = {
@@ -165,9 +165,12 @@ export default function StoreReportsPage() {
       return
     }
 
+    const updatedAt = new Date().toISOString()
+    const storeUpdates = { ...proposed, updated_at: updatedAt }
+
     const { error: updateStoreError } = await supabase
       .from('stores')
-      .update({ ...proposed, updated_at: new Date().toISOString() })
+      .update(storeUpdates)
       .eq('id', storeId)
 
     if (updateStoreError) {
@@ -187,11 +190,12 @@ export default function StoreReportsPage() {
     } else {
       setReports((prev) => prev.filter((item) => item.id !== reportId))
       setMessage('Đã duyệt cập nhật cửa hàng.')
-      await invalidateStoreCache()
+      const nextStore = { ...(report.store || {}), ...storeUpdates }
+      await updateStoreInCache(storeId, storeUpdates)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { id: storeId, shouldRefetchAll: true },
+            detail: { type: 'update', id: storeId, store: nextStore },
           })
         )
       }

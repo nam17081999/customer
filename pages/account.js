@@ -9,7 +9,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 
 export default function AccountPage() {
   const router = useRouter()
-  const { user, role, isAdmin, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
+  const { user, role, isAdmin, isTelesale, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
   const [pageReady, setPageReady] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
@@ -42,13 +42,13 @@ export default function AccountPage() {
       </Head>
 
       <div className="min-h-screen bg-black">
-        <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <div className="mx-auto max-w-screen-md px-3 py-4 sm:px-4 sm:py-6">
           <Card className="rounded-2xl border border-gray-800">
-            <CardContent className="p-4 sm:p-5 space-y-4">
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-gray-800">
+            <CardContent className="space-y-4 p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2 border-b border-gray-800 pb-3">
                 <div className="min-w-0">
                   <p className="text-sm text-gray-400">Tài khoản đăng nhập</p>
-                  <p className="text-base font-semibold text-gray-200 truncate">{user?.email}</p>
+                  <p className="truncate text-base font-semibold text-gray-200">{user?.email}</p>
                   <p className="text-sm text-gray-400">
                     Quyền: {isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'}
                   </p>
@@ -66,26 +66,33 @@ export default function AccountPage() {
               </div>
 
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Menu nhanh</h1>
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Menu nhanh</h1>
               </div>
 
-              {isAdmin && <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Button asChild>
-                  <Link href="/overview">Màn tổng quan</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/store/export-data">Màn xuất dữ liệu</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/store/export-contacts">Màn xuất danh bạ</Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link href="/store/import">Màn nhập dữ liệu</Link>
-                </Button>
-              </div>}
-              {!isAdmin && (
+              {(isAdmin || isTelesale) && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Button asChild>
+                    <Link href="/telesale/overview">Màn telesale</Link>
+                  </Button>
+                  {isAdmin && (
+                    <>
+                      <Button asChild variant="outline">
+                        <Link href="/overview">Màn tổng quan</Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <Link href="/store/import">Màn nhập dữ liệu</Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <Link href="/store/export">Màn xuất dữ liệu</Link>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {isTelesale && !isAdmin && (
                 <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 text-sm text-gray-300">
-                  Telesale không có quyền vào các màn quản trị dữ liệu.
+                  Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
                 </div>
               )}
             </CardContent>

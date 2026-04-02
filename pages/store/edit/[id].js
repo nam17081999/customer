@@ -11,7 +11,7 @@ import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import StoreSupplementForm from '@/components/store/store-supplement-form'
 import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
@@ -385,12 +385,12 @@ export default function EditStore() {
       if (isAdmin) {
         const { error } = await supabase.from('stores').update(updates).eq('id', id)
         if (error) throw error
-
-        await invalidateStoreCache()
+        const nextStore = { ...store, ...updates }
+        await updateStoreInCache(id, updates)
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('storevis:stores-changed', {
-              detail: { type: 'update', id, shouldRefetchAll: true },
+              detail: { type: 'update', id, store: nextStore },
             })
           )
         }
@@ -478,12 +478,12 @@ export default function EditStore() {
 
       const { error } = await supabase.from('stores').update(updates).eq('id', id)
       if (error) throw error
-
-      await invalidateStoreCache()
+      const nextStore = { ...store, ...updates }
+      await updateStoreInCache(id, updates)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'update', id, shouldRefetchAll: true },
+            detail: { type: 'update', id, store: nextStore },
           })
         )
       }

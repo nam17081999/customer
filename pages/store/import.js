@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { supabase } from '@/lib/supabaseClient'
-import { getOrRefreshStores, invalidateStoreCache } from '@/lib/storeCache'
+import { appendStoresToCache, getOrRefreshStores } from '@/lib/storeCache'
 import {
   DEFAULT_STORE_TYPE,
   STORE_TYPE_OPTIONS,
@@ -584,16 +584,18 @@ export default function StoreImportPage() {
         active: true,
       }))
 
+      const insertedStores = []
       for (const chunk of chunkArray(payloads, 100)) {
-        const { error } = await supabase.from('stores').insert(chunk)
+        const { data, error } = await supabase.from('stores').insert(chunk).select()
         if (error) throw error
+        if (Array.isArray(data)) insertedStores.push(...data)
       }
 
-      await invalidateStoreCache()
+      await appendStoresToCache(insertedStores)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'bulk-import', shouldRefetchAll: true },
+            detail: { type: 'append-many', stores: insertedStores },
           })
         )
       }
@@ -601,7 +603,7 @@ export default function StoreImportPage() {
       setImportResult(`Đã nhập thành công ${readyRows.length} dòng. Bỏ qua ${skippedRows} dòng lỗi hoặc nghi trùng.`)
       setPreviewRows([])
       setSelectedFileName('')
-      await loadExistingStores()
+      setExistingStores((prev) => [...prev, ...prepareExistingStores(insertedStores)])
     } catch (error) {
       console.error(error)
       setImportResult('')
@@ -609,7 +611,7 @@ export default function StoreImportPage() {
     } finally {
       setImporting(false)
     }
-  }, [importing, loadExistingStores, previewRows])
+  }, [importing, previewRows])
 
   if (authLoading || !pageReady) {
     return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
