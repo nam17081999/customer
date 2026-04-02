@@ -2,9 +2,10 @@
 
 ## Tổng Quan
 
-**StoreVis** là ứng dụng web quản lý và tra cứu cửa hàng tại Hà Nội. Hai nhóm người dùng:
-- **User thường** (anonymous): tìm kiếm, xem bản đồ, thêm cửa hàng chờ duyệt
-- **Admin** (đã đăng nhập): duyệt/xác thực, chỉnh sửa, xem dashboard
+**StoreVis** là ứng dụng web quản lý và tra cứu cửa hàng tại Hà Nội. Ba nhóm người dùng:
+- **User thường** (anonymous): tìm kiếm, xem bản đồ, thêm cửa hàng chờ duyệt, báo cáo/bổ sung dữ liệu
+- **Telesale** (đã đăng nhập): theo dõi danh sách cần gọi, cập nhật kết quả gọi
+- **Admin** (đã đăng nhập): làm toàn bộ việc của telesale và quản trị dữ liệu
 
 ---
 
@@ -36,8 +37,11 @@ customer/
 │   ├── _app.js             # AuthProvider + Navbar + ErrorBoundary
 │   ├── index.js            # Tìm kiếm (/)
 │   ├── map.js              # Bản đồ MapLibre (/map)
-│   ├── login.js            # Đăng nhập admin
-│   ├── account.js          # Dashboard admin
+│   ├── login.js            # Đăng nhập
+│   ├── account.js          # Dashboard tài khoản
+│   ├── telesale/
+│   │   ├── overview.js     # Danh sách gọi + tổng quan telesale
+│   │   └── call/[id].js    # Màn chốt kết quả gọi
 │   └── store/
 │       ├── create.js       # Form tạo store 3 bước
 │       ├── import.js       # Nhập nhiều store từ file CSV + preview kiểm tra
@@ -60,7 +64,8 @@ customer/
 │   └── ui/                 # button, card, dialog, input, label, msg, toast, skeleton, full-page-loading
 ├── lib/
 │   ├── supabaseClient.js   # Supabase client singleton
-│   ├── AuthContext.js      # React Context: user, signIn, signOut
+│   ├── AuthContext.js      # React Context: user, signIn, signOut, role
+│   ├── authz.js            # Helpers phân quyền `admin` / `telesale`
 │   ├── storeCache.js       # 3-layer cache (memory → IDB → Supabase)
 │   ├── imagekit.js         # SDK ImageKit server-side
 │   ├── constants.js        # Hằng số, danh sách huyện/xã, loại cửa hàng
@@ -94,6 +99,19 @@ customer/
   - Vị trí người dùng ở `/` được refresh định kỳ mỗi 3 phút và khi quay lại tab/trang
   - Đồng bộ query của `/` lên URL phải có debounce + bỏ qua replace khi query không đổi để tránh flood navigation
 
+[Telesale]
+  - `/telesale/overview` chỉ lấy store có `phone` và `is_potential = true`
+  - Ưu tiên gọi sắp theo:
+    1. store chưa gọi
+    2. store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút
+    3. `goi_lai_sau`
+    4. `khong_nghe`
+    5. `con_hang`
+    6. `da_len_don`
+  - `con_hang` chỉ quay lại danh sách ưu tiên khi kết quả đó đã quá 2 ngày
+  - `da_len_don` chỉ quay lại danh sách ưu tiên khi đã quá 3 ngày
+  - `last_call_result_at` dùng để phân biệt cuộc gọi đã được chốt kết quả hay chưa
+
 [Admin export page: `/store/export`]
   - Không dùng cache public để xuất dữ liệu
   - Đọc trực tiếp Supabase với điều kiện `deleted_at IS NULL`
@@ -109,13 +127,14 @@ customer/
     - tọa độ thiếu cặp hoặc không hợp lệ
     - trùng trong chính file
     - nghi trùng với hệ thống hiện có
-  - Chỉ các dòng `ready` mới được insert; sau bulk import phải `invalidateStoreCache()` và dispatch `storevis:stores-changed`
+  - Chỉ các dòng `ready` mới được insert; sau bulk import phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`
 ```
 
 **Sau mutation:**
-- CREATE → `appendStoreToCache(newStore)`
-- DELETE (soft) → `removeStoreFromCache(id)` + `invalidateStoreCache()`
-- EDIT → `invalidateStoreCache()`
+- CREATE → `appendStoreToCache(newStore)` hoặc `appendStoresToCache(newStores)`
+- DELETE (soft) → `removeStoreFromCache(id)`
+- EDIT / verify / report-apply / telesale update → `updateStoreInCache()` hoặc `updateStoresInCache()`
+- Chỉ fallback sang `invalidateStoreCache()` khi không thể merge local an toàn
 - Custom event `storevis:stores-changed` để sync giữa tabs
 
 ---
@@ -127,12 +146,14 @@ customer/
 | `/` | Tìm kiếm | Public |
 | `/map` | Bản đồ MapLibre | Public |
 | `/store/create` | Tạo cửa hàng (3 bước) | Public |
+| `/telesale/overview` | Danh sách gọi và tổng quan telesale | Telesale/Admin |
+| `/telesale/call/[id]` | Màn cập nhật kết quả gọi | Telesale/Admin |
 | `/store/import` | Nhập nhiều cửa hàng từ file mẫu CSV | Admin |
 | `/store/export` | Xuất dữ liệu cửa hàng | Admin |
 | `/store/verify` | Duyệt cửa hàng chờ | Admin |
 | `/store/reports` | Duyệt báo cáo cửa hàng | Admin |
-| `/store/edit/[id]` | Chỉnh sửa | Admin |
-| `/account` | Dashboard | Admin |
+| `/store/edit/[id]` | Chỉnh sửa / bổ sung | Admin, public trong `mode=supplement` |
+| `/account` | Dashboard tài khoản | Telesale/Admin |
 | `/login` | Đăng nhập | Public |
 
 ---
@@ -186,6 +207,7 @@ customer/
   - vẫn bắt buộc `quận/huyện`, `xã/phường`
   - bắt buộc thêm `số điện thoại` hợp lệ
   - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`
+- Khi bước 1 đã có GPS để kiểm tra trùng, app sẽ prefetch quận/huyện + xã/phường của store gần nhất trong nền, bất kể kết quả trùng hay không trùng, để bước 2 có thể hiển thị ngay nếu 2 field còn trống
 - Trong duplicate panel của bước 1:
   - candidate còn thiếu dữ liệu có thể hiện nút **Bổ sung**
   - nút này chuyển sang `/store/edit/[id]?mode=supplement`

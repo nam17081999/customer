@@ -72,14 +72,6 @@ function comparePriorityStores(a, b) {
   return getPriorityTime(a) - getPriorityTime(b)
 }
 
-function isWithinDays(value, days) {
-  if (!value) return true
-  const time = new Date(value).getTime()
-  if (!Number.isFinite(time)) return true
-  const maxAge = days * 24 * 60 * 60 * 1000
-  return Date.now() - time <= maxAge
-}
-
 function isOlderThanDays(value, days) {
   if (!value) return true
   const time = new Date(value).getTime()
@@ -205,7 +197,6 @@ export default function TelesaleOverviewPage() {
       .sort(byRecentCallDesc)
       .slice(0, 6)
     const queueStores = potentialStores
-      .filter((store) => Boolean(store.is_potential))
       .filter((store) => {
         const result = store.last_call_result
         if (result === 'da_len_don' || result === 'da_bao_don') {

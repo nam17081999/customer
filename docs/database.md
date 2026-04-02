@@ -141,11 +141,18 @@ sales_note text null
 Gia tri khuyen nghi cho `last_call_result`:
 
 ```text
-khong_nghe_may
-quan_tam
-khong_quan_tam
+khong_nghe
 goi_lai_sau
-da_bao_don
+con_hang
+da_len_don
+```
+
+Gia tri cu van phai doc tuong thich khi hien thi/so lieu:
+
+```text
+khong_nghe_may -> khong_nghe
+quan_tam -> con_hang
+da_bao_don -> da_len_don
 ```
 
 SQL de ap len moi truong PRD duoc luu tai:

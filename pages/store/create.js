@@ -24,6 +24,7 @@ import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import { haversineKm } from '@/helper/distance'
 import {
   findNearbySimilarStores,
   findGlobalExactNameMatches,
@@ -85,6 +86,8 @@ export default function AddStore() {
   const duplicateCheckTimerRef = useRef(null)
   const duplicateCheckSeqRef = useRef(0)
   const duplicateGeoRequestedRef = useRef(false)
+  const nearestLocationPrefilledRef = useRef(false)
+  const nearestLocationPrefillRunningRef = useRef(false)
 
   // Map states
   const [pickedLat, setPickedLat] = useState(null)
@@ -211,6 +214,58 @@ export default function AddStore() {
     }
   }, [mapEditable])
 
+  function parseCoordinate(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
+    if (typeof value !== 'string') return NaN
+    const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
+    return Number.isFinite(parsed) ? parsed : NaN
+  }
+
+  async function autoFillNearestDistrictWard(originLat, originLng) {
+    if (nearestLocationPrefilledRef.current || nearestLocationPrefillRunningRef.current) return
+    if (district.trim() || ward.trim()) return
+    if (originLat == null || originLng == null) return
+
+    nearestLocationPrefillRunningRef.current = true
+    try {
+      const stores = await getOrRefreshStores()
+      const nearestStore = stores
+        .map((store) => {
+          const storeLat = parseCoordinate(store?.latitude)
+          const storeLng = parseCoordinate(store?.longitude)
+          const storeDistrict = String(store?.district || '').trim()
+          const storeWard = String(store?.ward || '').trim()
+          if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng) || !storeDistrict || !storeWard) {
+            return null
+          }
+          return {
+            store,
+            distance: haversineKm(originLat, originLng, storeLat, storeLng),
+          }
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.distance - b.distance)[0]
+
+      if (!nearestStore) return
+      const nextDistrict = toTitleCaseVI(String(nearestStore.store.district || '').trim())
+      const nextWard = toTitleCaseVI(String(nearestStore.store.ward || '').trim())
+
+      setDistrict(nextDistrict)
+      setWard(nextWard)
+      setFieldErrors((prev) => ({
+        ...prev,
+        district: '',
+        ward: '',
+      }))
+      nearestLocationPrefilledRef.current = true
+      showMessage('success', 'Đã tự chọn quận/huyện và xã/phường gần nhất')
+    } catch (err) {
+      console.error('Auto fill nearest district/ward error:', err)
+    } finally {
+      nearestLocationPrefillRunningRef.current = false
+    }
+  }
+
   // Handler for getting fresh GPS location
   const handleGetLocation = useCallback(async () => {
     try {
@@ -304,7 +359,6 @@ export default function AddStore() {
       const ok = window.confirm('Bạn có dữ liệu chưa lưu. Bạn có chắc muốn rời trang?')
       if (ok) return
       router.events.emit('routeChangeError')
-      // eslint-disable-next-line no-throw-literal
       throw 'Route change aborted by user'
     }
     router.events.on('routeChangeStart', onRouteChangeStart)
@@ -342,6 +396,8 @@ export default function AddStore() {
     setMapsLink('')
     setMapsLinkError('')
     setFieldErrors({})
+    nearestLocationPrefilledRef.current = false
+    nearestLocationPrefillRunningRef.current = false
     if (router.query?.name) {
       const { name: _discard, ...rest } = router.query
       void router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true }).catch((err) => {
@@ -436,6 +492,8 @@ export default function AddStore() {
         return
       }
     }
+
+    void autoFillNearestDistrictWard(checkLat, checkLng)
 
     const seq = ++duplicateCheckSeqRef.current
     setDuplicateCheckLoading(true)

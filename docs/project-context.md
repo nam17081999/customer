@@ -8,6 +8,7 @@
 - Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại và mức độ đầy đủ dữ liệu
 - Hiển thị vị trí cửa hàng trên bản đồ
 - Cho phép bất kỳ ai thêm cửa hàng mới (chờ admin duyệt)
+- Telesale theo dõi danh sách cần gọi và cập nhật kết quả gọi
 - Admin duyệt/quản lý danh sách, xem dashboard tổng quan
 
 **Đối tượng sử dụng**: app dành cho người có thể bị mắt kém → yêu cầu font lớn, tương phản cao.
@@ -33,10 +34,19 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 → Thêm cửa hàng (/store/create) → chờ duyệt
 ```
 
+### Telesale (đã đăng nhập)
+```
+Đăng nhập (/login)
+→ Dashboard (/account)
+→ Xem danh sách ưu tiên gọi (/telesale/overview)
+→ Gọi khách hàng → chốt kết quả (/telesale/call/[id])
+```
+
 ### Admin (đã đăng nhập)
 ```
 Đăng nhập (/login)
 → Dashboard (/account) → Duyệt stores (/store/verify)
+→ Màn telesale (/telesale/overview)
 → Nhập dữ liệu (/store/import)
 → Xuất dữ liệu (/store/export)
 → Duyệt báo cáo cửa hàng (/store/reports)
@@ -60,10 +70,13 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `pages/store/import.js` | Nhập nhiều store từ CSV mẫu, preview lỗi và nghi trùng trước khi insert |
 | `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
+| `pages/telesale/overview.js` | Danh sách ưu tiên gọi + thống kê telesale |
+| `pages/telesale/call/[id].js` | Màn riêng để chốt kết quả cuộc gọi |
 | `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
 | `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
 | `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
 | `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Bổ sung` |
+| `lib/authz.js` | Helpers quyền theo `role` để ẩn/hiện hành động đúng vai trò |
 
 ---
 
@@ -102,12 +115,15 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
 15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
-16. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
-17. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
-18. **`/store/edit/[id]?mode=supplement`**: luôn bắt đầu từ bước 1, khóa dữ liệu đã có, chỉ cho nhập phần thiếu; nếu store đã có vị trí thì flow chỉ còn 2 bước, nếu chưa có vị trí thì bước 3 sẽ tự lấy GPS một lần; người chưa đăng nhập gửi `store_report`, admin thì cập nhật trực tiếp.
-19. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
-20. **`/store/import`**: dùng file mẫu CSV, parse ở client và preview theo từng dòng trước khi insert; không import thẳng file chưa qua kiểm tra.
-21. **Bulk import**: chỉ insert các dòng `ready`; xong phải `invalidateStoreCache()` và dispatch `storevis:stores-changed`.
+16. **`/store/create` bước 1-2**: bước 1 đã lấy GPS để check trùng; kết quả này được dùng để prefill quận/huyện + xã/phường của cửa hàng gần nhất trong nền trước khi sang bước 2.
+17. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
+18. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
+19. **`/store/edit/[id]?mode=supplement`**: luôn bắt đầu từ bước 1, khóa dữ liệu đã có, chỉ cho nhập phần thiếu; nếu store đã có vị trí thì flow chỉ còn 2 bước, nếu chưa có vị trí thì bước 3 sẽ tự lấy GPS một lần; người chưa đăng nhập gửi `store_report`, admin thì cập nhật trực tiếp.
+20. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
+21. **`/store/import`**: dùng file mẫu CSV, parse ở client và preview theo từng dòng trước khi insert; không import thẳng file chưa qua kiểm tra.
+22. **Bulk import**: chỉ insert các dòng `ready`; xong phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`.
+23. **Role hiện tại**: `guest`, `telesale`, `admin`; `telesale/admin` vào được `/account` và `/telesale/overview`, còn `admin` mới có các màn quản trị dữ liệu.
+24. **Telesale queue**: chỉ lấy store `is_potential` có `phone`; ưu tiên riêng cho store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút, dùng `last_call_result_at` để phân biệt.
 
 ---
 
@@ -147,6 +163,11 @@ Ban toi gian cho telesale su dung 6 cot tren `stores`:
 - `last_call_result_at`
 - `last_order_reported_at`
 - `sales_note`
+
+Màn telesale đang dùng route:
+
+- `/telesale/overview`
+- `/telesale/call/[id]`
 
 Script SQL cap nhat moi truong duoc luu tai:
 

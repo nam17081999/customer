@@ -34,7 +34,6 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const router = useRouter()
   const { user, isAdmin, isTelesale } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -374,7 +373,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
             )}
           </div>
           {/* Close */}
-          <DialogClose className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition">
+          <DialogClose className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition cursor-pointer">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </DialogClose>
         </div>

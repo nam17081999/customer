@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+﻿import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
@@ -135,6 +135,29 @@ export default function EditStore() {
     fetchStore()
   }, [router.isReady, id, pageReady])
 
+  const handleGetLocation = useCallback(async () => {
+    try {
+      setResolvingAddr(true)
+      const { coords, error } = await getBestPosition({
+        maxWaitTime: 2000,
+        desiredAccuracy: 15,
+        skipCache: true,
+      })
+      if (!coords) {
+        showMessage('error', getGeoErrorMessage(error))
+        return
+      }
+      setPickedLat(coords.latitude)
+      setPickedLng(coords.longitude)
+      showMessage('success', 'ÄÃ£ cáº­p nháº­t vá»‹ trÃ­ GPS má»›i')
+    } catch (err) {
+      console.error('Get location error:', err)
+      showMessage('error', getGeoErrorMessage(err))
+    } finally {
+      setResolvingAddr(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!pageReady || !store || !isSupplementMode) return
     if (autoLocationRequestedRef.current) return
@@ -145,7 +168,7 @@ export default function EditStore() {
 
     autoLocationRequestedRef.current = true
     handleGetLocation()
-  }, [pageReady, store, isSupplementMode, currentStep, supplementLocationOpen, pickedLat, pickedLng])
+  }, [pageReady, store, isSupplementMode, currentStep, supplementLocationOpen, pickedLat, pickedLng, handleGetLocation])
 
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
@@ -248,29 +271,6 @@ export default function EditStore() {
       setMapsLinkError('Lỗi khi xử lý link')
     } finally {
       setMapsLinkLoading(false)
-    }
-  }
-
-  async function handleGetLocation() {
-    try {
-      setResolvingAddr(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 15,
-        skipCache: true,
-      })
-      if (!coords) {
-        showMessage('error', getGeoErrorMessage(error))
-        return
-      }
-      setPickedLat(coords.latitude)
-      setPickedLng(coords.longitude)
-      showMessage('success', 'Đã cập nhật vị trí GPS mới')
-    } catch (err) {
-      console.error('Get location error:', err)
-      showMessage('error', getGeoErrorMessage(err))
-    } finally {
-      setResolvingAddr(false)
     }
   }
 

@@ -145,7 +145,7 @@ export default function HomePage() {
     }, 250)
 
     return () => window.clearTimeout(syncTimer)
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router.isReady, router.pathname, router.query])
+  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router, router.isReady, router.pathname, router.query])
 
   // Compute ward/district options from static DISTRICT_WARD_SUGGESTIONS
   const wardOptions = useMemo(() => (
