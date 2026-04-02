@@ -259,6 +259,10 @@ export default function AddStore() {
       const nextDistrict = toTitleCaseVI(String(nearestStore.store.district || '').trim())
       const nextWard = toTitleCaseVI(String(nearestStore.store.ward || '').trim())
 
+      // Re-check before applying prefill to avoid overwriting user input typed during async fetch
+      if (nearestLocationPrefilledRef.current || district.trim() || ward.trim()) {
+        return
+      }
       if (districtRef.current.trim() || wardRef.current.trim()) return
       setDistrict(nextDistrict)
       setWard(nextWard)
