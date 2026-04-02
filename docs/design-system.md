@@ -143,7 +143,6 @@ Trang map luôn dark (không theo system preference):
 - Filter district active: `bg-sky-500/20 text-sky-300`
 - Filter ward active: `bg-emerald-500/20 text-emerald-300`
 - Filter store type active: `tông violet`
-- Filter store size active: `tông amber`
 - Floating GPS button: góc phải dưới, `bg-slate-950/90`, viền `border-slate-600/70`, hover `sky`
 - Hiển thị thêm chấm xanh vị trí người dùng trên bản đồ
 

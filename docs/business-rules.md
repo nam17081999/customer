@@ -30,7 +30,8 @@
 - **Tùy chọn**: Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
-- Có nút **Lưu luôn** ngay tại bước 2:
+- Khi bước 1 đã lấy được GPS để kiểm tra trùng, hệ thống sẽ tự prefill quận/huyện + xã/phường của cửa hàng gần nhất ngay trong nền, bất kể kết quả trùng hay không trùng; sang bước 2 thì field đã sẵn sàng nếu chưa bị nhập tay
+- Có nút **Lưu luôn** ngay tại bước 2 chỉ khi là admin hoặc telesale:
   - vẫn bắt buộc `Quận/Huyện` + `Xã/Phường`
   - **bắt buộc thêm số điện thoại hợp lệ**
   - trước khi lưu phải hỏi xác nhận việc lưu cửa hàng **không có vị trí**
@@ -55,7 +56,7 @@
 
 ### Chỉnh sửa (Admin)
 - **Bắt buộc**: Quận/Huyện + Xã/Phường khi **chỉnh sửa**.
-- Lưu xong: `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
+- Lưu xong: ưu tiên cập nhật cache local rồi dispatch `storevis:stores-changed`.
 - Nếu mở `/store/edit/[id]?mode=supplement`:
   - luôn bắt đầu từ **bước 1**
   - chỉ cho nhập dữ liệu còn thiếu, dữ liệu đã có thì bị khóa
@@ -85,7 +86,7 @@ User có 2 lựa chọn:
 **Trạng thái báo cáo**: `pending` → `approved` hoặc `rejected`.
 
 ### Admin duyệt báo cáo
-- **Báo cáo sửa**: cập nhật `stores` theo `proposed_changes`, sau đó `invalidateStoreCache()` + dispatch `storevis:stores-changed`.
+- **Báo cáo sửa**: cập nhật `stores` theo `proposed_changes`, sau đó cập nhật cache local + dispatch `storevis:stores-changed`.
 - **Báo cáo lý do**: chỉ đánh dấu đã xử lý (`approved`), **không** sửa dữ liệu.
 - Nút **Chỉ đường** ở màn admin **chỉ hiện** khi **có thay đổi tọa độ** (lat/lng).
 
@@ -170,11 +171,40 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - `/store/verify`: danh sách `active = false`, bulk select + verify
 - Xác thực: `UPDATE stores SET active = true WHERE id IN (...)`
 - Soft delete: `UPDATE stores SET deleted_at = now()`
-- Sau xác thực/xóa: `invalidateStoreCache()` + dispatch `storevis:stores-changed`
+- Sau xác thực/xóa: cập nhật cache local + dispatch `storevis:stores-changed`
 
 ---
 
-## 6. Phát Hiện Trùng Tên
+## 6. Telesale
+
+- Chỉ cửa hàng `is_potential = true` và có `phone` mới xuất hiện ở màn telesale.
+- Guest bấm gọi thì gọi thẳng.
+- `telesale/admin` bấm gọi sẽ có 2 lựa chọn:
+  - `Chỉ gọi`
+  - `Gọi lên đơn`
+- `Gọi lên đơn` sẽ:
+  - gọi ra số điện thoại
+  - cập nhật `last_called_at`
+  - tự chuyển store sang `is_potential = true`
+  - điều hướng sang `/telesale/call/[id]` để chốt kết quả gọi
+- Khi lưu kết quả gọi:
+  - cập nhật `last_call_result`
+  - cập nhật `last_call_result_at`
+  - cập nhật `sales_note`
+  - nếu là `da_len_don` thì cập nhật thêm `last_order_reported_at`
+- Danh sách ưu tiên gọi sắp theo:
+  1. store chưa gọi
+  2. store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút
+  3. `goi_lai_sau`
+  4. `khong_nghe`
+  5. `con_hang`
+  6. `da_len_don`
+- `con_hang` chỉ hiện lại trong danh sách ưu tiên khi lần cập nhật kết quả đó đã quá 2 ngày.
+- `da_len_don` chỉ hiện lại trong danh sách ưu tiên khi lần báo đơn đó đã quá 3 ngày.
+
+---
+
+## 7. Phát Hiện Trùng Tên
 
 Bỏ qua các từ chung khi so sánh (`IGNORED_NAME_TERMS`):
 > "cửa hàng", "tạp hoá", "quán nước", "cafe", "siêu thị", "quán", "shop", "mart", và nhiều loại khác
@@ -187,7 +217,7 @@ Bỏ qua các từ chung khi so sánh (`IGNORED_NAME_TERMS`):
 
 ---
 
-## 7. Địa Lý
+## 8. Địa Lý
 
 6 huyện trong `lib/constants.js`: Hoài Đức, Đan Phượng, Phúc Thọ, Bắc Từ Liêm, Nam Từ Liêm, Quốc Oai (~100+ xã/phường).
 
@@ -195,16 +225,18 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 
 ---
 
-## 8. Authentication
+## 9. Authentication
 
 - Supabase Email/Password — không có đăng ký
-- `AuthContext.js`: `user`, `loading`, `signIn`, `signOut`
-- Route protection: mỗi admin page tự check + redirect `/login?from=...`
-- `isAdmin = Boolean(user)`
+- `AuthContext.js`: `user`, `loading`, `signIn`, `signOut`, `role`, `isAdmin`, `isTelesale`, `isAuthenticated`
+- Route protection:
+  - trang admin chỉ dành cho `admin`
+  - trang telesale dành cho `telesale/admin`
+- `role` lấy từ metadata Supabase; nếu tài khoản cũ chưa có metadata thì fallback thành `admin`
 
 ---
 
-## 9. Image Upload Flow
+## 10. Image Upload Flow
 
 ```
 1. Compress (browser-image-compression): max 1MB, 1600px, JPEG 0.8
@@ -217,7 +249,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 
 ---
 
-## 10. Xuất Dữ Liệu
+## 11. Xuất Dữ Liệu
 
 - Màn export Excel/CSV phải xuất **tất cả cửa hàng đang có** (`deleted_at IS NULL`)
 - File Excel/CSV **không phụ thuộc** cửa hàng có số điện thoại hay không
@@ -226,7 +258,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 
 ---
 
-## 11. Nhập Dữ Liệu
+## 12. Nhập Dữ Liệu
 
 - `/store/import` là màn admin để nhập nhiều cửa hàng từ file `.csv`
 - Màn này phải có nút tải **file mẫu** để người dùng điền đúng cột
@@ -257,13 +289,13 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
   - nghi trùng với hệ thống hiện có → trạng thái `Nghi trùng`
 - Chỉ các dòng `Sẵn sàng nhập` mới được insert vào `stores`
 - Bulk import xong phải:
-  - `invalidateStoreCache()`
+  - cập nhật cache local hoặc fallback `invalidateStoreCache()`
   - dispatch `storevis:stores-changed`
   - tải lại danh sách store hiện có để các lần import sau so trùng đúng
 
 ---
 
-## 12. Quy Tắc Tiếng Việt & Dialog Xác Nhận
+## 13. Quy Tắc Tiếng Việt & Dialog Xác Nhận
 
 - Text tiếng Việt hiển thị cho user/admin phải giữ đúng dấu trong source và trên UI.
 - Nếu terminal hiển thị sai dấu, chưa được coi đó là bằng chứng file source bị hỏng.
