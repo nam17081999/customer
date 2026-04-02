@@ -149,7 +149,7 @@ export default function EditStore() {
       }
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
-      showMessage('success', 'ÄÃ£ cáº­p nháº­t vá»‹ trÃ­ GPS má»›i')
+      showMessage('success', 'Đã cập nhật vị trí GPS mới!')
     } catch (err) {
       console.error('Get location error:', err)
       showMessage('error', getGeoErrorMessage(err))

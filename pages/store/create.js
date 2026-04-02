@@ -45,6 +45,8 @@ export default function AddStore() {
   const [addressDetail, setAddressDetail] = useState('')
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
+  const wardRef = useRef('')
+  const districtRef = useRef('')
   // unified message state
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
@@ -105,6 +107,12 @@ export default function AddStore() {
   const [mapsLink, setMapsLink] = useState('')
   const [mapsLinkLoading, setMapsLinkLoading] = useState(false)
   const [mapsLinkError, setMapsLinkError] = useState('')
+  useEffect(() => {
+    wardRef.current = ward
+  }, [ward])
+  useEffect(() => {
+    districtRef.current = district
+  }, [district])
   const hasUnsavedChanges = useMemo(() => {
     if (loading || showSuccess) return false
     return Boolean(
@@ -244,12 +252,14 @@ export default function AddStore() {
           }
         })
         .filter(Boolean)
-        .sort((a, b) => a.distance - b.distance)[0]
+      .sort((a, b) => a.distance - b.distance)[0]
 
       if (!nearestStore) return
+      if (districtRef.current.trim() || wardRef.current.trim()) return
       const nextDistrict = toTitleCaseVI(String(nearestStore.store.district || '').trim())
       const nextWard = toTitleCaseVI(String(nearestStore.store.ward || '').trim())
 
+      if (districtRef.current.trim() || wardRef.current.trim()) return
       setDistrict(nextDistrict)
       setWard(nextWard)
       setFieldErrors((prev) => ({
