@@ -156,7 +156,7 @@ export default function EditStore() {
     } finally {
       setResolvingAddr(false)
     }
-  }, [])
+  }, [showMessage])
 
   useEffect(() => {
     if (!pageReady || !store || !isSupplementMode) return
