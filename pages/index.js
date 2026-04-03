@@ -24,6 +24,7 @@ const LOCATION_REFRESH_COOLDOWN_MS = 5 * 1000
 const FILTER_FLAG_HAS_PHONE = 'has_phone'
 const FILTER_FLAG_HAS_IMAGE = 'has_image'
 const FILTER_FLAG_NO_LOCATION = 'has_no_location'
+const FILTER_FLAG_POTENTIAL = 'is_potential'
 
 function parseCoordinate(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
@@ -336,6 +337,9 @@ export default function HomePage() {
     if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION)) {
       results = results.filter((s) => !hasStoreCoordinates(s))
     }
+    if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)) {
+      results = results.filter((s) => Boolean(s.is_potential))
+    }
     // Text search (supports Vietnamese without tones + any word order)
     if (hasTextSearch) {
       const term = searchTerm.trim().toLowerCase()
@@ -531,6 +535,7 @@ export default function HomePage() {
                       { value: FILTER_FLAG_HAS_PHONE, label: 'Có số điện thoại' },
                       { value: FILTER_FLAG_HAS_IMAGE, label: 'Có ảnh' },
                       { value: FILTER_FLAG_NO_LOCATION, label: 'Không có vị trí' },
+                      { value: FILTER_FLAG_POTENTIAL, label: 'Tiềm năng' },
                     ].map((flag) => {
                       const active = selectedDetailFlags.includes(flag.value)
                       return (
