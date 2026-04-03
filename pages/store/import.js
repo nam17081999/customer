@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { supabase } from '@/lib/supabaseClient'
-import { appendStoresToCache, getOrRefreshStores } from '@/lib/storeCache'
+import { appendStoresToCache, getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import {
   DEFAULT_STORE_TYPE,
   STORE_TYPE_OPTIONS,
@@ -278,44 +278,103 @@ function getRowStatusVariant(status) {
   return 'border-red-900/70 bg-red-950/20 text-red-200'
 }
 
+function canResolveSystemDuplicate(row) {
+  return (
+    row.errors.length === 0
+    && row.duplicateInFileRows.length === 0
+    && (row.phoneDuplicateInFileRows || []).length === 0
+  )
+}
+
 function finalizePreviewRow(
   draft,
   duplicateInFileRows,
   phoneDuplicateInFileRows,
-  duplicateAccepted = false,
+  resolutionMode = '',
+  selectedDuplicateId = null,
   duplicateListExpanded = false
 ) {
   const issues = [...draft.errors]
   const blockingIssues = []
+  const hasResolvedSystemDuplicate = resolutionMode === 'create'
+    || ((resolutionMode === 'keep-existing' || resolutionMode === 'prefer-import') && selectedDuplicateId != null)
 
   if (phoneDuplicateInFileRows.length > 0) {
     blockingIssues.push(`Trùng số điện thoại với dòng ${phoneDuplicateInFileRows.join(', ')} trong file`)
   }
-  if (draft.phoneDuplicateMatches.length > 0) {
+  if (draft.phoneDuplicateMatches.length > 0 && draft.duplicateMatches.length === 0) {
     blockingIssues.push(`Số điện thoại đã tồn tại trong dữ liệu: ${buildPhoneDuplicateSummary(draft.phoneDuplicateMatches)}`)
   }
 
   issues.push(...blockingIssues)
+  if (draft.phoneDuplicateMatches.length > 0 && draft.duplicateMatches.length > 0) {
+    issues.push(`Số điện thoại đang trùng với dữ liệu hiện có: ${buildPhoneDuplicateSummary(draft.phoneDuplicateMatches)}`)
+  }
   if (duplicateInFileRows.length > 0) {
     issues.push(`Trùng y hệt với dòng ${duplicateInFileRows.join(', ')} trong file`)
   }
-  if (draft.duplicateMatches.length > 0 && !duplicateAccepted) {
+  if (draft.duplicateMatches.length > 0 && !hasResolvedSystemDuplicate) {
     issues.push(`Có ${draft.duplicateMatches.length} cửa hàng có thể trùng trong hệ thống`)
   }
 
   const status = draft.errors.length > 0 || blockingIssues.length > 0
     ? 'error'
-    : (duplicateInFileRows.length > 0 || (draft.duplicateMatches.length > 0 && !duplicateAccepted) ? 'duplicate' : 'ready')
+    : (duplicateInFileRows.length > 0 || (draft.duplicateMatches.length > 0 && !hasResolvedSystemDuplicate) ? 'duplicate' : 'ready')
 
   return {
     ...draft,
     duplicateInFileRows,
     phoneDuplicateInFileRows,
-    duplicateAccepted,
+    resolutionMode,
+    selectedDuplicateId,
     duplicateListExpanded,
     issues,
     status,
   }
+}
+
+function isMissingValue(value) {
+  return value == null || String(value).trim() === ''
+}
+
+function pickResolvedValue(existingValue, incomingValue, preferImport) {
+  const existingMissing = isMissingValue(existingValue)
+  const incomingMissing = isMissingValue(incomingValue)
+
+  if (existingMissing && incomingMissing) return null
+  if (existingMissing) return incomingValue
+  if (incomingMissing) return existingValue
+  return preferImport ? incomingValue : existingValue
+}
+
+function buildResolutionPatch(existingStore, row, resolutionMode) {
+  if (!existingStore || !row) return null
+  const preferImport = resolutionMode === 'prefer-import'
+
+  const patch = {}
+  const nextStoreType = pickResolvedValue(existingStore.store_type, row.storeTypeValue, preferImport)
+  const nextAddressDetail = pickResolvedValue(existingStore.address_detail, row.addressDetail, preferImport)
+  const nextWard = pickResolvedValue(existingStore.ward, row.ward, preferImport)
+  const nextDistrict = pickResolvedValue(existingStore.district, row.district, preferImport)
+  const nextPhone = pickResolvedValue(existingStore.phone, row.phone, preferImport)
+  const nextNote = pickResolvedValue(existingStore.note, row.note, preferImport)
+
+  if (nextStoreType !== existingStore.store_type) patch.store_type = nextStoreType
+  if (nextAddressDetail !== existingStore.address_detail) patch.address_detail = nextAddressDetail
+  if (nextWard !== existingStore.ward) patch.ward = nextWard
+  if (nextDistrict !== existingStore.district) patch.district = nextDistrict
+  if (nextPhone !== existingStore.phone) patch.phone = nextPhone
+  if (nextNote !== existingStore.note) patch.note = nextNote
+
+  const existingLat = parseCoordinate(existingStore.latitude)
+  const existingLng = parseCoordinate(existingStore.longitude)
+  const existingHasCoordinates = hasValidCoordinates(existingLat, existingLng)
+  if ((!existingHasCoordinates && row.hasCoordinates) || (preferImport && row.hasCoordinates)) {
+    patch.latitude = row.latitude
+    patch.longitude = row.longitude
+  }
+
+  return Object.keys(patch).length > 0 ? patch : null
 }
 
 export default function StoreImportPage() {
@@ -542,14 +601,32 @@ export default function StoreImportPage() {
     )))
   }, [])
 
-  const handleToggleDuplicateAccepted = useCallback((rowNumber) => {
+  const handleChooseDuplicateTarget = useCallback((rowNumber, selectedDuplicateId) => {
     setPreviewRows((prev) => prev.map((row) => {
       if (row.rowNumber !== rowNumber) return row
+      const nextSelectedDuplicateId = row.selectedDuplicateId === selectedDuplicateId ? null : selectedDuplicateId
+      const nextResolutionMode = nextSelectedDuplicateId == null ? '' : row.resolutionMode
       return finalizePreviewRow(
         row,
         row.duplicateInFileRows,
         row.phoneDuplicateInFileRows || [],
-        !row.duplicateAccepted,
+        nextResolutionMode,
+        nextSelectedDuplicateId,
+        row.duplicateListExpanded
+      )
+    }))
+  }, [])
+
+  const handleSetDuplicateResolution = useCallback((rowNumber, resolutionMode) => {
+    setPreviewRows((prev) => prev.map((row) => {
+      if (row.rowNumber !== rowNumber) return row
+      const nextResolutionMode = row.resolutionMode === resolutionMode ? '' : resolutionMode
+      return finalizePreviewRow(
+        row,
+        row.duplicateInFileRows,
+        row.phoneDuplicateInFileRows || [],
+        nextResolutionMode,
+        nextResolutionMode === 'create' ? null : row.selectedDuplicateId,
         row.duplicateListExpanded
       )
     }))
@@ -560,17 +637,22 @@ export default function StoreImportPage() {
     if (readyRows.length === 0 || importing) return
 
     const skippedRows = previewRows.length - readyRows.length
-    const confirmed = window.confirm(
-      `Sẽ nhập ${readyRows.length} dòng hợp lệ và bỏ qua ${skippedRows} dòng lỗi/trùng. Bạn có muốn tiếp tục không?`
+    const createRows = readyRows.filter((row) => row.resolutionMode === 'create' || row.duplicateMatches.length === 0)
+    const resolvedDuplicateRows = readyRows.filter((row) => (
+      (row.resolutionMode === 'keep-existing' || row.resolutionMode === 'prefer-import')
+      && row.selectedDuplicateId != null
+    ))
+    const importConfirmed = window.confirm(
+      `Sẽ xử lý ${readyRows.length} dòng hợp lệ, gồm ${createRows.length} dòng tạo mới và ${resolvedDuplicateRows.length} dòng cập nhật từ cửa hàng nghi trùng. Bỏ qua ${skippedRows} dòng lỗi hoặc chưa chọn hướng xử lý. Bạn có muốn tiếp tục không?`
     )
-    if (!confirmed) return
+    if (!importConfirmed) return
 
     setImporting(true)
     setParseError('')
     setImportResult('')
 
     try {
-      const payloads = readyRows.map((row) => ({
+      const createPayloads = createRows.map((row) => ({
         name: row.name,
         store_type: row.storeTypeValue || DEFAULT_STORE_TYPE,
         address_detail: row.addressDetail || null,
@@ -584,26 +666,68 @@ export default function StoreImportPage() {
         active: true,
       }))
 
-      const insertedStores = []
-      for (const chunk of chunkArray(payloads, 100)) {
-        const { data, error } = await supabase.from('stores').insert(chunk).select()
+      const nextInsertedStores = []
+      if (createPayloads.length > 0) {
+        for (const chunk of chunkArray(createPayloads, 100)) {
+          const { data, error } = await supabase.from('stores').insert(chunk).select()
+          if (error) throw error
+          if (Array.isArray(data)) nextInsertedStores.push(...data)
+        }
+      }
+
+      const nextResolvedStores = []
+      for (const row of resolvedDuplicateRows) {
+        const existingStore = existingStores.find((store) => store.id === row.selectedDuplicateId)
+        if (!existingStore) continue
+        const patch = buildResolutionPatch(existingStore, row, row.resolutionMode)
+        if (!patch) {
+          nextResolvedStores.push(existingStore)
+          continue
+        }
+        const { data, error } = await supabase
+          .from('stores')
+          .update(patch)
+          .eq('id', row.selectedDuplicateId)
+          .select()
+          .single()
         if (error) throw error
-        if (Array.isArray(data)) insertedStores.push(...data)
+        if (data) nextResolvedStores.push(data)
       }
 
-      await appendStoresToCache(insertedStores)
+      await appendStoresToCache(nextInsertedStores)
+      await updateStoresInCache(nextResolvedStores)
+
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'append-many', stores: insertedStores },
-          })
-        )
+        if (nextInsertedStores.length > 0) {
+          window.dispatchEvent(
+            new CustomEvent('storevis:stores-changed', {
+              detail: { type: 'append-many', stores: nextInsertedStores },
+            })
+          )
+        }
+        nextResolvedStores.forEach((store) => {
+          if (!store?.id) return
+          window.dispatchEvent(
+            new CustomEvent('storevis:stores-changed', {
+              detail: { type: 'update', store },
+            })
+          )
+        })
       }
 
-      setImportResult(`Đã nhập thành công ${readyRows.length} dòng. Bỏ qua ${skippedRows} dòng lỗi hoặc nghi trùng.`)
+      setImportResult(`Đã xử lý thành công ${readyRows.length} dòng: ${nextInsertedStores.length} dòng tạo mới, ${resolvedDuplicateRows.length} dòng cập nhật từ cửa hàng nghi trùng. Bỏ qua ${skippedRows} dòng lỗi hoặc chưa chọn hướng xử lý.`)
       setPreviewRows([])
       setSelectedFileName('')
-      setExistingStores((prev) => [...prev, ...prepareExistingStores(insertedStores)])
+      setExistingStores((prev) => {
+        const nextById = new Map(prev.map((store) => [store.id, store]))
+        prepareExistingStores(nextResolvedStores).forEach((store) => {
+          if (store?.id != null) nextById.set(store.id, store)
+        })
+        prepareExistingStores(nextInsertedStores).forEach((store) => {
+          if (store?.id != null) nextById.set(store.id, store)
+        })
+        return Array.from(nextById.values())
+      })
     } catch (error) {
       console.error(error)
       setImportResult('')
@@ -611,7 +735,7 @@ export default function StoreImportPage() {
     } finally {
       setImporting(false)
     }
-  }, [importing, previewRows])
+  }, [existingStores, importing, previewRows])
 
   if (authLoading || !pageReady) {
     return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
@@ -785,7 +909,7 @@ export default function StoreImportPage() {
                               <div>
                                 <p className="text-sm font-medium text-gray-200">Các cửa hàng có thể trùng trong hệ thống</p>
                                 <p className="mt-1 text-xs text-gray-400">
-                                  Chỉ đối chiếu trong cùng quận / huyện. Bạn có thể mở danh sách để kiểm tra trước khi chấp thuận nhập.
+                                  Chỉ đối chiếu trong cùng quận / huyện. Hãy chọn một cửa hàng phù hợp trước, sau đó mới quyết định giữ dữ liệu cũ hay lấy dữ liệu mới.
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -797,45 +921,77 @@ export default function StoreImportPage() {
                                 >
                                   {row.duplicateListExpanded ? 'Thu gọn' : `Xem ${row.duplicateMatches.length} cửa hàng`}
                                 </Button>
-                                {row.errors.length === 0
-                                  && row.duplicateInFileRows.length === 0
-                                  && (row.phoneDuplicateInFileRows || []).length === 0
-                                  && row.phoneDuplicateMatches.length === 0 && (
+                                {canResolveSystemDuplicate(row) && (
                                   <Button
                                     type="button"
-                                    variant={row.duplicateAccepted ? 'outline' : 'primary'}
+                                    variant={row.resolutionMode === 'create' ? 'primary' : 'outline'}
                                     className="h-9 px-3 text-sm"
-                                    onClick={() => handleToggleDuplicateAccepted(row.rowNumber)}
+                                    onClick={() => handleSetDuplicateResolution(row.rowNumber, 'create')}
                                   >
-                                    {row.duplicateAccepted ? 'Bỏ chấp thuận' : 'Chấp thuận'}
+                                    {row.resolutionMode === 'create' ? 'Bỏ tạo mới' : 'Tạo mới'}
                                   </Button>
                                 )}
                               </div>
                             </div>
-                            {row.duplicateAccepted
-                              && row.errors.length === 0
-                              && row.duplicateInFileRows.length === 0
-                              && (row.phoneDuplicateInFileRows || []).length === 0
-                              && row.phoneDuplicateMatches.length === 0 && (
+                            {row.resolutionMode === 'create' && canResolveSystemDuplicate(row) && (
                               <div className="mt-3 rounded-lg border border-green-900/70 bg-green-950/20 px-3 py-2 text-sm text-green-200">
-                                Dòng này đã được chấp thuận nhập dù có thể trùng với dữ liệu hiện có.
+                                Dòng này sẽ được tạo mới dù đang có cửa hàng nghi trùng trong hệ thống.
+                              </div>
+                            )}
+                            {row.selectedDuplicateId != null && row.resolutionMode !== 'create' && (
+                              <div className="mt-3 rounded-lg border border-sky-900/70 bg-sky-950/20 px-3 py-2 text-sm text-sky-200">
+                                Dữ liệu ở hai bên sẽ được giữ lại nếu chỉ một bên có. Với các trường cùng có dữ liệu, bạn cần chọn giữ dữ liệu cũ hoặc lấy dữ liệu mới.
                               </div>
                             )}
                             {row.duplicateListExpanded && (
                               <div className="mt-3 space-y-2">
                                 {row.duplicateMatches.map((match) => (
                                   <div key={`${row.rowNumber}-match-${match.id}`} className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2 text-sm text-gray-300">
-                                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                      <span className="font-medium text-gray-100">{match.name || 'Cửa hàng'}</span>
-                                      <span className="text-xs text-gray-400">
-                                        {typeof match.distance === 'number' ? formatDistance(match.distance) : 'Không có vị trí'}
-                                      </span>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                      <div>
+                                        <span className="font-medium text-gray-100">{match.name || 'Cửa hàng'}</span>
+                                        <div className="mt-1 text-xs text-gray-400">
+                                          {typeof match.distance === 'number'
+                                            ? formatDistance(match.distance)
+                                            : (match.hasCoordinates ? 'Đã có vị trí' : 'Không có vị trí')}
+                                        </div>
+                                      </div>
+                                      {canResolveSystemDuplicate(row) && (
+                                        <Button
+                                          type="button"
+                                          variant={row.selectedDuplicateId === match.id ? 'primary' : 'outline'}
+                                          className="h-8 px-3 text-sm"
+                                          onClick={() => handleChooseDuplicateTarget(row.rowNumber, match.id)}
+                                        >
+                                          {row.selectedDuplicateId === match.id ? 'Đã chọn' : 'Chọn cửa hàng này'}
+                                        </Button>
+                                      )}
                                     </div>
                                     <div className="mt-1 text-xs text-gray-400">
                                       {formatAddressParts(match) || 'Chưa có địa chỉ'}
                                     </div>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+                            {row.selectedDuplicateId != null && canResolveSystemDuplicate(row) && row.resolutionMode !== 'create' && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant={row.resolutionMode === 'keep-existing' ? 'primary' : 'outline'}
+                                  className="h-9 px-3 text-sm"
+                                  onClick={() => handleSetDuplicateResolution(row.rowNumber, 'keep-existing')}
+                                >
+                                  Giữ dữ liệu cũ
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant={row.resolutionMode === 'prefer-import' ? 'primary' : 'outline'}
+                                  className="h-9 px-3 text-sm"
+                                  onClick={() => handleSetDuplicateResolution(row.rowNumber, 'prefer-import')}
+                                >
+                                  Lấy dữ liệu mới
+                                </Button>
                               </div>
                             )}
                           </div>
