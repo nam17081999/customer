@@ -287,7 +287,15 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
   - `Vĩ độ` và `Kinh độ` phải đi theo cặp; nếu có thì phải hợp lệ
   - trùng trong chính file → trạng thái `Nghi trùng`
   - nghi trùng với hệ thống hiện có → trạng thái `Nghi trùng`
-- Chỉ các dòng `Sẵn sàng nhập` mới được insert vào `stores`
+- Nếu nghi trùng với hệ thống, admin có thể:
+  - `Tạo mới`
+  - hoặc chọn một cửa hàng nghi trùng cụ thể rồi chọn `Giữ dữ liệu cũ` hoặc `Lấy dữ liệu mới`
+- Với hai lựa chọn trên:
+  - field chỉ có ở một bên thì vẫn được giữ lại
+  - field có ở cả hai bên thì theo lựa chọn `Giữ dữ liệu cũ` hoặc `Lấy dữ liệu mới`
+- Chỉ các dòng `Sẵn sàng nhập` mới được xử lý:
+  - `Tạo mới` → insert vào `stores`
+  - chọn store nghi trùng + `Giữ dữ liệu cũ` / `Lấy dữ liệu mới` → update store đã chọn theo rule trên
 - Bulk import xong phải:
   - cập nhật cache local hoặc fallback `invalidateStoreCache()`
   - dispatch `storevis:stores-changed`

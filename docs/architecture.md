@@ -127,7 +127,13 @@ customer/
     - tọa độ thiếu cặp hoặc không hợp lệ
     - trùng trong chính file
     - nghi trùng với hệ thống hiện có
-  - Chỉ các dòng `ready` mới được insert; sau bulk import phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`
+  - Nếu một dòng nghi trùng trong hệ thống, UI cho chọn:
+    - `Tạo mới`
+    - hoặc chọn một store nghi trùng cụ thể rồi chọn `Giữ dữ liệu cũ` / `Lấy dữ liệu mới`
+  - Khi update store nghi trùng:
+    - field chỉ có ở một bên thì vẫn được giữ lại
+    - field có ở cả hai bên thì theo lựa chọn `Giữ dữ liệu cũ` / `Lấy dữ liệu mới`
+  - Chỉ các dòng `ready` mới được xử lý; sau bulk import phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`
 ```
 
 **Sau mutation:**
