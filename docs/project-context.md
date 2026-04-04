@@ -1,21 +1,21 @@
-# 🗺️ Project Context - StoreVis
+# Ã°Å¸â€”ÂºÃ¯Â¸Â Project Context - StoreVis
 
-## Đây là gì?
+## Ã„ÂÃƒÂ¢y lÃƒÂ  gÃƒÂ¬?
 
-**StoreVis** là ứng dụng web tra cứu và quản lý danh sách **cửa hàng** (tạp hóa, quán nước, quán ăn, v.v.) tại một số huyện ngoại thành Hà Nội.
+**StoreVis** lÃƒÂ  Ã¡Â»Â©ng dÃ¡Â»Â¥ng web tra cÃ¡Â»Â©u vÃƒÂ  quÃ¡ÂºÂ£n lÃƒÂ½ danh sÃƒÂ¡ch **cÃ¡Â»Â­a hÃƒÂ ng** (tÃ¡ÂºÂ¡p hÃƒÂ³a, quÃƒÂ¡n nÃ†Â°Ã¡Â»â€ºc, quÃƒÂ¡n Ã„Æ’n, v.v.) tÃ¡ÂºÂ¡i mÃ¡Â»â„¢t sÃ¡Â»â€˜ huyÃ¡Â»â€¡n ngoÃ¡ÂºÂ¡i thÃƒÂ nh HÃƒÂ  NÃ¡Â»â„¢i.
 
-**Mục tiêu chính:**
-- Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại và mức độ đầy đủ dữ liệu
-- Hiển thị vị trí cửa hàng trên bản đồ
-- Cho phép bất kỳ ai thêm cửa hàng mới (chờ admin duyệt)
-- Telesale theo dõi danh sách cần gọi và cập nhật kết quả gọi
-- Admin duyệt/quản lý danh sách, xem dashboard tổng quan
+**MÃ¡Â»Â¥c tiÃƒÂªu chÃƒÂ­nh:**
+- GiÃƒÂºp ngÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng tÃƒÂ¬m kiÃ¡ÂºÂ¿m cÃ¡Â»Â­a hÃƒÂ ng theo tÃƒÂªn, quÃ¡ÂºÂ­n, xÃƒÂ£, loÃ¡ÂºÂ¡i vÃƒÂ  mÃ¡Â»Â©c Ã„â€˜Ã¡Â»â„¢ Ã„â€˜Ã¡ÂºÂ§y Ã„â€˜Ã¡Â»Â§ dÃ¡Â»Â¯ liÃ¡Â»â€¡u
+- HiÃ¡Â»Æ’n thÃ¡Â»â€¹ vÃ¡Â»â€¹ trÃƒÂ­ cÃ¡Â»Â­a hÃƒÂ ng trÃƒÂªn bÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ
+- Cho phÃƒÂ©p bÃ¡ÂºÂ¥t kÃ¡Â»Â³ ai thÃƒÂªm cÃ¡Â»Â­a hÃƒÂ ng mÃ¡Â»â€ºi (chÃ¡Â»Â admin duyÃ¡Â»â€¡t)
+- Telesale theo dÃƒÂµi danh sÃƒÂ¡ch cÃ¡ÂºÂ§n gÃ¡Â»Âi vÃƒÂ  cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ gÃ¡Â»Âi
+- Admin duyÃ¡Â»â€¡t/quÃ¡ÂºÂ£n lÃƒÂ½ danh sÃƒÂ¡ch, xem dashboard tÃ¡Â»â€¢ng quan
 
-**Đối tượng sử dụng**: app dành cho người có thể bị mắt kém → yêu cầu font lớn, tương phản cao.
+**Ã„ÂÃ¡Â»â€˜i tÃ†Â°Ã¡Â»Â£ng sÃ¡Â»Â­ dÃ¡Â»Â¥ng**: app dÃƒÂ nh cho ngÃ†Â°Ã¡Â»Âi cÃƒÂ³ thÃ¡Â»Æ’ bÃ¡Â»â€¹ mÃ¡ÂºÂ¯t kÃƒÂ©m Ã¢â€ â€™ yÃƒÂªu cÃ¡ÂºÂ§u font lÃ¡Â»â€ºn, tÃ†Â°Ã†Â¡ng phÃ¡ÂºÂ£n cao.
 
 ---
 
-## Tên Hệ Thống
+## TÃƒÂªn HÃ¡Â»â€¡ ThÃ¡Â»â€˜ng
 
 - **App name**: StoreVis
 - **Database table**: `stores`, `store_reports`
@@ -23,132 +23,132 @@
 
 ---
 
-## Luồng Chính
+## LuÃ¡Â»â€œng ChÃƒÂ­nh
 
-### User thường (không đăng nhập)
+### User thÃ†Â°Ã¡Â»Âng (khÃƒÂ´ng Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p)
 ```
-Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
-→ Click card → xem chi tiết (modal)
-→ Báo cáo cửa hàng (từ modal)
-→ Xem bản đồ (/map)
-→ Thêm cửa hàng (/store/create) → chờ duyệt
-```
-
-### Telesale (đã đăng nhập)
-```
-Đăng nhập (/login)
-→ Dashboard (/account)
-→ Xem danh sách ưu tiên gọi (/telesale/overview)
-→ Gọi khách hàng → chốt kết quả (/telesale/call/[id])
+Trang chÃ¡Â»Â§ (/) Ã¢â€ â€™ TÃƒÂ¬m kiÃ¡ÂºÂ¿m theo tÃƒÂªn + bÃ¡Â»â„¢ lÃ¡Â»Âc chi tiÃ¡ÂºÂ¿t
+Ã¢â€ â€™ Click card Ã¢â€ â€™ xem chi tiÃ¡ÂºÂ¿t (modal)
+Ã¢â€ â€™ BÃƒÂ¡o cÃƒÂ¡o cÃ¡Â»Â­a hÃƒÂ ng (tÃ¡Â»Â« modal)
+Ã¢â€ â€™ Xem bÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ (/map)
+Ã¢â€ â€™ ThÃƒÂªm cÃ¡Â»Â­a hÃƒÂ ng (/store/create) Ã¢â€ â€™ chÃ¡Â»Â duyÃ¡Â»â€¡t
 ```
 
-### Admin (đã đăng nhập)
+### Telesale (Ã„â€˜ÃƒÂ£ Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p)
 ```
-Đăng nhập (/login)
-→ Dashboard (/account) → Duyệt stores (/store/verify)
-→ Màn telesale (/telesale/overview)
-→ Nhập dữ liệu (/store/import)
-→ Xuất dữ liệu (/store/export)
-→ Duyệt báo cáo cửa hàng (/store/reports)
-→ Sửa store (/store/edit/[id])
-→ Bổ sung dữ liệu còn thiếu cho store (`/store/edit/[id]?mode=supplement`, public cũng mở được)
-→ Thêm store → active ngay
+Ã„ÂÃ„Æ’ng nhÃ¡ÂºÂ­p (/login)
+Ã¢â€ â€™ Dashboard (/account)
+Ã¢â€ â€™ Xem danh sÃƒÂ¡ch Ã†Â°u tiÃƒÂªn gÃ¡Â»Âi (/telesale/overview)
+Ã¢â€ â€™ GÃ¡Â»Âi khÃƒÂ¡ch hÃƒÂ ng Ã¢â€ â€™ chÃ¡Â»â€˜t kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ (/telesale/call/[id])
+```
+
+### Admin (Ã„â€˜ÃƒÂ£ Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p)
+```
+Ã„ÂÃ„Æ’ng nhÃ¡ÂºÂ­p (/login)
+Ã¢â€ â€™ Dashboard (/account) Ã¢â€ â€™ DuyÃ¡Â»â€¡t stores (/store/verify)
+Ã¢â€ â€™ MÃƒÂ n telesale (/telesale/overview)
+Ã¢â€ â€™ NhÃ¡ÂºÂ­p dÃ¡Â»Â¯ liÃ¡Â»â€¡u (/store/import)
+Ã¢â€ â€™ XuÃ¡ÂºÂ¥t dÃ¡Â»Â¯ liÃ¡Â»â€¡u (/store/export)
+Ã¢â€ â€™ DuyÃ¡Â»â€¡t bÃƒÂ¡o cÃƒÂ¡o cÃ¡Â»Â­a hÃƒÂ ng (/store/reports)
+Ã¢â€ â€™ SÃ¡Â»Â­a store (/store/edit/[id])
+Ã¢â€ â€™ BÃ¡Â»â€¢ sung dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃƒÂ²n thiÃ¡ÂºÂ¿u cho store (`/store/edit/[id]?mode=supplement`, public cÃ…Â©ng mÃ¡Â»Å¸ Ã„â€˜Ã†Â°Ã¡Â»Â£c)
+Ã¢â€ â€™ ThÃƒÂªm store Ã¢â€ â€™ active ngay
 ```
 
 ---
 
-## Các File Quan Trọng Nhất
+## CÃƒÂ¡c File Quan TrÃ¡Â»Âng NhÃ¡ÂºÂ¥t
 
-| File | Vai trò |
+| File | Vai trÃƒÂ² |
 |---|---|
-| `lib/storeCache.js` | Cache trung tâm — đọc/ghi/invalidate |
-| `lib/constants.js` | Danh sách huyện/xã cố định |
-| `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
-| `helper/geolocation.js` | Lấy GPS, compass |
-| `pages/store/create.js` | Form tạo cửa hàng 3 bước |
-| `pages/store/edit/[id].js` | Chỉnh sửa store + chế độ `supplement` theo step để chỉ bổ sung dữ liệu còn thiếu |
-| `pages/store/import.js` | Nhập nhiều store từ CSV mẫu, preview lỗi và nghi trùng trước khi insert |
-| `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
-| `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
-| `pages/telesale/overview.js` | Danh sách ưu tiên gọi + thống kê telesale |
-| `pages/telesale/call/[id].js` | Màn riêng để chốt kết quả cuộc gọi |
-| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
-| `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
-| `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Bổ sung` |
-| `lib/authz.js` | Helpers quyền theo `role` để ẩn/hiện hành động đúng vai trò |
+| `lib/storeCache.js` | Cache trung tÃƒÂ¢m Ã¢â‚¬â€ Ã„â€˜Ã¡Â»Âc/ghi/invalidate |
+| `lib/constants.js` | Danh sÃƒÂ¡ch huyÃ¡Â»â€¡n/xÃƒÂ£ cÃ¡Â»â€˜ Ã„â€˜Ã¡Â»â€¹nh |
+| `helper/duplicateCheck.js` | PhÃƒÂ¡t hiÃ¡Â»â€¡n cÃ¡Â»Â­a hÃƒÂ ng trÃƒÂ¹ng tÃƒÂªn |
+| `helper/geolocation.js` | LÃ¡ÂºÂ¥y GPS, compass |
+| `pages/store/create.js` | Form tÃ¡ÂºÂ¡o cÃ¡Â»Â­a hÃƒÂ ng 3 bÃ†Â°Ã¡Â»â€ºc |
+| `pages/store/edit/[id].js` | ChÃ¡Â»â€°nh sÃ¡Â»Â­a store + chÃ¡ÂºÂ¿ Ã„â€˜Ã¡Â»â„¢ `supplement` theo step Ã„â€˜Ã¡Â»Æ’ chÃ¡Â»â€° bÃ¡Â»â€¢ sung dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃƒÂ²n thiÃ¡ÂºÂ¿u |
+| `pages/store/import.js` | NhÃ¡ÂºÂ­p nhiÃ¡Â»Âu store tÃ¡Â»Â« CSV mÃ¡ÂºÂ«u, preview lÃ¡Â»â€”i vÃƒÂ  nghi trÃƒÂ¹ng trÃ†Â°Ã¡Â»â€ºc khi insert |
+| `pages/store/export.js` | XuÃ¡ÂºÂ¥t CSV toÃƒÂ n bÃ¡Â»â„¢ store Ã„â€˜ang cÃƒÂ³ + VCF theo sÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i |
+| `pages/store/reports.js` | Admin duyÃ¡Â»â€¡t bÃƒÂ¡o cÃƒÂ¡o cÃ¡Â»Â­a hÃƒÂ ng |
+| `pages/telesale/overview.js` | Danh sÃƒÂ¡ch Ã†Â°u tiÃƒÂªn gÃ¡Â»Âi + thÃ¡Â»â€˜ng kÃƒÂª telesale |
+| `pages/telesale/call/[id].js` | MÃƒÂ n riÃƒÂªng Ã„â€˜Ã¡Â»Æ’ chÃ¡Â»â€˜t kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ cuÃ¡Â»â„¢c gÃ¡Â»Âi |
+| `pages/map.js` | BÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ MapLibre, custom markers, focus theo query, nÃƒÂºt vÃ¡Â»Â GPS, chÃ¡ÂºÂ¥m xanh vÃ¡Â»â€¹ trÃƒÂ­ hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i, sidebar lÃ¡Â»Âc |
+| `pages/index.js` | TÃƒÂ¬m kiÃ¡ÂºÂ¿m local vÃ¡Â»â€ºi scoring, bÃ¡Â»â„¢ lÃ¡Â»Âc chi tiÃ¡ÂºÂ¿t, refresh vÃ¡Â»â€¹ trÃƒÂ­ Ã„â€˜Ã¡Â»â€¹nh kÃ¡Â»Â³, filter `KhÃƒÂ´ng cÃƒÂ³ vÃ¡Â»â€¹ trÃƒÂ­` |
+| `components/navbar.jsx` | Top nav desktop tÃ¡Â»â€˜i giÃ¡ÂºÂ£n + bottom tab mobile |
+| `components/store-detail-modal.jsx` | Modal chi tiÃ¡ÂºÂ¿t + bÃƒÂ¡o cÃƒÂ¡o + nÃƒÂºt chuyÃ¡Â»Æ’n sang /map + loÃ¡ÂºÂ¡i cÃ¡Â»Â­a hÃƒÂ ng phÃƒÂ­a trÃƒÂªn tÃƒÂªn + nÃƒÂºt `BÃ¡Â»â€¢ sung` |
+| `lib/authz.js` | Helpers quyÃ¡Â»Ân theo `role` Ã„â€˜Ã¡Â»Æ’ Ã¡ÂºÂ©n/hiÃ¡Â»â€¡n hÃƒÂ nh Ã„â€˜Ã¡Â»â„¢ng Ã„â€˜ÃƒÂºng vai trÃƒÂ² |
 
 ---
 
-## Phụ Thuộc Ngoại Vi
+## PhÃ¡Â»Â¥ ThuÃ¡Â»â„¢c NgoÃ¡ÂºÂ¡i Vi
 
-| Service | Dùng cho | Biến env |
+| Service | DÃƒÂ¹ng cho | BiÃ¡ÂºÂ¿n env |
 |---|---|---|
 | Supabase | Database + Auth | `NEXT_PUBLIC_SUPABASE_URL`, `ANON_KEY` |
-| ImageKit.io | CDN ảnh | `NEXT_PUBLIC_IMAGE_BASE_URL`, public/private key |
+| ImageKit.io | CDN Ã¡ÂºÂ£nh | `NEXT_PUBLIC_IMAGE_BASE_URL`, public/private key |
 | Google Maps API | Location picker (create/edit form) | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` |
-| OpenStreetMap | Tile bản đồ (/map) | Không cần key |
+| OpenStreetMap | Tile bÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ (/map) | KhÃƒÂ´ng cÃ¡ÂºÂ§n key |
 
 ---
 
-## Phạm Vi Địa Lý
+## PhÃ¡ÂºÂ¡m Vi Ã„ÂÃ¡Â»â€¹a LÃƒÂ½
 
-6 huyện tại Hà Nội: **Hoài Đức, Đan Phượng, Phúc Thọ, Bắc Từ Liêm, Nam Từ Liêm, Quốc Oai**.
-Danh sách xã/phường cố định trong `lib/constants.js`.
+6 huyÃ¡Â»â€¡n tÃ¡ÂºÂ¡i HÃƒÂ  NÃ¡Â»â„¢i: **HoÃƒÂ i Ã„ÂÃ¡Â»Â©c, Ã„Âan PhÃ†Â°Ã¡Â»Â£ng, PhÃƒÂºc ThÃ¡Â»Â, BÃ¡ÂºÂ¯c TÃ¡Â»Â« LiÃƒÂªm, Nam TÃ¡Â»Â« LiÃƒÂªm, QuÃ¡Â»â€˜c Oai**.
+Danh sÃƒÂ¡ch xÃƒÂ£/phÃ†Â°Ã¡Â»Âng cÃ¡Â»â€˜ Ã„â€˜Ã¡Â»â€¹nh trong `lib/constants.js`.
 
 ---
 
-## 21 Điều Cần Biết Khi Code
+## 21 Ã„ÂiÃ¡Â»Âu CÃ¡ÂºÂ§n BiÃ¡ÂºÂ¿t Khi Code
 
-1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
-2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
-3. **Soft delete** — dùng `deleted_at`, không bao giờ `DELETE` query
-4. **`active = true`** chỉ khi admin tạo hoặc admin duyệt
-5. **Không có cột `name_search`** trong DB — không thêm field này khi insert
-6. **Pages Router** — file đặt trong `pages/`, không phải `app/`
-7. **TailwindCSS v4** — cú pháp `@import "tailwindcss"` trong globals.css
-8. **Dark mode**: Ứng dụng chạy **Dark Mode duy nhất**. Không có Light Mode.
-9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
-10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
-11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
-12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/có SĐT/có ảnh/không có vị trí là multi-select.
-13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
-14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
-15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
-16. **`/store/create` bước 1-2**: bước 1 đã lấy GPS để check trùng; kết quả này được dùng để prefill quận/huyện + xã/phường của cửa hàng gần nhất trong nền trước khi sang bước 2.
-17. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
-18. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
-19. **`/store/edit/[id]?mode=supplement`**: luôn bắt đầu từ bước 1, khóa dữ liệu đã có, chỉ cho nhập phần thiếu; nếu store đã có vị trí thì flow chỉ còn 2 bước, nếu chưa có vị trí thì bước 3 sẽ tự lấy GPS một lần; người chưa đăng nhập gửi `store_report`, admin thì cập nhật trực tiếp.
-20. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
-21. **`/store/import`**: dùng file mẫu CSV, parse ở client và preview theo từng dòng trước khi insert; không import thẳng file chưa qua kiểm tra.
-22. **`/store/import` nghi trùng**: mỗi dòng có thể chọn `Tạo mới`, hoặc phải chọn 1 cửa hàng nghi trùng cụ thể trước rồi mới chọn `Giữ dữ liệu cũ` hoặc `Lấy dữ liệu mới`.
-23. **Bulk import**: khi update vào cửa hàng nghi trùng, field chỉ có ở một bên vẫn được giữ lại; field có ở cả hai bên thì theo lựa chọn `Giữ dữ liệu cũ` / `Lấy dữ liệu mới`; xong phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`.
-24. **Role hiện tại**: `guest`, `telesale`, `admin`; `telesale/admin` vào được `/account` và `/telesale/overview`, còn `admin` mới có các màn quản trị dữ liệu.
-25. **Telesale queue**: chỉ lấy store `is_potential` có `phone`; ưu tiên riêng cho store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút, dùng `last_call_result_at` để phân biệt.
+1. **KhÃƒÂ´ng gÃ¡Â»Âi Supabase trÃ¡Â»Â±c tiÃ¡ÂºÂ¿p Ã„â€˜Ã¡Â»Æ’ Ã„â€˜Ã¡Â»Âc stores** Ã¢â‚¬â€ luÃƒÂ´n qua `getOrRefreshStores()`
+2. **`image_url` lÃƒÂ  tÃƒÂªn file**, khÃƒÂ´ng phÃ¡ÂºÂ£i URL Ã¢â‚¬â€ full URL = `BASE_URL + image_url`
+3. **Soft delete** Ã¢â‚¬â€ dÃƒÂ¹ng `deleted_at`, khÃƒÂ´ng bao giÃ¡Â»Â `DELETE` query
+4. **`active = true`** chÃ¡Â»â€° khi admin tÃ¡ÂºÂ¡o hoÃ¡ÂºÂ·c admin duyÃ¡Â»â€¡t
+5. **KhÃƒÂ´ng cÃƒÂ³ cÃ¡Â»â„¢t `name_search`** trong DB Ã¢â‚¬â€ khÃƒÂ´ng thÃƒÂªm field nÃƒÂ y khi insert
+6. **Pages Router** Ã¢â‚¬â€ file Ã„â€˜Ã¡ÂºÂ·t trong `pages/`, khÃƒÂ´ng phÃ¡ÂºÂ£i `app/`
+7. **TailwindCSS v4** Ã¢â‚¬â€ cÃƒÂº phÃƒÂ¡p `@import "tailwindcss"` trong globals.css
+8. **Dark mode**: Ã¡Â»Â¨ng dÃ¡Â»Â¥ng chÃ¡ÂºÂ¡y **Dark Mode duy nhÃ¡ÂºÂ¥t**. KhÃƒÂ´ng cÃƒÂ³ Light Mode.
+9. **MapTheme**: Trang bÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ dÃƒÂ¹ng bÃ¡Â»â„¢ lÃ¡Â»Âc tÃ¡Â»â€˜i (`.dark-map-filter`). RiÃƒÂªng cÃƒÂ¡c form nhÃ¡ÂºÂ­p liÃ¡Â»â€¡u (`create/edit`) dÃƒÂ¹ng bÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ **SÃƒÂ¡ng** (`dark={false}`) Ã„â€˜Ã¡Â»Æ’ nhÃƒÂ¬n lÃ¡Â»â„¢ trÃƒÂ¬nh rÃƒÂµ hÃ†Â¡n.
+10. **Font tÃ¡Â»â€˜i thiÃ¡Â»Æ’u `text-base` (16px)** Ã¢â‚¬â€ app cho ngÃ†Â°Ã¡Â»Âi mÃ¡ÂºÂ¯t kÃƒÂ©m, khÃƒÂ´ng dÃƒÂ¹ng `text-xs`/`text-[11px]` cho thÃƒÂ´ng tin quan trÃ¡Â»Âng.
+11. **BÃ¡ÂºÂ£n Ã„â€˜Ã¡Â»â€œ quay theo hÃ†Â°Ã¡Â»â€ºng**: CÃ¡ÂºÂ§n gÃ¡Â»Âi `requestCompassHeading()` TRÃ†Â¯Ã¡Â»Å¡C `await` trong hÃƒÂ m xÃ¡Â»Â­ lÃƒÂ½ click/thao tÃƒÂ¡c thÃƒÂ¬ mÃ¡Â»â€ºi qua Ã„â€˜Ã†Â°Ã¡Â»Â£c quyÃ¡Â»Ân User Gesture cÃ¡Â»Â§a iOS/Safari.
+12. **Trang `/` cÃƒÂ³ bÃ¡Â»â„¢ lÃ¡Â»Âc chi tiÃ¡ÂºÂ¿t**: quÃ¡ÂºÂ­n/xÃƒÂ£ lÃƒÂ  single-select; loÃ¡ÂºÂ¡i/cÃƒÂ³ SÃ„ÂT/cÃƒÂ³ Ã¡ÂºÂ£nh/khÃƒÂ´ng cÃƒÂ³ vÃ¡Â»â€¹ trÃƒÂ­ lÃƒÂ  multi-select.
+13. **Trang `/` tÃ¡Â»Â± lÃƒÂ m mÃ¡Â»â€ºi GPS**: vÃƒÂ o trang, sau mÃ¡Â»â€”i 3 phÃƒÂºt, vÃƒÂ  khi quay lÃ¡ÂºÂ¡i tab/trang.
+14. **Trang `/map` cÃƒÂ³ chÃ¡ÂºÂ¥m xanh vÃ¡Â»â€¹ trÃƒÂ­ hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i** ngoÃƒÂ i marker cÃ¡Â»Â­a hÃƒÂ ng, vÃƒÂ  khÃƒÂ´ng hiÃ¡Â»Æ’n thÃ¡Â»â€¹ store khÃƒÂ´ng cÃƒÂ³ tÃ¡Â»Âa Ã„â€˜Ã¡Â»â„¢.
+15. **`/store/create` bÃ†Â°Ã¡Â»â€ºc 2 cÃƒÂ³ nhÃƒÂ¡nh `LÃ†Â°u luÃƒÂ´n`**: bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c phone hÃ¡Â»Â£p lÃ¡Â»â€¡, cho phÃƒÂ©p lÃ†Â°u store chÃ†Â°a cÃƒÂ³ vÃ¡Â»â€¹ trÃƒÂ­, cÃƒÂ³ confirm trÃ†Â°Ã¡Â»â€ºc khi lÃ†Â°u.
+16. **`/store/create` bÃ†Â°Ã¡Â»â€ºc 1-2**: bÃ†Â°Ã¡Â»â€ºc 1 Ã„â€˜ÃƒÂ£ lÃ¡ÂºÂ¥y GPS Ã„â€˜Ã¡Â»Æ’ check trÃƒÂ¹ng; kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ nÃƒÂ y Ã„â€˜Ã†Â°Ã¡Â»Â£c dÃƒÂ¹ng Ã„â€˜Ã¡Â»Æ’ prefill quÃ¡ÂºÂ­n/huyÃ¡Â»â€¡n + xÃƒÂ£/phÃ†Â°Ã¡Â»Âng cÃ¡Â»Â§a cÃ¡Â»Â­a hÃƒÂ ng gÃ¡ÂºÂ§n nhÃ¡ÂºÂ¥t trong nÃ¡Â»Ân trÃ†Â°Ã¡Â»â€ºc khi sang bÃ†Â°Ã¡Â»â€ºc 2.
+17. **Duplicate check**: store khÃƒÂ´ng cÃƒÂ³ tÃ¡Â»Âa Ã„â€˜Ã¡Â»â„¢ vÃ¡ÂºÂ«n cÃƒÂ³ thÃ¡Â»Æ’ xuÃ¡ÂºÂ¥t hiÃ¡Â»â€¡n Ã¡Â»Å¸ match toÃƒÂ n hÃ¡Â»â€¡ thÃ¡Â»â€˜ng nhÃ†Â°ng khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c cÃƒÂ³ `distance` giÃ¡ÂºÂ£.
+18. **Duplicate panel**: candidate cÃƒÂ²n thiÃ¡ÂºÂ¿u dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃƒÂ³ thÃ¡Â»Æ’ cÃƒÂ³ nÃƒÂºt `BÃ¡Â»â€¢ sung` Ã„â€˜Ã¡Â»Æ’ mÃ¡Â»Å¸ `/store/edit/[id]?mode=supplement`.
+19. **`/store/edit/[id]?mode=supplement`**: luÃƒÂ´n bÃ¡ÂºÂ¯t Ã„â€˜Ã¡ÂºÂ§u tÃ¡Â»Â« bÃ†Â°Ã¡Â»â€ºc 1, khÃƒÂ³a dÃ¡Â»Â¯ liÃ¡Â»â€¡u Ã„â€˜ÃƒÂ£ cÃƒÂ³, chÃ¡Â»â€° cho nhÃ¡ÂºÂ­p phÃ¡ÂºÂ§n thiÃ¡ÂºÂ¿u; nÃ¡ÂºÂ¿u store Ã„â€˜ÃƒÂ£ cÃƒÂ³ vÃ¡Â»â€¹ trÃƒÂ­ thÃƒÂ¬ flow chÃ¡Â»â€° cÃƒÂ²n 2 bÃ†Â°Ã¡Â»â€ºc, nÃ¡ÂºÂ¿u chÃ†Â°a cÃƒÂ³ vÃ¡Â»â€¹ trÃƒÂ­ thÃƒÂ¬ bÃ†Â°Ã¡Â»â€ºc 3 sÃ¡ÂºÂ½ tÃ¡Â»Â± lÃ¡ÂºÂ¥y GPS mÃ¡Â»â„¢t lÃ¡ÂºÂ§n; ngÃ†Â°Ã¡Â»Âi chÃ†Â°a Ã„â€˜Ã„Æ’ng nhÃ¡ÂºÂ­p gÃ¡Â»Â­i `store_report`, admin thÃƒÂ¬ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t trÃ¡Â»Â±c tiÃ¡ÂºÂ¿p.
+20. **Layout desktop**: dÃƒÂ¹ng `scrollbar-gutter: stable` Ã„â€˜Ã¡Â»Æ’ trÃƒÂ¡nh xÃƒÂª dÃ¡Â»â€¹ch khi chuyÃ¡Â»Æ’n giÃ¡Â»Â¯a trang cÃƒÂ³/khÃƒÂ´ng cÃƒÂ³ scrollbar.
+21. **`/store/import`**: dÃƒÂ¹ng file mÃ¡ÂºÂ«u CSV, parse Ã¡Â»Å¸ client vÃƒÂ  preview theo tÃ¡Â»Â«ng dÃƒÂ²ng trÃ†Â°Ã¡Â»â€ºc khi insert; khÃƒÂ´ng import thÃ¡ÂºÂ³ng file chÃ†Â°a qua kiÃ¡Â»Æ’m tra.
+22. **`/store/import` nghi trÃƒÂ¹ng**: mÃ¡Â»â€”i dÃƒÂ²ng cÃƒÂ³ thÃ¡Â»Æ’ chÃ¡Â»Ân `TÃ¡ÂºÂ¡o mÃ¡Â»â€ºi`, hoÃ¡ÂºÂ·c phÃ¡ÂºÂ£i chÃ¡Â»Ân 1 cÃ¡Â»Â­a hÃƒÂ ng nghi trÃƒÂ¹ng cÃ¡Â»Â¥ thÃ¡Â»Æ’ trÃ†Â°Ã¡Â»â€ºc rÃ¡Â»â€œi mÃ¡Â»â€ºi chÃ¡Â»Ân `GiÃ¡Â»Â¯ dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃ…Â©` hoÃ¡ÂºÂ·c `LÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u mÃ¡Â»â€ºi`.
+23. **Bulk import**: khi update vÃƒÂ o cÃ¡Â»Â­a hÃƒÂ ng nghi trÃƒÂ¹ng, field chÃ¡Â»â€° cÃƒÂ³ Ã¡Â»Å¸ mÃ¡Â»â„¢t bÃƒÂªn vÃ¡ÂºÂ«n Ã„â€˜Ã†Â°Ã¡Â»Â£c giÃ¡Â»Â¯ lÃ¡ÂºÂ¡i; field cÃƒÂ³ Ã¡Â»Å¸ cÃ¡ÂºÂ£ hai bÃƒÂªn thÃƒÂ¬ theo lÃ¡Â»Â±a chÃ¡Â»Ân `GiÃ¡Â»Â¯ dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃ…Â©` / `LÃ¡ÂºÂ¥y dÃ¡Â»Â¯ liÃ¡Â»â€¡u mÃ¡Â»â€ºi`; xong phÃ¡ÂºÂ£i cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t cache local hoÃ¡ÂºÂ·c fallback `invalidateStoreCache()`, rÃ¡Â»â€œi dispatch `storevis:stores-changed`.
+24. **Role hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i**: `guest`, `telesale`, `admin`; `telesale/admin` vÃƒÂ o Ã„â€˜Ã†Â°Ã¡Â»Â£c `/account` vÃƒÂ  `/telesale/overview`, cÃƒÂ²n `admin` mÃ¡Â»â€ºi cÃƒÂ³ cÃƒÂ¡c mÃƒÂ n quÃ¡ÂºÂ£n trÃ¡Â»â€¹ dÃ¡Â»Â¯ liÃ¡Â»â€¡u.
+25. **Telesale queue**: chÃ¡Â»â€° lÃ¡ÂºÂ¥y store `is_potential` cÃƒÂ³ `phone`; Ã†Â°u tiÃƒÂªn riÃƒÂªng cho store Ã„â€˜ÃƒÂ£ gÃ¡Â»Âi nhÃ†Â°ng chÃ†Â°a cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t kÃ¡ÂºÂ¿t quÃ¡ÂºÂ£ trong vÃƒÂ²ng 30 phÃƒÂºt, dÃƒÂ¹ng `last_call_result_at` Ã„â€˜Ã¡Â»Æ’ phÃƒÂ¢n biÃ¡Â»â€¡t.
 
 ---
 
 ## Convention & Naming
 
-| Thành phần | Convention |
+| ThÃƒÂ nh phÃ¡ÂºÂ§n | Convention |
 |---|---|
-| Tên cửa hàng | Title Case tiếng Việt (`toTitleCaseVI()`) |
-| Địa chỉ | Title Case (ward, district, address_detail) |
+| TÃƒÂªn cÃ¡Â»Â­a hÃƒÂ ng | Title Case tiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t (`toTitleCaseVI()`) |
+| Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€° | Title Case (ward, district, address_detail) |
 | File component | kebab-case `.jsx` |
-| File page/lib/helper | kebab-case hoặc camelCase `.js` |
+| File page/lib/helper | kebab-case hoÃ¡ÂºÂ·c camelCase `.js` |
 | Custom event | `storevis:stores-changed` |
 | IDB database (cache) | `storevis_cache` |
 | Editor config | `.editorconfig` (UTF-8, LF) |
 
 ---
 
-## Guardrail Tiếng Việt
+## Guardrail TiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t
 
-- Repo có `.editorconfig` để ép mặc định `UTF-8` và `LF`.
-- Khi sửa file có tiếng Việt, ưu tiên patch nhỏ thay vì rewrite cả file.
-- Không dùng cách ghi file dễ làm vỡ encoding nếu chưa kiểm soát rõ đầu ra.
-- Không kết luận file hỏng chỉ vì terminal Windows hiển thị sai dấu; cần đối chiếu thêm bằng `git diff` hoặc UI thực tế.
-- Hai màn admin dễ lộ lỗi tiếng Việt ra UI là:
+- Repo cÃƒÂ³ `.editorconfig` Ã„â€˜Ã¡Â»Æ’ ÃƒÂ©p mÃ¡ÂºÂ·c Ã„â€˜Ã¡Â»â€¹nh `UTF-8` vÃƒÂ  `LF`.
+- Khi sÃ¡Â»Â­a file cÃƒÂ³ tiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t, Ã†Â°u tiÃƒÂªn patch nhÃ¡Â»Â thay vÃƒÂ¬ rewrite cÃ¡ÂºÂ£ file.
+- KhÃƒÂ´ng dÃƒÂ¹ng cÃƒÂ¡ch ghi file dÃ¡Â»â€¦ lÃƒÂ m vÃ¡Â»Â¡ encoding nÃ¡ÂºÂ¿u chÃ†Â°a kiÃ¡Â»Æ’m soÃƒÂ¡t rÃƒÂµ Ã„â€˜Ã¡ÂºÂ§u ra.
+- KhÃƒÂ´ng kÃ¡ÂºÂ¿t luÃ¡ÂºÂ­n file hÃ¡Â»Âng chÃ¡Â»â€° vÃƒÂ¬ terminal Windows hiÃ¡Â»Æ’n thÃ¡Â»â€¹ sai dÃ¡ÂºÂ¥u; cÃ¡ÂºÂ§n Ã„â€˜Ã¡Â»â€˜i chiÃ¡ÂºÂ¿u thÃƒÂªm bÃ¡ÂºÂ±ng `git diff` hoÃ¡ÂºÂ·c UI thÃ¡Â»Â±c tÃ¡ÂºÂ¿.
+- Hai mÃƒÂ n admin dÃ¡Â»â€¦ lÃ¡Â»â„¢ lÃ¡Â»â€”i tiÃ¡ÂºÂ¿ng ViÃ¡Â»â€¡t ra UI lÃƒÂ :
   - `/store/verify`
   - `/store/reports`
 
@@ -165,7 +165,7 @@ Ban toi gian cho telesale su dung 6 cot tren `stores`:
 - `last_order_reported_at`
 - `sales_note`
 
-Màn telesale đang dùng route:
+MÃƒÂ n telesale Ã„â€˜ang dÃƒÂ¹ng route:
 
 - `/telesale/overview`
 - `/telesale/call/[id]`
@@ -173,3 +173,26 @@ Màn telesale đang dùng route:
 Script SQL cap nhat moi truong duoc luu tai:
 
 - `docs/sql/2026-04-01-add-store-telesale-columns.sql`
+
+---
+
+## Search UX Notes (2026-04)
+
+- Search hiá»‡n giá»¯ tráº¡ng thÃ¡i theo cáº£ URL vÃ  `sessionStorage`.
+- NgÆ°á»i dÃ¹ng Ä‘ang tÃ¬m dá»Ÿ, chuyá»ƒn sang trang khÃ¡c rá»“i báº¥m láº¡i tab `TÃ¬m kiáº¿m`, pháº£i quay vá» Ä‘Ãºng search trÆ°á»›c Ä‘Ã³.
+- CÃ¡c tiÃªu chÃ­ Ä‘ang Ä‘Æ°á»£c giá»¯ gá»“m:
+  - tá»« khÃ³a (`q`)
+  - quáº­n/huyá»‡n (`district`)
+  - xÃ£/phÆ°á»ng (`ward`)
+  - loáº¡i cá»­a hÃ ng (`types`)
+  - cÃ¡c cá» chi tiáº¿t dá»¯ liá»‡u (`flags`)
+- Khi thay Ä‘á»•i text hoáº·c filter trong lÃºc Ä‘ang cuá»™n sÃ¢u á»Ÿ danh sÃ¡ch, danh sÃ¡ch pháº£i tá»± trá»Ÿ vá» Ä‘áº§u Ä‘á»ƒ ngÆ°á»i dÃ¹ng nhÃ¬n tháº¥y káº¿t quáº£ má»›i ngay.
+
+## Vietnamese Copy Note
+
+- CÃ¡c thay Ä‘á»•i gáº§n Ä‘Ã¢y á»Ÿ search/navbar Ä‘Ã£ tá»«ng phÃ¡t sinh lá»—i tiáº¿ng Viá»‡t do ghi file sai encoding.
+- Vá»›i cÃ¡c file UI cÃ³ tiáº¿ng Viá»‡t hiá»ƒn thá»‹ trá»±c tiáº¿p nhÆ° `pages/index.js` vÃ  `components/navbar.jsx`, cáº§n giá»¯ UTF-8 khÃ´ng BOM vÃ  kiá»ƒm tra láº¡i text sau khi sá»­a.
+## Create Role Note
+
+- Khi `telesale` tạo cửa hàng mới ở `/store/create`, cửa hàng đó mặc định là `tiềm năng` (`is_potential = true`).
+- Rule này đi theo payload tạo store, nên áp dụng đồng nhất cho cả tạo đầy đủ vị trí và `Lưu luôn` không có vị trí.

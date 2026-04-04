@@ -38,7 +38,7 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
 
 export default function AddStore() {
   const router = useRouter()
-  const { isAdmin } = useAuth() || {}
+  const { isAdmin, isTelesale } = useAuth() || {}
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
   const nameInputRef = useRef(null)
@@ -754,6 +754,7 @@ export default function AddStore() {
         ward: normalizedWard,
         district: normalizedDistrict,
         active: isAdmin,
+        is_potential: Boolean(isTelesale),
         note,
         phone: validatedPhone || null,
         image_url: imageFilename,
