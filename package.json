@@ -9,7 +9,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "text:check": "node scripts/check-mojibake.js",
+    "text:check:staged": "node scripts/check-mojibake.js --staged",
+    "hooks:install": "node scripts/install-git-hooks.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",

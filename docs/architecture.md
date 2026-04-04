@@ -245,6 +245,12 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 - Source/docs có tiếng Việt phải được giữ ở `UTF-8`; repo dùng `.editorconfig` để giảm lỗi encoding giữa editor/tool khác nhau.
 - Khi sửa text tiếng Việt, ưu tiên patch cục bộ thay vì rewrite cả file.
+- Repo có thêm guardrail tự động:
+  - `scripts/check-mojibake.js`
+  - `npm run text:check`
+  - `npm run text:check:staged`
+  - `.githooks/pre-commit`
+  - `npm run hooks:install` để đặt `core.hooksPath = .githooks`
 - Các dialog xác nhận ở màn admin phải dùng đúng primitive accessibility của Radix:
   - `DialogTitle`
   - `DialogDescription`

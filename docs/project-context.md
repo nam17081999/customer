@@ -192,6 +192,11 @@ Script SQL cap nhat moi truong duoc luu tai:
 
 - Các thay đổi gần đây ở search/navbar đã từng phát sinh lỗi tiếng Việt do ghi file sai encoding.
 - Với các file UI có tiếng Việt hiển thị trực tiếp như `pages/index.js` và `components/navbar.jsx`, cần giữ UTF-8 không BOM và kiểm tra lại text sau khi sửa.
+- Repo có thêm:
+  - `npm run text:check` để quét mojibake trên toàn repo
+  - `npm run text:check:staged` để quét file staged trước khi commit
+  - `.githooks/pre-commit` để chặn commit chứa dấu hiệu lỗi mã hóa
+- Sau khi clone repo hoặc đổi Git config cục bộ, cần chạy lại `npm run hooks:install`.
 
 ## Create Role Note
 

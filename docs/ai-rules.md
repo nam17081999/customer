@@ -22,6 +22,9 @@ Quy tắc bắt buộc khi sinh code cho project StoreVis. Đọc file này trư
 - Ưu tiên `apply_patch` khi chỉ sửa một phần file có tiếng Việt.
 - Tránh rewrite cả file bằng PowerShell `Set-Content`, `Out-File`, hoặc pipeline text nếu chưa kiểm soát rõ encoding đầu ra.
 - Khi buộc phải tạo file mới, giữ literal tiếng Việt chuẩn trong source; không chấp nhận mojibake như `Ã`, `Ä`, `áº`, `á»`.
+- Trước khi commit, chạy `npm run text:check:staged`. Khi cần quét toàn repo, chạy `npm run text:check`.
+- Repo dùng hook `.githooks/pre-commit` để chặn commit nếu file staged còn dấu hiệu mojibake. Sau khi clone repo hoặc reset Git config cục bộ, chạy lại `npm run hooks:install`.
+- `docs/ai-rules.md` là ngoại lệ duy nhất có thể chứa ví dụ mojibake để minh họa rule cấm. Không dùng file này làm bằng chứng rằng repo còn lỗi encoding.
 - Sau khi sửa text tiếng Việt:
   1. kiểm tra lại `git diff`
   2. nếu là UI text, ưu tiên reload màn hình để xác nhận
