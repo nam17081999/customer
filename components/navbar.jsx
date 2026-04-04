@@ -55,19 +55,20 @@ export default function Navbar() {
   const { isAdmin, isTelesale } = useAuth() || {}
   const [pendingStores, setPendingStores] = useState(0)
   const [pendingReports, setPendingReports] = useState(0)
+  const [searchHref, setSearchHref] = useState('/')
   const currentPath = pathname || ''
-  const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : '\u004e\u0067\u01b0\u1eddi \u0064\u00f9\u006e\u0067'
+  const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : 'Người dùng'
   const accountMobileLabel = isAdmin ? 'Admin' : isTelesale ? 'Tele' : 'ND'
 
   const guestLinks = [
-    { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
+    { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
     { href: '/account', active: currentPath === '/account', label: accountLabel, mobileLabel: accountMobileLabel, Icon: AccountIcon },
   ]
 
   const telesaleLinks = [
-    { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
+    { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
     { href: '/telesale/overview', active: currentPath === '/telesale/overview', label: 'Telesale', mobileLabel: 'TS', Icon: DashboardIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
@@ -75,7 +76,7 @@ export default function Navbar() {
   ]
 
   const adminLinks = [
-    { href: '/', active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
+    { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
     { href: '/store/verify', active: currentPath === '/store/verify', label: 'Xác thực', mobileLabel: 'Duyệt', Icon: VerifyIcon, badge: pendingStores },
     { href: '/store/reports', active: currentPath === '/store/reports', label: 'Báo cáo', mobileLabel: 'BC', Icon: ReportIcon, badge: pendingReports },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
@@ -118,6 +119,33 @@ export default function Navbar() {
       alive = false
     }
   }, [isAdmin])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const syncSearchHref = (nextHref) => {
+      if (typeof nextHref === 'string' && nextHref.startsWith('/')) {
+        setSearchHref(nextHref)
+      }
+    }
+
+    const handleSearchRouteChanged = (event) => {
+      syncSearchHref(event?.detail?.href)
+    }
+
+    const handlePageShow = () => {
+      syncSearchHref(window.sessionStorage.getItem('storevis:last-search-route') || '/')
+    }
+
+    handlePageShow()
+    window.addEventListener('storevis:search-route-changed', handleSearchRouteChanged)
+    window.addEventListener('pageshow', handlePageShow)
+
+    return () => {
+      window.removeEventListener('storevis:search-route-changed', handleSearchRouteChanged)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [])
 
   const renderBadge = (count, opts = {}) => {
     if (!count || count <= 0) return null
