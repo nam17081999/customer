@@ -56,6 +56,9 @@ export default function EditStore() {
   const [active, setActive] = useState(false)
   const [pickedLat, setPickedLat] = useState(null)
   const [pickedLng, setPickedLng] = useState(null)
+  const [initialGPSLat, setInitialGPSLat] = useState(null)
+  const [initialGPSLng, setInitialGPSLng] = useState(null)
+  const [userHasEditedMap, setUserHasEditedMap] = useState(false)
   const [mapEditable, setMapEditable] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
 
@@ -125,6 +128,9 @@ export default function EditStore() {
       setActive(Boolean(data.active))
       setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
       setPickedLng(typeof data.longitude === 'number' ? data.longitude : null)
+      setInitialGPSLat(null)
+      setInitialGPSLng(null)
+      setUserHasEditedMap(false)
       setCurrentStep(1)
       setShowSuccess(false)
       setSuccessMode('')
@@ -133,6 +139,14 @@ export default function EditStore() {
     }
     fetchStore()
   }, [router.isReady, id, pageReady])
+
+  const handleLocationChange = useCallback((lat, lng) => {
+    setPickedLat(lat)
+    setPickedLng(lng)
+    if (mapEditable) {
+      setUserHasEditedMap(true)
+    }
+  }, [mapEditable])
 
   const handleGetLocation = useCallback(async () => {
     try {
@@ -146,8 +160,11 @@ export default function EditStore() {
         showMessage('error', getGeoErrorMessage(error))
         return
       }
+      setInitialGPSLat(coords.latitude)
+      setInitialGPSLng(coords.longitude)
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
+      setUserHasEditedMap(false)
       showMessage('success', 'Đã cập nhật vị trí GPS mới!')
     } catch (err) {
       console.error('Get location error:', err)
@@ -237,8 +254,11 @@ export default function EditStore() {
 
     let coords = extractCoordsFromUrl(trimmed)
     if (coords) {
+      setInitialGPSLat(coords.lat)
+      setInitialGPSLng(coords.lng)
       setPickedLat(coords.lat)
       setPickedLng(coords.lng)
+      setUserHasEditedMap(true)
       showMessage('success', `Đã lấy vị trí: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
       return
     }
@@ -260,8 +280,11 @@ export default function EditStore() {
       if (!data.success || !data.finalUrl) { setMapsLinkError('Không mở được link'); return }
       coords = extractCoordsFromUrl(data.finalUrl)
       if (coords) {
+        setInitialGPSLat(coords.lat)
+        setInitialGPSLng(coords.lng)
         setPickedLat(coords.lat)
         setPickedLng(coords.lng)
+        setUserHasEditedMap(true)
         showMessage('success', `Đã lấy vị trí: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
       } else {
         setMapsLinkError('Không tìm thấy tọa độ từ link')
@@ -271,6 +294,19 @@ export default function EditStore() {
     } finally {
       setMapsLinkLoading(false)
     }
+  }
+
+  function getFinalCoordinates() {
+    if (userHasEditedMap && pickedLat != null && pickedLng != null) {
+      return { latitude: pickedLat, longitude: pickedLng }
+    }
+    if (initialGPSLat != null && initialGPSLng != null) {
+      return { latitude: initialGPSLat, longitude: initialGPSLng }
+    }
+    if (pickedLat != null && pickedLng != null) {
+      return { latitude: pickedLat, longitude: pickedLng }
+    }
+    return { latitude: null, longitude: null }
   }
 
   function buildDuplicatePhoneMessage(matches) {
@@ -348,9 +384,12 @@ export default function EditStore() {
         const normalizedNote = note.trim()
         if (normalizedNote) updates.note = normalizedNote
       }
-      if (!supplementLocks.location && Number.isFinite(pickedLat) && Number.isFinite(pickedLng)) {
-        updates.latitude = pickedLat
-        updates.longitude = pickedLng
+      if (!supplementLocks.location) {
+        const finalCoords = getFinalCoordinates()
+        if (Number.isFinite(finalCoords.latitude) && Number.isFinite(finalCoords.longitude)) {
+          updates.latitude = finalCoords.latitude
+          updates.longitude = finalCoords.longitude
+        }
       }
 
       if (imageFile && !supplementLocks.image) {
@@ -461,6 +500,7 @@ export default function EditStore() {
         if (ikData.name) newImageUrl = ikData.name
       }
 
+      const finalCoords = getFinalCoordinates()
       const updates = {
         name: toTitleCaseVI(name.trim()),
         store_type: storeType || DEFAULT_STORE_TYPE,
@@ -470,8 +510,8 @@ export default function EditStore() {
         phone: validatedPhone || null,
         note: note.trim() || null,
         active,
-        latitude: pickedLat,
-        longitude: pickedLng,
+        latitude: finalCoords.latitude,
+        longitude: finalCoords.longitude,
         image_url: newImageUrl,
       }
 
@@ -585,7 +625,7 @@ export default function EditStore() {
         pickedLng={pickedLng}
         locationSectionOpen={supplementLocationOpen}
         openLocationSection={() => setSupplementLocationOpen(true)}
-        onLocationChange={(lat, lng) => { setPickedLat(lat); setPickedLng(lng) }}
+        onLocationChange={handleLocationChange}
         mapEditable={mapEditable}
         setMapEditable={setMapEditable}
         resolvingAddr={resolvingAddr}
@@ -828,7 +868,7 @@ export default function EditStore() {
               initialLng={pickedLng}
               editable={mapEditable}
               onToggleEditable={() => setMapEditable((v) => !v)}
-              onChange={(lat, lng) => { setPickedLat(lat); setPickedLng(lng) }}
+              onChange={handleLocationChange}
               onGetLocation={handleGetLocation}
               resolvingAddr={resolvingAddr}
               dark={false}

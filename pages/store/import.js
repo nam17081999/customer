@@ -278,6 +278,18 @@ function getRowStatusVariant(status) {
   return 'border-red-900/70 bg-red-950/20 text-red-200'
 }
 
+function getRowStatusLabel(status) {
+  if (status === 'ready') return 'Sẵn sàng nhập'
+  if (status === 'duplicate') return 'Cần xử lý'
+  return 'Lỗi dữ liệu'
+}
+
+function getRowContainerVariant(status) {
+  if (status === 'ready') return 'border-green-900/40 bg-green-950/10'
+  if (status === 'duplicate') return 'border-amber-900/40 bg-amber-950/10'
+  return 'border-red-900/40 bg-red-950/10'
+}
+
 function canResolveSystemDuplicate(row) {
   return (
     row.errors.length === 0
@@ -391,6 +403,7 @@ export default function StoreImportPage() {
   const [parsing, setParsing] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState('')
+  const [hideReadyRows, setHideReadyRows] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -686,7 +699,10 @@ export default function StoreImportPage() {
         }
         const { data, error } = await supabase
           .from('stores')
-          .update(patch)
+          .update({
+            ...patch,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', row.selectedDuplicateId)
           .select()
           .single()
@@ -736,6 +752,12 @@ export default function StoreImportPage() {
       setImporting(false)
     }
   }, [existingStores, importing, previewRows])
+
+  const visiblePreviewRows = useMemo(() => (
+    hideReadyRows
+      ? previewRows.filter((row) => row.status !== 'ready')
+      : previewRows
+  ), [hideReadyRows, previewRows])
 
   if (authLoading || !pageReady) {
     return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
@@ -844,160 +866,205 @@ export default function StoreImportPage() {
                       <p className="text-sm text-gray-400">
                         Mỗi dòng được kiểm tra lỗi dữ liệu, trùng y hệt trong file và cửa hàng có thể trùng trong hệ thống cùng quận / huyện.
                       </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Đang hiển thị {visiblePreviewRows.length} / {previewRows.length} dòng
+                      </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={handleImport}
-                      disabled={importing || summary.ready === 0}
-                    >
-                      {importing ? 'Đang nhập dữ liệu...' : `Nhập ${summary.ready} dòng hợp lệ`}
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setHideReadyRows((prev) => !prev)}
+                        disabled={previewRows.length === 0}
+                      >
+                        {hideReadyRows ? 'Hiện tất cả dòng' : 'Chỉ xem cần xử lý'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        onClick={handleImport}
+                        disabled={importing || summary.ready === 0}
+                      >
+                        {importing ? 'Đang nhập dữ liệu...' : `Nhập ${summary.ready} dòng hợp lệ`}
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
-                    {previewRows.map((row) => (
-                      <div key={`preview-row-${row.rowNumber}`} className="rounded-xl border border-gray-800 bg-black/40 p-3">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-sm text-gray-400">Dòng {row.rowNumber}</p>
-                            <h3 className="text-base font-semibold text-gray-100 break-words">
-                              {row.name || 'Chưa có tên cửa hàng'}
-                            </h3>
-                            <p className="mt-1 text-sm text-gray-400 break-words">
-                              {buildRowAddress(row) || 'Chưa có địa chỉ'}
-                            </p>
-                          </div>
-                          <span className={`inline-flex self-start rounded-full px-2.5 py-1 text-xs font-medium ${getRowStatusVariant(row.status)}`}>
-                            {row.status === 'ready' ? 'Sẵn sàng nhập' : row.status === 'duplicate' ? 'Nghi trùng' : 'Lỗi dữ liệu'}
-                          </span>
-                        </div>
+                    {visiblePreviewRows.map((row) => {
+                      const selectedDuplicate = row.duplicateMatches.find((match) => match.id === row.selectedDuplicateId)
 
-                        <div className="mt-3 grid gap-2 text-sm text-gray-300 sm:grid-cols-2">
-                          <div>
-                            <span className="text-gray-500">Loại:</span> {row.storeTypeLabel || 'Không rõ'}
+                      return (
+                        <div
+                          key={`preview-row-${row.rowNumber}`}
+                          className={`rounded-xl border p-3 ${getRowContainerVariant(row.status)}`}
+                        >
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex rounded-full border border-gray-800 bg-black/40 px-2 py-0.5 text-xs font-medium text-gray-300">
+                                  Dòng {row.rowNumber}
+                                </span>
+                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getRowStatusVariant(row.status)}`}>
+                                  {getRowStatusLabel(row.status)}
+                                </span>
+                              </div>
+                              <h3 className="mt-2 text-base font-semibold text-gray-100 break-words">
+                                {row.name || 'Chưa có tên cửa hàng'}
+                              </h3>
+                              <p className="mt-1 text-sm text-gray-400 break-words">
+                                {buildRowAddress(row) || 'Chưa có địa chỉ'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <span className="text-gray-500">Số điện thoại:</span> {row.phone || 'Không có'}
+
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
+                            <span className="inline-flex items-center rounded-full border border-gray-800 bg-black/40 px-2.5 py-1 text-gray-300">
+                              Loại: {row.storeTypeLabel || 'Không rõ'}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-gray-800 bg-black/40 px-2.5 py-1 text-gray-300">
+                              {row.phone ? `SĐT: ${row.phone}` : 'Không có số điện thoại'}
+                            </span>
+                            <span className="inline-flex items-center rounded-full border border-gray-800 bg-black/40 px-2.5 py-1 text-gray-300">
+                              {row.hasCoordinates ? 'Đã có vị trí' : 'Không có vị trí'}
+                            </span>
+                            {row.note && (
+                              <span className="inline-flex items-center rounded-full border border-gray-800 bg-black/40 px-2.5 py-1 text-gray-300">
+                                Có ghi chú
+                              </span>
+                            )}
                           </div>
-                          <div>
-                            <span className="text-gray-500">Vị trí:</span> {row.hasCoordinates ? `${row.latitude.toFixed(6)}, ${row.longitude.toFixed(6)}` : 'Không có vị trí'}
-                          </div>
-                          {row.note && (
-                            <div className="sm:col-span-2">
-                              <span className="text-gray-500">Ghi chú:</span> {row.note}
+
+                          {row.issues.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {row.issues.map((issue) => (
+                                <div
+                                  key={`${row.rowNumber}-${issue}`}
+                                  className={`rounded-lg border px-3 py-2 text-sm ${row.status === 'error' ? 'border-red-900/70 bg-red-950/20 text-red-200' : 'border-amber-900/70 bg-amber-950/20 text-amber-200'}`}
+                                >
+                                  {issue}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {row.duplicateMatches.length > 0 && (
+                            <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/70 p-3">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-100">Xử lý cửa hàng nghi trùng</p>
+                                  <p className="mt-1 text-xs text-gray-400">
+                                    Bước 1: chọn đúng cửa hàng trong hệ thống. Bước 2: chọn ưu tiên dữ liệu cũ hay dữ liệu mới.
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-9 px-3 text-sm"
+                                    onClick={() => handleToggleDuplicateList(row.rowNumber)}
+                                  >
+                                    {row.duplicateListExpanded ? 'Ẩn danh sách trùng' : `Chọn trong ${row.duplicateMatches.length} cửa hàng`}
+                                  </Button>
+                                  {canResolveSystemDuplicate(row) && (
+                                    <Button
+                                      type="button"
+                                      variant={row.resolutionMode === 'create' ? 'primary' : 'outline'}
+                                      className="h-9 px-3 text-sm"
+                                      onClick={() => handleSetDuplicateResolution(row.rowNumber, 'create')}
+                                    >
+                                      {row.resolutionMode === 'create' ? 'Đang chọn tạo mới' : 'Tạo mới'}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {row.resolutionMode === 'create' && canResolveSystemDuplicate(row) && (
+                                <div className="mt-3 rounded-lg border border-green-900/70 bg-green-950/20 px-3 py-2 text-sm text-green-200">
+                                  Dòng này sẽ được tạo mới dù đang có cửa hàng nghi trùng trong hệ thống.
+                                </div>
+                              )}
+
+                              {row.duplicateListExpanded && (
+                                <div className="mt-3 space-y-2">
+                                  {row.duplicateMatches.map((match) => (
+                                    <div key={`${row.rowNumber}-match-${match.id}`} className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2">
+                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="min-w-0">
+                                          <div className="text-sm font-medium text-gray-100 break-words">
+                                            {match.name || 'Cửa hàng'}
+                                          </div>
+                                          <div className="mt-1 text-xs text-gray-400 break-words">
+                                            {formatAddressParts(match) || 'Chưa có địa chỉ'}
+                                          </div>
+                                          <div className="mt-1 text-xs text-gray-500">
+                                            {typeof match.distance === 'number'
+                                              ? formatDistance(match.distance)
+                                              : (match.hasCoordinates ? 'Đã có vị trí' : 'Không có vị trí')}
+                                          </div>
+                                        </div>
+                                        {canResolveSystemDuplicate(row) && (
+                                          <Button
+                                            type="button"
+                                            variant={row.selectedDuplicateId === match.id ? 'primary' : 'outline'}
+                                            className="h-8 px-3 text-sm"
+                                            onClick={() => handleChooseDuplicateTarget(row.rowNumber, match.id)}
+                                          >
+                                            {row.selectedDuplicateId === match.id ? 'Đã chọn' : 'Chọn cửa hàng này'}
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {selectedDuplicate && row.resolutionMode !== 'create' && (
+                                <div className="mt-3 rounded-lg border border-sky-900/70 bg-sky-950/20 px-3 py-2">
+                                  <p className="text-sm font-medium text-sky-100">Đã chọn đối chiếu với: {selectedDuplicate.name}</p>
+                                  <p className="mt-1 text-xs text-sky-200/90">
+                                    Field chỉ có ở một bên sẽ luôn được giữ lại. Với field có ở cả hai bên, chọn cách ưu tiên bên dưới.
+                                  </p>
+                                </div>
+                              )}
+
+                              {row.selectedDuplicateId != null && canResolveSystemDuplicate(row) && row.resolutionMode !== 'create' && (
+                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetDuplicateResolution(row.rowNumber, 'keep-existing')}
+                                    className={`rounded-lg border px-3 py-3 text-left transition ${
+                                      row.resolutionMode === 'keep-existing'
+                                        ? 'border-blue-500 bg-blue-500/15 text-blue-100'
+                                        : 'border-gray-700 bg-black/40 text-gray-300 hover:bg-gray-900'
+                                    }`}
+                                  >
+                                    <div className="text-sm font-semibold">Giữ dữ liệu cũ</div>
+                                    <div className="mt-1 text-xs text-gray-400">
+                                      Chỉ lấy thêm các field đang thiếu trong hệ thống.
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetDuplicateResolution(row.rowNumber, 'prefer-import')}
+                                    className={`rounded-lg border px-3 py-3 text-left transition ${
+                                      row.resolutionMode === 'prefer-import'
+                                        ? 'border-blue-500 bg-blue-500/15 text-blue-100'
+                                        : 'border-gray-700 bg-black/40 text-gray-300 hover:bg-gray-900'
+                                    }`}
+                                  >
+                                    <div className="text-sm font-semibold">Lấy dữ liệu mới</div>
+                                    <div className="mt-1 text-xs text-gray-400">
+                                      Giữ lại field thiếu và ưu tiên dữ liệu từ file khi có xung đột.
+                                    </div>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-
-                        {row.issues.length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            {row.issues.map((issue) => (
-                              <div
-                                key={`${row.rowNumber}-${issue}`}
-                                className={`rounded-lg border px-3 py-2 text-sm ${row.status === 'error' ? 'border-red-900/70 bg-red-950/20 text-red-200' : 'border-amber-900/70 bg-amber-950/20 text-amber-200'}`}
-                              >
-                                {issue}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {row.duplicateMatches.length > 0 && (
-                          <div className="mt-3 rounded-lg border border-gray-800 bg-gray-950/70 p-3">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-gray-200">Các cửa hàng có thể trùng trong hệ thống</p>
-                                <p className="mt-1 text-xs text-gray-400">
-                                  Chỉ đối chiếu trong cùng quận / huyện. Hãy chọn một cửa hàng phù hợp trước, sau đó mới quyết định giữ dữ liệu cũ hay lấy dữ liệu mới.
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-9 px-3 text-sm"
-                                  onClick={() => handleToggleDuplicateList(row.rowNumber)}
-                                >
-                                  {row.duplicateListExpanded ? 'Thu gọn' : `Xem ${row.duplicateMatches.length} cửa hàng`}
-                                </Button>
-                                {canResolveSystemDuplicate(row) && (
-                                  <Button
-                                    type="button"
-                                    variant={row.resolutionMode === 'create' ? 'primary' : 'outline'}
-                                    className="h-9 px-3 text-sm"
-                                    onClick={() => handleSetDuplicateResolution(row.rowNumber, 'create')}
-                                  >
-                                    {row.resolutionMode === 'create' ? 'Bỏ tạo mới' : 'Tạo mới'}
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            {row.resolutionMode === 'create' && canResolveSystemDuplicate(row) && (
-                              <div className="mt-3 rounded-lg border border-green-900/70 bg-green-950/20 px-3 py-2 text-sm text-green-200">
-                                Dòng này sẽ được tạo mới dù đang có cửa hàng nghi trùng trong hệ thống.
-                              </div>
-                            )}
-                            {row.selectedDuplicateId != null && row.resolutionMode !== 'create' && (
-                              <div className="mt-3 rounded-lg border border-sky-900/70 bg-sky-950/20 px-3 py-2 text-sm text-sky-200">
-                                Dữ liệu ở hai bên sẽ được giữ lại nếu chỉ một bên có. Với các trường cùng có dữ liệu, bạn cần chọn giữ dữ liệu cũ hoặc lấy dữ liệu mới.
-                              </div>
-                            )}
-                            {row.duplicateListExpanded && (
-                              <div className="mt-3 space-y-2">
-                                {row.duplicateMatches.map((match) => (
-                                  <div key={`${row.rowNumber}-match-${match.id}`} className="rounded-lg border border-gray-800 bg-black/40 px-3 py-2 text-sm text-gray-300">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                      <div>
-                                        <span className="font-medium text-gray-100">{match.name || 'Cửa hàng'}</span>
-                                        <div className="mt-1 text-xs text-gray-400">
-                                          {typeof match.distance === 'number'
-                                            ? formatDistance(match.distance)
-                                            : (match.hasCoordinates ? 'Đã có vị trí' : 'Không có vị trí')}
-                                        </div>
-                                      </div>
-                                      {canResolveSystemDuplicate(row) && (
-                                        <Button
-                                          type="button"
-                                          variant={row.selectedDuplicateId === match.id ? 'primary' : 'outline'}
-                                          className="h-8 px-3 text-sm"
-                                          onClick={() => handleChooseDuplicateTarget(row.rowNumber, match.id)}
-                                        >
-                                          {row.selectedDuplicateId === match.id ? 'Đã chọn' : 'Chọn cửa hàng này'}
-                                        </Button>
-                                      )}
-                                    </div>
-                                    <div className="mt-1 text-xs text-gray-400">
-                                      {formatAddressParts(match) || 'Chưa có địa chỉ'}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {row.selectedDuplicateId != null && canResolveSystemDuplicate(row) && row.resolutionMode !== 'create' && (
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  variant={row.resolutionMode === 'keep-existing' ? 'primary' : 'outline'}
-                                  className="h-9 px-3 text-sm"
-                                  onClick={() => handleSetDuplicateResolution(row.rowNumber, 'keep-existing')}
-                                >
-                                  Giữ dữ liệu cũ
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant={row.resolutionMode === 'prefer-import' ? 'primary' : 'outline'}
-                                  className="h-9 px-3 text-sm"
-                                  onClick={() => handleSetDuplicateResolution(row.rowNumber, 'prefer-import')}
-                                >
-                                  Lấy dữ liệu mới
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
