@@ -164,7 +164,7 @@ export default function Navbar() {
       <nav className="sticky top-0 z-50 hidden border-b border-white/10 bg-slate-950/82 backdrop-blur-xl sm:block">
         <div className="mx-auto flex h-12 w-full max-w-screen-md items-center gap-1.5 px-3 sm:px-4">
           <Link href="/" className="flex shrink-0 items-center text-sm font-semibold uppercase tracking-[0.1em] text-slate-100">
-            <span>StoreVis</span>
+            <span>NPP Hà Công</span>
           </Link>
 
           <div className="ml-auto hidden items-center gap-1 sm:flex">

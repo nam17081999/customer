@@ -1,5 +1,5 @@
 /**
- * Service Worker for StoreVis PWA
+ * Service Worker for NPP Hà Công PWA
  *
  * Strategy:
  *   - App shell (HTML/JS/CSS): Cache-first with network fallback

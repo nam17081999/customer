@@ -141,7 +141,7 @@ export default function OverviewPage() {
   return (
     <>
       <Head>
-        <title>Tổng quan - StoreVis</title>
+        <title>Tổng quan - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

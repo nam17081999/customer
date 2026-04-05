@@ -1,4 +1,4 @@
--- StoreVis PRD migration
+-- NPP Hà Công PRD migration
 -- Add minimal telesale fields directly on public.stores
 
 alter table public.stores

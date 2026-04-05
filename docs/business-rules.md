@@ -1,4 +1,4 @@
-# 📋 Quy Tắc Nghiệp Vụ - StoreVis
+# 📋 Quy Tắc Nghiệp Vụ - NPP Hà Công
 
 ## 1. Trạng Thái Cửa Hàng
 

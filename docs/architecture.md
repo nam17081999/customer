@@ -1,8 +1,8 @@
-# 🏗️ Kiến Trúc Hệ Thống - StoreVis
+# 🏗️ Kiến Trúc Hệ Thống - NPP Hà Công
 
 ## Tổng Quan
 
-**StoreVis** là ứng dụng web quản lý và tra cứu cửa hàng tại Hà Nội. Ba nhóm người dùng:
+**NPP Hà Công** là ứng dụng web quản lý và tra cứu cửa hàng tại Hà Nội. Ba nhóm người dùng:
 - **User thường** (anonymous): tìm kiếm, xem bản đồ, thêm cửa hàng chờ duyệt, báo cáo/bổ sung dữ liệu
 - **Telesale** (đã đăng nhập): theo dõi danh sách cần gọi, cập nhật kết quả gọi
 - **Admin** (đã đăng nhập): làm toàn bộ việc của telesale và quản trị dữ liệu

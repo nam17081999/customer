@@ -752,7 +752,7 @@ export default function StoreImportPage() {
   return (
     <>
       <Head>
-        <title>Nhập dữ liệu - StoreVis</title>
+        <title>Nhập dữ liệu - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

@@ -300,22 +300,22 @@ export function StoreExportScreen({ mode = 'all' }) {
   const exportStoresToExcel = async () => {
     const csv = buildStoreCsv(stores)
     const stamp = new Date().toISOString().slice(0, 10)
-    await exportTextFile(`storevis-stores-${stamp}.csv`, csv, 'text/csv;charset=utf-8;')
+    await exportTextFile(`npp-ha-cong-stores-${stamp}.csv`, csv, 'text/csv;charset=utf-8;')
   }
 
   const exportContacts = async () => {
     const vcf = buildContactsVcf(storesWithPhone)
     const stamp = new Date().toISOString().slice(0, 10)
-    await exportTextFile(`storevis-contacts-${stamp}.vcf`, vcf, 'text/vcard;charset=utf-8;')
+    await exportTextFile(`npp-ha-cong-contacts-${stamp}.vcf`, vcf, 'text/vcard;charset=utf-8;')
   }
 
   const isDataOnly = mode === 'data'
   const isContactsOnly = mode === 'contacts'
   const pageTitle = isDataOnly
-    ? 'Xuất dữ liệu - StoreVis'
+    ? 'Xuất dữ liệu - NPP Hà Công'
     : isContactsOnly
-      ? 'Xuất danh bạ - StoreVis'
-      : 'Xuất dữ liệu - StoreVis'
+      ? 'Xuất danh bạ - NPP Hà Công'
+      : 'Xuất dữ liệu - NPP Hà Công'
 
   if (authLoading || !pageReady) {
     return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />

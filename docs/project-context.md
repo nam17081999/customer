@@ -1,8 +1,8 @@
-# 🗺️ Project Context - StoreVis
+# 🗺️ Project Context - NPP Hà Công
 
 ## Đây là gì?
 
-**StoreVis** là ứng dụng web tra cứu và quản lý danh sách **cửa hàng** (tạp hóa, quán nước, quán ăn, v.v.) tại một số huyện ngoại thành Hà Nội.
+**NPP Hà Công** là ứng dụng web tra cứu và quản lý danh sách **cửa hàng** (tạp hóa, quán nước, quán ăn, v.v.) tại một số huyện ngoại thành Hà Nội.
 
 **Mục tiêu chính:**
 - Giúp người dùng tìm kiếm cửa hàng theo tên, quận, xã, loại và mức độ đầy đủ dữ liệu
@@ -17,7 +17,7 @@
 
 ## Tên Hệ Thống
 
-- **App name**: StoreVis
+- **App name**: NPP Hà Công
 - **Database table**: `stores`, `store_reports`
 - **IDB cache name**: `storevis_cache`
 

@@ -1,8 +1,8 @@
-# StoreVis Skill Pack
+# NPP Hà Công Skill Pack
 
-Bo skill noi bo cho StoreVis gom 2 phan:
+Bo skill noi bo cho NPP Hà Công gom 2 phan:
 
-- `storevis-project-execution.SKILL.md`: Luat code va guardrails theo dung architecture/business/design/database cua StoreVis.
+- `storevis-project-execution.SKILL.md`: Luat code va guardrails theo dung architecture/business/design/database cua NPP Hà Công.
 - `storevis-ai-collaboration.SKILL.md`: Khung cong tac voi AI de giao viec ro, bao cao ro, verify ro.
 
 ## Cach dung khuyen nghi

@@ -12,7 +12,7 @@ export default function App({ Component, pageProps }) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
-        <title>StoreVis - Quản lý cửa hàng</title>
+        <title>NPP Hà Công - Quản lý cửa hàng</title>
         <meta name="description" content="Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales" />
         <meta name="theme-color" content="#000000" />
         <link rel="manifest" href="/manifest.json" />

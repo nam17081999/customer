@@ -35,7 +35,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <Head><title>Đăng nhập - StoreVis</title></Head>
+      <Head><title>Đăng nhập - NPP Hà Công</title></Head>
       <div className="min-h-[80vh] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center">

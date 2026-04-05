@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "StoreVis - Quản lý cửa hàng",
+  title: "NPP Hà Công - Quản lý cửa hàng",
   description: "Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales",
 };
 
