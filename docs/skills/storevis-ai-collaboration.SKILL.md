@@ -1,9 +1,9 @@
 ---
 name: storevis-ai-collaboration
-description: Dùng để chuẩn hóa cách AI trao đổi, phân rã task, báo cáo tiến độ, kiểm chứng, và ra quyết định nhanh khi phát triển StoreVis.
+description: Dùng để chuẩn hóa cách AI trao đổi, phân rã task, báo cáo tiến độ, kiểm chứng, và ra quyết định nhanh khi phát triển NPP Hà Công.
 ---
 
-# StoreVis AI Collaboration
+# NPP Hà Công AI Collaboration
 
 Skill này tập trung vào cách AI làm việc với bạn để tăng tốc, giảm vòng lặp, và giữ tính nhất quán.
 

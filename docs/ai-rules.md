@@ -1,6 +1,6 @@
-# 🤖 AI Coding Rules - StoreVis
+# 🤖 AI Coding Rules - NPP Hà Công
 
-Quy tắc bắt buộc khi sinh code cho project StoreVis. Đọc file này trước khi code.
+Quy tắc bắt buộc khi sinh code cho project NPP Hà Công. Đọc file này trước khi code.
 
 ---
 

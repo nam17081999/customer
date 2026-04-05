@@ -1,15 +1,15 @@
 ---
 name: storevis-project-execution
-description: Dùng khi build/fix/refactor StoreVis để bám đúng kiến trúc, business rules, cache flow, map flow, image flow, và accessibility.
+description: Dùng khi build/fix/refactor NPP Hà Công để bám đúng kiến trúc, business rules, cache flow, map flow, image flow, và accessibility.
 ---
 
-# StoreVis Project Execution
+# NPP Hà Công Project Execution
 
 Skill này dùng để AI làm việc đúng “luật dự án”, giảm lỗi ngầm và tránh sửa sai flow nghiệp vụ.
 
 ## Khi nào dùng
 
-- Thêm tính năng mới cho StoreVis.
+- Thêm tính năng mới cho NPP Hà Công.
 - Sửa bug ở search, create/edit store, map, verify/reports.
 - Refactor nhỏ và vừa trong codebase hiện tại.
 
@@ -52,7 +52,7 @@ Skill này dùng để AI làm việc đúng “luật dự án”, giảm lỗi
 5. Verify theo đúng flow bị tác động.
 6. Báo cáo kết quả theo output contract.
 
-## Guardrails theo domain StoreVis
+## Guardrails theo domain NPP Hà Công
 
 - Search:
 - Giữ hỗ trợ tiếng Việt có dấu/không dấu.

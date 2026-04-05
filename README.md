@@ -1,4 +1,4 @@
-# StoreVis - Ứng dụng Quản lý Cửa hàng
+# NPP Hà Công - Ứng dụng Quản lý Cửa hàng
 
 > Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales/kinh doanh
 

@@ -1,4 +1,4 @@
-# 🎨 Design System - StoreVis
+# 🎨 Design System - NPP Hà Công
 
 ## Nguyên Tắc Ưu Tiên
 

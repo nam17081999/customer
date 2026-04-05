@@ -1,4 +1,4 @@
-# 🗄️ Database & Cache - StoreVis
+# 🗄️ Database & Cache - NPP Hà Công
 
 ## Supabase (PostgreSQL)
 
@@ -128,7 +128,7 @@ last_order_reported_at, sales_note
 
 ## Telesale Minimal Fields
 
-StoreVis ban toi gian cho telesale them truc tiep 6 cot tren `public.stores`:
+NPP Hà Công ban toi gian cho telesale them truc tiep 6 cot tren `public.stores`:
 
 ```sql
 is_potential boolean not null default false

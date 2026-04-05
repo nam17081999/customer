@@ -38,7 +38,7 @@ export default function AccountPage() {
   return (
     <>
       <Head>
-        <title>Tài khoản - StoreVis</title>
+        <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

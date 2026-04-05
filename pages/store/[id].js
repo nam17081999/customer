@@ -93,7 +93,7 @@ export default function StoreDetailPage() {
   return (
     <>
       <Head>
-        <title>{store ? `${store.name} - StoreVis` : 'Chi tiết cửa hàng - StoreVis'}</title>
+        <title>{store ? `${store.name} - NPP Hà Công` : 'Chi tiết cửa hàng - NPP Hà Công'}</title>
       </Head>
 
       <div className="min-h-[calc(100dvh-3.5rem)] bg-black px-3 py-4 sm:px-4 sm:py-6">

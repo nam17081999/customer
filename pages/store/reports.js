@@ -244,7 +244,7 @@ export default function StoreReportsPage() {
   return (
     <>
       <Head>
-        <title>Báo cáo cửa hàng - StoreVis</title>
+        <title>Báo cáo cửa hàng - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

@@ -1,10 +1,10 @@
-# StoreVis Agents Guide
+# NPP Hà Công Agents Guide
 
 This file defines how AI agents should work in this repository.
 
 ## 1. Mission
 
-Build and maintain StoreVis safely, with high correctness for:
+Build and maintain NPP Hà Công safely, with high correctness for:
 - Store search (Vietnamese-friendly matching)
 - Store create/edit/report/verify flows
 - Map and geolocation behavior

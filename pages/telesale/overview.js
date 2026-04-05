@@ -240,7 +240,7 @@ export default function TelesaleOverviewPage() {
   return (
     <>
       <Head>
-        <title>Telesale - StoreVis</title>
+        <title>Telesale - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

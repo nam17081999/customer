@@ -211,7 +211,7 @@ export default function VerifyStorePage() {
   return (
     <>
       <Head>
-        <title>Xác thực cửa hàng - StoreVis</title>
+        <title>Xác thực cửa hàng - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black">

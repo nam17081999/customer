@@ -167,7 +167,7 @@ export default function TelesaleCallResultPage() {
   return (
     <>
       <Head>
-        <title>Kết quả gọi lên đơn - StoreVis</title>
+        <title>Kết quả gọi lên đơn - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-screen bg-black px-3 py-4 sm:px-4 sm:py-6">

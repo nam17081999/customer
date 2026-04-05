@@ -1,4 +1,4 @@
--- StoreVis cache versioning migration
+-- NPP Hà Công cache versioning migration
 -- Goal: avoid full-store refetch on every check while keeping cache freshness.
 
 create table if not exists public.store_cache_versions (

@@ -84,7 +84,7 @@ export default function StoreReportPage() {
   return (
     <>
       <Head>
-        <title>Báo cáo cửa hàng - StoreVis</title>
+        <title>Báo cáo cửa hàng - NPP Hà Công</title>
       </Head>
 
       <div className="min-h-[calc(100dvh-3.5rem)] bg-black px-3 py-4 sm:px-4 sm:py-6">

@@ -1,6 +1,6 @@
 {
-  "name": "StoreVis - Quản lý cửa hàng",
-  "short_name": "StoreVis",
+  "name": "NPP Hà Công - Quản lý cửa hàng",
+  "short_name": "NPP Hà Công",
   "description": "Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales",
   "start_url": "/",
   "display": "standalone",
