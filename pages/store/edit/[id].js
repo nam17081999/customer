@@ -53,6 +53,7 @@ export default function EditStore() {
   const [ward, setWard] = useState('')
   const [district, setDistrict] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneSecondary, setPhoneSecondary] = useState('')
   const [note, setNote] = useState('')
   const [active, setActive] = useState(false)
   const [pickedLat, setPickedLat] = useState(null)
@@ -137,6 +138,7 @@ export default function EditStore() {
       setWard(data.ward || '')
       setDistrict(data.district || '')
       setPhone(data.phone || '')
+      setPhoneSecondary(data.phone_secondary || '')
       setNote(data.note || '')
       setActive(Boolean(data.active))
       setPickedLat(typeof data.latitude === 'number' ? data.latitude : null)
@@ -209,6 +211,7 @@ export default function EditStore() {
     ward: Boolean(String(store?.ward || '').trim()),
     district: Boolean(String(store?.district || '').trim()),
     phone: Boolean(String(store?.phone || '').trim()),
+    phoneSecondary: Boolean(String(store?.phone_secondary || '').trim()),
     note: Boolean(String(store?.note || '').trim()),
     location: originalHasCoordinates,
   }), [store, originalHasCoordinates])
@@ -311,40 +314,85 @@ export default function EditStore() {
     return { latitude: null, longitude: null }
   }
 
-  function buildDuplicatePhoneMessage(matches) {
+  function buildDuplicatePhoneMessage(matches, label = 'Số điện thoại') {
     const labels = matches.slice(0, 3).map((entry) => entry.name || 'Cửa hàng')
-    return `Số điện thoại đã tồn tại ở ${labels.join('; ')}`
+    return `${label} đã tồn tại ở ${labels.join('; ')}`
   }
 
-  async function validateCurrentPhone({ skipWhenLocked = false } = {}) {
-    if (skipWhenLocked && supplementLocks.phone) {
-      return { normalizedPhone: store?.phone || '', error: '' }
+  async function validateCurrentPhones({ skipWhenLocked = false } = {}) {
+    const fallbackPrimary = skipWhenLocked && supplementLocks.phone ? String(store?.phone || '').trim() : ''
+    const fallbackSecondary = skipWhenLocked && supplementLocks.phoneSecondary ? String(store?.phone_secondary || '').trim() : ''
+
+    const rawPrimary = skipWhenLocked && supplementLocks.phone ? fallbackPrimary : phone.trim()
+    const rawSecondary = skipWhenLocked && supplementLocks.phoneSecondary ? fallbackSecondary : phoneSecondary.trim()
+
+    let normalizedPrimary = ''
+    let normalizedSecondary = ''
+
+    if (rawPrimary) {
+      const validation = validateVietnamPhone(rawPrimary)
+      if (!validation.isValid) {
+        return { normalizedPhone: '', normalizedPhoneSecondary: '', error: validation.message }
+      }
+      normalizedPrimary = validation.normalized
     }
 
-    const normalizedPhone = phone.trim()
-    if (!normalizedPhone) {
-      return { normalizedPhone: '', error: '' }
+    if (!normalizedPrimary && rawSecondary) {
+      return { normalizedPhone: '', normalizedPhoneSecondary: '', error: 'Vui lòng nhập số điện thoại 1 trước' }
     }
 
-    const phoneValidation = validateVietnamPhone(normalizedPhone)
-    if (!phoneValidation.isValid) {
-      return { normalizedPhone: '', error: phoneValidation.message }
+    if (rawSecondary) {
+      const validation = validateVietnamPhone(rawSecondary)
+      if (!validation.isValid) {
+        return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: '', error: validation.message }
+      }
+      normalizedSecondary = validation.normalized
+    }
+
+    if (normalizedPrimary && normalizedSecondary && normalizedPrimary === normalizedSecondary) {
+      return {
+        normalizedPhone: normalizedPrimary,
+        normalizedPhoneSecondary: '',
+        error: 'Số điện thoại 2 không được trùng số điện thoại 1',
+      }
+    }
+
+    if (!normalizedPrimary && !normalizedSecondary) {
+      return { normalizedPhone: '', normalizedPhoneSecondary: '', error: '' }
     }
 
     const cached = await getCachedStores()
     const stores = Array.isArray(cached?.data) ? cached.data : []
-    const duplicatePhoneStores = findDuplicatePhoneStores(stores, phoneValidation.normalized, { excludeStoreId: id })
-    if (duplicatePhoneStores.length > 0) {
-      return { normalizedPhone: '', error: buildDuplicatePhoneMessage(duplicatePhoneStores) }
+
+    if (normalizedPrimary) {
+      const duplicatePhoneStores = findDuplicatePhoneStores(stores, normalizedPrimary, { excludeStoreId: id })
+      if (duplicatePhoneStores.length > 0) {
+        return {
+          normalizedPhone: '',
+          normalizedPhoneSecondary: normalizedSecondary,
+          error: buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 1'),
+        }
+      }
     }
 
-    return { normalizedPhone: phoneValidation.normalized, error: '' }
+    if (normalizedSecondary) {
+      const duplicatePhoneStores = findDuplicatePhoneStores(stores, normalizedSecondary, { excludeStoreId: id })
+      if (duplicatePhoneStores.length > 0) {
+        return {
+          normalizedPhone: normalizedPrimary,
+          normalizedPhoneSecondary: '',
+          error: buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2'),
+        }
+      }
+    }
+
+    return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: normalizedSecondary, error: '' }
   }
 
 
 
 
-  async function executeSaveSupplement(validatedSupplementPhone) {
+  async function executeSaveSupplement(validatedSupplementPhone, validatedSupplementPhoneSecondary) {
     setSaving(true)
     try {
       const nowIso = new Date().toISOString()
@@ -372,6 +420,9 @@ export default function EditStore() {
       }
       if (!supplementLocks.phone) {
         if (validatedSupplementPhone) updates.phone = validatedSupplementPhone
+      }
+      if (!supplementLocks.phoneSecondary) {
+        if (validatedSupplementPhoneSecondary) updates.phone_secondary = validatedSupplementPhoneSecondary
       }
       if (!supplementLocks.note) {
         const normalizedNote = note.trim()
@@ -430,7 +481,11 @@ export default function EditStore() {
       return
     }
 
-    const { normalizedPhone: validatedSupplementPhone, error: supplementPhoneError } = await validateCurrentPhone({ skipWhenLocked: true })
+    const {
+      normalizedPhone: validatedSupplementPhone,
+      normalizedPhoneSecondary: validatedSupplementPhoneSecondary,
+      error: supplementPhoneError,
+    } = await validateCurrentPhones({ skipWhenLocked: true })
     if (supplementPhoneError) {
       showMessage('error', supplementPhoneError)
       return
@@ -439,11 +494,11 @@ export default function EditStore() {
     setConfirmAction({
       open: true,
       type: 'supplement',
-      payload: { validatedSupplementPhone },
+      payload: { validatedSupplementPhone, validatedSupplementPhoneSecondary },
     })
   }
 
-  async function executeEditSave(validatedPhone) {
+  async function executeEditSave(validatedPhone, validatedPhoneSecondary) {
     setSaving(true)
     try {
       const nowIso = new Date().toISOString()
@@ -456,6 +511,7 @@ export default function EditStore() {
         ward: ward.trim() || null,
         district: district.trim() || null,
         phone: validatedPhone || null,
+        phone_secondary: validatedPhoneSecondary || null,
         note: note.trim() || null,
         active,
         latitude: finalCoords.latitude,
@@ -489,11 +545,11 @@ export default function EditStore() {
     setConfirmAction({ open: false, type: '', payload: null })
 
     if (type === 'supplement') {
-      await executeSaveSupplement(payload.validatedSupplementPhone)
+      await executeSaveSupplement(payload.validatedSupplementPhone, payload.validatedSupplementPhoneSecondary)
       return
     }
     if (type === 'edit') {
-      await executeEditSave(payload.validatedPhone)
+      await executeEditSave(payload.validatedPhone, payload.validatedPhoneSecondary)
     }
   }
 
@@ -510,7 +566,11 @@ export default function EditStore() {
       return
     }
 
-    const { normalizedPhone: validatedPhone, error: phoneError } = await validateCurrentPhone()
+    const {
+      normalizedPhone: validatedPhone,
+      normalizedPhoneSecondary: validatedPhoneSecondary,
+      error: phoneError,
+    } = await validateCurrentPhones()
     if (phoneError) {
       showMessage('error', phoneError)
       return
@@ -519,7 +579,7 @@ export default function EditStore() {
     setConfirmAction({
       open: true,
       type: 'edit',
-      payload: { validatedPhone },
+      payload: { validatedPhone, validatedPhoneSecondary },
     })
   }
 
@@ -621,6 +681,8 @@ export default function EditStore() {
         setAddressDetail={setAddressDetail}
         phone={phone}
         setPhone={setPhone}
+        phoneSecondary={phoneSecondary}
+        setPhoneSecondary={setPhoneSecondary}
         note={note}
         setNote={setNote}
         supplementLocks={supplementLocks}
@@ -763,6 +825,22 @@ export default function EditStore() {
             className="h-11 rounded-xl text-sm"
           />
         </div>
+
+        {(phone.trim() || phoneSecondary.trim()) && (
+          <div>
+            <Label htmlFor="edit-phone-secondary" className="text-sm font-medium text-gray-300 mb-1.5 block">
+              Số điện thoại 2
+            </Label>
+            <Input
+              id="edit-phone-secondary"
+              type="tel"
+              value={phoneSecondary}
+              onChange={(e) => setPhoneSecondary(e.target.value)}
+              placeholder="VD: 0988 123 456"
+              className="h-11 rounded-xl text-sm"
+            />
+          </div>
+        )}
 
         {/* Note */}
         <div>

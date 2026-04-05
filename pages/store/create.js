@@ -57,6 +57,7 @@ export default function AddStore() {
     msgTimerRef.current = setTimeout(() => { setMsgState((s) => ({ ...s, show: false })); msgTimerRef.current = null }, duration)
   }
   const [phone, setPhone] = useState('')
+  const [phoneSecondary, setPhoneSecondary] = useState('')
   const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
   const canShowQuickSave = Boolean(
     normalizedPhoneForQuickSave && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
@@ -132,12 +133,13 @@ export default function AddStore() {
       ward.trim() ||
       district.trim() ||
       phone.trim() ||
+      phoneSecondary.trim() ||
       note.trim() ||
       pickedLat != null ||
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, storeType, addressDetail, ward, district, phone, note, pickedLat, pickedLng, currentStep, loading])
+  }, [name, storeType, addressDetail, ward, district, phone, phoneSecondary, note, pickedLat, pickedLng, currentStep, loading])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -384,6 +386,7 @@ export default function AddStore() {
     setWard('')
     setDistrict('')
     setPhone('')
+    setPhoneSecondary('')
     setNote('')
     setAllowDuplicate(false)
     setDuplicateCandidates([])
@@ -542,9 +545,9 @@ export default function AddStore() {
     if (nameValid || allowDuplicate) setCurrentStep(2)
   }
 
-  function buildDuplicatePhoneMessage(matches) {
+  function buildDuplicatePhoneMessage(matches, label = 'Số điện thoại') {
     const labels = matches.slice(0, 3).map((store) => store.name || 'Cửa hàng')
-    return `Số điện thoại đã tồn tại ở ${labels.join('; ')}`
+    return `${label} đã tồn tại ở ${labels.join('; ')}`
   }
 
   function getBaseStep2Errors({ requirePhone = false } = {}) {
@@ -552,25 +555,59 @@ export default function AddStore() {
     if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
     if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
     const normalizedPhone = phone.trim()
+    const normalizedPhoneSecondary = phoneSecondary.trim()
     if (requirePhone && !normalizedPhone) {
       errs.phone = 'Vui lòng nhập số điện thoại để lưu luôn'
     }
 
-    return { errs, normalizedPhone }
+    if (!normalizedPhone && normalizedPhoneSecondary) {
+      errs.phone = 'Vui lòng nhập số điện thoại 1 trước'
+    }
+
+    return { errs, normalizedPhone, normalizedPhoneSecondary }
   }
 
   async function validateStep2Fields({ requirePhone = false } = {}) {
-    const { errs, normalizedPhone } = getBaseStep2Errors({ requirePhone })
+    const { errs, normalizedPhone, normalizedPhoneSecondary } = getBaseStep2Errors({ requirePhone })
+    let validatedPhone = ''
+    let validatedPhoneSecondary = ''
 
     if (!errs.phone && normalizedPhone) {
       const phoneValidation = validateVietnamPhone(normalizedPhone)
       if (!phoneValidation.isValid) {
         errs.phone = phoneValidation.message
       } else {
-        const stores = await getOrRefreshStores()
-        const duplicatePhoneStores = findDuplicatePhoneStores(stores, phoneValidation.normalized)
+        validatedPhone = phoneValidation.normalized
+      }
+    }
+
+    if (!errs.phone && !errs.phone_secondary && normalizedPhoneSecondary) {
+      const phoneSecondaryValidation = validateVietnamPhone(normalizedPhoneSecondary)
+      if (!phoneSecondaryValidation.isValid) {
+        errs.phone_secondary = phoneSecondaryValidation.message
+      } else {
+        validatedPhoneSecondary = phoneSecondaryValidation.normalized
+      }
+    }
+
+    if (!errs.phone && !errs.phone_secondary && validatedPhone && validatedPhoneSecondary && validatedPhone === validatedPhoneSecondary) {
+      errs.phone_secondary = 'Số điện thoại 2 không được trùng số điện thoại 1'
+    }
+
+    if (!errs.phone && !errs.phone_secondary && (validatedPhone || validatedPhoneSecondary)) {
+      const stores = await getOrRefreshStores()
+
+      if (validatedPhone) {
+        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhone)
         if (duplicatePhoneStores.length > 0) {
-          errs.phone = buildDuplicatePhoneMessage(duplicatePhoneStores)
+          errs.phone = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 1')
+        }
+      }
+
+      if (!errs.phone_secondary && validatedPhoneSecondary) {
+        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhoneSecondary)
+        if (duplicatePhoneStores.length > 0) {
+          errs.phone_secondary = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
         }
       }
     }
@@ -580,9 +617,10 @@ export default function AddStore() {
       district: errs.district || '',
       ward: errs.ward || '',
       phone: errs.phone || '',
+      phone_secondary: errs.phone_secondary || '',
     }))
 
-    return { errs, normalizedPhone }
+    return { errs, normalizedPhone, normalizedPhoneSecondary }
   }
 
   async function validateStep2AndGoNext() {
@@ -657,10 +695,19 @@ export default function AddStore() {
     const normalizedName = toTitleCaseVI(name.trim())
     const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
     const rawPhone = phone.trim()
+    const rawPhoneSecondary = phoneSecondary.trim()
     let validatedPhone = ''
+    let validatedPhoneSecondary = ''
 
     try {
       setLoading(true)
+
+      if (!rawPhone && rawPhoneSecondary) {
+        setFieldErrors((prev) => ({ ...prev, phone: 'Vui lòng nhập số điện thoại 1 trước' }))
+        showMessage('error', 'Vui lòng nhập số điện thoại 1 trước')
+        setLoading(false)
+        return false
+      }
 
       if (rawPhone) {
         const phoneValidation = validateVietnamPhone(rawPhone)
@@ -677,6 +724,34 @@ export default function AddStore() {
         if (duplicatePhoneStores.length > 0) {
           const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores)
           setFieldErrors((prev) => ({ ...prev, phone: duplicateMessage }))
+          showMessage('error', duplicateMessage)
+          setLoading(false)
+          return false
+        }
+      }
+
+      if (rawPhoneSecondary) {
+        const phoneSecondaryValidation = validateVietnamPhone(rawPhoneSecondary)
+        if (!phoneSecondaryValidation.isValid) {
+          setFieldErrors((prev) => ({ ...prev, phone_secondary: phoneSecondaryValidation.message }))
+          showMessage('error', phoneSecondaryValidation.message)
+          setLoading(false)
+          return false
+        }
+        validatedPhoneSecondary = phoneSecondaryValidation.normalized
+
+        if (validatedPhone && validatedPhoneSecondary && validatedPhone === validatedPhoneSecondary) {
+          setFieldErrors((prev) => ({ ...prev, phone_secondary: 'Số điện thoại 2 không được trùng số điện thoại 1' }))
+          showMessage('error', 'Số điện thoại 2 không được trùng số điện thoại 1')
+          setLoading(false)
+          return false
+        }
+
+        const stores = await getOrRefreshStores()
+        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhoneSecondary)
+        if (duplicatePhoneStores.length > 0) {
+          const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
+          setFieldErrors((prev) => ({ ...prev, phone_secondary: duplicateMessage }))
           showMessage('error', duplicateMessage)
           setLoading(false)
           return false
@@ -721,6 +796,7 @@ export default function AddStore() {
         is_potential: Boolean(isTelesale),
         note,
         phone: validatedPhone || null,
+        phone_secondary: validatedPhoneSecondary || null,
         image_url: null,
         latitude,
         longitude,
@@ -1106,30 +1182,30 @@ export default function AddStore() {
                   <div className="text-xs text-red-600">{fieldErrors.phone}</div>
                 )}
               </div>
-              
-              <div className="sm:hidden">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between rounded-xl px-1 py-1.5 text-left transition text-gray-400 hover:text-gray-200"
-                  onClick={() => setShowMoreMobileStep2((v) => !v)}
-                  aria-expanded={showMoreMobileStep2}
-                >
-                  <span className="text-sm">
-                    {showMoreMobileStep2 ? 'Thu gọn phần thêm' : 'Hiển thị thêm ghi chú'}
-                  </span>
-                  <span
-                    className={`ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-transform ${
-                      showMoreMobileStep2 ? 'rotate-180' : ''
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-                      <path d="M5 7.5 10 12.5 15 7.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </button>
-              </div>
 
+              {(phone.trim() || phoneSecondary.trim()) && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone-secondary" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Số điện thoại 2 <span className="font-normal text-gray-400">(không bắt buộc)</span>
+                  </Label>
+                  <Input
+                    id="phone-secondary"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9+ ]*"
+                    value={phoneSecondary}
+                    onChange={(e) => {
+                      setPhoneSecondary(e.target.value)
+                      if (fieldErrors.phone_secondary) setFieldErrors((prev) => ({ ...prev, phone_secondary: '' }))
+                    }}
+                    placeholder="0912 345 678"
+                    className="text-base sm:text-base"
+                  />
+                  {fieldErrors.phone_secondary && (
+                    <div className="text-xs text-red-600">{fieldErrors.phone_secondary}</div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>

@@ -49,6 +49,8 @@ export default function StoreSupplementForm({
   setAddressDetail,
   phone,
   setPhone,
+  phoneSecondary,
+  setPhoneSecondary,
   note,
   setNote,
   supplementLocks,
@@ -73,6 +75,7 @@ export default function StoreSupplementForm({
     && supplementLocks.ward
     && supplementLocks.addressDetail
     && supplementLocks.phone
+    && supplementLocks.phoneSecondary
     && supplementLocks.note
 
   const submitLabel = user ? 'Hoàn thành bổ sung' : 'Gửi bổ sung'
@@ -286,6 +289,25 @@ export default function StoreSupplementForm({
                     className={`text-base sm:text-base ${lockedInputClass}`}
                   />
                 </div>
+
+                {(phone.trim() || phoneSecondary.trim()) && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="supplement-phone-secondary" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                      Số điện thoại 2
+                    </Label>
+                    <Input
+                      id="supplement-phone-secondary"
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9+ ]*"
+                      value={phoneSecondary}
+                      onChange={(e) => setPhoneSecondary(e.target.value)}
+                      disabled={supplementLocks.phoneSecondary}
+                      placeholder="0912 345 678"
+                      className={`text-base sm:text-base ${lockedInputClass}`}
+                    />
+                  </div>
+                )}
 
 
                 <div className="space-y-1.5">

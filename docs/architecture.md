@@ -102,6 +102,9 @@ customer/
 
 [Telesale]
   - `/telesale/overview` chỉ lấy store có `phone` và `is_potential = true`
+  - Ở các card/modal, nút gọi dùng chung mọi role:
+    - nếu chỉ có 1 số (`phone` hoặc `phone_secondary`) thì gọi trực tiếp
+    - nếu có 2 số thì mở dialog chọn số để gọi
   - Ưu tiên gọi sắp theo:
     1. store chưa gọi
     2. store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút
@@ -233,6 +236,10 @@ customer/
   - bắt buộc thêm `số điện thoại` hợp lệ
   - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`
 - Khi bước 1 đã có GPS để kiểm tra trùng, app sẽ prefetch quận/huyện + xã/phường của store gần nhất trong nền, bất kể kết quả trùng hay không trùng, để bước 2 có thể hiển thị ngay nếu 2 field còn trống
+- Form số điện thoại hỗ trợ 2 số:
+  - mặc định chỉ hiện ô `SĐT 1`
+  - khi người dùng bắt đầu nhập `SĐT 1`, hệ thống mới hiện thêm ô `SĐT 2`
+  - `SĐT 2` không được trùng `SĐT 1`
 - Trong duplicate panel của bước 1:
   - candidate còn thiếu dữ liệu có thể hiện nút **Bổ sung**
   - nút này chuyển sang `/store/edit/[id]?mode=supplement`

@@ -141,7 +141,10 @@ export function findDuplicatePhoneStores(stores, rawPhone, options = {}) {
 
   return (stores || []).filter((store) => {
     if (excludeStoreId != null && String(store?.id) === String(excludeStoreId)) return false
-    return normalizeVietnamPhoneForComparison(store?.phone || '') === normalizedPhone
+    const phoneCandidates = [store?.phone, store?.phone_secondary]
+      .map((value) => normalizeVietnamPhoneForComparison(value || ''))
+      .filter(Boolean)
+    return phoneCandidates.includes(normalizedPhone)
   })
 }
 

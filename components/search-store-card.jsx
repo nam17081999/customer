@@ -73,6 +73,7 @@ export default function SearchStoreCard({
   const hasCoordinates = hasStoreCoordinates(store)
   const typeMeta = getStoreTypeMeta(store.store_type)
   const directionHref = hasCoordinates ? `https://www.google.com/maps?q=${store.latitude},${store.longitude}` : ''
+  const hasAnyPhone = Boolean(String(store.phone || '').trim() || String(store.phone_secondary || '').trim())
 
   const handleCompactAction = (event) => {
     event.preventDefault()
@@ -177,7 +178,7 @@ export default function SearchStoreCard({
                     </svg>
                   </CircleIconButton>
                 )}
-                {store.phone && (
+                {hasAnyPhone && (
                   <TelesaleCallDialog
                     store={store}
                     trigger={(
@@ -280,7 +281,7 @@ export default function SearchStoreCard({
                   </svg>
                 </CircleIconButton>
               )}
-              {store.phone && (
+              {hasAnyPhone && (
                 <TelesaleCallDialog
                   store={store}
                   trigger={(

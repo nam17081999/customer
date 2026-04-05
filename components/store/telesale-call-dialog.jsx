@@ -1,35 +1,29 @@
 ﻿import { cloneElement, isValidElement, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useRouter } from 'next/router'
-import { useAuth } from '@/lib/AuthContext'
-import { supabase } from '@/lib/supabaseClient'
-import { updateStoreInCache } from '@/lib/storeCache'
 
 function buildTelHref(phone) {
   return `tel:${String(phone || '').replace(/[^0-9+]/g, '')}`
 }
 
+function getPhoneNumbers(store) {
+  return [store?.phone, store?.phone_secondary]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+}
+
 export default function TelesaleCallDialog({ store, trigger, onSaved }) {
-  const router = useRouter()
-  const { isAdmin, isTelesale } = useAuth() || {}
-  const canTrackTelesale = isAdmin || isTelesale
+  const phoneNumbers = getPhoneNumbers(store)
   const [open, setOpen] = useState(false)
-  const [error, setError] = useState('')
-  const [submittingOrderCall, setSubmittingOrderCall] = useState(false)
 
   const handleOpenChange = (nextOpen) => {
-    if (submittingOrderCall && !nextOpen) return
     setOpen(nextOpen)
-    if (!nextOpen) {
-      setError('')
-      setSubmittingOrderCall(false)
-    }
   }
 
-  const startPhoneCall = () => {
-    if (!store?.phone) return
-    const href = buildTelHref(store.phone)
+  const startPhoneCall = (phone) => {
+    if (!phone) return
+    const href = buildTelHref(phone)
     const anchor = document.createElement('a')
     anchor.href = href
     anchor.style.display = 'none'
@@ -38,79 +32,23 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
     anchor.remove()
   }
 
-  const markCallStarted = async () => {
-    if (!canTrackTelesale || !store?.id) return true
-    const nowIso = new Date().toISOString()
-    const { error: updateError } = await supabase
-      .from('stores')
-      .update({ last_called_at: nowIso, is_potential: true, updated_at: nowIso })
-      .eq('id', store.id)
-
-    if (updateError) {
-      console.error(updateError)
-      setError('Không lưu được thời gian gọi. Vui lòng thử lại.')
-      return false
-    }
-
-    const nextStore = { ...store, last_called_at: nowIso, is_potential: true, updated_at: nowIso }
-    await updateStoreInCache(store.id, { last_called_at: nowIso, is_potential: true, updated_at: nowIso })
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('storevis:stores-changed', {
-          detail: { type: 'update', id: store.id, store: nextStore },
-        }),
-      )
-    }
-
-    onSaved?.(nextStore)
-    return true
-  }
-
   const handleTriggerClick = (event) => {
     event.preventDefault()
     event.stopPropagation()
     event.nativeEvent?.stopImmediatePropagation?.()
 
-    if (!store?.phone) return
-    if (!canTrackTelesale) {
-      startPhoneCall()
+    if (phoneNumbers.length === 0) return
+    if (phoneNumbers.length === 1) {
+      startPhoneCall(phoneNumbers[0])
       return
     }
 
-    setError('')
     setOpen(true)
   }
 
-  const handleCallOnly = () => {
-    if (submittingOrderCall) return
+  const handleSelectPhone = (phone) => {
     setOpen(false)
-    startPhoneCall()
-  }
-
-  const handleCallToOrder = async () => {
-    if (!canTrackTelesale) {
-      setOpen(false)
-      startPhoneCall()
-      return
-    }
-
-    const from = router.asPath || '/'
-    setError('')
-    setSubmittingOrderCall(true)
-
-    const saved = await markCallStarted()
-    if (!saved) {
-      setSubmittingOrderCall(false)
-      return
-    }
-
-    startPhoneCall()
-    setOpen(false)
-    void router.push(`/telesale/call/${store.id}?from=${encodeURIComponent(from)}`).catch((pushError) => {
-      if (!pushError?.cancelled) {
-        console.error(pushError)
-      }
-    })
+    startPhoneCall(phone)
   }
 
   const triggerNode = isValidElement(trigger)
@@ -128,24 +66,23 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden rounded-xl p-0 z-300">
           <div className="border-b border-gray-800 px-4 py-3">
-            <DialogTitle className="text-base font-semibold text-gray-100">Chọn cách gọi</DialogTitle>
+            <DialogTitle className="text-base font-semibold text-gray-100">Chọn số để gọi</DialogTitle>
             <DialogDescription className="mt-1 text-sm text-gray-400">
               {store?.name}
             </DialogDescription>
           </div>
 
           <div className="space-y-3 px-4 py-4">
-            <Button type="button" className="w-full" onClick={handleCallOnly}>
-              Chỉ gọi
-            </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={handleCallToOrder} disabled={submittingOrderCall}>
-              {submittingOrderCall ? 'Đang chuẩn bị...' : 'Gọi lên đơn'}
-            </Button>
-            {error && (
-              <div className="rounded-xl border border-red-900/70 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-                {error}
-              </div>
-            )}
+            {phoneNumbers.map((phone, index) => (
+              <Button
+                key={`call-phone-${phone}-${index}`}
+                type="button"
+                className="w-full"
+                onClick={() => handleSelectPhone(phone)}
+              >
+                {phoneNumbers.length > 1 ? `Số ${index + 1}: ` : ''}{phone}
+              </Button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
