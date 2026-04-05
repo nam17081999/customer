@@ -714,28 +714,31 @@ export default function HomePage() {
               {[...Array(5)].map((_, i) => (
                 <Card key={i} className={`overflow-hidden rounded-md border border-gray-800 bg-gray-950 ${loading ? '' : 'opacity-70'}`}>
                   <CardContent className="p-0">
-                    <div className="grid grid-cols-[auto_1fr_auto] gap-x-2 gap-y-2 p-3">
-                      <div className="flex h-6 w-6 items-center justify-center">
-                        <div className="h-4.5 w-4.5 animate-pulse rounded-sm bg-gray-800" />
-                      </div>
-
+                    <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
                       <div className="min-w-0">
-                        <div className="h-5 w-3/4 animate-pulse rounded bg-gray-700" />
+                        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+                          <div className="flex h-6 w-6 items-center justify-center">
+                            <div className="h-4.5 w-4.5 animate-pulse rounded-sm bg-gray-800" />
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="h-6 w-2/5 animate-pulse rounded bg-gray-700" />
+                          </div>
+
+                          <div className="col-span-2 mt-1 flex items-center gap-1">
+                            <div className="h-4 w-4 animate-pulse rounded-full bg-gray-800" />
+                            <div className="h-4 w-20 animate-pulse rounded bg-gray-800" />
+                          </div>
+
+                          <div className="col-span-2 mt-1 space-y-1.5 pr-1">
+                            <div className="h-4 w-full animate-pulse rounded bg-gray-800" />
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="row-span-3 flex shrink-0 flex-col justify-center gap-2">
+                      <div className="flex shrink-0 flex-col justify-center gap-2">
                         <div className="h-10 w-10 animate-pulse rounded-full border border-gray-800 bg-gray-800" />
                         <div className="h-10 w-10 animate-pulse rounded-full border border-gray-800 bg-gray-800" />
-                      </div>
-
-                      <div className="col-span-2 flex items-center gap-1">
-                        <div className="h-4 w-4 animate-pulse rounded-full bg-gray-800" />
-                        <div className="h-4 w-16 animate-pulse rounded bg-gray-800" />
-                      </div>
-
-                      <div className="col-span-2 space-y-2">
-                        <div className="h-4 w-full animate-pulse rounded bg-gray-800" />
-                        <div className="h-4 w-2/3 animate-pulse rounded bg-gray-800" />
                       </div>
                     </div>
                   </CardContent>
