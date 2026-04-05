@@ -9,7 +9,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --ext .js,.jsx --ignore-pattern .next --ignore-pattern node_modules",
+    "lint:fix": "eslint . --ext .js,.jsx --fix --ignore-pattern .next --ignore-pattern node_modules",
     "text:check": "node scripts/check-mojibake.js",
     "text:check:staged": "node scripts/check-mojibake.js --staged",
     "hooks:install": "node scripts/install-git-hooks.js"

@@ -51,13 +51,6 @@ export default function StoreSupplementForm({
   setPhone,
   note,
   setNote,
-  imageFile,
-  setImageFile,
-  imagePreview,
-  setImagePreview,
-  setImageError,
-  currentImage,
-  fileInputRef,
   supplementLocks,
   pickedLat,
   pickedLng,
@@ -81,7 +74,6 @@ export default function StoreSupplementForm({
     && supplementLocks.addressDetail
     && supplementLocks.phone
     && supplementLocks.note
-    && supplementLocks.image
 
   const submitLabel = user ? 'Hoàn thành bổ sung' : 'Gửi bổ sung'
 
@@ -105,7 +97,6 @@ export default function StoreSupplementForm({
 
   const lockedChipClass = 'cursor-not-allowed border-gray-500 bg-gray-800 text-gray-100 opacity-100'
   const lockedInputClass = 'disabled:cursor-not-allowed disabled:opacity-100 disabled:border-gray-500 disabled:bg-gray-800 disabled:text-gray-100'
-  const lockedUploadClass = 'cursor-not-allowed border-gray-500 bg-gray-800/90 opacity-100'
   const visibleStoreTypes = supplementLocks.storeType && storeType
     ? STORE_TYPE_OPTIONS.filter((type) => type.value === storeType)
     : STORE_TYPE_OPTIONS
@@ -201,7 +192,7 @@ export default function StoreSupplementForm({
                 <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
                   Thoát
                 </Button>
-                <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+                <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                   Tiếp theo
                 </Button>
               </div>
@@ -296,78 +287,6 @@ export default function StoreSupplementForm({
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="supplement-image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span>
-                  </Label>
-                  <div className="relative w-full">
-                    {imagePreview ? (
-                      <div className="relative group w-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imagePreview}
-                          alt="Ảnh xem trước"
-                          className="h-40 w-full max-w-full rounded border border-gray-300 bg-gray-100 object-cover dark:border-gray-700 dark:bg-gray-800"
-                        />
-                        {!supplementLocks.image && (
-                          <button
-                            type="button"
-                            className="absolute -right-2 -top-2 cursor-pointer rounded-full border border-gray-300 bg-white p-1 text-gray-400 shadow hover:bg-red-100 hover:text-red-600 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-red-900"
-                            onClick={() => {
-                              setImageFile(null)
-                              if (imagePreview) URL.revokeObjectURL(imagePreview)
-                              setImagePreview(null)
-                            }}
-                            aria-label="Xóa ảnh"
-                          >
-                            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-                              <path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    ) : currentImage ? (
-                      <div className="relative group w-full">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={currentImage}
-                          alt={store.name}
-                          className="h-40 w-full max-w-full rounded border border-gray-500 bg-gray-100 object-cover dark:border-gray-600 dark:bg-gray-800"
-                          onError={() => setImageError(true)}
-                        />
-                      </div>
-                    ) : (
-                      <label
-                        htmlFor="supplement-image"
-                        className={`flex h-32 w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-700 bg-gray-900 transition ${
-                          supplementLocks.image ? lockedUploadClass : 'cursor-pointer hover:bg-gray-800'
-                        }`}
-                      >
-                        <svg className="mb-1 h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-                        </svg>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">Chụp hoặc chọn ảnh</span>
-                        <input
-                          id="supplement-image"
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*;capture=camera"
-                          capture="environment"
-                          disabled={supplementLocks.image}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
-                            setImageFile(file)
-                            setImageError(false)
-                            setImagePreview(URL.createObjectURL(file))
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="supplement-note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -393,7 +312,7 @@ export default function StoreSupplementForm({
 
               <div className="hidden gap-2 pt-2 sm:flex">
                 <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(1)} />
-                <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+                <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                   {stepCount === 2 ? renderPrimaryLabel() : 'Tiếp theo →'}
                 </Button>
               </div>
@@ -461,7 +380,7 @@ export default function StoreSupplementForm({
 
               <div className="hidden gap-2 pt-2 sm:flex">
                 <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
-                <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+                <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                   {renderPrimaryLabel()}
                 </Button>
               </div>
@@ -480,7 +399,7 @@ export default function StoreSupplementForm({
               <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
                 Thoát
               </Button>
-              <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+              <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                 Tiếp theo
               </Button>
             </div>
@@ -489,7 +408,7 @@ export default function StoreSupplementForm({
           {currentStep === 2 && (
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(1)} />
-              <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+              <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                 {stepCount === 2 ? renderPrimaryLabel() : 'Tiếp theo →'}
               </Button>
             </div>
@@ -498,7 +417,7 @@ export default function StoreSupplementForm({
           {currentStep === 3 && (
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
-              <Button type="button" className="flex-1" onClick={handlePrimaryAction}>
+              <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
                 {renderPrimaryLabel()}
               </Button>
             </div>

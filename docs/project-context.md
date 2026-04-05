@@ -188,6 +188,28 @@ Script SQL cap nhat moi truong duoc luu tai:
   - các cờ chi tiết dữ liệu (`flags`)
 - Khi thay đổi text hoặc filter trong lúc đang cuộn sâu ở danh sách, danh sách phải tự trở về đầu để người dùng nhìn thấy kết quả mới ngay.
 
+## Recent Updates (2026-04-05)
+
+- Đã thêm cơ chế version cache cho `stores` để giảm call toàn bộ dữ liệu:
+  - SQL migration: `docs/sql/2026-04-05-add-store-cache-version.sql`
+  - Bảng mới: `public.store_cache_versions`
+  - Trigger mới: `trg_stores_bump_cache_version` (bump version sau mỗi `insert/update/delete` trên `stores`)
+- `lib/storeCache.js` đã ưu tiên check version nhẹ trước khi quyết định refetch toàn bộ:
+  - Nếu `cacheVersion` local trùng server version: dùng cache ngay
+  - Nếu lệch version: mới fetch all để đồng bộ
+  - Nếu chưa chạy migration version: fallback về cơ chế cũ `count + max(updated_at)`
+- Luồng thao tác dữ liệu chính đã thống nhất cập nhật `updated_at` khi mutate:
+  - chỉnh sửa
+  - bổ sung
+  - soft delete
+  - cập nhật telesale
+- Sau các thao tác thành công, app điều hướng về Search (`/`) và hiển thị thông báo chung dạng trượt từ trên xuống:
+  - tạo cửa hàng
+  - chỉnh sửa
+  - bổ sung
+  - xóa
+- Flash message được truyền qua `sessionStorage` key `storevis:flash-message` để dùng chung giữa trang nguồn và trang Search.
+
 ## Vietnamese Copy Note
 
 - Các thay đổi gần đây ở search/navbar đã từng phát sinh lỗi tiếng Việt do ghi file sai encoding.

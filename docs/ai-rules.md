@@ -50,6 +50,31 @@ await removeStoreFromCache(storeId)     // sau soft-delete
 await invalidateStoreCache()            // sau EDIT
 ```
 
+### Cache versioning (bat buoc cho moi moi truong)
+
+- Moi moi truong Supabase phai chay migration:
+  - `docs/sql/2026-04-05-add-store-cache-version.sql`
+- Neu migration da co:
+  - uu tien check version tu `store_cache_versions`
+  - chi fetch all stores khi version lech
+- Neu migration chua co:
+  - cho phep fallback tam thoi `count + max(updated_at)`
+
+### updated_at rule (bat buoc)
+
+- Moi thay doi du lieu tren `stores` phai cap nhat `updated_at` cung luc:
+  - edit
+  - supplement
+  - soft delete
+  - telesale updates
+
+### Redirect + thong bao sau thao tac thanh cong
+
+- Sau `create/edit/supplement/delete` thanh cong:
+  - dieu huong ve `/`
+  - hien thong bao top-slide thong nhat bang `Msg`
+  - flash payload dung `sessionStorage['storevis:flash-message']`
+
 **Ngoại lệ duy nhất cho export admin:**
 ```js
 // `/store/export` được phép đọc trực tiếp Supabase để lấy đủ toàn bộ store

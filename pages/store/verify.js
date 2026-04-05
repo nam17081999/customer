@@ -231,15 +231,15 @@ export default function VerifyStorePage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl bg-amber-950/30 border border-amber-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-amber-300">Chờ xác thực</p>
+                  <p className="text-sm uppercase tracking-wide text-amber-300">Chờ xác thực</p>
                   <p className="text-2xl font-bold text-amber-200">{stores.length}</p>
                 </div>
                 <div className="rounded-xl bg-blue-950/30 border border-blue-900 p-3">
-                  <p className="text-[11px] uppercase tracking-wide text-blue-300">Đang chọn</p>
+                  <p className="text-sm uppercase tracking-wide text-blue-300">Đang chọn</p>
                   <p className="text-2xl font-bold text-blue-200">{selectedIds.size}</p>
                 </div>
                 <div className="rounded-xl bg-green-950/30 border border-green-900 p-3 col-span-2 sm:col-span-1">
-                  <p className="text-[11px] uppercase tracking-wide text-green-300">Hiển thị sau lọc</p>
+                  <p className="text-sm uppercase tracking-wide text-green-300">Hiển thị sau lọc</p>
                   <p className="text-2xl font-bold text-green-200">{filteredStores.length}</p>
                 </div>
               </div>
@@ -348,7 +348,7 @@ export default function VerifyStorePage() {
                           <h3 className="min-w-0 flex-1 text-lg font-semibold text-gray-100 leading-snug break-words [overflow-wrap:anywhere]">
                             {store.name || 'Cửa hàng chưa đặt tên'}
                           </h3>
-                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-xs font-medium bg-amber-900/40 text-amber-300">
+                          <span className="inline-flex shrink-0 whitespace-nowrap items-center rounded-full px-2.5 py-1 text-sm font-medium bg-amber-900/40 text-amber-300">
                             Chờ xác thực
                           </span>
                         </div>

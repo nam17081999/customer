@@ -8,6 +8,8 @@ import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import { parseCoordinate } from '@/helper/coordinate'
+import { formatAddressParts } from '@/lib/utils'
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -47,13 +49,6 @@ function getFirstWord(name = '') {
   return first.slice(0, 12)
 }
 
-function parseCoordinate(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
-  if (typeof value !== 'string') return NaN
-  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
-  return Number.isFinite(parsed) ? parsed : NaN
-}
-
 function toLatLng(store) {
   let lat = parseCoordinate(store.latitude)
   let lng = parseCoordinate(store.longitude)
@@ -70,10 +65,6 @@ function toLatLng(store) {
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
 
   return { lat, lng }
-}
-
-function buildAddress(store) {
-  return [store.address_detail, store.ward, store.district].filter(Boolean).join(', ')
 }
 
 /**
@@ -253,6 +244,7 @@ export default function MapPage() {
   const popupRef = useRef(null)
   const highlightedStoreIdRef = useRef(null)
   const locatingUserRef = useRef(false)
+  const pendingHeadingRef = useRef(null)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -698,7 +690,7 @@ export default function MapPage() {
         storeId: String(store.id),
         name: store.name || 'Cửa hàng',
         shortName: getFirstWord(store.name),
-        address: buildAddress(store),
+        address: formatAddressParts(store),
       },
     }))
 
@@ -763,7 +755,7 @@ export default function MapPage() {
           storeId: String(s.id),
           name: s.name || 'Cửa hàng',
           shortName: getFirstWord(s.name),
-          address: buildAddress(s),
+          address: formatAddressParts(s),
           highlighted: String(s.id) === storeId ? 'yes' : 'no',
         },
       }))
@@ -818,20 +810,30 @@ export default function MapPage() {
       const gpsHeading = typeof coords?.heading === 'number' && Number.isFinite(coords.heading)
         ? ((coords.heading % 360) + 360) % 360
         : null
-      const heading = compassHeading ?? gpsHeading
+      const heading = compassHeading ?? gpsHeading ?? pendingHeadingRef.current
 
       if (!coords) {
         setLocationError(getGeoErrorMessage(error))
         return null
       }
 
+      const normalizedHeading = typeof heading === 'number'
+        ? ((heading % 360) + 360) % 360
+        : null
+
       const nextLocation = {
         latitude: coords.latitude,
         longitude: coords.longitude,
         accuracy: coords.accuracy ?? null,
-        heading,
+        heading: normalizedHeading,
       }
-      setUserLocation(nextLocation)
+      if (normalizedHeading != null) {
+        pendingHeadingRef.current = normalizedHeading
+      }
+      setUserLocation((prev) => ({
+        ...nextLocation,
+        heading: normalizedHeading ?? prev?.heading ?? null,
+      }))
 
       if (shouldRecenter) {
         const map = mapRef.current
@@ -857,6 +859,26 @@ export default function MapPage() {
   }, [])
 
   const recenterToUserLocation = useCallback(() => {
+    if (locatingUserRef.current) {
+      requestCompassHeading()
+        .then((result) => {
+          const heading = typeof result?.heading === 'number'
+            ? ((result.heading % 360) + 360) % 360
+            : null
+
+          if (heading == null) return
+          pendingHeadingRef.current = heading
+          setUserLocation((prev) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              heading,
+            }
+          })
+        })
+        .catch(() => null)
+      return null
+    }
     return refreshUserLocation({ shouldRecenter: true, forceFreshPosition: true })
   }, [refreshUserLocation])
 
@@ -989,7 +1011,6 @@ export default function MapPage() {
             <button
               type="button"
               onClick={recenterToUserLocation}
-              disabled={locatingUser}
               title="Về vị trí đang đứng"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300 disabled:cursor-wait disabled:opacity-70"
             >

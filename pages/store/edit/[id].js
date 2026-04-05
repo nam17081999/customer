@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabaseClient'
@@ -6,11 +6,12 @@ import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Msg } from '@/components/ui/msg'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import StoreSupplementForm from '@/components/store/store-supplement-form'
-import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
-import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
+import { getCachedStores, updateStoreInCache } from '@/lib/storeCache'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
@@ -62,11 +63,6 @@ export default function EditStore() {
   const [mapEditable, setMapEditable] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
 
-  // Image
-  const [imageFile, setImageFile] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [imageError, setImageError] = useState(false)
-  const fileInputRef = useRef(null)
 
   // Map link
   const [mapsLink, setMapsLink] = useState('')
@@ -79,9 +75,26 @@ export default function EditStore() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMode, setSuccessMode] = useState('')
   const [supplementLocationOpen, setSupplementLocationOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState({
+    open: false,
+    type: '',
+    payload: null,
+  })
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
   const autoLocationRequestedRef = useRef(false)
+
+  const pushSearchWithNotice = useCallback(async (text, type = 'success') => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
+        type,
+        text,
+        createdAt: Date.now(),
+      }))
+      window.dispatchEvent(new CustomEvent('storevis:flash-message'))
+    }
+    await router.push('/')
+  }, [router])
 
   function showMessage(type, text, duration = 3000) {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
@@ -108,15 +121,15 @@ export default function EditStore() {
   useEffect(() => {
     if (!router.isReady || !id || !pageReady) return
     async function fetchStore() {
-      const { data, error } = await supabase
-        .from('stores')
-        .select('*')
-        .eq('id', id)
-        .single()
-      if (error || !data) {
+      const cached = await getCachedStores()
+      const cachedStores = Array.isArray(cached?.data) ? cached.data : []
+      const data = cachedStores.find((entry) => String(entry?.id) === String(id))
+
+      if (!data) {
         setFetchError('Không tìm thấy cửa hàng.')
         return
       }
+
       setStore(data)
       setName(data.name || '')
       setStoreType(data.store_type || DEFAULT_STORE_TYPE)
@@ -197,7 +210,6 @@ export default function EditStore() {
     district: Boolean(String(store?.district || '').trim()),
     phone: Boolean(String(store?.phone || '').trim()),
     note: Boolean(String(store?.note || '').trim()),
-    image: Boolean(String(store?.image_url || '').trim()),
     location: originalHasCoordinates,
   }), [store, originalHasCoordinates])
   const supplementStepCount = originalHasCoordinates ? 2 : 3
@@ -214,16 +226,6 @@ export default function EditStore() {
   const hasEditableSupplementFields = useMemo(() => (
     Object.values(supplementLocks).some((value) => value === false)
   ), [supplementLocks])
-
-  // Image file handler
-  function handleImageChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImageFile(file)
-    setImageError(false)
-    const url = URL.createObjectURL(file)
-    setImagePreview(url)
-  }
 
   // Extract coords from Google Maps URL
   function extractCoordsFromUrl(url) {
@@ -329,7 +331,8 @@ export default function EditStore() {
       return { normalizedPhone: '', error: phoneValidation.message }
     }
 
-    const stores = await getOrRefreshStores()
+    const cached = await getCachedStores()
+    const stores = Array.isArray(cached?.data) ? cached.data : []
     const duplicatePhoneStores = findDuplicatePhoneStores(stores, phoneValidation.normalized, { excludeStoreId: id })
     if (duplicatePhoneStores.length > 0) {
       return { normalizedPhone: '', error: buildDuplicatePhoneMessage(duplicatePhoneStores) }
@@ -341,21 +344,11 @@ export default function EditStore() {
 
 
 
-  async function handleSaveSupplement() {
-    if (!hasEditableSupplementFields) {
-      showMessage('error', 'Cửa hàng này không còn dữ liệu nào để bổ sung')
-      return
-    }
-
-    const { normalizedPhone: validatedSupplementPhone, error: supplementPhoneError } = await validateCurrentPhone({ skipWhenLocked: true })
-    if (supplementPhoneError) {
-      showMessage('error', supplementPhoneError)
-      return
-    }
-
-      setSaving(true)
-      try {
-        const updates = {}
+  async function executeSaveSupplement(validatedSupplementPhone) {
+    setSaving(true)
+    try {
+      const nowIso = new Date().toISOString()
+      const updates = {}
 
       if (!supplementLocks.name) {
         const normalizedName = toTitleCaseVI(name.trim())
@@ -392,33 +385,13 @@ export default function EditStore() {
         }
       }
 
-      if (imageFile && !supplementLocks.image) {
-        const authRes = await fetch('/api/imagekit-auth')
-        const authData = await authRes.json()
-        if (!authData.token) throw new Error('imagekit-auth thất bại')
-
-        const { IMAGEKIT_URL_ENDPOINT, IMAGEKIT_PUBLIC_KEY } = await import('@/lib/constants')
-        const formData = new FormData()
-        formData.append('file', imageFile)
-        formData.append('fileName', `store-${id}-${Date.now()}`)
-        formData.append('publicKey', IMAGEKIT_PUBLIC_KEY)
-        formData.append('signature', authData.signature)
-        formData.append('expire', authData.expire)
-        formData.append('token', authData.token)
-
-        const ikRes = await fetch(`${IMAGEKIT_URL_ENDPOINT}/api/v1/files/upload`, {
-          method: 'POST',
-          body: formData,
-        })
-        const ikData = await ikRes.json()
-        if (ikData.name) updates.image_url = ikData.name
-      }
-
       if (Object.keys(updates).length === 0) {
         showMessage('error', 'Bạn chưa bổ sung thêm thông tin nào')
         setSaving(false)
         return
       }
+
+      updates.updated_at = nowIso
 
       if (isAdmin) {
         const { error } = await supabase.from('stores').update(updates).eq('id', id)
@@ -432,7 +405,6 @@ export default function EditStore() {
             })
           )
         }
-        setSuccessMode('supplement-update')
       } else {
         const { error } = await supabase.from('store_reports').insert([{
           store_id: id,
@@ -442,16 +414,86 @@ export default function EditStore() {
           reporter_id: null,
         }])
         if (error) throw error
-        setSuccessMode('supplement-report')
       }
-
-      setShowSuccess(true)
-      showMessage('success', isAdmin ? 'Đã bổ sung thông tin cửa hàng!' : 'Đã gửi đề xuất bổ sung để admin duyệt!', 1500)
+      await pushSearchWithNotice(isAdmin ? 'Đã bổ sung thông tin cửa hàng!' : 'Đã gửi đề xuất bổ sung để admin duyệt!')
     } catch (err) {
       console.error(err)
       showMessage('error', err.message || 'Lưu thất bại, vui lòng thử lại')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSaveSupplement() {
+    if (!hasEditableSupplementFields) {
+      showMessage('error', 'Cửa hàng này không còn dữ liệu nào để bổ sung')
+      return
+    }
+
+    const { normalizedPhone: validatedSupplementPhone, error: supplementPhoneError } = await validateCurrentPhone({ skipWhenLocked: true })
+    if (supplementPhoneError) {
+      showMessage('error', supplementPhoneError)
+      return
+    }
+
+    setConfirmAction({
+      open: true,
+      type: 'supplement',
+      payload: { validatedSupplementPhone },
+    })
+  }
+
+  async function executeEditSave(validatedPhone) {
+    setSaving(true)
+    try {
+      const nowIso = new Date().toISOString()
+
+      const finalCoords = getFinalCoordinates()
+      const updates = {
+        name: toTitleCaseVI(name.trim()),
+        store_type: storeType || DEFAULT_STORE_TYPE,
+        address_detail: addressDetail.trim() || null,
+        ward: ward.trim() || null,
+        district: district.trim() || null,
+        phone: validatedPhone || null,
+        note: note.trim() || null,
+        active,
+        latitude: finalCoords.latitude,
+        longitude: finalCoords.longitude,
+        updated_at: nowIso,
+      }
+
+      const { error } = await supabase.from('stores').update(updates).eq('id', id)
+      if (error) throw error
+      const nextStore = { ...store, ...updates }
+      await updateStoreInCache(id, updates)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('storevis:stores-changed', {
+            detail: { type: 'update', id, store: nextStore },
+          })
+        )
+      }
+      await pushSearchWithNotice('Đã lưu thay đổi cửa hàng!')
+    } catch (err) {
+      console.error(err)
+      showMessage('error', err.message || 'Lưu thất bại, vui lòng thử lại')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleConfirmAction() {
+    const payload = confirmAction.payload || {}
+    const type = confirmAction.type
+    setConfirmAction({ open: false, type: '', payload: null })
+
+    if (type === 'supplement') {
+      await executeSaveSupplement(payload.validatedSupplementPhone)
+      return
+    }
+    if (type === 'edit') {
+      await executeEditSave(payload.validatedPhone)
     }
   }
 
@@ -474,66 +516,11 @@ export default function EditStore() {
       return
     }
 
-    setSaving(true)
-    try {
-      let newImageUrl = store?.image_url || null
-
-      if (imageFile) {
-        const authRes = await fetch('/api/imagekit-auth')
-        const authData = await authRes.json()
-        if (!authData.token) throw new Error('imagekit-auth thất bại')
-
-        const { IMAGEKIT_URL_ENDPOINT, IMAGEKIT_PUBLIC_KEY } = await import('@/lib/constants')
-        const formData = new FormData()
-        formData.append('file', imageFile)
-        formData.append('fileName', `store-${id}-${Date.now()}`)
-        formData.append('publicKey', IMAGEKIT_PUBLIC_KEY)
-        formData.append('signature', authData.signature)
-        formData.append('expire', authData.expire)
-        formData.append('token', authData.token)
-
-        const ikRes = await fetch(`${IMAGEKIT_URL_ENDPOINT}/api/v1/files/upload`, {
-          method: 'POST',
-          body: formData,
-        })
-        const ikData = await ikRes.json()
-        if (ikData.name) newImageUrl = ikData.name
-      }
-
-      const finalCoords = getFinalCoordinates()
-      const updates = {
-        name: toTitleCaseVI(name.trim()),
-        store_type: storeType || DEFAULT_STORE_TYPE,
-        address_detail: addressDetail.trim() || null,
-        ward: ward.trim() || null,
-        district: district.trim() || null,
-        phone: validatedPhone || null,
-        note: note.trim() || null,
-        active,
-        latitude: finalCoords.latitude,
-        longitude: finalCoords.longitude,
-        image_url: newImageUrl,
-      }
-
-      const { error } = await supabase.from('stores').update(updates).eq('id', id)
-      if (error) throw error
-      const nextStore = { ...store, ...updates }
-      await updateStoreInCache(id, updates)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'update', id, store: nextStore },
-          })
-        )
-      }
-      showMessage('success', 'Đã lưu thay đổi!', 1500)
-      setTimeout(() => router.push('/'), 1600)
-    } catch (err) {
-      console.error(err)
-      showMessage('error', err.message || 'Lưu thất bại, vui lòng thử lại')
-    } finally {
-      setSaving(false)
-    }
+    setConfirmAction({
+      open: true,
+      type: 'edit',
+      payload: { validatedPhone },
+    })
   }
 
   if (authLoading || !pageReady) return <FullPageLoading />
@@ -582,12 +569,35 @@ export default function EditStore() {
     )
   }
 
-  const hasExistingImage = Boolean(String(store?.image_url || '').trim())
-  const currentImage = imagePreview || (imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url))
-  const supplementCurrentImage = hasExistingImage ? currentImage : imagePreview
+  const confirmDialogNode = (
+    <ConfirmDialog
+      open={confirmAction.open}
+      onOpenChange={(open) => {
+        setConfirmAction((prev) => (open ? prev : { open: false, type: '', payload: null }))
+      }}
+      title={confirmAction.type === 'supplement' ? 'Xác nhận bổ sung cửa hàng' : 'Xác nhận chỉnh sửa cửa hàng'}
+      description={
+        confirmAction.type === 'supplement'
+          ? 'Bạn có chắc muốn lưu phần dữ liệu bổ sung này không?'
+          : 'Bạn có chắc muốn lưu các thay đổi của cửa hàng không?'
+      }
+      confirmLabel={confirmAction.type === 'supplement' ? 'Lưu bổ sung' : 'Lưu thay đổi'}
+      loading={saving}
+      onConfirm={handleConfirmAction}
+    />
+  )
+
+  const loadingOverlayNode = (
+    <FullPageLoading
+      visible={saving}
+      message={isSupplementMode ? 'Đang lưu bổ sung…' : 'Đang cập nhật cửa hàng…'}
+    />
+  )
+
 
   if (isSupplementMode) {
     return (
+      <>
         <StoreSupplementForm
         router={router}
         user={isAdmin ? user : null}
@@ -613,13 +623,6 @@ export default function EditStore() {
         setPhone={setPhone}
         note={note}
         setNote={setNote}
-        imageFile={imageFile}
-        setImageFile={setImageFile}
-        imagePreview={imagePreview}
-        setImagePreview={setImagePreview}
-        setImageError={setImageError}
-        currentImage={supplementCurrentImage}
-        fileInputRef={fileInputRef}
         supplementLocks={supplementLocks}
         pickedLat={pickedLat}
         pickedLng={pickedLng}
@@ -637,11 +640,15 @@ export default function EditStore() {
         handleMapsLink={handleMapsLink}
         handleSaveSupplement={handleSaveSupplement}
       />
+      {loadingOverlayNode}
+      {confirmDialogNode}
+      </>
     )
   }
 
   return (
     <div className="min-h-screen bg-black">
+      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       {/* Header */}
       <div className="sticky top-0 z-20 bg-black/95 backdrop-blur border-b border-gray-800 px-4 py-3 flex items-center gap-3">
         <Button
@@ -679,44 +686,6 @@ export default function EditStore() {
             ))}
           </select>
         </div>
-        {/* Image */}
-        <div>
-          <Label className="text-sm font-medium text-gray-300 mb-2 block">Ảnh cửa hàng</Label>
-          <div
-            className="relative w-full h-48 rounded-2xl overflow-hidden bg-gray-900 cursor-pointer group border border-gray-800"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {currentImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={currentImage}
-                alt={store.name}
-                className="w-full h-full object-cover"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <svg className="w-12 h-12 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-              <span className="text-white text-sm font-medium">Đổi ảnh</span>
-            </div>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleImageChange}
-          />
-          {imageFile && (
-            <p className="text-xs text-gray-500 mt-1">Ảnh mới: {imageFile.name}</p>
-          )}
-        </div>
-
         {/* Name */}
         <div>
           <Label htmlFor="edit-name" className="text-sm font-medium text-gray-300 mb-1.5 block">
@@ -876,13 +845,6 @@ export default function EditStore() {
           </div>
         </div>
 
-        {/* Toast message */}
-        {msgState.show && (
-          <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${msgState.type === 'error' ? 'bg-red-500' : 'bg-green-600'}`}>
-            {msgState.text}
-          </div>
-        )}
-
         {/* Submit */}
         <div className="pt-2 pb-8">
           <Button
@@ -901,6 +863,9 @@ export default function EditStore() {
           </Button>
         </div>
       </form>
+
+      {confirmDialogNode}
+      {loadingOverlayNode}
     </div>
   )
 }

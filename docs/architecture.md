@@ -90,7 +90,8 @@ customer/
 [storeCache.js — 3 layers]
   1. In-memory (60s cooldown, promise dedup)
   2. IndexedDB storevis_cache
-  3. Supabase (count + max updated_at check)
+  3. Supabase (version check ưu tiên, fallback count + max updated_at)
+  4. Global version row: `store_cache_versions(cache_key='stores')`
   ↕
 [Pages: getOrRefreshStores()] → filter + sort client-side
   - Mặc định trang tìm kiếm: không có tiêu chí thì render toàn bộ cửa hàng, sort gần → xa
@@ -142,6 +143,24 @@ customer/
 - EDIT / verify / report-apply / telesale update → `updateStoreInCache()` hoặc `updateStoresInCache()`
 - Chỉ fallback sang `invalidateStoreCache()` khi không thể merge local an toàn
 - Custom event `storevis:stores-changed` để sync giữa tabs
+- Sau các thao tác thành công ở create/edit/supplement/delete:
+  - điều hướng về `/`
+  - ghi flash message vào `sessionStorage['storevis:flash-message']`
+  - Search page hiển thị message qua `Msg` (top-slide) theo chuẩn thống nhất
+
+### Cache Version Sync (2026-04-05)
+
+- Migration SQL: `docs/sql/2026-04-05-add-store-cache-version.sql`
+- DB objects:
+  - table `public.store_cache_versions`
+  - function `public.bump_stores_cache_version()`
+  - trigger `trg_stores_bump_cache_version` on `public.stores`
+- Runtime behavior trong `lib/storeCache.js`:
+  - cache local lưu thêm `cacheVersion`
+  - khi đọc cache: check version nhẹ từ `store_cache_versions`
+  - nếu version trùng: không fetch all
+  - nếu version lệch: fetch all rồi cập nhật cache
+  - nếu version table chưa sẵn sàng: fallback logic cũ `count + max(updated_at)`
 
 ---
 

@@ -7,6 +7,7 @@
 
 import { haversineKm } from '@/helper/distance'
 import { getOrRefreshStores } from '@/lib/storeCache'
+import { parseCoordinate } from '@/helper/coordinate'
 
 /** Common business-type words that should be ignored when comparing names. */
 export const IGNORED_NAME_TERMS = [
@@ -85,13 +86,6 @@ export function extractWords(normalized) {
     .split(' ')
     .map((w) => w.trim())
     .filter((w) => w.length >= 2)
-}
-
-function parseCoordinate(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
-  if (typeof value !== 'string') return NaN
-  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
-  return Number.isFinite(parsed) ? parsed : NaN
 }
 
 // ── Comparison functions ────────────────────────────────────────────────
