@@ -677,7 +677,9 @@ export default function HomePage() {
             </div>
           )}
 
-          {hasSearchCriteria ? (
+          {showSkeleton ? (
+            <div className="h-5 w-56 animate-pulse rounded bg-gray-800" aria-hidden="true" />
+          ) : hasSearchCriteria ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <p className="min-w-0 text-sm text-gray-400">
                 Tìm thấy <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng
@@ -697,11 +699,9 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            !showSkeleton && (
-              <p className="text-sm text-gray-400">
-                Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
-              </p>
-            )
+            <p className="text-sm text-gray-400">
+              Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
+            </p>
           )}
         </div>
 
