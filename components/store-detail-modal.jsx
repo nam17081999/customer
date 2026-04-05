@@ -399,7 +399,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
           </div>
         </div>
 
-        <div className="p-4 space-y-3">
+        <div className="p-3 space-y-3">
           {/* Name + distance */}
           <div className="rounded-xl border border-gray-800 bg-gray-950/70 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Thông tin cửa hàng</p>
@@ -534,7 +534,6 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
               onClick={(e) => {
                 e.stopPropagation()
                 const from = router.asPath || '/'
-                resolvedOnOpenChange?.(false)
                 router.push(`/store/report/${store.id}?from=${encodeURIComponent(from)}`)
               }}
             >

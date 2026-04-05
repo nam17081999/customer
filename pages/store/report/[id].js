@@ -85,9 +85,6 @@ export default function StoreReportPage() {
 
           <header className="space-y-1">
             <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Báo cáo cửa hàng</h1>
-            <p className="text-base text-gray-400">
-              Giao diện riêng để nhập báo cáo đầy đủ và dễ thao tác hơn trên điện thoại.
-            </p>
           </header>
 
           {loading && (
