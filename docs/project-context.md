@@ -173,3 +173,54 @@ Màn telesale đang dùng route:
 Script SQL cap nhat moi truong duoc luu tai:
 
 - `docs/sql/2026-04-01-add-store-telesale-columns.sql`
+
+---
+
+## Search UX Notes (2026-04)
+
+- Search hiện giữ trạng thái theo cả URL và `sessionStorage`.
+- Người dùng đang tìm dở, chuyển sang trang khác rồi bấm lại tab `Tìm kiếm`, phải quay về đúng search trước đó.
+- Các tiêu chí đang được giữ gồm:
+  - từ khóa (`q`)
+  - quận/huyện (`district`)
+  - xã/phường (`ward`)
+  - loại cửa hàng (`types`)
+  - các cờ chi tiết dữ liệu (`flags`)
+- Khi thay đổi text hoặc filter trong lúc đang cuộn sâu ở danh sách, danh sách phải tự trở về đầu để người dùng nhìn thấy kết quả mới ngay.
+
+## Recent Updates (2026-04-05)
+
+- Đã thêm cơ chế version cache cho `stores` để giảm call toàn bộ dữ liệu:
+  - SQL migration: `docs/sql/2026-04-05-add-store-cache-version.sql`
+  - Bảng mới: `public.store_cache_versions`
+  - Trigger mới: `trg_stores_bump_cache_version` (bump version sau mỗi `insert/update/delete` trên `stores`)
+- `lib/storeCache.js` đã ưu tiên check version nhẹ trước khi quyết định refetch toàn bộ:
+  - Nếu `cacheVersion` local trùng server version: dùng cache ngay
+  - Nếu lệch version: mới fetch all để đồng bộ
+  - Nếu chưa chạy migration version: fallback về cơ chế cũ `count + max(updated_at)`
+- Luồng thao tác dữ liệu chính đã thống nhất cập nhật `updated_at` khi mutate:
+  - chỉnh sửa
+  - bổ sung
+  - soft delete
+  - cập nhật telesale
+- Sau các thao tác thành công, app điều hướng về Search (`/`) và hiển thị thông báo chung dạng trượt từ trên xuống:
+  - tạo cửa hàng
+  - chỉnh sửa
+  - bổ sung
+  - xóa
+- Flash message được truyền qua `sessionStorage` key `storevis:flash-message` để dùng chung giữa trang nguồn và trang Search.
+
+## Vietnamese Copy Note
+
+- Các thay đổi gần đây ở search/navbar đã từng phát sinh lỗi tiếng Việt do ghi file sai encoding.
+- Với các file UI có tiếng Việt hiển thị trực tiếp như `pages/index.js` và `components/navbar.jsx`, cần giữ UTF-8 không BOM và kiểm tra lại text sau khi sửa.
+- Repo có thêm:
+  - `npm run text:check` để quét mojibake trên toàn repo
+  - `npm run text:check:staged` để quét file staged trước khi commit
+  - `.githooks/pre-commit` để chặn commit chứa dấu hiệu lỗi mã hóa
+- Sau khi clone repo hoặc đổi Git config cục bộ, cần chạy lại `npm run hooks:install`.
+
+## Create Role Note
+
+- Khi `telesale` tạo cửa hàng mới ở `/store/create`, cửa hàng đó mặc định là `tiềm năng` (`is_potential = true`).
+- Rule này đi theo payload tạo store, nên áp dụng đồng nhất cho cả tạo đầy đủ vị trí và `Lưu luôn` không có vị trí.

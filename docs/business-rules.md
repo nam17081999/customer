@@ -317,3 +317,10 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 - Hai màn áp dụng bắt buộc:
   - `/store/verify`
   - `/store/reports`
+## 14. Tạo Store Theo Role
+
+- Nếu người tạo là `telesale`, store mới được tạo trực tiếp trong `stores` sẽ mặc định có `is_potential = true`.
+- Rule này áp dụng cho cả:
+  - luồng tạo đủ 3 bước
+  - nhánh `Lưu luôn` ở bước 2
+- `guest` và `admin` giữ nguyên hành vi cũ, không tự bật `is_potential` chỉ vì vừa tạo store.

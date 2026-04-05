@@ -49,7 +49,7 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 | Success | `bg-green-950/30` | Thông báo thành công |
 | Warning | `bg-amber-950/30` | Cảnh báo |
 | Error | `bg-red-950/30` | Lỗi |
-| Active nav mobile | `text-blue-400` | Tab đang chọn |
+| Active nav mobile | `text-blue-400` | Tab ?"??~ang chọn |
 | Step/Tag active | `bg-blue-600` | Trạng thái đang chọn |
 | Step/Tag inactive | `bg-gray-800 border-gray-700` | Trạng thái chưa chọn (cố định) |
 
@@ -196,3 +196,22 @@ Trang map luôn dark (không theo system preference):
 - UI copy tiếng Việt phải được lưu trực tiếp bằng `UTF-8`.
 - Nếu có nghi ngờ lỗi dấu, ưu tiên kiểm tra trên browser trước khi rewrite file.
 - `.editorconfig` của repo là một phần của design hygiene để tránh lệch encoding giữa các editor.
+
+---
+## Search Page Copy Rules
+
+- Các label điều hướng và tìm kiếm trên navbar/search page là copy lõi, không được để lỗi dấu tiếng Việt.
+- Các nhãn sau cần giữ nguyên chính tả khi chỉnh sửa UI:
+  - `Tìm kiếm`
+  - `Lọc`
+  - `Mở bộ lọc chi tiết`
+  - `Quận / Huyện`
+  - `Xã / Phường`
+  - `Chi tiết dữ liệu`
+  - `Không có vị trí`
+  - `Tiềm năng`
+  - `Xóa lọc`
+  - `Thu gọn`
+  - `Không tìm thấy cửa hàng`
+  - `Hết kết quả`
+- Sau khi sửa copy tiếng Việt ở các khu vực này, cần kiểm tra trực tiếp trên UI hoặc ít nhất qua diff UTF-8 sạch, không chỉ dựa vào terminal Windows.

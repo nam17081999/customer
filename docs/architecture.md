@@ -90,7 +90,8 @@ customer/
 [storeCache.js — 3 layers]
   1. In-memory (60s cooldown, promise dedup)
   2. IndexedDB storevis_cache
-  3. Supabase (count + max updated_at check)
+  3. Supabase (version check ưu tiên, fallback count + max updated_at)
+  4. Global version row: `store_cache_versions(cache_key='stores')`
   ↕
 [Pages: getOrRefreshStores()] → filter + sort client-side
   - Mặc định trang tìm kiếm: không có tiêu chí thì render toàn bộ cửa hàng, sort gần → xa
@@ -142,6 +143,24 @@ customer/
 - EDIT / verify / report-apply / telesale update → `updateStoreInCache()` hoặc `updateStoresInCache()`
 - Chỉ fallback sang `invalidateStoreCache()` khi không thể merge local an toàn
 - Custom event `storevis:stores-changed` để sync giữa tabs
+- Sau các thao tác thành công ở create/edit/supplement/delete:
+  - điều hướng về `/`
+  - ghi flash message vào `sessionStorage['storevis:flash-message']`
+  - Search page hiển thị message qua `Msg` (top-slide) theo chuẩn thống nhất
+
+### Cache Version Sync (2026-04-05)
+
+- Migration SQL: `docs/sql/2026-04-05-add-store-cache-version.sql`
+- DB objects:
+  - table `public.store_cache_versions`
+  - function `public.bump_stores_cache_version()`
+  - trigger `trg_stores_bump_cache_version` on `public.stores`
+- Runtime behavior trong `lib/storeCache.js`:
+  - cache local lưu thêm `cacheVersion`
+  - khi đọc cache: check version nhẹ từ `store_cache_versions`
+  - nếu version trùng: không fetch all
+  - nếu version lệch: fetch all rồi cập nhật cache
+  - nếu version table chưa sẵn sàng: fallback logic cũ `count + max(updated_at)`
 
 ---
 
@@ -166,7 +185,7 @@ customer/
 
 ## API Routes
 
-| Endpoint | Method | Chức năng |
+| Endpoint | Method | Chức n?"?'ng |
 |---|---|---|
 | `/api/upload-image` | POST | Upload ảnh → ImageKit (private key) |
 | `/api/upload-image` | DELETE | Xóa ảnh khỏi ImageKit |
@@ -245,9 +264,29 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 - Source/docs có tiếng Việt phải được giữ ở `UTF-8`; repo dùng `.editorconfig` để giảm lỗi encoding giữa editor/tool khác nhau.
 - Khi sửa text tiếng Việt, ưu tiên patch cục bộ thay vì rewrite cả file.
+- Repo có thêm guardrail tự động:
+  - `scripts/check-mojibake.js`
+  - `npm run text:check`
+  - `npm run text:check:staged`
+  - `.githooks/pre-commit`
+  - `npm run hooks:install` để đặt `core.hooksPath = .githooks`
 - Các dialog xác nhận ở màn admin phải dùng đúng primitive accessibility của Radix:
   - `DialogTitle`
   - `DialogDescription`
 - Rule này áp dụng rõ cho:
   - `/store/verify`
   - `/store/reports`
+
+---
+## Search State Persistence
+
+- Trang `/` đồng bộ trạng thái tìm kiếm lên URL qua query params: `q`, `district`, `ward`, `types`, `flags`.
+- Khi người dùng rời trang rồi bấm lại tab `Tìm kiếm`, navbar đọc `sessionStorage['storevis:last-search-route']` để quay lại đúng URL tìm kiếm gần nhất thay vì quay về `/` rỗng.
+- Trên trang `/`, khi người dùng đổi text tìm kiếm hoặc đổi bộ lọc, danh sách kết quả sẽ tự cuộn về đầu bằng `react-virtuoso` để tránh giữ nguyên vị trí cuộn cũ.
+- Logic này chỉ áp dụng khi tiêu chí tìm kiếm thay đổi, không tự cuộn lại khi dữ liệu store đồng bộ nền.
+
+## Vietnamese Text Guardrail For Recent Search/Navbar Changes
+
+- Các nhãn mới ở `pages/index.js` và `components/navbar.jsx` phải được lưu trực tiếp bằng UTF-8 sạch.
+- Các chuỗi vừa thêm cần giữ đúng tiếng Việt hiển thị, gồm: `Tìm kiếm`, `Lọc`, `Mở bộ lọc chi tiết`, `Xóa lọc`, `Thu gọn`, `Không tìm thấy cửa hàng`, `Hết kết quả`, `Người dùng`.
+- Khi sửa lại các khu vực này, ưu tiên patch cục bộ và tránh rewrite lớn nếu không cần thiết để giảm rủi ro lỗi mã hóa.

@@ -9,10 +9,12 @@ import { supabase } from '@/lib/supabaseClient'
 import { appendStoresToCache, getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import {
   DEFAULT_STORE_TYPE,
+  STORE_TYPE_OPTION_BY_VALUE,
   STORE_TYPE_OPTIONS,
 } from '@/lib/constants'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { haversineKm } from '@/helper/distance'
+import { hasValidCoordinates, parseCoordinate } from '@/helper/coordinate'
 import {
   containsAllInputWords,
   extractWords,
@@ -72,26 +74,6 @@ function buildOptionLookup(options) {
 }
 
 const STORE_TYPE_LOOKUP = buildOptionLookup(STORE_TYPE_OPTIONS)
-
-function parseCoordinate(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
-  if (typeof value !== 'string') return NaN
-  const trimmed = value.trim()
-  if (!trimmed) return NaN
-  const parsed = Number.parseFloat(trimmed.replace(/,/g, '.'))
-  return Number.isFinite(parsed) ? parsed : NaN
-}
-
-function hasValidCoordinates(lat, lng) {
-  return (
-    Number.isFinite(lat)
-    && Number.isFinite(lng)
-    && lat >= -90
-    && lat <= 90
-    && lng >= -180
-    && lng <= 180
-  )
-}
 
 function sanitizeCsvValue(value) {
   const normalized = value == null ? '' : String(value)
@@ -189,7 +171,7 @@ function getCsvCell(row, headerMap, field) {
 
 function resolveStoreType(rawValue) {
   if (!String(rawValue || '').trim()) {
-    const fallback = STORE_TYPE_OPTIONS.find((option) => option.value === DEFAULT_STORE_TYPE) || STORE_TYPE_OPTIONS[0]
+    const fallback = STORE_TYPE_OPTION_BY_VALUE[DEFAULT_STORE_TYPE] || STORE_TYPE_OPTIONS[0]
     return { option: fallback, error: '' }
   }
   const matched = STORE_TYPE_LOOKUP.get(normalizeToken(rawValue))
@@ -866,7 +848,7 @@ export default function StoreImportPage() {
                       <p className="text-sm text-gray-400">
                         Mỗi dòng được kiểm tra lỗi dữ liệu, trùng y hệt trong file và cửa hàng có thể trùng trong hệ thống cùng quận / huyện.
                       </p>
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-sm text-gray-500">
                         Đang hiển thị {visiblePreviewRows.length} / {previewRows.length} dòng
                       </p>
                     </div>
@@ -902,10 +884,10 @@ export default function StoreImportPage() {
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className="inline-flex rounded-full border border-gray-800 bg-black/40 px-2 py-0.5 text-xs font-medium text-gray-300">
+                                <span className="inline-flex rounded-full border border-gray-800 bg-black/40 px-2 py-0.5 text-sm font-medium text-gray-300">
                                   Dòng {row.rowNumber}
                                 </span>
-                                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getRowStatusVariant(row.status)}`}>
+                                <span className={`inline-flex rounded-full px-2.5 py-1 text-sm font-medium ${getRowStatusVariant(row.status)}`}>
                                   {getRowStatusLabel(row.status)}
                                 </span>
                               </div>
@@ -918,7 +900,7 @@ export default function StoreImportPage() {
                             </div>
                           </div>
 
-                          <div className="mt-3 flex flex-wrap gap-2 text-xs sm:text-sm">
+                          <div className="mt-3 flex flex-wrap gap-2 text-sm">
                             <span className="inline-flex items-center rounded-full border border-gray-800 bg-black/40 px-2.5 py-1 text-gray-300">
                               Loại: {row.storeTypeLabel || 'Không rõ'}
                             </span>
@@ -953,7 +935,7 @@ export default function StoreImportPage() {
                               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
                                   <p className="text-sm font-medium text-gray-100">Xử lý cửa hàng nghi trùng</p>
-                                  <p className="mt-1 text-xs text-gray-400">
+                                  <p className="mt-1 text-sm text-gray-400">
                                     Bước 1: chọn đúng cửa hàng trong hệ thống. Bước 2: chọn ưu tiên dữ liệu cũ hay dữ liệu mới.
                                   </p>
                                 </div>
@@ -994,10 +976,10 @@ export default function StoreImportPage() {
                                           <div className="text-sm font-medium text-gray-100 break-words">
                                             {match.name || 'Cửa hàng'}
                                           </div>
-                                          <div className="mt-1 text-xs text-gray-400 break-words">
+                                          <div className="mt-1 text-sm text-gray-400 break-words">
                                             {formatAddressParts(match) || 'Chưa có địa chỉ'}
                                           </div>
-                                          <div className="mt-1 text-xs text-gray-500">
+                                          <div className="mt-1 text-sm text-gray-500">
                                             {typeof match.distance === 'number'
                                               ? formatDistance(match.distance)
                                               : (match.hasCoordinates ? 'Đã có vị trí' : 'Không có vị trí')}
@@ -1022,7 +1004,7 @@ export default function StoreImportPage() {
                               {selectedDuplicate && row.resolutionMode !== 'create' && (
                                 <div className="mt-3 rounded-lg border border-sky-900/70 bg-sky-950/20 px-3 py-2">
                                   <p className="text-sm font-medium text-sky-100">Đã chọn đối chiếu với: {selectedDuplicate.name}</p>
-                                  <p className="mt-1 text-xs text-sky-200/90">
+                                  <p className="mt-1 text-sm text-sky-200/90">
                                     Field chỉ có ở một bên sẽ luôn được giữ lại. Với field có ở cả hai bên, chọn cách ưu tiên bên dưới.
                                   </p>
                                 </div>
@@ -1040,7 +1022,7 @@ export default function StoreImportPage() {
                                     }`}
                                   >
                                     <div className="text-sm font-semibold">Giữ dữ liệu cũ</div>
-                                    <div className="mt-1 text-xs text-gray-400">
+                                    <div className="mt-1 text-sm text-gray-400">
                                       Chỉ lấy thêm các field đang thiếu trong hệ thống.
                                     </div>
                                   </button>
@@ -1054,7 +1036,7 @@ export default function StoreImportPage() {
                                     }`}
                                   >
                                     <div className="text-sm font-semibold">Lấy dữ liệu mới</div>
-                                    <div className="mt-1 text-xs text-gray-400">
+                                    <div className="mt-1 text-sm text-gray-400">
                                       Giữ lại field thiếu và ưu tiên dữ liệu từ file khi có xung đột.
                                     </div>
                                   </button>

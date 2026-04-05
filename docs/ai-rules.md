@@ -22,6 +22,9 @@ Quy tắc bắt buộc khi sinh code cho project StoreVis. Đọc file này trư
 - Ưu tiên `apply_patch` khi chỉ sửa một phần file có tiếng Việt.
 - Tránh rewrite cả file bằng PowerShell `Set-Content`, `Out-File`, hoặc pipeline text nếu chưa kiểm soát rõ encoding đầu ra.
 - Khi buộc phải tạo file mới, giữ literal tiếng Việt chuẩn trong source; không chấp nhận mojibake như `Ã`, `Ä`, `áº`, `á»`.
+- Trước khi commit, chạy `npm run text:check:staged`. Khi cần quét toàn repo, chạy `npm run text:check`.
+- Repo dùng hook `.githooks/pre-commit` để chặn commit nếu file staged còn dấu hiệu mojibake. Sau khi clone repo hoặc reset Git config cục bộ, chạy lại `npm run hooks:install`.
+- `docs/ai-rules.md` là ngoại lệ duy nhất có thể chứa ví dụ mojibake để minh họa rule cấm. Không dùng file này làm bằng chứng rằng repo còn lỗi encoding.
 - Sau khi sửa text tiếng Việt:
   1. kiểm tra lại `git diff`
   2. nếu là UI text, ưu tiên reload màn hình để xác nhận
@@ -46,6 +49,31 @@ await appendStoreToCache(newStore)      // sau CREATE
 await removeStoreFromCache(storeId)     // sau soft-delete
 await invalidateStoreCache()            // sau EDIT
 ```
+
+### Cache versioning (bat buoc cho moi moi truong)
+
+- Moi moi truong Supabase phai chay migration:
+  - `docs/sql/2026-04-05-add-store-cache-version.sql`
+- Neu migration da co:
+  - uu tien check version tu `store_cache_versions`
+  - chi fetch all stores khi version lech
+- Neu migration chua co:
+  - cho phep fallback tam thoi `count + max(updated_at)`
+
+### updated_at rule (bat buoc)
+
+- Moi thay doi du lieu tren `stores` phai cap nhat `updated_at` cung luc:
+  - edit
+  - supplement
+  - soft delete
+  - telesale updates
+
+### Redirect + thong bao sau thao tac thanh cong
+
+- Sau `create/edit/supplement/delete` thanh cong:
+  - dieu huong ve `/`
+  - hien thong bao top-slide thong nhat bang `Msg`
+  - flash payload dung `sessionStorage['storevis:flash-message']`
 
 **Ngoại lệ duy nhất cho export admin:**
 ```js

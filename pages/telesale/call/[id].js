@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabaseClient'
-import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
+import { getCachedStores, updateStoreInCache } from '@/lib/storeCache'
 import { formatAddressParts } from '@/lib/utils'
 import { TELESALE_CALL_RESULT_OPTIONS, formatLastCalledText, getTelesaleResultLabel } from '@/helper/telesale'
 
@@ -64,7 +64,8 @@ export default function TelesaleCallResultPage() {
     setLoadingStore(true)
     setError('')
     try {
-      const stores = await getOrRefreshStores()
+      const cached = await getCachedStores()
+      const stores = Array.isArray(cached?.data) ? cached.data : []
       const found = (stores || []).find((item) => String(item.id) === String(id))
       if (!found) {
         setStore(null)
@@ -110,6 +111,7 @@ export default function TelesaleCallResultPage() {
       last_call_result_at: nowIso,
       sales_note: salesNote.trim() || null,
       last_order_reported_at: callResult === 'da_len_don' ? nowIso : null,
+      updated_at: nowIso,
     }
 
     const { error: updateError } = await supabase

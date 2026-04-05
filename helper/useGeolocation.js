@@ -35,7 +35,6 @@ export function useGeolocation(options = {}) {
 
     for (let i = 0; i < attempts; i++) {
       try {
-        // eslint-disable-next-line no-await-in-loop
         const position = await new Promise((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
             resolve,

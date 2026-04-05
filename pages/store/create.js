@@ -14,9 +14,9 @@ import {
   STORE_TYPE_OPTIONS,
   DEFAULT_STORE_TYPE,
 } from '@/lib/constants'
-// browser-image-compression is dynamically imported at usage point to reduce bundle size
 import { Msg } from '@/components/ui/msg'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { findDuplicatePhoneStores, formatDistance, validateVietnamPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
 import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
@@ -25,6 +25,7 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { invalidateStoreCache, appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { haversineKm } from '@/helper/distance'
+import { parseCoordinate } from '@/helper/coordinate'
 import {
   findNearbySimilarStores,
   findGlobalExactNameMatches,
@@ -38,7 +39,7 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
 
 export default function AddStore() {
   const router = useRouter()
-  const { isAdmin } = useAuth() || {}
+  const { isAdmin, isTelesale } = useAuth() || {}
   const [name, setName] = useState('')
   const [storeType, setStoreType] = useState(DEFAULT_STORE_TYPE)
   const nameInputRef = useRef(null)
@@ -62,21 +63,13 @@ export default function AddStore() {
   )
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const [imageFile, setImageFile] = useState(null)
   const [showMoreMobileStep2, setShowMoreMobileStep2] = useState(false)
-  const previewUrl = useMemo(() => (imageFile ? URL.createObjectURL(imageFile) : null), [imageFile])
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl)
-    }
-  }, [previewUrl])
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
   useEffect(() => {
     if (currentStep !== 2) setShowMoreMobileStep2(false)
   }, [currentStep])
-  const [showSuccess, setShowSuccess] = useState(false)
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
@@ -107,6 +100,23 @@ export default function AddStore() {
   const [mapsLink, setMapsLink] = useState('')
   const [mapsLinkLoading, setMapsLinkLoading] = useState(false)
   const [mapsLinkError, setMapsLinkError] = useState('')
+  const [confirmCreate, setConfirmCreate] = useState({
+    open: false,
+    type: '',
+    payload: null,
+  })
+
+  const pushSearchWithNotice = useCallback(async (text, type = 'success') => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
+        type,
+        text,
+        createdAt: Date.now(),
+      }))
+      window.dispatchEvent(new CustomEvent('storevis:flash-message'))
+    }
+    await router.push('/')
+  }, [router])
   useEffect(() => {
     wardRef.current = ward
   }, [ward])
@@ -114,7 +124,7 @@ export default function AddStore() {
     districtRef.current = district
   }, [district])
   const hasUnsavedChanges = useMemo(() => {
-    if (loading || showSuccess) return false
+    if (loading) return false
     return Boolean(
       name.trim() ||
       storeType !== DEFAULT_STORE_TYPE ||
@@ -123,12 +133,11 @@ export default function AddStore() {
       district.trim() ||
       phone.trim() ||
       note.trim() ||
-      imageFile ||
       pickedLat != null ||
       pickedLng != null ||
       currentStep !== 1
     )
-  }, [name, storeType, addressDetail, ward, district, phone, note, imageFile, pickedLat, pickedLng, currentStep, loading, showSuccess])
+  }, [name, storeType, addressDetail, ward, district, phone, note, pickedLat, pickedLng, currentStep, loading])
 
 
   // Extract lat/lng from a Google Maps URL
@@ -221,13 +230,6 @@ export default function AddStore() {
       setUserHasEditedMap(true)
     }
   }, [mapEditable])
-
-  function parseCoordinate(value) {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
-    if (typeof value !== 'string') return NaN
-    const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
-    return Number.isFinite(parsed) ? parsed : NaN
-  }
 
   async function autoFillNearestDistrictWard(originLat, originLng) {
     if (nearestLocationPrefilledRef.current || nearestLocationPrefillRunningRef.current) return
@@ -391,7 +393,6 @@ export default function AddStore() {
     setDistrict('')
     setPhone('')
     setNote('')
-    setImageFile(null)
     setAllowDuplicate(false)
     setDuplicateCandidates([])
     setDuplicateCheckError('')
@@ -714,43 +715,6 @@ export default function AddStore() {
         }
       }
 
-      let uploadResult = null
-      let imageFilename = null
-      if (imageFile) {
-        const options = {
-          maxSizeMB: 1,
-          maxWidthOrHeight: 1600,
-          useWebWorker: true,
-          initialQuality: 0.8,
-          fileType: 'image/jpeg',
-        }
-        let fileToUpload = imageFile
-        try {
-          const { default: imageCompression } = await import('browser-image-compression')
-          const compressed = await imageCompression(imageFile, options)
-          fileToUpload = compressed
-        } catch (cmpErr) {
-          console.warn('Nén ảnh thất bại, dùng ảnh gốc:', cmpErr)
-        }
-
-        const formData = new FormData()
-        formData.append('file', fileToUpload)
-        formData.append('fileName', `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.jpg`)
-        formData.append('useUniqueFileName', 'true')
-
-        const uploadResponse = await fetch('/api/upload-image', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (!uploadResponse.ok) {
-          throw new Error('Upload ảnh thất bại')
-        }
-
-        uploadResult = await uploadResponse.json()
-        imageFilename = uploadResult.name
-      }
-
       const normalizedDetail = toTitleCaseVI(addressDetail.trim())
       const normalizedWard = toTitleCaseVI(ward.trim())
       const normalizedDistrict = toTitleCaseVI(district.trim())
@@ -762,9 +726,10 @@ export default function AddStore() {
         ward: normalizedWard,
         district: normalizedDistrict,
         active: isAdmin,
+        is_potential: Boolean(isTelesale),
         note,
         phone: validatedPhone || null,
-        image_url: imageFilename,
+        image_url: null,
         latitude,
         longitude,
       }
@@ -776,17 +741,6 @@ export default function AddStore() {
 
       if (insertError) {
         console.error(insertError)
-        if (uploadResult?.fileId) {
-          try {
-            await fetch('/api/upload-image', {
-              method: 'DELETE',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ fileId: uploadResult.fileId }),
-            })
-          } catch (deleteErr) {
-            console.warn('Could not delete uploaded image:', deleteErr)
-          }
-        }
         showMessage('error', 'Lỗi khi lưu dữ liệu')
         setLoading(false)
         return false
@@ -799,7 +753,7 @@ export default function AddStore() {
         await invalidateStoreCache()
       }
 
-      setShowSuccess(true)
+      await pushSearchWithNotice('Tạo cửa hàng thành công!')
       return true
     } catch (err) {
       console.error(err)
@@ -817,14 +771,22 @@ export default function AddStore() {
       return
     }
 
-    const confirmed = window.confirm('Bạn có muốn lưu cửa hàng này mà không có vị trí không?')
-    if (!confirmed) return
-
-    await persistStore({
-      latitude: null,
-      longitude: null,
-      shouldCheckFinalDuplicates: false,
+    setConfirmCreate({
+      open: true,
+      type: 'quick-save',
+      payload: {
+        latitude: null,
+        longitude: null,
+        shouldCheckFinalDuplicates: false,
+      },
     })
+  }
+
+  async function handleConfirmCreate() {
+    const payload = confirmCreate.payload
+    if (!payload) return
+    setConfirmCreate({ open: false, type: '', payload: null })
+    await persistStore(payload)
   }
 
 
@@ -927,52 +889,18 @@ export default function AddStore() {
       return
     }
 
-    await persistStore({
-      latitude,
-      longitude,
-      shouldCheckFinalDuplicates: true,
+    setConfirmCreate({
+      open: true,
+      type: 'create',
+      payload: {
+        latitude,
+        longitude,
+        shouldCheckFinalDuplicates: true,
+      },
     })
   }
 
 
-
-  // Success screen
-  if (showSuccess) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center px-6 py-10 space-y-5 max-w-sm mx-auto">
-          <div className="text-6xl">✅</div>
-          <h2 className="text-xl font-bold text-white">Tạo cửa hàng thành công!</h2>
-          <p className="text-sm text-gray-400">Cửa hàng đã được lưu vào hệ thống.</p>
-          <div className="flex flex-col gap-3 pt-2">
-            <Button
-              className="w-full"
-              onClick={() => {
-                setShowSuccess(false)
-                resetCreateForm()
-              }}
-            >
-              Tạo cửa hàng khác
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push('/map')}
-            >
-              Xem bản đồ
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full"
-              onClick={() => router.push('/')}
-            >
-              Về trang chủ
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // Step indicator labels
   const steps = [
@@ -1092,7 +1020,7 @@ export default function AddStore() {
             </>
           )}
 
-          {/* Step 2: Address + Image + Optional info */}
+            {/* Step 2: Address + Optional info */}
           {currentStep === 2 && (
             <>
               {/* Quận/Huyện */}
@@ -1195,7 +1123,7 @@ export default function AddStore() {
                   aria-expanded={showMoreMobileStep2}
                 >
                   <span className="text-sm">
-                    {showMoreMobileStep2 ? 'Thu gọn phần thêm' : 'Hiển thị thêm ảnh và ghi chú'}
+                    {showMoreMobileStep2 ? 'Thu gọn phần thêm' : 'Hiển thị thêm ghi chú'}
                   </span>
                   <span
                     className={`ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-transform ${
@@ -1210,53 +1138,11 @@ export default function AddStore() {
                 </button>
               </div>
 
-              <div className={`${showMoreMobileStep2 ? 'block' : 'hidden'} sm:block space-y-4`}>
-              {/* Ảnh */}
-              <div className="space-y-1.5">
-                <Label htmlFor="image" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ảnh cửa hàng <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
-                <div className="relative w-full">
-                  {imageFile ? (
-                    <div className="relative group w-full">
-                      <img
-                        src={previewUrl}
-                        alt="Ảnh xem trước"
-                        className="w-full max-w-full h-40 object-cover rounded border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
-                      />
-                      <button
-                        type="button"
-                        className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-full p-1 shadow hover:bg-red-100 dark:hover:bg-red-900 text-gray-400 hover:text-red-600 cursor-pointer"
-                        onClick={() => setImageFile(null)}
-                        aria-label="Xoá ảnh"
-                      >
-                        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M6 6l8 8M6 14L14 6" strokeWidth="2" strokeLinecap="round" /></svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <label htmlFor="image" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer bg-gray-900 hover:bg-gray-800 transition">
-                      <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" /></svg>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">📸 Chụp hoặc chọn ảnh</span>
-                      <input
-                        id="image"
-                        type="file"
-                        accept="image/*;capture=camera"
-                        capture="environment"
-                        onChange={(e) => {
-                          setImageFile(e.target.files?.[0] || null)
-                          if (fieldErrors.image) setFieldErrors((prev) => ({ ...prev, image: '' }))
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span></Label>
                 <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Bán từ 6:00 - 22:00" className="text-base sm:text-base" />
               </div>
-              </div>
-
               <div className="pt-2 hidden sm:flex gap-2">
                 <Button
                   type="button"
@@ -1462,6 +1348,22 @@ export default function AddStore() {
           )}
         </form>
       </div>
+
+      <ConfirmDialog
+        open={confirmCreate.open}
+        onOpenChange={(open) => {
+          setConfirmCreate((prev) => (open ? prev : { open: false, type: '', payload: null }))
+        }}
+        title={confirmCreate.type === 'quick-save' ? 'Xác nhận lưu không vị trí' : 'Xác nhận tạo cửa hàng'}
+        description={
+          confirmCreate.type === 'quick-save'
+            ? 'Cửa hàng sẽ được tạo ngay nhưng chưa có vị trí bản đồ. Bạn có muốn tiếp tục?'
+            : 'Bạn có chắc muốn tạo cửa hàng với thông tin hiện tại không?'
+        }
+        confirmLabel={confirmCreate.type === 'quick-save' ? 'Lưu luôn' : 'Tạo cửa hàng'}
+        loading={loading}
+        onConfirm={handleConfirmCreate}
+      />
     </div>
   )
 }

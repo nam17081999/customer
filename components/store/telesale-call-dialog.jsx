@@ -16,10 +16,15 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
   const canTrackTelesale = isAdmin || isTelesale
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const [submittingOrderCall, setSubmittingOrderCall] = useState(false)
 
   const handleOpenChange = (nextOpen) => {
+    if (submittingOrderCall && !nextOpen) return
     setOpen(nextOpen)
-    if (!nextOpen) setError('')
+    if (!nextOpen) {
+      setError('')
+      setSubmittingOrderCall(false)
+    }
   }
 
   const startPhoneCall = () => {
@@ -38,7 +43,7 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
     const nowIso = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('stores')
-      .update({ last_called_at: nowIso, is_potential: true })
+      .update({ last_called_at: nowIso, is_potential: true, updated_at: nowIso })
       .eq('id', store.id)
 
     if (updateError) {
@@ -47,8 +52,8 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
       return false
     }
 
-    const nextStore = { ...store, last_called_at: nowIso, is_potential: true }
-    await updateStoreInCache(store.id, { last_called_at: nowIso, is_potential: true })
+    const nextStore = { ...store, last_called_at: nowIso, is_potential: true, updated_at: nowIso }
+    await updateStoreInCache(store.id, { last_called_at: nowIso, is_potential: true, updated_at: nowIso })
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('storevis:stores-changed', {
@@ -77,11 +82,12 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
   }
 
   const handleCallOnly = () => {
+    if (submittingOrderCall) return
     setOpen(false)
     startPhoneCall()
   }
 
-  const handleCallToOrder = () => {
+  const handleCallToOrder = async () => {
     if (!canTrackTelesale) {
       setOpen(false)
       startPhoneCall()
@@ -90,10 +96,21 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
 
     const from = router.asPath || '/'
     setError('')
-    setOpen(false)
+    setSubmittingOrderCall(true)
+
+    const saved = await markCallStarted()
+    if (!saved) {
+      setSubmittingOrderCall(false)
+      return
+    }
+
     startPhoneCall()
-    void markCallStarted()
-    router.push(`/telesale/call/${store.id}?from=${encodeURIComponent(from)}`)
+    setOpen(false)
+    void router.push(`/telesale/call/${store.id}?from=${encodeURIComponent(from)}`).catch((pushError) => {
+      if (!pushError?.cancelled) {
+        console.error(pushError)
+      }
+    })
   }
 
   const triggerNode = isValidElement(trigger)
@@ -109,7 +126,7 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
     <>
       {triggerNode}
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden rounded-xl p-0">
+        <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden rounded-xl p-0 z-300">
           <div className="border-b border-gray-800 px-4 py-3">
             <DialogTitle className="text-base font-semibold text-gray-100">Chọn cách gọi</DialogTitle>
             <DialogDescription className="mt-1 text-sm text-gray-400">
@@ -121,8 +138,8 @@ export default function TelesaleCallDialog({ store, trigger, onSaved }) {
             <Button type="button" className="w-full" onClick={handleCallOnly}>
               Chỉ gọi
             </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={handleCallToOrder}>
-              Gọi lên đơn
+            <Button type="button" variant="outline" className="w-full" onClick={handleCallToOrder} disabled={submittingOrderCall}>
+              {submittingOrderCall ? 'Đang chuẩn bị...' : 'Gọi lên đơn'}
             </Button>
             {error && (
               <div className="rounded-xl border border-red-900/70 bg-red-950/30 px-3 py-2 text-sm text-red-200">

@@ -1,13 +1,12 @@
 import { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
-import Image from 'next/image'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
-import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { formatDistance } from '@/helper/validation'
@@ -15,6 +14,7 @@ import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/sto
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
 import { formatLastCalledText, getTelesaleResultLabel, hasReportedOrder } from '@/helper/telesale'
+import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { supabase } from '@/lib/supabaseClient'
 import { removeStoreFromCache, updateStoreInCache } from '@/lib/storeCache'
 
@@ -34,8 +34,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const router = useRouter()
   const { user, isAdmin, isTelesale } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
-  const [imageError, setImageError] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [reportMode, setReportMode] = useState('')
@@ -63,6 +62,11 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const isControlled = open !== undefined
   const resolvedOpen = isControlled ? open : internalOpen
   const resolvedOnOpenChange = isControlled ? onOpenChange : setInternalOpen
+  const handleDetailOpenChange = (nextOpen) => {
+    // Keep detail modal open while delete confirmation is active.
+    if (!nextOpen && confirmDeleteOpen) return
+    resolvedOnOpenChange?.(nextOpen)
+  }
 
   const triggerNode = isValidElement(trigger)
     ? cloneElement(trigger, {
@@ -137,9 +141,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const canSupplement = hasStoreSupplementOpportunity(store)
   const isActive = Boolean(store.active)
   const addressText = formatAddressParts(store)
-  const imageSrc = imageError ? STORE_PLACEHOLDER_IMAGE : getFullImageUrl(store.image_url)
-  const resolvedStoreType = store.store_type || DEFAULT_STORE_TYPE
-  const storeTypeLabel = STORE_TYPE_OPTIONS.find((option) => option.value === resolvedStoreType)?.label || resolvedStoreType
+  const storeTypeMeta = getStoreTypeMeta(store.store_type)
+  const storeTypeLabel = storeTypeMeta.label
   const canTrackTelesale = isAdmin || isTelesale
 
   const showDetailNotice = (message) => {
@@ -151,22 +154,23 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     }, 3000)
   }
 
-  const handleDelete = async (e) => {
-    e.stopPropagation()
-    if (!deleteConfirm) {
-      setDeleteConfirm(true)
-      setTimeout(() => setDeleteConfirm(false), 4000)
-      return
-    }
+  const handleDelete = async () => {
     setDeleting(true)
+    const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('stores')
-      .update({ deleted_at: new Date().toISOString() })
+      .update({ deleted_at: nowIso, updated_at: nowIso })
       .eq('id', store.id)
     if (!error) {
       await removeStoreFromCache(store.id)
 
       if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
+          type: 'success',
+          text: 'Đã xóa cửa hàng!',
+          createdAt: Date.now(),
+        }))
+        window.dispatchEvent(new CustomEvent('storevis:flash-message'))
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
             detail: { type: 'delete', id: store.id },
@@ -175,6 +179,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
       }
       if (onOpenChange) onOpenChange(false)
       else setInternalOpen(false)
+      setConfirmDeleteOpen(false)
+      await router.push('/')
     }
     setDeleting(false)
   }
@@ -193,11 +199,12 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     if (!canTrackTelesale || !store?.id || potentialSaving) return
 
     const nextPotential = !isPotential
+    const nowIso = new Date().toISOString()
     setPotentialSaving(true)
 
     const { error } = await supabase
       .from('stores')
-      .update({ is_potential: nextPotential })
+      .update({ is_potential: nextPotential, updated_at: nowIso })
       .eq('id', store.id)
 
     if (error) {
@@ -208,8 +215,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
     }
 
     setIsPotential(nextPotential)
-    const nextStore = { ...store, is_potential: nextPotential }
-    await updateStoreInCache(store.id, { is_potential: nextPotential })
+    const nextStore = { ...store, is_potential: nextPotential, updated_at: nowIso }
+    await updateStoreInCache(store.id, { is_potential: nextPotential, updated_at: nowIso })
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('storevis:stores-changed', {
@@ -351,88 +358,83 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   }
 
   const detailContent = (
-    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh]">
+    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh] z-300">
       <div className="flex flex-col max-h-[90vh] overflow-y-auto">
-        {/* Image */}
-        <div className="relative w-full h-48 sm:h-56 bg-gray-900 flex-shrink-0">
-          <Image
-            src={imageSrc}
-            alt={store.name}
-            fill
-            className="object-contain"
-            sizes="(max-width:448px) 100vw, 448px"
-            onError={() => setImageError(true)}
-          />
-          {/* Badges */}
-          <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5">
+        <div className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/95 backdrop-blur pt-5 pb-4 px-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-sky-500/40 bg-sky-500/10 text-sky-300">
+                {storeTypeMeta.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-400">{storeTypeLabel}</p>
+                <OverflowMarquee
+                  text={store.name}
+                  textClassName="mt-0.5 text-xl font-bold text-gray-100 leading-tight"
+                />
+              </div>
+            </div>
+            <DialogClose className="absolute right-2.5 top-2.5 cursor-pointer h-8 w-8 shrink-0 rounded-full border border-gray-700 bg-gray-900/80 text-gray-300 transition hover:bg-gray-800 hover:text-white">
+              <svg className="mx-auto h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </DialogClose>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {isActive && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/90 text-white backdrop-blur-sm shadow-sm">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-200 border border-green-500/40">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                 Xác thực
               </span>
             )}
-          </div>
-          {/* Close */}
-          <DialogClose className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition cursor-pointer">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </DialogClose>
-        </div>
-
-        {/* Info */}
-        <div className="px-4 pt-4 pb-2 space-y-3">
-          {/* Name + distance */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="mt-1 text-sm font-medium text-gray-400">
-                {storeTypeLabel}
-              </p>
-              <h3 className="mt-1 text-xl font-bold text-gray-100 leading-tight break-words">
-                {store.name}
-              </h3>
-            </div>
             {typeof store.distance === 'number' ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300 flex-shrink-0 whitespace-nowrap">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-300">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 {formatDistance(store.distance)}
               </span>
             ) : !hasCoords ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-950/80 text-amber-200 flex-shrink-0 whitespace-nowrap">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-950/80 px-2 py-0.5 text-xs font-medium text-amber-200">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
                 Chưa có vị trí
               </span>
             ) : null}
           </div>
+        </div>
 
-          {/* Address */}
-          {addressText && (
-            <div className="flex items-start gap-2.5 text-base text-gray-400">
-              <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span className="break-words leading-relaxed">{addressText}</span>
-            </div>
-          )}
+        <div className="p-4 space-y-3">
+          {/* Name + distance */}
+          <div className="rounded-xl border border-gray-800 bg-gray-950/70 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Thông tin cửa hàng</p>
 
-          {/* Phone */}
-          {store.phone && (
-            <div className="flex items-center gap-2.5 text-base">
-              <svg className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-              <span className="break-all text-left text-gray-300">{store.phone}</span>
-            </div>
-          )}
+            {/* Address */}
+            {addressText && (
+              <div className="mt-2 flex items-start gap-2.5 text-base text-gray-400">
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="break-words leading-relaxed">{addressText}</span>
+              </div>
+            )}
 
-          {/* Note */}
-          {store.note && (
-            <div className="flex items-start gap-2.5 text-base text-gray-400">
-              <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              <span className="break-words leading-relaxed">{store.note}</span>
-            </div>
-          )}
+            {/* Phone */}
+            {store.phone && (
+              <div className="mt-2 flex items-center gap-2.5 text-base text-gray-400">
+                <svg className="w-5 h-5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <span className="break-all text-left">{store.phone}</span>
+              </div>
+            )}
+
+            {/* Note */}
+            {store.note && (
+              <div className="mt-2 flex items-start gap-2.5 text-base text-gray-400">
+                <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="break-words leading-relaxed">{store.note}</span>
+              </div>
+            )}
+          </div>
 
           {canTrackTelesale && store.phone && (
             <div className="rounded-xl border border-gray-800 bg-gray-950/70 p-3 space-y-3">
@@ -529,23 +531,23 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h8M7 12h5" />
                 </svg>
               }
-              onClick={() => {
-                setReportOpen(true)
-                setReportMode('')
-                setReportError('')
-                setReportSuccess('')
+              onClick={(e) => {
+                e.stopPropagation()
+                const from = router.asPath || '/'
+                resolvedOnOpenChange?.(false)
+                router.push(`/store/report/${store.id}?from=${encodeURIComponent(from)}`)
               }}
             >
               Báo cáo
             </Button>
             {isAdmin && (
               <Button
-                variant={deleteConfirm ? 'default' : 'outline'}
-                className={`w-full ${deleteConfirm ? 'bg-red-600 hover:bg-red-500 text-white' : 'text-red-300 border-red-900/60 hover:bg-red-950/20'}`}
+                variant="destructive"
+                className="w-full"
                 disabled={deleting}
-                onClick={handleDelete}
+                onClick={() => setConfirmDeleteOpen(true)}
               >
-                {deleting ? 'Đang xóa...' : deleteConfirm ? 'Xác nhận xóa' : 'Xóa cửa hàng'}
+                {deleting ? 'Đang xóa...' : 'Xóa cửa hàng'}
               </Button>
             )}
           </div>
@@ -815,9 +817,22 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const content = reportOpen ? reportContent : detailContent
 
   return (
-    <Dialog open={resolvedOpen} onOpenChange={resolvedOnOpenChange}>
-      {triggerNode || null}
-      {content}
-    </Dialog>
+    <>
+      <Dialog open={resolvedOpen} onOpenChange={handleDetailOpenChange}>
+        {triggerNode || null}
+        {content}
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Xác nhận xóa cửa hàng"
+        description="Cửa hàng sẽ bị ẩn khỏi hệ thống theo cơ chế xóa mềm. Bạn có chắc muốn tiếp tục?"
+        confirmLabel="Xóa cửa hàng"
+        loading={deleting}
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+    </>
   )
 }

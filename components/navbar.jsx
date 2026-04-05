@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabaseClient'
-import { getOrRefreshStores } from '@/lib/storeCache'
+import { getCachedStores } from '@/lib/storeCache'
 
 const SearchIcon = ({ className }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -96,14 +96,15 @@ export default function Navbar() {
         return
       }
       try {
-        const [stores, reportCountRes] = await Promise.all([
-          getOrRefreshStores(),
+        const [cachedStoresResult, reportCountRes] = await Promise.all([
+          getCachedStores(),
           supabase
             .from('store_reports')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'pending'),
         ])
         if (!alive) return
+        const stores = Array.isArray(cachedStoresResult?.data) ? cachedStoresResult.data : []
         const pendingStoreCount = (stores || []).filter((store) => store.active !== true).length
         setPendingStores(pendingStoreCount)
         setPendingReports(typeof reportCountRes.count === 'number' ? reportCountRes.count : 0)
@@ -184,7 +185,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      <div className="safe-area-bottom fixed inset-x-0 bottom-0 z-[60] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:hidden">
+      <div className="safe-area-bottom fixed inset-x-0 bottom-0 z-[1000] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:hidden">
         <div className="mx-auto flex h-14 w-full max-w-screen-md">
           {navLinks.map(({ href, active, label, mobileLabel, Icon, badge }) => (
             <Link

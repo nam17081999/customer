@@ -46,7 +46,7 @@ export default function StoreLocationPicker({
     <div className={`relative ${className}`}>
       {/* Control buttons - top right inside map */}
       {showControls && (
-        <div className="absolute top-3 right-2 z-[1100] flex flex-col gap-1.5 items-end">
+        <div className="absolute top-3 right-2 z-[100] flex flex-col gap-1.5 items-end">
           {/* Get location button */}
           {onGetLocation && (
             <button
@@ -73,7 +73,7 @@ export default function StoreLocationPicker({
 
       {/* Lock/Unlock button - top center inside map */}
       {showControls && onToggleEditable && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1100]">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[100]">
           <button
             type="button"
             onClick={onToggleEditable}

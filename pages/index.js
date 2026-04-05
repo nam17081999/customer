@@ -1,16 +1,18 @@
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+﻿import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { Virtuoso } from 'react-virtuoso'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Msg } from '@/components/ui/msg'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
+import { parseCoordinate } from '@/helper/coordinate'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -25,13 +27,7 @@ const FILTER_FLAG_HAS_PHONE = 'has_phone'
 const FILTER_FLAG_HAS_IMAGE = 'has_image'
 const FILTER_FLAG_NO_LOCATION = 'has_no_location'
 const FILTER_FLAG_POTENTIAL = 'is_potential'
-
-function parseCoordinate(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN
-  if (typeof value !== 'string') return NaN
-  const parsed = Number.parseFloat(value.trim().replace(/,/g, '.'))
-  return Number.isFinite(parsed) ? parsed : NaN
-}
+const FLASH_MESSAGE_DURATION_MS = 3800
 
 function hasStoreCoordinates(store) {
   return Number.isFinite(parseCoordinate(store?.latitude)) && Number.isFinite(parseCoordinate(store?.longitude))
@@ -87,6 +83,8 @@ function persistSearchRoute(query) {
 
 export default function HomePage() {
   const router = useRouter()
+  const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
+  const msgTimerRef = useRef(null)
   const [allStores, setAllStores] = useState([])
   const [storesLoaded, setStoresLoaded] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -129,6 +127,47 @@ export default function HomePage() {
       setShowDetailedFilters(true)
     }
   }, [router.isReady, router.query])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const consumeFlashMessage = () => {
+      const rawFlash = window.sessionStorage.getItem('storevis:flash-message')
+      if (!rawFlash) return
+
+      window.sessionStorage.removeItem('storevis:flash-message')
+      try {
+        const parsed = JSON.parse(rawFlash)
+        if (!parsed?.text) return
+        if (msgTimerRef.current) {
+          clearTimeout(msgTimerRef.current)
+        }
+        setMsgState({
+          type: parsed.type || 'info',
+          text: String(parsed.text),
+          show: true,
+        })
+        msgTimerRef.current = setTimeout(() => {
+          setMsgState((prev) => ({ ...prev, show: false }))
+          msgTimerRef.current = null
+        }, FLASH_MESSAGE_DURATION_MS)
+      } catch {
+        // Ignore malformed flash payload.
+      }
+    }
+
+    const handleFlashEvent = () => consumeFlashMessage()
+    consumeFlashMessage()
+    window.addEventListener('storevis:flash-message', handleFlashEvent)
+
+    return () => {
+      window.removeEventListener('storevis:flash-message', handleFlashEvent)
+      if (msgTimerRef.current) {
+        clearTimeout(msgTimerRef.current)
+        msgTimerRef.current = null
+      }
+    }
+  }, [])
 
   // Sync state to URL query params (shallow, no navigation)
   useEffect(() => {
@@ -482,6 +521,7 @@ export default function HomePage() {
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] overflow-hidden bg-black">
+      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       <div className="mx-auto flex h-full max-w-screen-md flex-col gap-3 px-3 pt-4 sm:px-4 sm:pt-6">
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -637,7 +677,9 @@ export default function HomePage() {
             </div>
           )}
 
-          {hasSearchCriteria ? (
+          {showSkeleton ? (
+            <div className="h-5 w-56 animate-pulse rounded bg-gray-800" aria-hidden="true" />
+          ) : hasSearchCriteria ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <p className="min-w-0 text-sm text-gray-400">
                 Tìm thấy <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng
@@ -657,11 +699,9 @@ export default function HomePage() {
               </button>
             </div>
           ) : (
-            !showSkeleton && (
-              <p className="text-sm text-gray-400">
-                Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
-              </p>
-            )
+            <p className="text-sm text-gray-400">
+              Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
+            </p>
           )}
         </div>
 
