@@ -534,7 +534,9 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
               onClick={(e) => {
                 e.stopPropagation()
                 const from = router.asPath || '/'
-                router.push(`/store/report/${store.id}?from=${encodeURIComponent(from)}`)
+                const hasDistance = typeof store.distance === 'number' && Number.isFinite(store.distance)
+                const distanceQuery = hasDistance ? `&distance=${encodeURIComponent(String(store.distance))}` : ''
+                router.push(`/store/report/${store.id}?from=${encodeURIComponent(from)}${distanceQuery}`)
               }}
             >
               Báo cáo
