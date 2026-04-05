@@ -13,6 +13,7 @@
 | `ward` | text | NULL | Xã/Phường |
 | `district` | text | NULL | Quận/Huyện |
 | `phone` | text | NULL | SĐT Việt Nam |
+| `phone_secondary` | text | NULL | SĐT phụ (tuỳ chọn) |
 | `note` | text | NULL | Ghi chú |
 | `image_url` | text | NULL | **Tên file** ảnh trên ImageKit (không phải URL đầy đủ) |
 | `latitude` | float8 | NULL | Vĩ độ |
@@ -106,7 +107,7 @@ RLS cho `store_reports`:
 ### SELECT_FIELDS (fields được cache)
 ```
 id, name, store_type, image_url, latitude, longitude, address_detail,
-ward, district, phone, note, active, created_at, updated_at,
+ward, district, phone, phone_secondary, note, active, created_at, updated_at,
 is_potential, last_called_at, last_call_result, last_call_result_at,
 last_order_reported_at, sales_note
 ```

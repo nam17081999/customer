@@ -27,8 +27,10 @@
 
 ### Bước 2: Thông Tin
 - **Bắt buộc**: Quận/Huyện + Xã/Phường (từ danh sách `DISTRICT_WARD_SUGGESTIONS`)
-- **Tùy chọn**: Địa chỉ chi tiết, SĐT, Ghi chú, Ảnh
+- **Tùy chọn**: Địa chỉ chi tiết, SĐT 1, SĐT 2, Ghi chú, Ảnh
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
+- SĐT 2 chỉ hiển thị khi đã bắt đầu nhập SĐT 1
+- Không cho phép SĐT 2 trùng với SĐT 1
 - Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
 - Khi bước 1 đã lấy được GPS để kiểm tra trùng, hệ thống sẽ tự prefill quận/huyện + xã/phường của cửa hàng gần nhất ngay trong nền, bất kể kết quả trùng hay không trùng; sang bước 2 thì field đã sẵn sàng nếu chưa bị nhập tay
 - Có nút **Lưu luôn** ngay tại bước 2 chỉ khi là admin hoặc telesale:
@@ -178,15 +180,9 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 ## 6. Telesale
 
 - Chỉ cửa hàng `is_potential = true` và có `phone` mới xuất hiện ở màn telesale.
-- Guest bấm gọi thì gọi thẳng.
-- `telesale/admin` bấm gọi sẽ có 2 lựa chọn:
-  - `Chỉ gọi`
-  - `Gọi lên đơn`
-- `Gọi lên đơn` sẽ:
-  - gọi ra số điện thoại
-  - cập nhật `last_called_at`
-  - tự chuyển store sang `is_potential = true`
-  - điều hướng sang `/telesale/call/[id]` để chốt kết quả gọi
+- Nút gọi trên card/modal dùng chung cho mọi role:
+  - nếu cửa hàng chỉ có 1 số thì gọi ngay
+  - nếu cửa hàng có 2 số thì mở hộp chọn số để gọi
 - Khi lưu kết quả gọi:
   - cập nhật `last_call_result`
   - cập nhật `last_call_result_at`

@@ -98,7 +98,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 
 ---
 
-## 21 Điều Cần Biết Khi Code
+## 21+ Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
 2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
@@ -125,6 +125,8 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 23. **Bulk import**: khi update vào cửa hàng nghi trùng, field chỉ có ở một bên vẫn được giữ lại; field có ở cả hai bên thì theo lựa chọn `Giữ dữ liệu cũ` / `Lấy dữ liệu mới`; xong phải cập nhật cache local hoặc fallback `invalidateStoreCache()`, rồi dispatch `storevis:stores-changed`.
 24. **Role hiện tại**: `guest`, `telesale`, `admin`; `telesale/admin` vào được `/account` và `/telesale/overview`, còn `admin` mới có các màn quản trị dữ liệu.
 25. **Telesale queue**: chỉ lấy store `is_potential` có `phone`; ưu tiên riêng cho store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút, dùng `last_call_result_at` để phân biệt.
+26. **Số điện thoại thứ 2**: `stores` có thêm `phone_secondary`; ở form create/edit/supplement, ô số 2 chỉ hiện khi đã bắt đầu nhập số 1 và không được trùng số 1.
+27. **Nút gọi dùng chung mọi role**: nếu chỉ có 1 số thì gọi ngay; nếu có 2 số thì mở dialog để chọn số cần gọi.
 
 ---
 
