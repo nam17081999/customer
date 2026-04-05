@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
-import { formatDistance } from '@/helper/validation'
+import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
@@ -143,10 +143,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange })
   const addressText = formatAddressParts(store)
   const storeTypeMeta = getStoreTypeMeta(store.store_type)
   const storeTypeLabel = storeTypeMeta.label
-  const phoneNumbers = [store.phone, store.phone_secondary]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)
-    .filter((value, index, arr) => arr.indexOf(value) === index)
+  const phoneNumbers = getStorePhoneNumbers(store)
   const canTrackTelesale = isAdmin || isTelesale
 
   const showDetailNotice = (message) => {

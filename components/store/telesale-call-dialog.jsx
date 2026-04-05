@@ -1,20 +1,14 @@
 ﻿import { cloneElement, isValidElement, useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { getStorePhoneNumbers } from '@/helper/validation'
 
 function buildTelHref(phone) {
   return `tel:${String(phone || '').replace(/[^0-9+]/g, '')}`
 }
 
-function getPhoneNumbers(store) {
-  return [store?.phone, store?.phone_secondary]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)
-    .filter((value, index, arr) => arr.indexOf(value) === index)
-}
-
-export default function TelesaleCallDialog({ store, trigger, onSaved }) {
-  const phoneNumbers = getPhoneNumbers(store)
+export default function TelesaleCallDialog({ store, trigger }) {
+  const phoneNumbers = getStorePhoneNumbers(store)
   const [open, setOpen] = useState(false)
 
   const handleOpenChange = (nextOpen) => {

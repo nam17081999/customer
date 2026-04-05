@@ -148,6 +148,13 @@ export function findDuplicatePhoneStores(stores, rawPhone, options = {}) {
   })
 }
 
+export function getStorePhoneNumbers(store) {
+  return [store?.phone, store?.phone_secondary]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+}
+
 /**
  * Validate coordinates
  */

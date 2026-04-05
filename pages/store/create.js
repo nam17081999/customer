@@ -64,13 +64,9 @@ export default function AddStore() {
   )
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
-  const [showMoreMobileStep2, setShowMoreMobileStep2] = useState(false)
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
   const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
-  useEffect(() => {
-    if (currentStep !== 2) setShowMoreMobileStep2(false)
-  }, [currentStep])
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
@@ -1185,7 +1181,7 @@ export default function AddStore() {
 
               {(phone.trim() || phoneSecondary.trim()) && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone-secondary" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  <Label htmlFor="phone-secondary" className="block text-sm font-medium text-gray-300">
                     Số điện thoại 2 <span className="font-normal text-gray-400">(không bắt buộc)</span>
                   </Label>
                   <Input
