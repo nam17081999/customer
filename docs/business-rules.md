@@ -159,6 +159,12 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - Có nút **về vị trí đang đứng** ở góc phải dưới, dùng GPS hiện tại rồi `flyTo()`
 - Khi vào `/map`, hiển thị thêm **chấm xanh** cho vị trí hiện tại của người dùng
 
+**Bản đồ trong form (create/edit/supplement/report edit)**:
+- Dùng chung `LocationPicker`/`StoreLocationPicker`.
+- Luôn hiển thị thêm các cửa hàng lân cận quanh vị trí đang đứng (tâm pin hiện tại).
+- Cách hiển thị marker lân cận tương tự màn `/map` (icon + nhãn), để người dùng dễ đối chiếu vị trí.
+- Chỉ render tối đa **50 cửa hàng gần nhất** (đã lọc tọa độ hợp lệ).
+
 **Thẻ chi tiết cửa hàng**:
 - Trong `StoreDetailModal`, `loại cửa hàng` hiển thị phía trên tên
 - Dùng cỡ chữ nhỏ hơn tên để giữ hierarchy

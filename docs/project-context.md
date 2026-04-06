@@ -127,6 +127,8 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 25. **Telesale queue**: chỉ lấy store `is_potential` có `phone`; ưu tiên riêng cho store đã gọi nhưng chưa cập nhật kết quả trong vòng 30 phút, dùng `last_call_result_at` để phân biệt.
 26. **Số điện thoại thứ 2**: `stores` có thêm `phone_secondary`; ở form create/edit/supplement, ô số 2 chỉ hiện khi đã bắt đầu nhập số 1 và không được trùng số 1.
 27. **Nút gọi dùng chung mọi role**: nếu chỉ có 1 số thì gọi ngay; nếu có 2 số thì mở dialog để chọn số cần gọi.
+28. **Map trong form create/edit/supplement**: phải hiển thị thêm marker cửa hàng lân cận quanh vị trí hiện tại, theo phong cách tương tự `/map`.
+29. **Giới hạn marker lân cận**: chỉ render tối đa **50 cửa hàng gần nhất** có tọa độ hợp lệ để tránh rối bản đồ và giảm tải render.
 
 ---
 

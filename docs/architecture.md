@@ -226,6 +226,13 @@ customer/
   - admin đã đăng nhập có thể cập nhật trực tiếp `stores`
   - người chưa đăng nhập vẫn mở được supplement flow nhưng submit sẽ tạo `store_reports` để admin duyệt
 
+## Bản Đồ Trong Form Create/Edit/Supplement
+
+- Các màn `create`, `edit`, `supplement` (và report kiểu edit) dùng chung map picker trong `components/map/location-picker.jsx`.
+- Map picker đọc dữ liệu qua `getOrRefreshStores()` và render thêm lớp cửa hàng lân cận để hỗ trợ chốt vị trí.
+- Marker lân cận dùng kiểu hiển thị tương tự `/map` (icon + nhãn ngắn), không chỉ chấm tròn.
+- Giới hạn hiển thị: tối đa **50 cửa hàng gần nhất** quanh tâm hiện tại của pin/map.
+
 ---
 
 ## Create Flow Mở Rộng
