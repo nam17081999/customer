@@ -59,8 +59,11 @@ export default function AddStore() {
   const [phone, setPhone] = useState('')
   const [phoneSecondary, setPhoneSecondary] = useState('')
   const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
+  const canQuickSaveWithoutLocation = Boolean(isAdmin)
   const canShowQuickSave = Boolean(
-    normalizedPhoneForQuickSave && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
+    canQuickSaveWithoutLocation
+    && normalizedPhoneForQuickSave
+    && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
   )
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -793,7 +796,6 @@ export default function AddStore() {
         note,
         phone: validatedPhone || null,
         phone_secondary: validatedPhoneSecondary || null,
-        image_url: null,
         latitude,
         longitude,
       }
@@ -829,6 +831,11 @@ export default function AddStore() {
   }
 
   async function handleSaveWithoutLocation() {
+    if (!canQuickSaveWithoutLocation) {
+      showMessage('error', 'Telesale cần hoàn thành bước 3 để lưu vị trí cửa hàng.')
+      return
+    }
+
     const { errs } = await validateStep2Fields({ requirePhone: true })
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Muốn lưu luôn ở bước 2 thì cần số điện thoại hợp lệ.' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
@@ -1160,7 +1167,12 @@ export default function AddStore() {
 
               {/* Phone & Note — always visible */}
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(bắt buộc nếu lưu luôn ở bước 2)</span></Label>
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Số điện thoại
+                  <span className="font-normal text-gray-400">
+                    {canQuickSaveWithoutLocation ? ' (bắt buộc nếu lưu luôn ở bước 2)' : ' (không bắt buộc)'}
+                  </span>
+                </Label>
                 <Input
                   id="phone"
                   type="tel"

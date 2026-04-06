@@ -38,7 +38,7 @@ const StoreLocationPicker = dynamic(
 export default function EditStore() {
   const router = useRouter()
   const { id } = router.query
-  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
+  const { user, isAdmin, isTelesale, isAuthenticated, loading: authLoading } = useAuth() || {}
   const rawMode = Array.isArray(router.query.mode) ? router.query.mode[0] : router.query.mode
   const isSupplementMode = rawMode === 'supplement' || rawMode === 'location-only'
 
@@ -204,6 +204,7 @@ export default function EditStore() {
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
   const originalHasCoordinates = hasStoreCoordinates(store)
+  const canSupplementLocation = !originalHasCoordinates || Boolean(isTelesale)
   const supplementLocks = useMemo(() => ({
     name: Boolean(String(store?.name || '').trim()),
     storeType: Boolean(String(store?.store_type || '').trim()),
@@ -213,9 +214,9 @@ export default function EditStore() {
     phone: Boolean(String(store?.phone || '').trim()),
     phoneSecondary: Boolean(String(store?.phone_secondary || '').trim()),
     note: Boolean(String(store?.note || '').trim()),
-    location: originalHasCoordinates,
-  }), [store, originalHasCoordinates])
-  const supplementStepCount = originalHasCoordinates ? 2 : 3
+    location: !canSupplementLocation,
+  }), [store, canSupplementLocation])
+  const supplementStepCount = canSupplementLocation ? 3 : 2
   const supplementSteps = supplementStepCount === 2
     ? [
       { num: 1, label: 'Tên' },
@@ -462,7 +463,7 @@ export default function EditStore() {
           report_type: 'edit',
           reason_codes: null,
           proposed_changes: updates,
-          reporter_id: null,
+          reporter_id: user?.id || null,
         }])
         if (error) throw error
       }
@@ -660,7 +661,7 @@ export default function EditStore() {
       <>
         <StoreSupplementForm
         router={router}
-        user={isAdmin ? user : null}
+        user={isAuthenticated ? user : null}
         store={store}
         msgState={msgState}
         steps={supplementSteps}

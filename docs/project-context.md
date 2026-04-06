@@ -85,7 +85,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | Service | Dùng cho | Biến env |
 |---|---|---|
 | Supabase | Database + Auth | `NEXT_PUBLIC_SUPABASE_URL`, `ANON_KEY` |
-| ImageKit.io | CDN ảnh | `NEXT_PUBLIC_IMAGE_BASE_URL`, public/private key |
+| Image CDN | Hiển thị ảnh từ filename | `NEXT_PUBLIC_IMAGE_BASE_URL` |
 | Google Maps API | Location picker (create/edit form) | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` |
 | OpenStreetMap | Tile bản đồ (/map) | Không cần key |
 

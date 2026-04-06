@@ -8,9 +8,11 @@ import { haversineKm } from '@/helper/distance'
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const NEARBY_STORES_LIMIT = 30
 
-function getFirstWord(name = '') {
+function getMarkerLabelText(name = '') {
   const cleaned = String(name || '').trim()
-  return (cleaned.split(/\s+/)[0] || 'CH').slice(0, 14)
+  if (!cleaned) return 'Cửa hàng'
+  // Keep full nearby store name instead of abbreviating to first word.
+  return cleaned
 }
 
 function createStoreMarker(text, fontSize = 12) {
@@ -95,9 +97,10 @@ function createStoreMarker(text, fontSize = 12) {
     ctx.quadraticCurveTo(lx, ly, lx + r2, ly)
     ctx.closePath()
   }
-  ctx.fillStyle = 'rgba(2, 6, 23, 0.95)'
+  // Reduce transparency a bit for easier reading.
+  ctx.fillStyle = 'rgba(2, 6, 23, 0.98)'
   ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)'
   ctx.lineWidth = dpr
   ctx.stroke()
 
@@ -199,7 +202,7 @@ export default function LocationPicker({
     features.forEach((item, index) => {
       const markerImage = `nearby-sm-${String(item.id)}`
       if (!nearbyImageIdsRef.current.has(markerImage) && !map.hasImage(markerImage)) {
-        const img = createStoreMarker(getFirstWord(item.name || 'Cửa hàng'))
+        const img = createStoreMarker(getMarkerLabelText(item.name || 'Cửa hàng'))
         map.addImage(markerImage, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
         nearbyImageIdsRef.current.add(markerImage)
       }

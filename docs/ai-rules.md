@@ -116,7 +116,6 @@ await supabase.from('stores').insert([{
   address_detail, ward, district,      // ← cũng Title Case
   active: Boolean(isAdmin),
   note, phone,
-  image_url: imageFilename,            // ← chỉ tên file, không phải URL
   latitude, longitude,
   // ← KHÔNG có name_search (cột không tồn tại trong DB)
 }]).select()
@@ -156,13 +155,11 @@ await supabase.from('stores')
 
 ---
 
-## 4. Image
+## 4. Image Display
 
 - `image_url` trong DB = **tên file** (ví dụ: `1716000000_abc.jpg`)
 - Full URL: `process.env.NEXT_PUBLIC_IMAGE_BASE_URL + image_url`
 - Helper: `getFullImageUrl(image_url)` trong `@/helper/imageUtils`
-- Upload: POST multipart/form-data tới `/api/upload-image`
-- Nén ảnh bằng `browser-image-compression` trước upload
 
 ---
 
@@ -373,7 +370,6 @@ window.addEventListener('storevis:stores-changed', handler)
 - **useMemo**: filter/sort nặng
 - **useCallback**: handlers truyền vào child component
 - **Promise dedup**: `getOrRefreshStores()` tự xử lý
-- Server-side: private key ImageKit chỉ trong `pages/api/`
 
 ---
 

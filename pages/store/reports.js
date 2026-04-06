@@ -32,7 +32,6 @@ const EDIT_FIELDS = [
   { key: 'district', label: 'Quận/Huyện' },
   { key: 'phone', label: 'Số điện thoại' },
   { key: 'note', label: 'Ghi chú' },
-  { key: 'image_url', label: 'Ảnh cửa hàng' },
   { key: 'latitude', label: 'Vĩ độ' },
   { key: 'longitude', label: 'Kinh độ' },
 ]
@@ -40,7 +39,6 @@ const EDIT_FIELDS = [
 const formatValue = (key, value) => {
   if (value === null || value === undefined || value === '') return '—'
   if (key === 'store_type') return storeTypeLabelMap[value] || String(value)
-  if (key === 'image_url') return 'Đã gửi ảnh mới'
   if (key === 'latitude' || key === 'longitude') {
     const num = Number(value)
     if (!Number.isFinite(num)) return '—'

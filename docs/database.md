@@ -73,26 +73,29 @@ CREATE INDEX idx_store_reports_store_id ON store_reports(store_id);
 
 ---
 
-## ⚠️ Bảo Mật: Cần Verify RLS
+## ⚠️ Bảo Mật: RLS Bắt Buộc
 
-Cần kiểm tra Supabase Row Level Security:
-- **Anonymous**: chỉ SELECT (`deleted_at IS NULL`) và INSERT (với `active = false`)
-- **Authenticated (admin)**: full CRUD
-- Nếu chưa bật RLS → user có thể UPDATE `active=true` trực tiếp qua API
+Môi trường phải chạy migration:
+- `docs/sql/2026-04-06-auth-roles-and-rls.sql`
 
-RLS cho `store_reports`:
-- **Anonymous + Authenticated**: chỉ **INSERT** báo cáo
-- **Authenticated (admin)**: SELECT + UPDATE trạng thái
+Quy tắc quyền sau migration:
+- Role chỉ lấy từ `app_metadata` trong JWT (`admin`, `telesale`, còn lại là `guest`)
+- `stores`:
+  - `anon/authenticated`: chỉ SELECT store chưa xóa mềm
+  - `anon/authenticated`: INSERT được với `active=false`; chỉ `admin` mới được `active=true`
+  - `is_potential=true` chỉ dành cho `telesale/admin` (guest không set được)
+  - `admin`: UPDATE đầy đủ
+  - `telesale`: chỉ UPDATE nhóm cột telesale (`is_potential`, `last_called_at`, `last_call_result`, `last_call_result_at`, `last_order_reported_at`, `sales_note`, `updated_at`)
+- `store_reports`:
+  - `anon/authenticated`: INSERT báo cáo với `status='pending'`
+  - `admin`: SELECT + UPDATE duyệt báo cáo
 
 ---
 
-## Ảnh (ImageKit.io)
+## Ảnh (hiển thị)
 
 - `image_url` chỉ là **tên file**: `1716000000_abc.jpg`
 - Full URL để hiển thị: `NEXT_PUBLIC_IMAGE_BASE_URL + image_url`
-- Upload: server-side POST `/api/upload-image` (dùng private key)
-- Delete: server-side DELETE `/api/upload-image`
-- Nén trước khi upload: max 1MB, 1600px, JPEG 0.8
 
 ---
 
