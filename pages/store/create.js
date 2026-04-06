@@ -58,10 +58,8 @@ export default function AddStore() {
   }
   const [phone, setPhone] = useState('')
   const [phoneSecondary, setPhoneSecondary] = useState('')
-  const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
-  const canShowQuickSave = Boolean(
-    normalizedPhoneForQuickSave && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
-  )
+  const telesaleNoStep3 = Boolean(isTelesale && !isAdmin)
+  const canQuickSaveWithoutLocation = Boolean(isAdmin || telesaleNoStep3)
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -230,6 +228,7 @@ export default function AddStore() {
   }, [mapEditable])
 
   async function autoFillNearestDistrictWard(originLat, originLng) {
+    if (telesaleNoStep3) return
     if (nearestLocationPrefilledRef.current || nearestLocationPrefillRunningRef.current) return
     if (district.trim() || ward.trim()) return
     if (originLat == null || originLng == null) return
@@ -628,10 +627,23 @@ export default function AddStore() {
   }
 
   async function validateStep2AndGoNext() {
-    const { errs } = await validateStep2Fields()
+    const { errs } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
+    }
+
+    if (telesaleNoStep3) {
+      setConfirmCreate({
+        open: true,
+        type: 'quick-save',
+        payload: {
+          latitude: null,
+          longitude: null,
+          shouldCheckFinalDuplicates: false,
+        },
+      })
+      return true
     }
     
     // Yêu cầu lấy hướng bàn ngay lập tức tại đây vì requestPermission trên iOS yêu cầu đồng bộ với thao tác click người dùng
@@ -801,7 +813,6 @@ export default function AddStore() {
         note,
         phone: validatedPhone || null,
         phone_secondary: validatedPhoneSecondary || null,
-        image_url: null,
         latitude,
         longitude,
       }
@@ -809,7 +820,10 @@ export default function AddStore() {
       let insertedRows = null
       let insertError = null
 
-      ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
+      ;({ data: insertedRows, error: insertError } = await supabase
+        .from('stores')
+        .insert([insertPayload])
+        .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note'))
 
       if (insertError) {
         console.error(insertError)
@@ -819,11 +833,17 @@ export default function AddStore() {
       }
 
       const newStore = insertedRows?.[0]
-      if (newStore) {
-        await appendStoreToCache(newStore)
-      } else {
-        await invalidateStoreCache()
+      if (!newStore?.id) {
+        console.error('Insert succeeded without returned row. Possible RLS select restriction or stale session.', {
+          insertPayload,
+          insertedRows,
+        })
+        showMessage('error', 'Tạo cửa hàng chưa hoàn tất. Không nhận được dữ liệu trả về từ máy chủ.')
+        setLoading(false)
+        return false
       }
+
+      await appendStoreToCache(newStore)
 
       await pushSearchWithNotice('Tạo cửa hàng thành công!')
       return true
@@ -834,24 +854,6 @@ export default function AddStore() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function handleSaveWithoutLocation() {
-    const { errs } = await validateStep2Fields({ requirePhone: true })
-    if (Object.keys(errs).length > 0) {
-      showMessage('error', errs.phone ? 'Muốn lưu luôn ở bước 2 thì cần số điện thoại hợp lệ.' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
-      return
-    }
-
-    setConfirmCreate({
-      open: true,
-      type: 'quick-save',
-      payload: {
-        latitude: null,
-        longitude: null,
-        shouldCheckFinalDuplicates: false,
-      },
-    })
   }
 
   async function handleConfirmCreate() {
@@ -975,11 +977,16 @@ export default function AddStore() {
 
 
   // Step indicator labels
-  const steps = [
-    { num: 1, label: 'Tên' },
-    { num: 2, label: 'Thông tin' },
-    { num: 3, label: 'Vị trí' },
-  ]
+  const steps = telesaleNoStep3
+    ? [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+    ]
+    : [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+      { num: 3, label: 'Vị trí' },
+    ]
   const showMobileActionBar = (
     (currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0)) ||
     currentStep === 2 ||
@@ -1168,7 +1175,12 @@ export default function AddStore() {
 
               {/* Phone & Note — always visible */}
               <div className="space-y-1.5">
-                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Số điện thoại <span className="font-normal text-gray-400">(bắt buộc nếu lưu luôn ở bước 2)</span></Label>
+                <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                  Số điện thoại
+                  <span className="font-normal text-gray-400">
+                    {telesaleNoStep3 ? ' (bắt buộc để lưu ở bước 2)' : ' (không bắt buộc)'}
+                  </span>
+                </Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -1223,30 +1235,12 @@ export default function AddStore() {
                   icon={<span>←</span>}
                   onClick={() => setCurrentStep(1)}
                 />
-                {canShowQuickSave && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    icon={
-                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
-                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
-                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
-                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
-                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
-                          </svg>
-                    }
-                    onClick={handleSaveWithoutLocation}
-                    aria-label="Lưu luôn"
-                    title="Lưu luôn"
-                  />
-                )}
                 <Button
                   type="button"
                   className="flex-1"
                   onClick={() => validateStep2AndGoNext()}
                 >
-                  Tiếp theo →
+                  {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                 </Button>
               </div>
             </>
@@ -1366,30 +1360,12 @@ export default function AddStore() {
                       icon={<span>←</span>}
                       onClick={() => setCurrentStep(1)}
                     />
-                    {canShowQuickSave && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        icon={
-                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
-                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
-                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
-                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
-                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
-                          </svg>
-                        }
-                        onClick={handleSaveWithoutLocation}
-                        aria-label="Lưu luôn"
-                        title="Lưu luôn"
-                      />
-                    )}
                     <Button
                       type="button"
                       className="flex-1"
                       onClick={() => validateStep2AndGoNext()}
                     >
-                      Tiếp theo →
+                      {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                     </Button>
                   </div>
                 )}

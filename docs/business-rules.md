@@ -27,13 +27,12 @@
 
 ### Bước 2: Thông Tin
 - **Bắt buộc**: Quận/Huyện + Xã/Phường (từ danh sách `DISTRICT_WARD_SUGGESTIONS`)
-- **Tùy chọn**: Địa chỉ chi tiết, SĐT 1, SĐT 2, Ghi chú, Ảnh
+- **Tùy chọn**: Địa chỉ chi tiết, SĐT 1, SĐT 2, Ghi chú
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - SĐT 2 chỉ hiển thị khi đã bắt đầu nhập SĐT 1
 - Không cho phép SĐT 2 trùng với SĐT 1
-- Ảnh: JPEG/PNG/WebP ≤10MB, nén về ≤1MB trước upload
 - Khi bước 1 đã lấy được GPS để kiểm tra trùng, hệ thống sẽ tự prefill quận/huyện + xã/phường của cửa hàng gần nhất ngay trong nền, bất kể kết quả trùng hay không trùng; sang bước 2 thì field đã sẵn sàng nếu chưa bị nhập tay
-- Có nút **Lưu luôn** ngay tại bước 2 chỉ khi là admin hoặc telesale:
+- Có nút **Lưu luôn** ngay tại bước 2 chỉ khi là admin:
   - vẫn bắt buộc `Quận/Huyện` + `Xã/Phường`
   - **bắt buộc thêm số điện thoại hợp lệ**
   - trước khi lưu phải hỏi xác nhận việc lưu cửa hàng **không có vị trí**
@@ -47,10 +46,9 @@
 
 ### Khi Submit
 1. Duplicate check lần cuối bằng tọa độ final
-2. Upload ảnh → `imageFilename`
-3. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
-4. `appendStoreToCache(newStore)`
-5. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối theo tọa độ, vì store chưa có vị trí
+2. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
+3. `appendStoreToCache(newStore)`
+4. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối theo tọa độ, vì store chưa có vị trí
 
 ---
 
@@ -234,24 +232,12 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 - Route protection:
   - trang admin chỉ dành cho `admin`
   - trang telesale dành cho `telesale/admin`
-- `role` lấy từ metadata Supabase; nếu tài khoản cũ chưa có metadata thì fallback thành `admin`
+- `role` chỉ lấy từ **app_metadata** của Supabase (server-managed), không dùng `user_metadata`
+- Tài khoản không có role hợp lệ được xem là `guest` (không có quyền admin/telesale)
 
 ---
 
-## 10. Image Upload Flow
-
-```
-1. Compress (browser-image-compression): max 1MB, 1600px, JPEG 0.8
-2. POST /api/upload-image (multipart)
-3. Server: ImageKit SDK upload (private key)
-4. Response: { name, fileId, ...}
-5. Lưu `name` vào DB (image_url)
-6. Nếu insert DB lỗi → DELETE ảnh đã upload (rollback)
-```
-
----
-
-## 11. Xuất Dữ Liệu
+## 10. Xuất Dữ Liệu
 
 - Màn export Excel/CSV phải xuất **tất cả cửa hàng đang có** (`deleted_at IS NULL`)
 - File Excel/CSV **không phụ thuộc** cửa hàng có số điện thoại hay không
@@ -260,7 +246,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 
 ---
 
-## 12. Nhập Dữ Liệu
+## 11. Nhập Dữ Liệu
 
 - `/store/import` là màn admin để nhập nhiều cửa hàng từ file `.csv`
 - Màn này phải có nút tải **file mẫu** để người dùng điền đúng cột
@@ -305,7 +291,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 
 ---
 
-## 13. Quy Tắc Tiếng Việt & Dialog Xác Nhận
+## 12. Quy Tắc Tiếng Việt & Dialog Xác Nhận
 
 - Text tiếng Việt hiển thị cho user/admin phải giữ đúng dấu trong source và trên UI.
 - Nếu terminal hiển thị sai dấu, chưa được coi đó là bằng chứng file source bị hỏng.
@@ -319,7 +305,7 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 - Hai màn áp dụng bắt buộc:
   - `/store/verify`
   - `/store/reports`
-## 14. Tạo Store Theo Role
+## 13. Tạo Store Theo Role
 
 - Nếu người tạo là `telesale`, store mới được tạo trực tiếp trong `stores` sẽ mặc định có `is_potential = true`.
 - Rule này áp dụng cho cả:

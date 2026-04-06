@@ -657,7 +657,6 @@ export default function StoreImportPage() {
         note: row.note || null,
         latitude: row.latitude,
         longitude: row.longitude,
-        image_url: null,
         active: true,
       }))
 

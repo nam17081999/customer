@@ -17,7 +17,7 @@
 | UI | React | 19.x |
 | Styling | TailwindCSS v4 | ^4.x |
 | Database + Auth | Supabase (PostgreSQL) | ^2.54 |
-| Image CDN | ImageKit.io | ^6.x |
+| Image CDN | Config qua `NEXT_PUBLIC_IMAGE_BASE_URL` | — |
 | Map (trang bản đồ) | MapLibre GL + OpenStreetMap | ^4.7 |
 | Map (location picker) | Google Maps API | ^2.x |
 | Virtual List | react-virtuoso | ^4.x |
@@ -50,15 +50,12 @@ customer/
 │       ├── reports.js      # Duyệt báo cáo cửa hàng
 │       └── edit/[id].js    # Chỉnh sửa store
 ├── pages/api/
-│   ├── upload-image.js     # POST/DELETE ảnh → ImageKit
-│   ├── imagekit-auth.js    # GET auth token ImageKit
 │   └── expand-maps-link.js # POST: mở rộng Google Maps shortlink
 ├── components/
 │   ├── navbar.jsx          # Top nav (desktop) + bottom tab (mobile)
 │   ├── search-store-card.jsx   # Card store trong danh sách tìm kiếm
 │   ├── store-detail-modal.jsx  # Modal chi tiết + báo cáo + chuyển sang /map
 │   ├── detail-store-card.jsx
-│   ├── image-upload.jsx
 │   ├── error-boundary.jsx
 │   ├── map/                # location-picker, store-location-picker, google-location-picker
 │   └── ui/                 # button, card, dialog, input, label, msg, toast, skeleton, full-page-loading
@@ -67,7 +64,6 @@ customer/
 │   ├── AuthContext.js      # React Context: user, signIn, signOut, role
 │   ├── authz.js            # Helpers phân quyền `admin` / `telesale`
 │   ├── storeCache.js       # 3-layer cache (memory → IDB → Supabase)
-│   ├── imagekit.js         # SDK ImageKit server-side
 │   ├── constants.js        # Hằng số, danh sách huyện/xã, loại cửa hàng
 │   └── utils.js            # toTitleCaseVI, formatAddressParts, cn
 └── helper/
@@ -190,9 +186,6 @@ customer/
 
 | Endpoint | Method | Chức n?"?'ng |
 |---|---|---|
-| `/api/upload-image` | POST | Upload ảnh → ImageKit (private key) |
-| `/api/upload-image` | DELETE | Xóa ảnh khỏi ImageKit |
-| `/api/imagekit-auth` | GET | Token auth cho client-side |
 | `/api/expand-maps-link` | POST | Mở rộng Google Maps short URL |
 
 ---
@@ -212,7 +205,7 @@ customer/
 
 ## Luồng Bổ Sung Dữ Liệu
 
-- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, `image_url`, hoặc vị trí):
+- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, hoặc vị trí):
   - `StoreDetailModal` hiển thị nút **Bổ sung**
   - duplicate panel ở bước 1 của `/store/create` cũng có thể hiển thị nút **Bổ sung**
 - Nút này điều hướng sang `/store/edit/[id]?mode=supplement`
@@ -258,8 +251,6 @@ customer/
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY=
-IMAGEKIT_PRIVATE_KEY=           # Server-side only!
 NEXT_PUBLIC_IMAGE_BASE_URL=     # https://ik.imagekit.io/customer69/
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
@@ -268,7 +259,6 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 
 ## Lưu Ý Bảo Mật
 
-- `IMAGEKIT_PRIVATE_KEY` chỉ ở server (pages/api)
 - **⚠️ Cần verify RLS Supabase** để user thường không UPDATE/DELETE
 - Soft delete: dùng `deleted_at`, không DELETE SQL
 
