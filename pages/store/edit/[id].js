@@ -204,7 +204,7 @@ export default function EditStore() {
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
   const originalHasCoordinates = hasStoreCoordinates(store)
-  const canSupplementLocation = !originalHasCoordinates || Boolean(isTelesale)
+  const canSupplementLocation = !originalHasCoordinates && !isTelesale
   const supplementLocks = useMemo(() => ({
     name: Boolean(String(store?.name || '').trim()),
     storeType: Boolean(String(store?.store_type || '').trim()),

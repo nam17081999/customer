@@ -58,8 +58,9 @@ export default function AddStore() {
   }
   const [phone, setPhone] = useState('')
   const [phoneSecondary, setPhoneSecondary] = useState('')
+  const telesaleNoStep3 = Boolean(isTelesale && !isAdmin)
   const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
-  const canQuickSaveWithoutLocation = Boolean(isAdmin)
+  const canQuickSaveWithoutLocation = Boolean(isAdmin || telesaleNoStep3)
   const canShowQuickSave = Boolean(
     canQuickSaveWithoutLocation
     && normalizedPhoneForQuickSave
@@ -623,10 +624,23 @@ export default function AddStore() {
   }
 
   async function validateStep2AndGoNext() {
-    const { errs } = await validateStep2Fields()
+    const { errs } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
+    }
+
+    if (telesaleNoStep3) {
+      setConfirmCreate({
+        open: true,
+        type: 'quick-save',
+        payload: {
+          latitude: null,
+          longitude: null,
+          shouldCheckFinalDuplicates: false,
+        },
+      })
+      return true
     }
     
     // Yêu cầu lấy hướng bàn ngay lập tức tại đây vì requestPermission trên iOS yêu cầu đồng bộ với thao tác click người dùng
@@ -803,7 +817,10 @@ export default function AddStore() {
       let insertedRows = null
       let insertError = null
 
-      ;({ data: insertedRows, error: insertError } = await supabase.from('stores').insert([insertPayload]).select())
+      ;({ data: insertedRows, error: insertError } = await supabase
+        .from('stores')
+        .insert([insertPayload])
+        .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note'))
 
       if (insertError) {
         console.error(insertError)
@@ -813,11 +830,17 @@ export default function AddStore() {
       }
 
       const newStore = insertedRows?.[0]
-      if (newStore) {
-        await appendStoreToCache(newStore)
-      } else {
-        await invalidateStoreCache()
+      if (!newStore?.id) {
+        console.error('Insert succeeded without returned row. Possible RLS select restriction or stale session.', {
+          insertPayload,
+          insertedRows,
+        })
+        showMessage('error', 'Tạo cửa hàng chưa hoàn tất. Không nhận được dữ liệu trả về từ máy chủ.')
+        setLoading(false)
+        return false
       }
+
+      await appendStoreToCache(newStore)
 
       await pushSearchWithNotice('Tạo cửa hàng thành công!')
       return true
@@ -1250,7 +1273,7 @@ export default function AddStore() {
                   className="flex-1"
                   onClick={() => validateStep2AndGoNext()}
                 >
-                  Tiếp theo →
+                  {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                 </Button>
               </div>
             </>
@@ -1393,7 +1416,7 @@ export default function AddStore() {
                       className="flex-1"
                       onClick={() => validateStep2AndGoNext()}
                     >
-                      Tiếp theo →
+                      {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                     </Button>
                   </div>
                 )}
