@@ -59,13 +59,7 @@ export default function AddStore() {
   const [phone, setPhone] = useState('')
   const [phoneSecondary, setPhoneSecondary] = useState('')
   const telesaleNoStep3 = Boolean(isTelesale && !isAdmin)
-  const normalizedPhoneForQuickSave = String(phone || '').replace(/\s+/g, '')
   const canQuickSaveWithoutLocation = Boolean(isAdmin || telesaleNoStep3)
-  const canShowQuickSave = Boolean(
-    canQuickSaveWithoutLocation
-    && normalizedPhoneForQuickSave
-    && validateVietnamPhone(normalizedPhoneForQuickSave).isValid,
-  )
   const [note, setNote] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
@@ -234,6 +228,7 @@ export default function AddStore() {
   }, [mapEditable])
 
   async function autoFillNearestDistrictWard(originLat, originLng) {
+    if (telesaleNoStep3) return
     if (nearestLocationPrefilledRef.current || nearestLocationPrefillRunningRef.current) return
     if (district.trim() || ward.trim()) return
     if (originLat == null || originLng == null) return
@@ -853,29 +848,6 @@ export default function AddStore() {
     }
   }
 
-  async function handleSaveWithoutLocation() {
-    if (!canQuickSaveWithoutLocation) {
-      showMessage('error', 'Telesale cần hoàn thành bước 3 để lưu vị trí cửa hàng.')
-      return
-    }
-
-    const { errs } = await validateStep2Fields({ requirePhone: true })
-    if (Object.keys(errs).length > 0) {
-      showMessage('error', errs.phone ? 'Muốn lưu luôn ở bước 2 thì cần số điện thoại hợp lệ.' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
-      return
-    }
-
-    setConfirmCreate({
-      open: true,
-      type: 'quick-save',
-      payload: {
-        latitude: null,
-        longitude: null,
-        shouldCheckFinalDuplicates: false,
-      },
-    })
-  }
-
   async function handleConfirmCreate() {
     const payload = confirmCreate.payload
     if (!payload) return
@@ -997,11 +969,16 @@ export default function AddStore() {
 
 
   // Step indicator labels
-  const steps = [
-    { num: 1, label: 'Tên' },
-    { num: 2, label: 'Thông tin' },
-    { num: 3, label: 'Vị trí' },
-  ]
+  const steps = telesaleNoStep3
+    ? [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+    ]
+    : [
+      { num: 1, label: 'Tên' },
+      { num: 2, label: 'Thông tin' },
+      { num: 3, label: 'Vị trí' },
+    ]
   const showMobileActionBar = (
     (currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0)) ||
     currentStep === 2 ||
@@ -1193,7 +1170,7 @@ export default function AddStore() {
                 <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                   Số điện thoại
                   <span className="font-normal text-gray-400">
-                    {canQuickSaveWithoutLocation ? ' (bắt buộc nếu lưu luôn ở bước 2)' : ' (không bắt buộc)'}
+                    {telesaleNoStep3 ? ' (bắt buộc để lưu ở bước 2)' : ' (không bắt buộc)'}
                   </span>
                 </Label>
                 <Input
@@ -1250,24 +1227,6 @@ export default function AddStore() {
                   icon={<span>←</span>}
                   onClick={() => setCurrentStep(1)}
                 />
-                {canShowQuickSave && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    icon={
-                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
-                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
-                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
-                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
-                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
-                          </svg>
-                    }
-                    onClick={handleSaveWithoutLocation}
-                    aria-label="Lưu luôn"
-                    title="Lưu luôn"
-                  />
-                )}
                 <Button
                   type="button"
                   className="flex-1"
@@ -1393,24 +1352,6 @@ export default function AddStore() {
                       icon={<span>←</span>}
                       onClick={() => setCurrentStep(1)}
                     />
-                    {canShowQuickSave && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        icon={
-                          <svg className="h-5 w-5" viewBox="0 0 1200 1200" fill="none" stroke="currentColor" aria-hidden="true">
-                            <rect x="105.5" y="120" width="889" height="960" rx="281" ry="281" strokeWidth="70" />
-                            <path d="M943.83 240h101.9a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 420H967.18M967.18 510h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 690H967.18M967.18 780h78.55a48.76 48.76 0 0 1 48.77 48.77v82.46A48.76 48.76 0 0 1 1045.73 960H943.83" strokeWidth="70" />
-                            <circle cx="550" cy="445" r="155" strokeWidth="70" />
-                            <path d="M788.53 798.05a580.5 580.5 0 0 0-44.72-87.44c-92.46-147.48-307.35-147.48-399.8 0a581.54 581.54 0 0 0-44.73 87.44c-26.34 64.05 15.42 137.31 78 137.31H710.57c62.54 0 104.3-73.26 77.96-137.31Z" strokeWidth="70" />
-                          </svg>
-                        }
-                        onClick={handleSaveWithoutLocation}
-                        aria-label="Lưu luôn"
-                        title="Lưu luôn"
-                      />
-                    )}
                     <Button
                       type="button"
                       className="flex-1"
