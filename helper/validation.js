@@ -34,6 +34,9 @@ export function getVietnamPhoneInfo(rawValue, options = {}) {
   let normalized = trimmed.replace(/^'/, '')
   normalized = expandScientificNumber(normalized)
   normalized = normalized.replace(/\.0+$/, '')
+  const hasForbiddenChars = /[^0-9+\s().-]/.test(normalized)
+  const plusMatches = normalized.match(/\+/g) || []
+  const hasMisplacedPlus = plusMatches.length > 1 || (plusMatches.length === 1 && !normalized.startsWith('+'))
   normalized = normalized.replace(/[\s().-]+/g, '')
 
   const originalCompact = normalized.startsWith('+')
@@ -58,6 +61,8 @@ export function getVietnamPhoneInfo(rawValue, options = {}) {
     comparable,
     originalCompact,
     autoAddedLeadingZero: shouldRestoreLeadingZero,
+    hasForbiddenChars,
+    hasMisplacedPlus,
   }
 }
 
@@ -72,6 +77,15 @@ export function validateVietnamPhone(rawValue, options = {}) {
   const autoFixText = info.autoAddedLeadingZero
     ? `Đã tự thêm số 0 đầu thành ${normalized}. `
     : ''
+
+  if (info.input && (info.hasForbiddenChars || info.hasMisplacedPlus)) {
+    return {
+      isValid: false,
+      normalized,
+      message: `${autoFixText}Số điện thoại chỉ được chứa chữ số và ký tự phân tách hợp lệ (khoảng trắng, dấu chấm, ngoặc, gạch ngang), và chỉ dùng dấu + ở đầu số.`,
+      autoAddedLeadingZero: info.autoAddedLeadingZero,
+    }
+  }
 
   if (!normalized) {
     return {

@@ -3,9 +3,9 @@ import { IMAGEKIT_URL_ENDPOINT } from '@/lib/constants';
 export const STORE_PLACEHOLDER_IMAGE = '/store-placeholder.jpg'
 
 /**
- * Get full image URL from filename using ImageKit.io
+ * Get full image URL from filename
  * @param {string} filename - Image filename from database
- * @returns {string} Full ImageKit.io URL with optimizations
+ * @returns {string} Full CDN image URL with optimizations
  */
 export function getFullImageUrl(filename) {
   if (!filename) return STORE_PLACEHOLDER_IMAGE;
@@ -15,7 +15,7 @@ export function getFullImageUrl(filename) {
     return filename;
   }
   
-  // Build ImageKit URL with basic optimizations - directly to file without stores folder
+  // Build image URL with basic optimizations - directly to file without stores folder
   // IMAGEKIT_URL_ENDPOINT now comes from NEXT_PUBLIC_IMAGE_BASE_URL which already has trailing slash
   const baseUrl = IMAGEKIT_URL_ENDPOINT.endsWith('/') 
     ? IMAGEKIT_URL_ENDPOINT.slice(0, -1) 
@@ -29,7 +29,7 @@ export function getFullImageUrl(filename) {
  * @param {string} filename - Image filename from database
  * @param {number} width - Desired width (default: 300)
  * @param {number} height - Desired height (default: 200)
- * @returns {string} Optimized ImageKit.io URL
+ * @returns {string} Optimized image URL
  */
 export function getThumbnailUrl(filename, width = 300, height = 200) {
   if (!filename) return STORE_PLACEHOLDER_IMAGE;
@@ -47,8 +47,8 @@ export function getThumbnailUrl(filename, width = 300, height = 200) {
 }
 
 /**
- * Get filename from ImageKit URL
- * @param {string} imageUrl - ImageKit URL or filename
+ * Get filename from image URL
+ * @param {string} imageUrl - Image URL or filename
  * @returns {string} Just the filename
  */
 export function getImageFilename(imageUrl) {
@@ -59,7 +59,7 @@ export function getImageFilename(imageUrl) {
     return imageUrl;
   }
   
-  // Handle ImageKit URLs
+  // Handle ImageKit-style URLs
   if (imageUrl.includes('ik.imagekit.io')) {
     try {
       const url = new URL(imageUrl);
@@ -85,11 +85,3 @@ export function getImageFilename(imageUrl) {
   }
 }
 
-/**
- * Generate ImageKit upload URL for server-side uploads
- * @param {string} folder - Folder path (default: 'stores')
- * @returns {string} ImageKit upload URL
- */
-export function getImageKitUploadUrl(folder = 'stores') {
-  return 'https://upload.imagekit.io/api/v1/files/upload';
-}
