@@ -1,6 +1,12 @@
-import { StoreExportScreen } from '@/pages/store/export'
+import { useEffect } from 'react'
+import { useRouter } from 'next/router'
 
-export default function ExportContactsPage() {
-  return <StoreExportScreen mode="contacts" />
+export default function ExportContactsLegacyPage() {
+  const router = useRouter()
+
+  useEffect(() => {
+    router.replace('/admin/export')
+  }, [router])
+
+  return null
 }
-
