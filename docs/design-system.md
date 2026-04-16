@@ -146,6 +146,13 @@ Trang map luôn dark (không theo system preference):
 - Floating GPS button: góc phải dưới, `bg-slate-950/90`, viền `border-slate-600/70`, hover `sky`
 - Hiển thị thêm chấm xanh vị trí người dùng trên bản đồ
 
+### `/map` Interaction Updates
+- Nút hướng trên `/map`: khi bật sẽ xoay bản đồ theo hướng người dùng, khóa kéo bản đồ, và vẫn giữ zoom; khi tắt thì trả về thao tác bình thường
+- Dữ liệu vị trí và hướng người dùng trên `/map` được cập nhật định kỳ mỗi 3 giây khi màn hình đang mở
+- Modal tuyến đường trên mobile phải nằm trên cụm nút điều hướng dưới cùng và không bị khuyết phần trên
+- Nút ẩn/hiện cửa hàng ngoài tuyến chỉ còn đặt trong modal tuyến đường
+- Nút vị trí không hiển thị loading, chỉ còn hành vi quay về vị trí hiện tại
+
 ### Store Detail Modal
 - `Loại cửa hàng` hiển thị phía trên `Tên cửa hàng`
 - Dùng `text-sm` hoặc tương đương để hierarchy rõ ràng, không cạnh tranh với title

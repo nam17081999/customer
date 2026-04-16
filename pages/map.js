@@ -1,4 +1,4 @@
-import 'maplibre-gl/dist/maplibre-gl.css'
+﻿import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Input } from '@/components/ui/input'
@@ -20,16 +20,74 @@ function formatShortAddress(store) {
 
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
+const MAP_ROUTE_STORAGE_KEY = 'storevis:map-route-plan'
+const FIXED_ROUTE_POINT = {
+  lat: 21.0774332,
+  lng: 105.6951599,
+  name: 'Điểm xuất phát',
+}
+
+const HEADING_JITTER_DEG = 6
+const HEADING_SMOOTHING_ALPHA = 0.22
+
+function normalizeHeading(deg) {
+  if (!Number.isFinite(deg)) return null
+  return ((deg % 360) + 360) % 360
+}
+
+function shortestHeadingDelta(from, to) {
+  return ((((to - from) % 360) + 540) % 360) - 180
+}
+
+function smoothHeading(previous, next) {
+  const prev = normalizeHeading(previous)
+  const nextNorm = normalizeHeading(next)
+  if (nextNorm == null) return null
+  if (prev == null) return nextNorm
+
+  const delta = shortestHeadingDelta(prev, nextNorm)
+  if (Math.abs(delta) <= HEADING_JITTER_DEG) return prev
+
+  return normalizeHeading(prev + (delta * HEADING_SMOOTHING_ALPHA))
+}
+
+function formatRouteDistance(distanceMeters) {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return ''
+  if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`
+  return `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)} km`
+}
+
+function formatRouteDuration(durationSeconds) {
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return ''
+  const totalMinutes = Math.round(durationSeconds / 60)
+  if (totalMinutes < 60) return `${totalMinutes} phút`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) return `${hours} giờ`
+  return `${hours} giờ ${minutes} phút`
+}
+
+function moveItem(list, fromIndex, toIndex) {
+  if (toIndex < 0 || toIndex >= list.length || fromIndex === toIndex) return list
+  const next = [...list]
+  const [item] = next.splice(fromIndex, 1)
+  next.splice(toIndex, 0, item)
+  return next
+}
+
+const ROUTE_DRAG_HOLD_MS = 220
+const ROUTE_DRAG_CANCEL_PX = 10
+const MAP_INTERACTION_SUPPRESS_MS = 500
 
 /**
  * Get the first meaningful word of a store name,
  * skipping leading words that match IGNORED_NAME_TERMS.
- * E.g. "Cửa Hàng Anh Dũng" → "Anh"
+ * Example: "Cua Hang Anh Dung" -> "Anh"
  */
 function getFirstWord(name = '') {
   let remaining = String(name).trim().toLowerCase()
   // Sort ignored terms by length (longest first) so multi-word terms
-  // like "cửa hàng" are stripped before single-word "cửa".
+  // like "cua hang" are stripped before single-word "cua".
   const sorted = [...IGNORED_NAME_TERMS].sort((a, b) => b.length - a.length)
   let stripped = true
   while (stripped) {
@@ -55,7 +113,7 @@ function toLatLng(store) {
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
 
-  // Fix swapped coordinates when dữ liệu bị đảo cột lat/lng
+  // Fix swapped coordinates when latitude/longitude are reversed in data.
   if ((lat < -90 || lat > 90) && lng >= -90 && lng <= 90 && lat >= -180 && lat <= 180) {
     const temp = lat
     lat = lng
@@ -71,16 +129,16 @@ function toLatLng(store) {
  * Pre-render house icon + store name into a single canvas image.
  * Returns { width, height, data, dpr, anchorY } for MapLibre addImage.
  */
-function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = false) {
+function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = false, routeOrder = '') {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
 
-  // ── House icon dimensions ──
+  // House icon dimensions
   const iconSize = Math.round(38 * dpr) // circle diameter
   const iconPad = Math.round(2 * dpr)   // space around circle
   const hlPad = highlighted ? Math.round(5 * dpr) : 0 // extra space for highlight ring
   const gap = Math.round(1 * dpr)       // gap between icon and label
 
-  // ── Label dimensions ──
+  // Label dimensions
   const scaledFont = Math.round(fontSize * dpr)
   const maxPxWidth = Math.round(maxWidthEm * fontSize * dpr)
   const paddingX = Math.round(7 * dpr)
@@ -109,7 +167,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   const labelW = textW + paddingX * 2
   const labelH = lines.length * lineHeight + paddingY * 2
 
-  // ── Combined canvas ──
+  // Combined canvas
   const totalW = Math.max(iconSize + iconPad * 2 + hlPad * 2, labelW)
   const iconBottom = iconSize + hlPad * 2
   const totalH = iconBottom + gap + labelH
@@ -135,31 +193,39 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   // Circle bg
   ctx.beginPath()
   ctx.arc(iconCX, iconCY, r, 0, Math.PI * 2)
-  ctx.fillStyle = '#1f2937'
+  ctx.fillStyle = routeOrder ? '#f97316' : '#1f2937'
   ctx.fill()
   ctx.strokeStyle = '#ffffff'
   ctx.lineWidth = 1.5 * dpr
   ctx.stroke()
 
-  // House shape inside circle
-  const s = r * 0.52
-  ctx.fillStyle = '#ffffff'
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 0.8 * dpr
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  // Roof
-  ctx.beginPath()
-  ctx.moveTo(iconCX, iconCY - s * 0.9)
-  ctx.lineTo(iconCX - s, iconCY - s * 0.05)
-  ctx.lineTo(iconCX + s, iconCY - s * 0.05)
-  ctx.closePath()
-  ctx.fill()
-  // Body
-  ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
-  // Door
-  ctx.fillStyle = '#1f2937'
-  ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
+  if (routeOrder) {
+    ctx.font = `bold ${Math.round(16 * dpr)}px "Open Sans", system-ui, sans-serif`
+    ctx.fillStyle = '#fff7ed'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(routeOrder), iconCX, iconCY + dpr * 0.25)
+  } else {
+    // House shape inside circle
+    const s = r * 0.52
+    ctx.fillStyle = '#ffffff'
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = 0.8 * dpr
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    // Roof
+    ctx.beginPath()
+    ctx.moveTo(iconCX, iconCY - s * 0.9)
+    ctx.lineTo(iconCX - s, iconCY - s * 0.05)
+    ctx.lineTo(iconCX + s, iconCY - s * 0.05)
+    ctx.closePath()
+    ctx.fill()
+    // Body
+    ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
+    // Door
+    ctx.fillStyle = '#1f2937'
+    ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
+  }
 
   // Draw label background (centered horizontally)
   const lx = (totalW - labelW) / 2
@@ -255,18 +321,39 @@ export default function MapPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState(-1)
   const [canScrollDown, setCanScrollDown] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [isStandalonePwa, setIsStandalonePwa] = useState(false)
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [selectedWards, setSelectedWards] = useState([])
   const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
-  const [locatingUser, setLocatingUser] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [userLocation, setUserLocation] = useState(null)
+  const [followUserHeading, setFollowUserHeading] = useState(false)
+  const [routeStops, setRouteStops] = useState([])
+  const [routeGeojson, setRouteGeojson] = useState(EMPTY_FEATURE_COLLECTION)
+  const [routeSummary, setRouteSummary] = useState(null)
+  const [routeLoading, setRouteLoading] = useState(false)
+  const [routeSorting, setRouteSorting] = useState(false)
+  const [routeError, setRouteError] = useState('')
+  const [routePanelOpen, setRoutePanelOpen] = useState(false)
+  const [hideUnselectedStores, setHideUnselectedStores] = useState(false)
+  const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
+  const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
+  const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
+  const [dragRouteOffset, setDragRouteOffset] = useState({ x: 0, y: 0 })
+  const [dragRouteBox, setDragRouteBox] = useState(null)
+  const [routePlanHydrated, setRoutePlanHydrated] = useState(false)
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
+  const routeListScrollRef = useRef(null)
+  const routeItemRefs = useRef(new Map())
+  const routeDragStateRef = useRef(null)
+  const pendingRouteDragRef = useRef(null)
+  const routeAutoScrollRef = useRef(null)
+  const suppressMapInteractionUntilRef = useRef(0)
+  const restoredRoutePlanRef = useRef(false)
+  const followUserHeadingRef = useRef(false)
 
   const initialTarget = useMemo(() => {
     if (!router.isReady) return null
@@ -286,6 +373,32 @@ export default function MapPage() {
   }, [router.isReady, router.query.storeId])
 
   // Detect desktop via pointer capability (not screen width)
+  const routeStopIds = useMemo(
+    () => new Set(routeStops.map((store) => String(store.id))),
+    [routeStops]
+  )
+
+  const routeStopOrderById = useMemo(
+    () => new Map(routeStops.map((store, index) => [String(store.id), String(index + 1)])),
+    [routeStops]
+  )
+
+  const renderedRouteStops = useMemo(() => {
+    const items = routeStops.map((store, index) => ({ store, originalIndex: index }))
+    if (draggedRouteIndex < 0 || dragOverRouteIndex < 0) {
+      return items.map((item, displayIndex) => ({ ...item, displayIndex }))
+    }
+
+    return moveItem(items, draggedRouteIndex, dragOverRouteIndex)
+      .map((item, displayIndex) => ({ ...item, displayIndex }))
+  }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
+
+  const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
+
+  useEffect(() => {
+    followUserHeadingRef.current = followUserHeading
+  }, [followUserHeading])
+
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover) and (pointer: fine)')
     setIsDesktop(mq.matches)
@@ -325,6 +438,11 @@ export default function MapPage() {
       return typeMatched
     })
   }, [storesAfterAreaFilters, selectedStoreTypes])
+
+  const visibleMapStores = useMemo(() => {
+    if (!hideUnselectedStores || routeStopIds.size === 0) return filteredStores
+    return filteredStores.filter((store) => routeStopIds.has(String(store.id)))
+  }, [filteredStores, hideUnselectedStores, routeStopIds])
 
   // Available wards based on selected districts
   const availableWards = useMemo(() => {
@@ -396,7 +514,7 @@ export default function MapPage() {
     return storesWithCoords.filter((s) => (s.name || '').toLowerCase().includes(q))
   }, [searchTerm, storesWithCoords])
 
-  const storeMapRef = useRef(new Map()) // storeId → store data for quick lookup
+  const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -449,6 +567,11 @@ export default function MapPage() {
           data: EMPTY_FEATURE_COLLECTION,
         })
 
+        map.addSource('route-path', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
         // Combined marker: house icon + name label in one image per store
         map.addLayer({
           id: 'store-marker',
@@ -456,7 +579,9 @@ export default function MapPage() {
           source: 'stores',
           layout: {
             'icon-image': ['case',
+              ['all', ['==', ['get', 'highlighted'], 'yes'], ['!=', ['get', 'routeOrder'], '']], ['concat', 'smrh-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
               ['==', ['get', 'highlighted'], 'yes'], ['concat', 'smh-', ['get', 'storeId']],
+              ['!=', ['get', 'routeOrder'], ''], ['concat', 'smr-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
               ['concat', 'sm-', ['get', 'storeId']]
             ],
             'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
@@ -467,6 +592,36 @@ export default function MapPage() {
             'symbol-z-order': 'auto',
           },
         })
+
+        map.addLayer({
+          id: 'route-line-outline',
+          type: 'line',
+          source: 'route-path',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': 'rgba(15, 23, 42, 0.95)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 9, 16, 12],
+            'line-opacity': 0.95,
+          },
+        }, 'store-marker')
+
+        map.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route-path',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 5.5, 16, 7],
+            'line-opacity': 0.95,
+          },
+        }, 'store-marker')
 
         map.addLayer({
           id: 'user-location-halo',
@@ -513,11 +668,11 @@ export default function MapPage() {
           },
         })
 
-        // Click on store marker → open dialog
+        // Click on store marker -> open dialog
         map.on('click', 'store-marker', (e) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['store-marker'] })
-          if (!features.length) return
-          const f = features[0]
+          if (Date.now() < suppressMapInteractionUntilRef.current) return
+          const f = e.features?.[0]
+          if (!f) return
           const storeId = f.properties.storeId
           const store = storeMapRef.current.get(storeId)
           if (store) {
@@ -677,13 +832,13 @@ export default function MapPage() {
 
     // Build lookup map for click handler
     const lookup = new Map()
-    filteredStores.forEach((store) => { lookup.set(String(store.id), store) })
+    visibleMapStores.forEach((store) => { lookup.set(String(store.id), store) })
     storeMapRef.current = lookup
 
     const source = map.getSource('stores')
     if (!source) return
 
-    const features = filteredStores.map((store) => ({
+    const features = visibleMapStores.map((store) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [store.coords.lng, store.coords.lat] },
       properties: {
@@ -691,20 +846,24 @@ export default function MapPage() {
         name: store.name || 'Cửa hàng',
         shortName: getFirstWord(store.name),
         address: formatAddressParts(store),
+        routeOrder: routeStopOrderById.get(String(store.id)) || '',
       },
     }))
 
-    // Generate combined marker images (house icon + label in one canvas)
+    // Generate combined marker images (house icon or route number + label in one canvas)
     for (const f of features) {
-      const imgId = `sm-${f.properties.storeId}`
+      const routeOrder = f.properties.routeOrder || ''
+      const imgId = routeOrder
+        ? `smr-${f.properties.storeId}-${routeOrder}`
+        : `sm-${f.properties.storeId}`
       if (!map.hasImage(imgId)) {
-        const img = createStoreMarker(f.properties.name)
+        const img = createStoreMarker(f.properties.name, 13, 9, false, routeOrder)
         map.addImage(imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
       }
     }
 
     source.setData({ type: 'FeatureCollection', features })
-  }, [filteredStores, mapReady])
+  }, [mapReady, routeStopOrderById, visibleMapStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -730,6 +889,457 @@ export default function MapPage() {
     pointSource.setData({ type: 'FeatureCollection', features })
   }, [mapReady, userLocation])
 
+  useEffect(() => {
+    const latestById = new Map(storesWithCoords.map((store) => [String(store.id), store]))
+    setRouteStops((prev) => prev
+      .map((store) => latestById.get(String(store.id)) || null)
+      .filter(Boolean)
+    )
+  }, [storesWithCoords])
+
+  useEffect(() => {
+    if (restoredRoutePlanRef.current) return
+    if (typeof window === 'undefined') return
+    if (loading) return
+
+    try {
+      const raw = window.localStorage.getItem(MAP_ROUTE_STORAGE_KEY)
+      if (!raw) {
+        restoredRoutePlanRef.current = true
+        return
+      }
+
+      const parsed = JSON.parse(raw)
+      const savedIds = Array.isArray(parsed?.routeStopIds) ? parsed.routeStopIds.map(String) : []
+      const byId = new Map(storesWithCoords.map((store) => [String(store.id), store]))
+      const restoredStops = savedIds
+        .map((id) => byId.get(id) || null)
+        .filter(Boolean)
+
+      // Wait for the first non-loading store payload before finalizing restore.
+      if (savedIds.length > 0 && restoredStops.length === 0 && stores.length === 0) return
+
+      restoredRoutePlanRef.current = true
+      setRouteStops(restoredStops)
+      if (typeof parsed?.hideUnselectedStores === 'boolean') setHideUnselectedStores(parsed.hideUnselectedStores)
+    } catch (error) {
+      restoredRoutePlanRef.current = true
+      console.error('Restore route plan failed:', error)
+    } finally {
+      if (restoredRoutePlanRef.current) {
+        setRoutePlanHydrated(true)
+      }
+    }
+  }, [loading, stores, storesWithCoords])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!routePlanHydrated) return
+
+    try {
+      window.localStorage.setItem(MAP_ROUTE_STORAGE_KEY, JSON.stringify({
+        routeStopIds: routeStops.map((store) => String(store.id)),
+        hideUnselectedStores,
+      }))
+    } catch (error) {
+      console.error('Persist route plan failed:', error)
+    }
+  }, [routePlanHydrated, routeStops, hideUnselectedStores])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const routeSource = map.getSource('route-path')
+    if (routeSource) routeSource.setData(routeGeojson)
+  }, [mapReady, routeGeojson])
+
+  useEffect(() => {
+    setRouteGeojson(EMPTY_FEATURE_COLLECTION)
+    setRouteSummary(null)
+    setRouteError('')
+  }, [routeStops])
+
+  useEffect(() => {
+    if (routeStops.length === 0) setHideUnselectedStores(false)
+  }, [routeStops.length])
+
+  const addStoreToRoute = useCallback((store) => {
+    if (!store?.coords) return
+    setRouteStops((prev) => {
+      if (prev.some((item) => String(item.id) === String(store.id))) return prev
+      return [...prev, store]
+    })
+    setRouteError('')
+  }, [])
+
+  const removeRouteStop = useCallback((storeId) => {
+    setRouteStops((prev) => prev.filter((store) => String(store.id) !== String(storeId)))
+  }, [])
+
+  const clearRoutePlan = useCallback(() => {
+    setRouteStops([])
+    setRouteGeojson(EMPTY_FEATURE_COLLECTION)
+    setRouteSummary(null)
+    setRouteError('')
+  }, [])
+
+  const cancelPendingRouteDrag = useCallback(() => {
+    if (!pendingRouteDragRef.current) return
+    window.clearTimeout(pendingRouteDragRef.current.timerId)
+    pendingRouteDragRef.current = null
+  }, [])
+
+  const finishRouteDrag = useCallback((cancelled = false) => {
+    const dragState = routeDragStateRef.current
+    routeDragStateRef.current = null
+    cancelPendingRouteDrag()
+    if (routeAutoScrollRef.current) {
+      window.cancelAnimationFrame(routeAutoScrollRef.current)
+      routeAutoScrollRef.current = null
+    }
+
+    const fromIndex = dragState?.fromIndex ?? -1
+    const toIndex = dragState?.targetIndex ?? -1
+
+    if (!cancelled && fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
+      setRouteStops((prev) => moveItem(prev, fromIndex, toIndex))
+    }
+
+    setArmedRouteIndex(-1)
+    setDraggedRouteIndex(-1)
+    setDragOverRouteIndex(-1)
+    setDragRouteOffset({ x: 0, y: 0 })
+    setDragRouteBox(null)
+  }, [cancelPendingRouteDrag])
+
+  const updateRouteDragTarget = useCallback((clientY) => {
+    const entries = Array.from(routeItemRefs.current.entries())
+    if (entries.length === 0) return
+
+    let nextTarget = entries[entries.length - 1][0]
+    for (const [index, element] of entries) {
+      if (!element) continue
+      const rect = element.getBoundingClientRect()
+      if (clientY < rect.top + rect.height / 2) {
+        nextTarget = index
+        break
+      }
+    }
+
+    if (routeDragStateRef.current) {
+      routeDragStateRef.current.targetIndex = nextTarget
+    }
+    setDragOverRouteIndex(nextTarget)
+  }, [])
+
+  const tickRouteAutoScroll = useCallback(() => {
+    routeAutoScrollRef.current = null
+    const dragState = routeDragStateRef.current
+    const container = routeListScrollRef.current
+    if (!dragState || !container) return
+
+    const rect = container.getBoundingClientRect()
+    const threshold = 56
+    let delta = 0
+
+    if (dragState.lastClientY < rect.top + threshold) {
+      delta = Math.max(-14, -((rect.top + threshold - dragState.lastClientY) / 6))
+    } else if (dragState.lastClientY > rect.bottom - threshold) {
+      delta = Math.min(14, (dragState.lastClientY - (rect.bottom - threshold)) / 6)
+    }
+
+    if (delta !== 0) {
+      container.scrollTop += delta
+      updateRouteDragTarget(dragState.lastClientY)
+      routeAutoScrollRef.current = window.requestAnimationFrame(tickRouteAutoScroll)
+    }
+  }, [updateRouteDragTarget])
+
+  const activateRouteDrag = useCallback((dragState) => {
+    if (!dragState?.element) return
+
+    const elementRect = dragState.element.getBoundingClientRect()
+    routeDragStateRef.current = {
+      ...dragState,
+      status: 'dragging',
+      lastClientY: dragState.latestClientY,
+    }
+    dragState.element.setPointerCapture?.(dragState.pointerId)
+    setArmedRouteIndex(-1)
+    setDraggedRouteIndex(dragState.fromIndex)
+    setDragOverRouteIndex(dragState.fromIndex)
+    setDragRouteOffset({
+      x: dragState.latestClientX - dragState.startX,
+      y: dragState.latestClientY - dragState.startY,
+    })
+    setDragRouteBox({
+      left: elementRect.left,
+      top: elementRect.top,
+      width: elementRect.width,
+      height: elementRect.height,
+    })
+    updateRouteDragTarget(dragState.latestClientY)
+  }, [updateRouteDragTarget])
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      if (routeDragStateRef.current?.status === 'dragging') {
+        if (event.cancelable) event.preventDefault()
+        routeDragStateRef.current.lastClientY = event.clientY
+        routeDragStateRef.current.latestClientX = event.clientX
+        routeDragStateRef.current.latestClientY = event.clientY
+        setDragRouteOffset({
+          x: event.clientX - routeDragStateRef.current.startX,
+          y: event.clientY - routeDragStateRef.current.startY,
+        })
+        updateRouteDragTarget(event.clientY)
+        if (!routeAutoScrollRef.current) {
+          routeAutoScrollRef.current = window.requestAnimationFrame(tickRouteAutoScroll)
+        }
+        return
+      }
+
+      if (routeDragStateRef.current?.status === 'armed') {
+        if (event.cancelable) event.preventDefault()
+        routeDragStateRef.current.latestClientX = event.clientX
+        routeDragStateRef.current.latestClientY = event.clientY
+        routeDragStateRef.current.lastClientY = event.clientY
+
+        const movedX = Math.abs(event.clientX - routeDragStateRef.current.startX)
+        const movedY = Math.abs(event.clientY - routeDragStateRef.current.startY)
+        if (movedX > 3 || movedY > 3) {
+          activateRouteDrag(routeDragStateRef.current)
+        }
+        return
+      }
+
+      const pending = pendingRouteDragRef.current
+      if (!pending) return
+
+      const movedX = Math.abs(event.clientX - pending.startX)
+      const movedY = Math.abs(event.clientY - pending.startY)
+      if (movedX > ROUTE_DRAG_CANCEL_PX || movedY > ROUTE_DRAG_CANCEL_PX) {
+        cancelPendingRouteDrag()
+        return
+      }
+      pending.latestClientX = event.clientX
+      pending.latestClientY = event.clientY
+    }
+
+    const handlePointerUp = () => {
+      if (routeDragStateRef.current) {
+        finishRouteDrag(false)
+        return
+      }
+      cancelPendingRouteDrag()
+      setArmedRouteIndex(-1)
+    }
+
+    const handlePointerCancel = () => {
+      if (routeDragStateRef.current) {
+        finishRouteDrag(true)
+        return
+      }
+      cancelPendingRouteDrag()
+      setArmedRouteIndex(-1)
+    }
+
+    const handleTouchMove = (event) => {
+      if (!routeDragStateRef.current) return
+      if (event.cancelable) event.preventDefault()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false })
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerCancel)
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
+      window.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [activateRouteDrag, cancelPendingRouteDrag, finishRouteDrag, tickRouteAutoScroll, updateRouteDragTarget])
+
+  const startRouteDrag = useCallback((index, event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+
+    cancelPendingRouteDrag()
+    pendingRouteDragRef.current = {
+      fromIndex: index,
+      startX: event.clientX,
+      startY: event.clientY,
+      latestClientX: event.clientX,
+      latestClientY: event.clientY,
+      pointerId: event.pointerId,
+      element: event.currentTarget,
+      timerId: window.setTimeout(() => {
+        const pending = pendingRouteDragRef.current
+        if (!pending) return
+        routeDragStateRef.current = {
+          ...pending,
+          status: 'armed',
+          targetIndex: pending.fromIndex,
+          lastClientY: pending.latestClientY,
+        }
+        pendingRouteDragRef.current = null
+        setArmedRouteIndex(pending.fromIndex)
+      }, ROUTE_DRAG_HOLD_MS),
+    }
+  }, [cancelPendingRouteDrag])
+
+  const buildRoute = useCallback(async () => {
+    const startPoint = FIXED_ROUTE_POINT
+    const endPoint = FIXED_ROUTE_POINT
+
+    const stops = routeStops.map((store) => ({
+      id: String(store.id),
+      name: store.name || 'C\u1eeda h\u00e0ng',
+      lat: store.coords.lat,
+      lng: store.coords.lng,
+    }))
+
+    if (stops.length < 1) {
+      setRouteError('Chọn ít nhất 1 cửa hàng để vẽ tuyến.')
+      return
+    }
+
+    setRouteLoading(true)
+    setRouteError('')
+
+    try {
+      const response = await fetch('/api/route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start: startPoint,
+          end: endPoint,
+          stops,
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Kh\u00f4ng l\u1ea5y \u0111\u01b0\u1ee3c tuy\u1ebfn \u0111\u01b0\u1eddng.')
+      }
+
+      const routeFeature = {
+        type: 'Feature',
+        geometry: payload.geometry,
+        properties: {
+          distance: payload.distance,
+          duration: payload.duration,
+        },
+      }
+
+      setRouteGeojson({
+        type: 'FeatureCollection',
+        features: [routeFeature],
+      })
+      setRouteSummary({
+        distance: payload.distance,
+        duration: payload.duration,
+        returnsToFixedPoint: true,
+      })
+
+      const map = mapRef.current
+      const bounds = payload.geometry?.coordinates?.reduce((acc, [lng, lat]) => {
+        if (!acc) return [[lng, lat], [lng, lat]]
+        return [
+          [Math.min(acc[0][0], lng), Math.min(acc[0][1], lat)],
+          [Math.max(acc[1][0], lng), Math.max(acc[1][1], lat)],
+        ]
+      }, null)
+
+      if (map && bounds) {
+        map.fitBounds(bounds, {
+          padding: isDesktop
+            ? { top: 110, right: 370, bottom: 70, left: 70 }
+            : { top: 110, right: 40, bottom: 220, left: 40 },
+          duration: 900,
+        })
+      }
+    } catch (err) {
+      console.error('Build route failed:', err)
+      setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 v\u1ebd tuy\u1ebfn \u0111\u01b0\u1eddng ngay l\u00fac n\u00e0y.')
+    } finally {
+      setRouteLoading(false)
+    }
+  }, [isDesktop, routeStops])
+
+  const optimizeRouteOrder = useCallback(async () => {
+    if (routeStops.length < 2) {
+      setRouteError('Chọn ít nhất 2 cửa hàng để sắp xếp.')
+      return
+    }
+
+    const confirmed = typeof window === 'undefined'
+      ? true
+      : window.confirm('Sắp xếp lại thứ tự cửa hàng cho tuyến đi và quay về điểm xuất phát cố định? Thứ tự hiện tại sẽ được thay đổi.')
+
+    if (!confirmed) return
+
+    const startPoint = FIXED_ROUTE_POINT
+    const endPoint = FIXED_ROUTE_POINT
+
+    const stops = routeStops.map((store) => ({
+      id: String(store.id),
+      name: store.name || 'C\u1eeda h\u00e0ng',
+      lat: store.coords.lat,
+      lng: store.coords.lng,
+    }))
+
+    setRouteSorting(true)
+    setRouteError('')
+
+    try {
+      const response = await fetch('/api/route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mode: 'optimize',
+          start: startPoint,
+          end: endPoint,
+          stops,
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng.')
+      }
+
+      const orderedStopIds = Array.isArray(payload?.orderedStopIds) ? payload.orderedStopIds.map(String) : []
+      if (orderedStopIds.length !== routeStops.length) {
+        throw new Error('Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp l\u1ea1i \u0111\u1ea7y \u0111\u1ee7 danh s\u00e1ch c\u1eeda h\u00e0ng.')
+      }
+
+      const storeById = new Map(routeStops.map((store) => [String(store.id), store]))
+      const nextRouteStops = orderedStopIds
+        .map((id) => storeById.get(id) || null)
+        .filter(Boolean)
+
+      if (nextRouteStops.length !== routeStops.length) {
+        throw new Error('Kh\u00f4ng th\u1ec3 kh\u00f4i ph\u1ee5c \u0111\u1ea7y \u0111\u1ee7 danh s\u00e1ch sau khi s\u1eafp x\u1ebfp.')
+      }
+
+      setRouteStops(nextRouteStops)
+      setRouteGeojson(EMPTY_FEATURE_COLLECTION)
+      setRouteSummary(null)
+    } catch (err) {
+      console.error('Optimize route order failed:', err)
+      setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng l\u00fac n\u00e0y.')
+    } finally {
+      setRouteSorting(false)
+    }
+  }, [routeStops])
+
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
     const map = mapRef.current
@@ -738,9 +1348,11 @@ export default function MapPage() {
 
     // Generate highlighted image if not already cached
     const hlId = `smh-${store.id}`
-    if (!map.hasImage(hlId)) {
-      const img = createStoreMarker(store.name || 'Cửa hàng', 13, 9, true)
-      map.addImage(hlId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+    const routeOrder = routeStopOrderById.get(String(store.id)) || ''
+    const highlightedImageId = routeOrder ? `smrh-${store.id}-${routeOrder}` : hlId
+    if (!map.hasImage(highlightedImageId)) {
+      const img = createStoreMarker(store.name || 'Cửa hàng', 13, 9, true, routeOrder)
+      map.addImage(highlightedImageId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
     }
 
     // Update features: set highlighted property and move highlighted store to end (renders on top)
@@ -756,6 +1368,7 @@ export default function MapPage() {
           name: s.name || 'Cửa hàng',
           shortName: getFirstWord(s.name),
           address: formatAddressParts(s),
+          routeOrder: routeStopOrderById.get(String(s.id)) || '',
           highlighted: String(s.id) === storeId ? 'yes' : 'no',
         },
       }))
@@ -771,7 +1384,7 @@ export default function MapPage() {
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [filteredStores])
+  }, [filteredStores, routeStopOrderById])
 
   const handleSearch = useCallback(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -786,11 +1399,21 @@ export default function MapPage() {
     setShowSuggestions(false)
   }, [searchTerm, storesWithCoords, flyToStore])
 
+  const setMapBearing = useCallback((bearing) => {
+    const map = mapRef.current
+    if (!map) return
+
+    map.easeTo({
+      bearing,
+      duration: 500,
+      essential: true,
+    })
+  }, [])
+
   const refreshUserLocation = useCallback(async ({ shouldRecenter = false, forceFreshPosition = false } = {}) => {
     if (locatingUserRef.current) return null
 
     locatingUserRef.current = true
-    setLocatingUser(true)
     setLocationError('')
 
     try {
@@ -817,33 +1440,28 @@ export default function MapPage() {
         return null
       }
 
-      const normalizedHeading = typeof heading === 'number'
-        ? ((heading % 360) + 360) % 360
-        : null
+      const normalizedHeading = normalizeHeading(heading)
+      const smoothedHeading = smoothHeading(pendingHeadingRef.current, normalizedHeading)
 
       const nextLocation = {
         latitude: coords.latitude,
         longitude: coords.longitude,
         accuracy: coords.accuracy ?? null,
-        heading: normalizedHeading,
+        heading: smoothedHeading,
       }
-      if (normalizedHeading != null) {
-        pendingHeadingRef.current = normalizedHeading
+      if (smoothedHeading != null) {
+        pendingHeadingRef.current = smoothedHeading
       }
       setUserLocation((prev) => ({
         ...nextLocation,
-        heading: normalizedHeading ?? prev?.heading ?? null,
+        heading: smoothedHeading ?? prev?.heading ?? null,
       }))
 
       if (shouldRecenter) {
         const map = mapRef.current
         if (map) {
           setSelectedStore(null)
-          map.flyTo({
-            center: [coords.longitude, coords.latitude],
-            zoom: Math.max(map.getZoom(), 16),
-            duration: 900,
-          })
+          map.setCenter([coords.longitude, coords.latitude])
         }
       }
 
@@ -854,7 +1472,6 @@ export default function MapPage() {
       return null
     } finally {
       locatingUserRef.current = false
-      setLocatingUser(false)
     }
   }, [])
 
@@ -862,17 +1479,15 @@ export default function MapPage() {
     if (locatingUserRef.current) {
       requestCompassHeading()
         .then((result) => {
-          const heading = typeof result?.heading === 'number'
-            ? ((result.heading % 360) + 360) % 360
-            : null
+          const heading = normalizeHeading(result?.heading)
 
           if (heading == null) return
-          pendingHeadingRef.current = heading
+          pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
           setUserLocation((prev) => {
             if (!prev) return prev
             return {
               ...prev,
-              heading,
+              heading: pendingHeadingRef.current,
             }
           })
         })
@@ -881,6 +1496,35 @@ export default function MapPage() {
     }
     return refreshUserLocation({ shouldRecenter: true, forceFreshPosition: true })
   }, [refreshUserLocation])
+
+  const toggleUserHeadingRotation = useCallback(async () => {
+    if (followUserHeading) {
+      followUserHeadingRef.current = false
+      setFollowUserHeading(false)
+      setMapBearing(0)
+      return
+    }
+
+    let heading = userLocation?.heading ?? pendingHeadingRef.current ?? null
+    if (typeof heading !== 'number') {
+      const result = await requestCompassHeading().catch(() => null)
+      heading = normalizeHeading(result?.heading)
+      if (heading != null) {
+        pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
+        setUserLocation((prev) => (prev ? { ...prev, heading: pendingHeadingRef.current } : prev))
+      }
+    }
+
+    if (heading == null) {
+      setLocationError('Không lấy được hướng hiện tại của thiết bị.')
+      return
+    }
+
+    followUserHeadingRef.current = true
+    setFollowUserHeading(true)
+    setMapBearing(pendingHeadingRef.current ?? heading)
+    refreshUserLocation({ shouldRecenter: true, forceFreshPosition: true })
+  }, [followUserHeading, refreshUserLocation, setMapBearing, userLocation?.heading])
 
   useEffect(() => {
     if (!mapReady) return
@@ -897,6 +1541,48 @@ export default function MapPage() {
 
     flyToStore(matched)
   }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
+
+  useEffect(() => {
+    if (!mapReady) return
+    const map = mapRef.current
+    if (!map) return
+
+    if (followUserHeading) {
+      map.dragPan.disable()
+    } else {
+      map.dragPan.enable()
+    }
+
+    return () => {
+      map.dragPan.enable()
+    }
+  }, [followUserHeading, mapReady])
+
+  useEffect(() => {
+    if (!followUserHeading) return
+    if (!mapReady) return
+    if (!Number.isFinite(userLocation?.latitude) || !Number.isFinite(userLocation?.longitude)) return
+
+    const map = mapRef.current
+    if (!map) return
+
+    setSelectedStore(null)
+    map.setCenter([userLocation.longitude, userLocation.latitude])
+    if (userLocation.heading != null) {
+      setMapBearing(userLocation.heading)
+    }
+  }, [followUserHeading, mapReady, setMapBearing, userLocation?.latitude, userLocation?.longitude, userLocation?.heading])
+
+  useEffect(() => {
+    if (!mapReady) return undefined
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      refreshUserLocation({ shouldRecenter: false, forceFreshPosition: true })
+    }, 3000)
+
+    return () => window.clearInterval(intervalId)
+  }, [mapReady, refreshUserLocation])
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -973,17 +1659,31 @@ export default function MapPage() {
                   }}
                 >
                   {suggestions.map((store, idx) => (
-                    <button
+                    <div
                       key={store.id}
-                      type="button"
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors ${idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-slate-800/80'
-                        } border-b border-slate-700/50`}
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => flyToStore(store)}
+                      className={`flex items-center gap-2 border-b border-slate-700/50 px-2 py-2 ${idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-slate-800/80'}`}
                     >
-                      <span className="min-w-0 truncate text-base font-medium text-slate-100">{store.name}</span>
-                      <span className="shrink-0 max-w-[45%] truncate text-right text-sm text-slate-400">{formatShortAddress(store)}</span>
-                    </button>
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 text-left"
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={() => flyToStore(store)}
+                      >
+                        <div className="truncate text-base font-medium text-slate-100">{store.name}</div>
+                        <div className="truncate text-sm text-slate-400">{formatShortAddress(store)}</div>
+                      </button>
+                      <button
+                        type="button"
+                        className={`shrink-0 rounded-md border px-2 py-1 text-sm transition ${routeStopIds.has(String(store.id))
+                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                          : 'border-slate-600/70 bg-slate-950/80 text-slate-200 hover:border-sky-400 hover:text-sky-200'
+                          }`}
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={() => addStoreToRoute(store)}
+                      >
+                        {routeStopIds.has(String(store.id)) ? 'Đã thêm' : 'Thêm'}
+                      </button>
+                    </div>
                   ))}
                 </div>
                 {canScrollDown && (
@@ -998,6 +1698,251 @@ export default function MapPage() {
           </div>
         </div>
 
+        {!routePanelOpen && (
+          <div
+            className="pointer-events-none absolute left-3 z-20"
+            style={{ bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' }}
+          >
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="pointer-events-auto relative rounded-full border border-slate-600/70 bg-slate-950/90 px-4 py-2 text-sm font-medium text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-200"
+                onClick={() => setRoutePanelOpen(true)}
+              >
+                {'Tuy\u1ebfn \u0111\u01b0\u1eddng'}
+                {routeStops.length > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-orange-200/80 bg-orange-500 px-1.5 text-xs font-semibold text-orange-950 shadow">
+                    {routeStops.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {routePanelOpen && (
+          <div
+            className="pointer-events-none absolute left-3 right-3 z-30 sm:top-auto"
+            style={{
+              top: isDesktop ? 'auto' : '0.75rem',
+              bottom: isDesktop
+                ? (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem')
+                : '0.5rem',
+            }}
+          >
+            <div
+              className="pointer-events-auto flex h-full w-full max-w-none overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/95 shadow-2xl backdrop-blur sm:h-auto sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:max-w-[26rem]"
+              onPointerDown={(event) => {
+                suppressMapInteractionUntilRef.current = Date.now() + MAP_INTERACTION_SUPPRESS_MS
+                event.stopPropagation()
+              }}
+              onClick={(event) => {
+                suppressMapInteractionUntilRef.current = Date.now() + MAP_INTERACTION_SUPPRESS_MS
+                event.stopPropagation()
+              }}
+              onDoubleClick={(event) => {
+                suppressMapInteractionUntilRef.current = Date.now() + MAP_INTERACTION_SUPPRESS_MS
+                event.stopPropagation()
+              }}
+              onTouchStart={() => {
+                suppressMapInteractionUntilRef.current = Date.now() + MAP_INTERACTION_SUPPRESS_MS
+              }}
+            >
+              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-center justify-between px-4 pb-2 pt-4 sm:pt-3">
+                <div>
+                  <p className="text-base font-semibold text-slate-100">{'Tuy\u1ebfn \u0111\u01b0\u1eddng'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                {routeStops.length > 0 && (
+                  <button
+                    type="button"
+                    className={`rounded-full border p-2 transition ${hideUnselectedStores
+                      ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                      : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                      }`}
+                    onClick={() => setHideUnselectedStores((prev) => !prev)}
+                    title={hideUnselectedStores ? 'Hi\u1ec7n t\u1ea5t c\u1ea3 c\u1eeda h\u00e0ng' : '\u1ea8n c\u1eeda h\u00e0ng ngo\u00e0i tuy\u1ebfn'}
+                    aria-label={hideUnselectedStores ? 'Hi\u1ec7n t\u1ea5t c\u1ea3 c\u1eeda h\u00e0ng' : '\u1ea8n c\u1eeda h\u00e0ng ngo\u00e0i tuy\u1ebfn'}
+                  >
+                    {hideUnselectedStores ? (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.58 10.58A3 3 0 0014 14a2.99 2.99 0 002.12-.88" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.88 5.09A9.77 9.77 0 0112 4.8c5.05 0 9.27 3.11 10.5 7.2a11.8 11.8 0 01-4.04 5.54M6.61 6.61C4.54 7.84 2.98 9.75 2.5 12c.57 2.37 2.23 4.36 4.5 5.62" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.5 12C3.73 7.91 7.95 4.8 13 4.8S22.27 7.91 23.5 12c-1.23 4.09-5.45 7.2-10.5 7.2S3.73 16.09 2.5 12z" />
+                        <circle cx="13" cy="12" r="3" strokeWidth={2} />
+                      </svg>
+                    )}
+                  </button>
+                )}
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-700 p-2 text-slate-300 transition hover:border-slate-500 hover:text-white"
+                    onClick={() => setRoutePanelOpen(false)}
+                    aria-label={'\u1ea8n b\u1ea3ng tuy\u1ebfn \u0111\u01b0\u1eddng'}
+                    title={'\u1ea8n b\u1ea3ng tuy\u1ebfn \u0111\u01b0\u1eddng'}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M6 12h12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                ref={routeListScrollRef}
+                className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-3"
+                onContextMenu={(event) => event.preventDefault()}
+                style={{
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  WebkitTouchCallout: 'none',
+                }}
+              >
+                {selectedStore?.coords && !routeStopIds.has(String(selectedStore.id)) && (
+                  <Button variant="outline" className="w-full" onClick={() => addStoreToRoute(selectedStore)}>
+                    {'Th\u00eam c\u1eeda h\u00e0ng \u0111ang m\u1edf'}
+                  </Button>
+                )}
+
+                {routeStops.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-700 bg-slate-900/70 px-3 py-3 text-sm text-slate-400">
+                    {'G\u00f5 t\u00ean c\u1eeda h\u00e0ng \u1edf \u00f4 t\u00ecm ki\u1ebfm r\u1ed3i b\u1ea5m '}<span className="font-medium text-slate-200">{'Th\u00eam'}</span>{' \u0111\u1ec3 \u0111\u01b0a v\u00e0o tuy\u1ebfn.'}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {renderedRouteStops.map(({ store, originalIndex, displayIndex }) => (
+                      <div
+                        key={store.id}
+                        ref={(element) => {
+                          if (element) routeItemRefs.current.set(displayIndex, element)
+                          else routeItemRefs.current.delete(displayIndex)
+                        }}
+                        onPointerDown={(event) => startRouteDrag(originalIndex, event)}
+                        onContextMenu={(event) => event.preventDefault()}
+                        className={`rounded-lg border bg-slate-900/75 px-2.5 py-2 transition ${originalIndex === draggedRouteIndex
+                          ? 'border-slate-700/40 opacity-0'
+                          : originalIndex === armedRouteIndex
+                            ? 'border-sky-400/80 ring-1 ring-sky-400/50'
+                          : dragOverRouteIndex === displayIndex && draggedRouteIndex !== -1
+                            ? 'border-sky-400/80 ring-1 ring-sky-400/50'
+                            : 'border-slate-700/70'
+                          }`}
+                        style={originalIndex === draggedRouteIndex && dragRouteBox
+                          ? {
+                            height: `${dragRouteBox.height}px`,
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            WebkitTouchCallout: 'none',
+                          }
+                          : {
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            WebkitTouchCallout: 'none',
+                          }}
+                      >
+                        <div className="flex w-full items-start justify-between gap-2.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate font-medium text-slate-100">{store.name}</span>
+                              <span className="truncate text-slate-400">{formatShortAddress(store)}</span>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-start justify-end">
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 text-red-300 transition hover:bg-red-950/40"
+                              onPointerDown={(event) => event.stopPropagation()}
+                              onClick={() => removeRouteStop(store.id)}
+                              aria-label={`Lo\u1ea1i b\u1ecf c\u1eeda h\u00e0ng ${store.name} kh\u1ecfi tuy\u1ebfn`}
+                            >
+                              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {draggedRouteStore && dragRouteBox && (
+                  <div
+                    className="pointer-events-none fixed z-[400] rounded-lg border border-sky-400/80 bg-slate-900/95 px-2.5 py-2 shadow-2xl ring-1 ring-sky-400/40"
+                    style={{
+                      left: `${dragRouteBox.left}px`,
+                      top: `${dragRouteBox.top}px`,
+                      width: `${dragRouteBox.width}px`,
+                      transform: `translate(${dragRouteOffset.x}px, ${dragRouteOffset.y}px)`,
+                    }}
+                  >
+                    <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-2.5">
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate font-medium text-slate-100">{draggedRouteStore.name}</span>
+                          <span className="truncate text-slate-400">{formatShortAddress(draggedRouteStore)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {routeError && (
+                  <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                    {routeError}
+                  </div>
+                )}
+
+                {routeSummary && (
+                  <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-100">
+                    <div className="font-medium">{'\u0110\u00e3 v\u1ebd tuy\u1ebfn theo \u0111\u01b0\u1eddng th\u1eadt'}</div>
+                    <div className="mt-1 text-emerald-200/90">
+                      {formatRouteDistance(routeSummary.distance)} • {formatRouteDuration(routeSummary.duration)}
+                    </div>
+                    <div className="mt-1 text-xs text-emerald-200/80">
+                      {'Xuất phát và kết thúc tại điểm cố định đã chọn.'}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+              <div className="border-t border-slate-700/60 px-4 py-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={routeLoading || routeSorting || routeStops.length < 2}
+                    onClick={optimizeRouteOrder}
+                  >
+                    {routeSorting ? '\u0110ang s\u1eafp' : 'S\u1eafp x\u1ebfp'}
+                  </Button>
+                  <Button
+                    className="w-full"
+                    disabled={routeLoading || routeSorting || (routeStops.length === 0)}
+                    onClick={buildRoute}
+                  >
+                    {routeLoading ? '\u0110ang v\u1ebd' : 'V\u1ebd'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled={routeLoading || routeSorting || (routeStops.length === 0 && routeGeojson.features.length === 0)}
+                    onClick={clearRoutePlan}
+                  >
+                    Xóa
+                  </Button>
+                </div>
+              </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           className="pointer-events-none absolute right-3 sm:bottom-3 z-20"
           style={!isDesktop ? { bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' } : undefined}
@@ -1010,21 +1955,30 @@ export default function MapPage() {
             )}
             <button
               type="button"
+              onClick={toggleUserHeadingRotation}
+              title={followUserHeading ? 'Bỏ xoay theo hướng người dùng' : 'Xoay theo hướng người dùng'}
+              aria-label={followUserHeading ? 'Bỏ xoay theo hướng người dùng' : 'Xoay theo hướng người dùng'}
+              aria-pressed={followUserHeading}
+              className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur transition ${
+                followUserHeading
+                  ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                  : 'border-slate-600/70 bg-slate-950/90 text-slate-100 hover:border-sky-400 hover:text-sky-300'
+              }`}
+            >
+              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l3.5 7H19l-3.3 2.4L17 19l-5-3.2L7 19l1.3-6.6L5 10h3.5L12 3z" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={recenterToUserLocation}
               title="Về vị trí đang đứng"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300 disabled:cursor-wait disabled:opacity-70"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300"
             >
-              {locatingUser ? (
-                <svg className="h-4.5 w-4.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-              ) : (
-                <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
-                  <circle cx="12" cy="12" r="4" strokeWidth="2" />
-                </svg>
-              )}
+              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
+                <circle cx="12" cy="12" r="4" strokeWidth="2" />
+              </svg>
             </button>
           </div>
         </div>
@@ -1182,7 +2136,9 @@ export default function MapPage() {
         store={selectedStore}
         open={!!selectedStore}
         onOpenChange={(open) => { if (!open) setSelectedStore(null) }}
+        onAddToRoute={addStoreToRoute}
       />
     </div>
   )
 }
+
