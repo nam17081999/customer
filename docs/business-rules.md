@@ -156,6 +156,12 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - Không tự mở modal chi tiết trên `/map`
 - Có nút **về vị trí đang đứng** ở góc phải dưới, dùng GPS hiện tại rồi `flyTo()`
 - Khi vào `/map`, hiển thị thêm **chấm xanh** cho vị trí hiện tại của người dùng
+- `/map` có modal tuyến đường chung cho mobile/desktop; trên mobile modal ưu tiên chiều cao để không khuyết phần trên và nằm trên cụm nút điều hướng dưới cùng
+- Trong modal tuyến đường, nút ẩn/hiện cửa hàng ngoài tuyến chỉ còn đặt bên trong modal
+- Nút vị trí chỉ còn hành vi đưa về vị trí hiện tại, không hiển thị loading
+- Nút hướng khi bật sẽ xoay bản đồ theo hướng người dùng, khóa kéo bản đồ, và giữ zoom hiện tại; khi tắt thì bản đồ trở về thao tác bình thường
+- Vị trí và hướng người dùng trên `/map` được làm mới định kỳ mỗi 3 giây khi màn hình này đang mở
+- Khi chế độ hướng bật, bản đồ phải bám tâm theo vị trí người dùng, không cho kéo lệch khỏi vị trí đó
 
 **Bản đồ trong form (create/edit/supplement/report edit)**:
 - Dùng chung `LocationPicker`/`StoreLocationPicker`.

@@ -72,7 +72,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `pages/store/reports.js` | Admin duyệt báo cáo cửa hàng |
 | `pages/telesale/overview.js` | Danh sách ưu tiên gọi + thống kê telesale |
 | `pages/telesale/call/[id].js` | Màn riêng để chốt kết quả cuộc gọi |
-| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, chấm xanh vị trí hiện tại, sidebar lọc |
+| `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, nút xoay theo hướng, chấm xanh vị trí hiện tại, sidebar lọc, modal tuyến đường mobile/desktop |
 | `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
 | `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
 | `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Bổ sung` |
@@ -223,6 +223,16 @@ Script SQL cap nhat moi truong duoc luu tai:
   - `npm run text:check:staged` để quét file staged trước khi commit
   - `.githooks/pre-commit` để chặn commit chứa dấu hiệu lỗi mã hóa
 - Sau khi clone repo hoặc đổi Git config cục bộ, cần chạy lại `npm run hooks:install`.
+
+## Map UI Notes (2026-04-17)
+
+- `/map` có modal tuyến đường chung cho mobile/desktop.
+- Trên mobile, modal tuyến đường được ưu tiên chiều cao để không khuyết phần trên và nằm trên cụm nút điều hướng phía dưới.
+- Nút ẩn/hiện cửa hàng ngoài tuyến chỉ còn đặt bên trong modal tuyến đường.
+- Nút vị trí chỉ còn hành vi quay về vị trí hiện tại, không hiển thị loading.
+- Nút hướng khi bật sẽ xoay bản đồ theo hướng người dùng, khóa kéo bản đồ, và vẫn giữ zoom hiện tại; khi tắt thì bản đồ trở về thao tác bình thường.
+- Khi chế độ hướng bật, bản đồ phải bám tâm theo vị trí người dùng.
+- Vị trí và hướng người dùng trên `/map` được làm mới định kỳ mỗi 3 giây khi màn hình này đang mở.
 
 ## Create Role Note
 

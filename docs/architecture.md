@@ -200,6 +200,11 @@ customer/
 - Trang `/map` có nút về vị trí GPS hiện tại ở góc phải dưới
 - Trang `/map` hiển thị thêm source/layer riêng cho vị trí người dùng (blue dot)
 - Trang `/map` lọc ngay từ lúc nạp dữ liệu: chỉ store có tọa độ hợp lệ mới được đưa vào state hiển thị bản đồ
+- Trang `/map` có modal tuyến đường dùng chung cho mobile/desktop; mobile ưu tiên không gian hiển thị, modal nằm trên cụm nút điều hướng phía dưới
+- Trong modal tuyến đường, nút ẩn/hiện cửa hàng ngoài tuyến nằm bên trong modal, không còn nút riêng ngoài bản đồ
+- Nút xoay theo hướng người dùng chỉ khóa kéo bản đồ khi đang bật; khi tắt thì map trở lại thao tác bình thường, zoom luôn được giữ nguyên
+- Vị trí người dùng được làm mới định kỳ mỗi 3 giây khi trang `/map` đang mở
+- Khi chế độ xoay theo hướng bật, bản đồ bám theo vị trí người dùng ở tâm màn hình
 
 ---
 
