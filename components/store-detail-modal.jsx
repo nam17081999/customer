@@ -10,6 +10,7 @@ import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
+import { parseCoordinate } from '@/helper/coordinate'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
@@ -58,6 +59,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
   const [reportMapEditable, setReportMapEditable] = useState(false)
   const [reportResolving, setReportResolving] = useState(false)
   const suppressNextOpenRef = useRef(false)
+  const initializedStoreIdRef = useRef('')
 
   const isControlled = open !== undefined
   const resolvedOpen = isControlled ? open : internalOpen
@@ -96,7 +98,9 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
 
   useEffect(() => {
     if (!store) return
+
     if (!resolvedOpen) {
+      initializedStoreIdRef.current = ''
       setReportOpen(false)
       setReportMode('')
       setReportReasons([])
@@ -109,20 +113,26 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
         clearTimeout(detailNoticeTimerRef.current)
         detailNoticeTimerRef.current = null
       }
+      return
     }
-    if (resolvedOpen) {
-      setIsPotential(Boolean(store.is_potential))
-      setReportName(store.name || '')
-      setReportStoreType(store.store_type || DEFAULT_STORE_TYPE)
-      setReportAddressDetail(store.address_detail || '')
-      setReportWard(store.ward || '')
-      setReportDistrict(store.district || '')
-      setReportPhone(store.phone || '')
-      setReportNote(store.note || '')
-      setReportLat(typeof store.latitude === 'number' ? store.latitude : null)
-      setReportLng(typeof store.longitude === 'number' ? store.longitude : null)
-    }
-  }, [resolvedOpen, store?.id])
+
+    const storeIdKey = String(store.id || '')
+    if (!storeIdKey || initializedStoreIdRef.current === storeIdKey) return
+    initializedStoreIdRef.current = storeIdKey
+
+    const lat = parseCoordinate(store.latitude)
+    const lng = parseCoordinate(store.longitude)
+    setIsPotential(Boolean(store.is_potential))
+    setReportName(store.name || '')
+    setReportStoreType(store.store_type || DEFAULT_STORE_TYPE)
+    setReportAddressDetail(store.address_detail || '')
+    setReportWard(store.ward || '')
+    setReportDistrict(store.district || '')
+    setReportPhone(store.phone || '')
+    setReportNote(store.note || '')
+    setReportLat(Number.isFinite(lat) ? lat : null)
+    setReportLng(Number.isFinite(lng) ? lng : null)
+  }, [resolvedOpen, store])
 
   const canPrefetchMap = Boolean(
     resolvedOpen &&

@@ -163,10 +163,11 @@ export default function VerifyStorePage() {
     setSubmitting(true)
     setError('')
     setMessage('')
+    const updatedAt = new Date().toISOString()
 
     const { error: updateError } = await supabase
       .from('stores')
-      .update({ active: true })
+      .update({ active: true, updated_at: updatedAt })
       .in('id', ids)
 
     if (updateError) {
@@ -182,7 +183,7 @@ export default function VerifyStorePage() {
       ids.forEach((id) => next.delete(id))
       return next
     })
-    await updateStoresInCache(ids.map((storeId) => ({ id: storeId, active: true })))
+    await updateStoresInCache(ids.map((storeId) => ({ id: storeId, active: true, updated_at: updatedAt })))
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('storevis:stores-changed', {

@@ -21,14 +21,14 @@ function byRecentCallDesc(a, b) {
 }
 
 function getPriorityGroup(store) {
-  if (!store?.last_called_at) return -1
-  if (isResultStale(store)) return -2
+  if (!store?.last_called_at) return 0
+  if (isResultStale(store)) return 1
   const result = store?.last_call_result
-  if (result === 'goi_lai_sau') return 0
-  if (result === 'khong_nghe' || result === 'khong_nghe_may') return 1
-  if (result === 'con_hang' || result === 'quan_tam') return 2
-  if (result === 'da_len_don' || result === 'da_bao_don') return 3
-  return 4
+  if (result === 'goi_lai_sau') return 2
+  if (result === 'khong_nghe' || result === 'khong_nghe_may') return 3
+  if (result === 'con_hang' || result === 'quan_tam') return 4
+  if (result === 'da_len_don' || result === 'da_bao_don') return 5
+  return 6
 }
 
 function getTimeValue(value) {
@@ -54,13 +54,13 @@ function isResultStale(store) {
 
 function getPriorityTime(store) {
   const group = getPriorityGroup(store)
-  if (group === -1) {
+  if (group === 0) {
     return new Date(store?.created_at || store?.updated_at || 0).getTime()
   }
-  if (group === -2) {
+  if (group === 1) {
     return getTimeValue(store?.last_called_at || store?.updated_at || store?.created_at)
   }
-  if (group === 3) {
+  if (group === 5) {
     return getTimeValue(store?.last_order_reported_at || store?.last_call_result_at || store?.last_called_at)
   }
   return getTimeValue(store?.last_call_result_at || store?.last_called_at)
