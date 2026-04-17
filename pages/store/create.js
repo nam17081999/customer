@@ -22,7 +22,7 @@ import SearchStoreCard from '@/components/search-store-card'
 import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { invalidateStoreCache, appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
+import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { haversineKm } from '@/helper/distance'
 import { parseCoordinate } from '@/helper/coordinate'
@@ -73,7 +73,6 @@ export default function AddStore() {
   const [allowDuplicate, setAllowDuplicate] = useState(false)
   const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
   const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
-  const duplicateCheckTimerRef = useRef(null)
   const duplicateCheckSeqRef = useRef(0)
   const duplicateGeoRequestedRef = useRef(false)
   const nearestLocationPrefilledRef = useRef(false)
@@ -714,6 +713,14 @@ export default function AddStore() {
     const rawPhoneSecondary = phoneSecondary.trim()
     let validatedPhone = ''
     let validatedPhoneSecondary = ''
+    let storesForPhoneDupes = null
+
+    const getStoresForPhoneDupes = async () => {
+      if (!storesForPhoneDupes) {
+        storesForPhoneDupes = await getOrRefreshStores()
+      }
+      return storesForPhoneDupes
+    }
 
     try {
       setLoading(true)
@@ -735,7 +742,7 @@ export default function AddStore() {
         }
         validatedPhone = phoneValidation.normalized
 
-        const stores = await getOrRefreshStores()
+        const stores = await getStoresForPhoneDupes()
         const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhone)
         if (duplicatePhoneStores.length > 0) {
           const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores)
@@ -763,7 +770,7 @@ export default function AddStore() {
           return false
         }
 
-        const stores = await getOrRefreshStores()
+        const stores = await getStoresForPhoneDupes()
         const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhoneSecondary)
         if (duplicatePhoneStores.length > 0) {
           const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
@@ -810,7 +817,7 @@ export default function AddStore() {
         district: normalizedDistrict,
         active: isAdmin,
         is_potential: Boolean(isTelesale),
-        note,
+        note: note.trim() || null,
         phone: validatedPhone || null,
         phone_secondary: validatedPhoneSecondary || null,
         latitude,

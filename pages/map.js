@@ -10,6 +10,7 @@ import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { parseCoordinate } from '@/helper/coordinate'
 import { formatAddressParts } from '@/lib/utils'
+import { haversineKm } from '@/helper/distance'
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -29,6 +30,9 @@ const FIXED_ROUTE_POINT = {
 
 const HEADING_JITTER_DEG = 6
 const HEADING_SMOOTHING_ALPHA = 0.22
+const NAV_ARRIVE_DISTANCE_M = 45
+const NAV_LEAVE_DISTANCE_M = 90
+const NAV_WAREHOUSE_DISTANCE_M = 55
 
 function normalizeHeading(deg) {
   if (!Number.isFinite(deg)) return null
@@ -337,6 +341,8 @@ export default function MapPage() {
   const [routeError, setRouteError] = useState('')
   const [routePanelOpen, setRoutePanelOpen] = useState(false)
   const [hideUnselectedStores, setHideUnselectedStores] = useState(false)
+  const [passedRouteStopIds, setPassedRouteStopIds] = useState([])
+  const [activeRouteStopId, setActiveRouteStopId] = useState(null)
   const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
   const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
   const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
@@ -379,8 +385,16 @@ export default function MapPage() {
   )
 
   const routeStopOrderById = useMemo(
-    () => new Map(routeStops.map((store, index) => [String(store.id), String(index + 1)])),
-    [routeStops]
+    () => {
+      const passedSet = new Set(passedRouteStopIds)
+      const remainingStops = routeStops.filter((store) => !passedSet.has(String(store.id)))
+      return new Map(remainingStops.map((store, index) => [String(store.id), String(index + 1)]))
+    },
+    [routeStops, passedRouteStopIds]
+  )
+  const passedRouteStopIdSet = useMemo(
+    () => new Set(passedRouteStopIds),
+    [passedRouteStopIds]
   )
 
   const renderedRouteStops = useMemo(() => {
@@ -394,6 +408,10 @@ export default function MapPage() {
   }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
 
   const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
+  const routeStopIndexById = useMemo(
+    () => new Map(routeStops.map((store, index) => [String(store.id), index])),
+    [routeStops]
+  )
 
   useEffect(() => {
     followUserHeadingRef.current = followUserHeading
@@ -590,6 +608,9 @@ export default function MapPage() {
             'icon-ignore-placement': true,
             'symbol-sort-key': ['case', ['==', ['get', 'highlighted'], 'yes'], 999, 0],
             'symbol-z-order': 'auto',
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
           },
         })
 
@@ -847,6 +868,7 @@ export default function MapPage() {
         shortName: getFirstWord(store.name),
         address: formatAddressParts(store),
         routeOrder: routeStopOrderById.get(String(store.id)) || '',
+        passed: passedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
       },
     }))
 
@@ -863,7 +885,7 @@ export default function MapPage() {
     }
 
     source.setData({ type: 'FeatureCollection', features })
-  }, [mapReady, routeStopOrderById, visibleMapStores])
+  }, [mapReady, passedRouteStopIdSet, routeStopOrderById, visibleMapStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -964,17 +986,31 @@ export default function MapPage() {
     if (routeStops.length === 0) setHideUnselectedStores(false)
   }, [routeStops.length])
 
+  useEffect(() => {
+    const validIds = new Set(routeStops.map((store) => String(store.id)))
+    setPassedRouteStopIds((prev) => prev.filter((id) => validIds.has(id)))
+    setActiveRouteStopId((prev) => (prev && validIds.has(String(prev)) ? String(prev) : null))
+    if (routeStops.length === 0) {
+      followUserHeadingRef.current = false
+      setFollowUserHeading(false)
+    }
+  }, [routeStops])
+
   const addStoreToRoute = useCallback((store) => {
     if (!store?.coords) return
     setRouteStops((prev) => {
       if (prev.some((item) => String(item.id) === String(store.id))) return prev
       return [...prev, store]
     })
+    setPassedRouteStopIds([])
+    setActiveRouteStopId(null)
     setRouteError('')
   }, [])
 
   const removeRouteStop = useCallback((storeId) => {
     setRouteStops((prev) => prev.filter((store) => String(store.id) !== String(storeId)))
+    setPassedRouteStopIds((prev) => prev.filter((id) => id !== String(storeId)))
+    setActiveRouteStopId((prev) => (String(prev) === String(storeId) ? null : prev))
   }, [])
 
   const clearRoutePlan = useCallback(() => {
@@ -982,6 +1018,8 @@ export default function MapPage() {
     setRouteGeojson(EMPTY_FEATURE_COLLECTION)
     setRouteSummary(null)
     setRouteError('')
+    setPassedRouteStopIds([])
+    setActiveRouteStopId(null)
   }, [])
 
   const cancelPendingRouteDrag = useCallback(() => {
@@ -1004,6 +1042,8 @@ export default function MapPage() {
 
     if (!cancelled && fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
       setRouteStops((prev) => moveItem(prev, fromIndex, toIndex))
+      setPassedRouteStopIds([])
+      setActiveRouteStopId(null)
     }
 
     setArmedRouteIndex(-1)
@@ -1194,12 +1234,15 @@ export default function MapPage() {
     const startPoint = FIXED_ROUTE_POINT
     const endPoint = FIXED_ROUTE_POINT
 
-    const stops = routeStops.map((store) => ({
+    const passedSet = new Set(passedRouteStopIds)
+    const stops = routeStops
+      .filter((store) => !passedSet.has(String(store.id)))
+      .map((store) => ({
       id: String(store.id),
       name: store.name || 'C\u1eeda h\u00e0ng',
       lat: store.coords.lat,
       lng: store.coords.lng,
-    }))
+      }))
 
     if (stops.length < 1) {
       setRouteError('Chọn ít nhất 1 cửa hàng để vẽ tuyến.')
@@ -1269,7 +1312,7 @@ export default function MapPage() {
     } finally {
       setRouteLoading(false)
     }
-  }, [isDesktop, routeStops])
+  }, [isDesktop, passedRouteStopIds, routeStops])
 
   const optimizeRouteOrder = useCallback(async () => {
     if (routeStops.length < 2) {
@@ -1332,6 +1375,8 @@ export default function MapPage() {
       setRouteStops(nextRouteStops)
       setRouteGeojson(EMPTY_FEATURE_COLLECTION)
       setRouteSummary(null)
+      setPassedRouteStopIds([])
+      setActiveRouteStopId(null)
     } catch (err) {
       console.error('Optimize route order failed:', err)
       setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng l\u00fac n\u00e0y.')
@@ -1369,6 +1414,7 @@ export default function MapPage() {
           shortName: getFirstWord(s.name),
           address: formatAddressParts(s),
           routeOrder: routeStopOrderById.get(String(s.id)) || '',
+          passed: passedRouteStopIdSet.has(String(s.id)) ? 'yes' : 'no',
           highlighted: String(s.id) === storeId ? 'yes' : 'no',
         },
       }))
@@ -1384,7 +1430,7 @@ export default function MapPage() {
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [filteredStores, routeStopOrderById])
+  }, [filteredStores, passedRouteStopIdSet, routeStopOrderById])
 
   const handleSearch = useCallback(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1405,7 +1451,7 @@ export default function MapPage() {
 
     map.easeTo({
       bearing,
-      duration: 500,
+      duration: 900,
       essential: true,
     })
   }, [])
@@ -1461,7 +1507,12 @@ export default function MapPage() {
         const map = mapRef.current
         if (map) {
           setSelectedStore(null)
-          map.setCenter([coords.longitude, coords.latitude])
+          map.stop()
+          map.easeTo({
+            center: [coords.longitude, coords.latitude],
+            duration: 900,
+            essential: true,
+          })
         }
       }
 
@@ -1476,26 +1527,25 @@ export default function MapPage() {
   }, [])
 
   const recenterToUserLocation = useCallback(() => {
-    if (locatingUserRef.current) {
-      requestCompassHeading()
-        .then((result) => {
-          const heading = normalizeHeading(result?.heading)
-
-          if (heading == null) return
-          pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
-          setUserLocation((prev) => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              heading: pendingHeadingRef.current,
-            }
-          })
-        })
-        .catch(() => null)
+    if (!userLocation || !Number.isFinite(userLocation.latitude) || !Number.isFinite(userLocation.longitude)) {
+      setLocationError('Chưa có vị trí hiện tại để quay về.')
       return null
     }
-    return refreshUserLocation({ shouldRecenter: true, forceFreshPosition: true })
-  }, [refreshUserLocation])
+
+    const map = mapRef.current
+    if (!map) return null
+
+    setLocationError('')
+    setSelectedStore(null)
+    map.stop()
+    map.easeTo({
+      center: [userLocation.longitude, userLocation.latitude],
+      duration: 900,
+      essential: true,
+    })
+
+    return null
+  }, [userLocation])
 
   const toggleUserHeadingRotation = useCallback(async () => {
     if (followUserHeading) {
@@ -1505,8 +1555,12 @@ export default function MapPage() {
       return
     }
 
-    let heading = userLocation?.heading ?? pendingHeadingRef.current ?? null
-    if (typeof heading !== 'number') {
+    const currentLocation = userLocation
+    const map = mapRef.current
+    if (!map) return
+
+    let heading = currentLocation?.heading ?? pendingHeadingRef.current ?? null
+    if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
       const result = await requestCompassHeading().catch(() => null)
       heading = normalizeHeading(result?.heading)
       if (heading != null) {
@@ -1515,16 +1569,144 @@ export default function MapPage() {
       }
     }
 
-    if (heading == null) {
+    if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
       setLocationError('Không lấy được hướng hiện tại của thiết bị.')
       return
     }
 
     followUserHeadingRef.current = true
     setFollowUserHeading(true)
-    setMapBearing(pendingHeadingRef.current ?? heading)
-    refreshUserLocation({ shouldRecenter: true, forceFreshPosition: true })
-  }, [followUserHeading, refreshUserLocation, setMapBearing, userLocation?.heading])
+    setLocationError('')
+    setSelectedStore(null)
+    map.stop()
+    map.easeTo({
+      center: [currentLocation.longitude, currentLocation.latitude],
+      bearing: pendingHeadingRef.current ?? heading ?? 0,
+      duration: 900,
+      essential: true,
+    })
+    if (routeStops.length > 0) {
+      buildRoute()
+    }
+  }, [buildRoute, followUserHeading, routeStops.length, setMapBearing, userLocation])
+
+  useEffect(() => {
+    if (!followUserHeading) return
+    if (!Number.isFinite(userLocation?.latitude) || !Number.isFinite(userLocation?.longitude)) return
+    if (routeStops.length === 0) return
+
+    const nextPassedSet = new Set(passedRouteStopIds)
+
+    if (activeRouteStopId) {
+      const activeIndex = routeStopIndexById.get(String(activeRouteStopId))
+      if (activeIndex == null) {
+        setActiveRouteStopId(null)
+        return
+      }
+
+      const activeStop = routeStops[activeIndex]
+      const distanceFromActive = haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        activeStop.coords.lat,
+        activeStop.coords.lng
+      ) * 1000
+
+      if (distanceFromActive > NAV_LEAVE_DISTANCE_M) {
+        const activeId = String(activeStop.id)
+        if (!nextPassedSet.has(activeId)) {
+          setPassedRouteStopIds((prev) => (prev.includes(activeId) ? prev : [...prev, activeId]))
+        }
+        setActiveRouteStopId(null)
+      }
+      return
+    }
+
+    const firstRemainingStop = routeStops.find((store) => !nextPassedSet.has(String(store.id)))
+    if (!firstRemainingStop) return
+
+    const distanceToNext = haversineKm(
+      userLocation.latitude,
+      userLocation.longitude,
+      firstRemainingStop.coords.lat,
+      firstRemainingStop.coords.lng
+    ) * 1000
+
+    if (distanceToNext <= NAV_ARRIVE_DISTANCE_M) {
+      setActiveRouteStopId(String(firstRemainingStop.id))
+    }
+  }, [
+    followUserHeading,
+    userLocation?.latitude,
+    userLocation?.longitude,
+    routeStops,
+    passedRouteStopIds,
+    activeRouteStopId,
+    routeStopIndexById,
+  ])
+
+  const navigationInfo = useMemo(() => {
+    if (!followUserHeading || routeStops.length === 0) return null
+
+    const passedSet = new Set(passedRouteStopIds)
+    const activeIndex = activeRouteStopId ? routeStopIndexById.get(String(activeRouteStopId)) : -1
+    const activeStore = activeIndex != null && activeIndex >= 0 ? routeStops[activeIndex] : null
+    const firstRemainingIndex = routeStops.findIndex((store) => !passedSet.has(String(store.id)))
+    const nextStore = activeStore
+      ? routeStops.find((store, index) => index > activeIndex && !passedSet.has(String(store.id))) || null
+      : (firstRemainingIndex >= 0 ? routeStops[firstRemainingIndex] : null)
+
+    const atWarehouse = Number.isFinite(userLocation?.latitude) && Number.isFinite(userLocation?.longitude)
+      ? (haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        FIXED_ROUTE_POINT.lat,
+        FIXED_ROUTE_POINT.lng
+      ) * 1000) <= NAV_WAREHOUSE_DISTANCE_M
+      : false
+
+    if (activeStore) {
+      return {
+        currentLabel: 'Hiện tại',
+        currentStore: activeStore,
+        nextStore,
+      }
+    }
+
+    const lastPassedId = passedRouteStopIds.length > 0 ? passedRouteStopIds[passedRouteStopIds.length - 1] : null
+    const lastPassedStore = lastPassedId ? routeStops.find((store) => String(store.id) === String(lastPassedId)) : null
+
+    if (atWarehouse) {
+      return {
+        currentLabel: 'Hiện tại',
+        currentText: 'Kho',
+        nextStore,
+      }
+    }
+
+    if (lastPassedStore) {
+      return {
+        currentLabel: 'Đã qua',
+        currentStore: lastPassedStore,
+        nextStore,
+      }
+    }
+
+    return {
+      currentLabel: 'Hiện tại',
+      currentText: 'Đang di chuyển',
+      nextStore,
+    }
+  }, [
+    followUserHeading,
+    routeStops,
+    passedRouteStopIds,
+    activeRouteStopId,
+    routeStopIndexById,
+    userLocation?.latitude,
+    userLocation?.longitude,
+  ])
+  const showNavigationInfoPanel = followUserHeading && Boolean(navigationInfo)
 
   useEffect(() => {
     if (!mapReady) return
@@ -1567,11 +1749,14 @@ export default function MapPage() {
     if (!map) return
 
     setSelectedStore(null)
-    map.setCenter([userLocation.longitude, userLocation.latitude])
-    if (userLocation.heading != null) {
-      setMapBearing(userLocation.heading)
-    }
-  }, [followUserHeading, mapReady, setMapBearing, userLocation?.latitude, userLocation?.longitude, userLocation?.heading])
+    map.stop()
+    map.easeTo({
+      center: [userLocation.longitude, userLocation.latitude],
+      ...(userLocation.heading != null ? { bearing: userLocation.heading } : {}),
+      duration: 900,
+      essential: true,
+    })
+  }, [followUserHeading, mapReady, userLocation?.latitude, userLocation?.longitude, userLocation?.heading])
 
   useEffect(() => {
     if (!mapReady) return undefined
@@ -1611,8 +1796,9 @@ export default function MapPage() {
       <div className="relative flex-1 h-full">
         <div ref={mapContainerRef} className="absolute inset-0" />
 
-        <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
-          <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
+        {!showNavigationInfoPanel && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
+            <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
               <div className="grid grid-cols-[1fr_auto] items-center">
                 <Input
                   ref={inputRef}
@@ -1695,13 +1881,18 @@ export default function MapPage() {
                 )}
               </div>
             )}
+            </div>
           </div>
-        </div>
+        )}
 
         {!routePanelOpen && (
           <div
-            className="pointer-events-none absolute left-3 z-20"
-            style={{ bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' }}
+            className="pointer-events-none absolute left-3 z-10"
+            style={{
+              bottom: !isDesktop && showNavigationInfoPanel
+                ? (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 8.5rem)' : '8.5rem')
+                : (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem'),
+            }}
           >
             <div className="flex items-center gap-2">
               <button
@@ -1816,6 +2007,7 @@ export default function MapPage() {
                 ) : (
                   <div className="space-y-2">
                     {renderedRouteStops.map(({ store, originalIndex, displayIndex }) => (
+                      passedRouteStopIdSet.has(String(store.id)) ? null : (
                       <div
                         key={store.id}
                         ref={(element) => {
@@ -1824,7 +2016,7 @@ export default function MapPage() {
                         }}
                         onPointerDown={(event) => startRouteDrag(originalIndex, event)}
                         onContextMenu={(event) => event.preventDefault()}
-                        className={`rounded-lg border bg-slate-900/75 px-2.5 py-2 transition ${originalIndex === draggedRouteIndex
+                        className={`rounded-lg border bg-slate-900/75 px-2.5 py-2 transition ${passedRouteStopIdSet.has(String(store.id)) ? 'opacity-45' : ''} ${originalIndex === draggedRouteIndex
                           ? 'border-slate-700/40 opacity-0'
                           : originalIndex === armedRouteIndex
                             ? 'border-sky-400/80 ring-1 ring-sky-400/50'
@@ -1848,8 +2040,8 @@ export default function MapPage() {
                         <div className="flex w-full items-start justify-between gap-2.5">
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 flex-col">
-                              <span className="truncate font-medium text-slate-100">{store.name}</span>
-                              <span className="truncate text-slate-400">{formatShortAddress(store)}</span>
+                              <span className={`truncate font-medium ${passedRouteStopIdSet.has(String(store.id)) ? 'text-slate-400' : 'text-slate-100'}`}>{store.name}</span>
+                              <span className={`truncate ${passedRouteStopIdSet.has(String(store.id)) ? 'text-slate-500' : 'text-slate-400'}`}>{formatShortAddress(store)}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 items-start justify-end">
@@ -1867,6 +2059,7 @@ export default function MapPage() {
                           </div>
                         </div>
                       </div>
+                      )
                     ))}
                   </div>
                 )}
@@ -1924,7 +2117,10 @@ export default function MapPage() {
                   <Button
                     className="w-full"
                     disabled={routeLoading || routeSorting || (routeStops.length === 0)}
-                    onClick={buildRoute}
+                    onClick={async () => {
+                      setRoutePanelOpen(false)
+                      await buildRoute()
+                    }}
                   >
                     {routeLoading ? '\u0110ang v\u1ebd' : 'V\u1ebd'}
                   </Button>
@@ -1953,36 +2149,59 @@ export default function MapPage() {
                 {locationError}
               </div>
             )}
-            <button
-              type="button"
-              onClick={toggleUserHeadingRotation}
-              title={followUserHeading ? 'Bỏ xoay theo hướng người dùng' : 'Xoay theo hướng người dùng'}
-              aria-label={followUserHeading ? 'Bỏ xoay theo hướng người dùng' : 'Xoay theo hướng người dùng'}
-              aria-pressed={followUserHeading}
-              className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur transition ${
-                followUserHeading
-                  ? 'border-sky-400 bg-sky-500/20 text-sky-100'
-                  : 'border-slate-600/70 bg-slate-950/90 text-slate-100 hover:border-sky-400 hover:text-sky-300'
-              }`}
-            >
-              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l3.5 7H19l-3.3 2.4L17 19l-5-3.2L7 19l1.3-6.6L5 10h3.5L12 3z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={recenterToUserLocation}
-              title="Về vị trí đang đứng"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300"
-            >
-              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
-                <circle cx="12" cy="12" r="4" strokeWidth="2" />
-              </svg>
-            </button>
+            {routeStops.length > 0 && !showNavigationInfoPanel && (
+              <button
+                type="button"
+                onClick={toggleUserHeadingRotation}
+                title={followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+                aria-label={followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+                aria-pressed={followUserHeading}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur transition ${
+                  followUserHeading
+                    ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                    : 'border-slate-600/70 bg-slate-950/90 text-slate-100 hover:border-sky-400 hover:text-sky-300'
+                }`}
+              >
+                <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-9 16-7-7 16-1.7-6.3L9 20z" />
+                </svg>
+              </button>
+            )}
+            {!showNavigationInfoPanel && (
+              <button
+                type="button"
+                onClick={recenterToUserLocation}
+                title="Về vị trí đang đứng"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-600/70 bg-slate-950/90 text-slate-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300"
+              >
+                <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
+                  <circle cx="12" cy="12" r="4" strokeWidth="2" />
+                </svg>
+              </button>
+            )}
+            {showNavigationInfoPanel && navigationInfo && (
+              <div className={`rounded-xl border border-slate-700/70 bg-slate-950/95 shadow-lg backdrop-blur ${isDesktop ? 'w-[320px] px-4 py-3 text-sm' : 'w-[calc(100vw-1.5rem)] px-4 py-3 text-base'}`}>
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-sky-200">Dẫn đường</div>
+                  <button
+                    type="button"
+                    onClick={toggleUserHeadingRotation}
+                    className="flex h-9 items-center justify-center rounded-md border border-red-500/60 bg-red-500/20 px-3 text-sm font-semibold text-red-100 transition hover:border-red-400 hover:bg-red-500/30 hover:text-white"
+                  >
+                    Thoát
+                  </button>
+                </div>
+                <div className="mt-2 text-slate-300">
+                  {navigationInfo.currentLabel}: <span className="font-medium text-slate-100">{navigationInfo.currentStore ? navigationInfo.currentStore.name : navigationInfo.currentText}</span>
+                </div>
+                <div className="mt-1 text-slate-300">
+                  Tiếp theo: <span className="font-medium text-slate-100">{navigationInfo.nextStore ? navigationInfo.nextStore.name : 'Đã hoàn thành tuyến'}</span>
+                </div>
+              </div>
+            )}
+            </div>
           </div>
-        </div>
-
       </div>
 
       {/* Right Sidebar - desktop only (detected via pointer capability) */}
