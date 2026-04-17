@@ -294,8 +294,10 @@ export default function HomePage() {
   // Helper: compute distance for a store given current reference
   const computeDistance = useCallback((store, refLoc) => {
     if (!refLoc) return null
-    if (store.latitude == null || store.longitude == null) return null
-    return haversineKm(refLoc.latitude, refLoc.longitude, store.latitude, store.longitude)
+    const lat = parseCoordinate(store?.latitude)
+    const lng = parseCoordinate(store?.longitude)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    return haversineKm(refLoc.latitude, refLoc.longitude, lat, lng)
   }, [])
 
   // Load all stores — always goes through storeCache (which handles 60s cooldown + dedup)
