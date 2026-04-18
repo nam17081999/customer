@@ -31,7 +31,7 @@ const StoreLocationPicker = dynamic(
   }
 )
 
-export default function StoreDetailModal({ store, trigger, open, onOpenChange, onAddToRoute }) {
+export default function StoreDetailModal({ store, trigger, open, onOpenChange, onAddToRoute, onRemoveFromRoute, isInRoute = false }) {
   const router = useRouter()
   const { user, isAdmin, isTelesale } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
@@ -520,13 +520,26 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
                 Chỉnh sửa
               </Button>
             )}
-            {hasCoords && typeof onAddToRoute === 'function' && (
+            {hasCoords && isInRoute && typeof onRemoveFromRoute === 'function' && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRemoveFromRoute(store.id)
+                }}
+              >
+                Bỏ khỏi tuyến
+              </Button>
+            )}
+            {hasCoords && !isInRoute && typeof onAddToRoute === 'function' && (
               <Button
                 variant="outline"
                 className="w-full"
                 onClick={(e) => {
                   e.stopPropagation()
                   onAddToRoute(store)
+                  handleDetailOpenChange(false)
                 }}
               >
                 Thêm vào tuyến
