@@ -22,6 +22,7 @@ function formatShortAddress(store) {
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const MAP_ROUTE_STORAGE_KEY = 'storevis:map-route-plan'
+const STORE_MARKER_IMAGE_CACHE = new Map()
 const FIXED_ROUTE_POINT = {
   lat: 21.0774332,
   lng: 105.6951599,
@@ -33,6 +34,11 @@ const HEADING_SMOOTHING_ALPHA = 0.22
 const NAV_ARRIVE_DISTANCE_M = 45
 const NAV_LEAVE_DISTANCE_M = 90
 const NAV_WAREHOUSE_DISTANCE_M = 55
+const ROUTE_STOP_STATUS = {
+  PENDING: 'pending',
+  ARRIVED: 'arrived',
+  COMPLETED: 'completed',
+}
 
 function normalizeHeading(deg) {
   if (!Number.isFinite(deg)) return null
@@ -217,16 +223,13 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
     ctx.lineWidth = 0.8 * dpr
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
-    // Roof
     ctx.beginPath()
     ctx.moveTo(iconCX, iconCY - s * 0.9)
     ctx.lineTo(iconCX - s, iconCY - s * 0.05)
     ctx.lineTo(iconCX + s, iconCY - s * 0.05)
     ctx.closePath()
     ctx.fill()
-    // Body
     ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
-    // Door
     ctx.fillStyle = '#1f2937'
     ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
   }
@@ -252,6 +255,20 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   }
 
   return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
+}
+
+function getStoreMarkerCacheKey(text, fontSize, maxWidthEm, highlighted, routeOrder) {
+  return [text, fontSize, maxWidthEm, highlighted ? '1' : '0', routeOrder || ''].join('::')
+}
+
+function getOrCreateStoreMarkerImage(text, fontSize = 13, maxWidthEm = 9, highlighted = false, routeOrder = '') {
+  const cacheKey = getStoreMarkerCacheKey(text, fontSize, maxWidthEm, highlighted, routeOrder)
+  const cached = STORE_MARKER_IMAGE_CACHE.get(cacheKey)
+  if (cached) return cached
+
+  const nextImage = createStoreMarker(text, fontSize, maxWidthEm, highlighted, routeOrder)
+  STORE_MARKER_IMAGE_CACHE.set(cacheKey, nextImage)
+  return nextImage
 }
 
 function createUserHeadingFanImage() {
@@ -341,8 +358,7 @@ export default function MapPage() {
   const [routeError, setRouteError] = useState('')
   const [routePanelOpen, setRoutePanelOpen] = useState(false)
   const [hideUnselectedStores, setHideUnselectedStores] = useState(false)
-  const [passedRouteStopIds, setPassedRouteStopIds] = useState([])
-  const [activeRouteStopId, setActiveRouteStopId] = useState(null)
+  const [routeStopStatusById, setRouteStopStatusById] = useState({})
   const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
   const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
   const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
@@ -386,16 +402,24 @@ export default function MapPage() {
 
   const routeStopOrderById = useMemo(
     () => {
-      const passedSet = new Set(passedRouteStopIds)
-      const remainingStops = routeStops.filter((store) => !passedSet.has(String(store.id)))
+      const remainingStops = routeStops.filter((store) => {
+        const id = String(store.id)
+        return (routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) !== ROUTE_STOP_STATUS.COMPLETED
+      })
       return new Map(remainingStops.map((store, index) => [String(store.id), String(index + 1)]))
     },
-    [routeStops, passedRouteStopIds]
+    [routeStops, routeStopStatusById]
   )
-  const passedRouteStopIdSet = useMemo(
-    () => new Set(passedRouteStopIds),
-    [passedRouteStopIds]
-  )
+  const completedRouteStopIdSet = useMemo(() => {
+    const ids = []
+    for (const store of routeStops) {
+      const id = String(store.id)
+      if ((routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) === ROUTE_STOP_STATUS.COMPLETED) {
+        ids.push(id)
+      }
+    }
+    return new Set(ids)
+  }, [routeStops, routeStopStatusById])
 
   const renderedRouteStops = useMemo(() => {
     const items = routeStops.map((store, index) => ({ store, originalIndex: index }))
@@ -408,10 +432,6 @@ export default function MapPage() {
   }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
 
   const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
-  const routeStopIndexById = useMemo(
-    () => new Map(routeStops.map((store, index) => [String(store.id), index])),
-    [routeStops]
-  )
 
   useEffect(() => {
     followUserHeadingRef.current = followUserHeading
@@ -564,10 +584,16 @@ export default function MapPage() {
         },
         center: initialTarget ? [initialTarget.lng, initialTarget.lat] : DEFAULT_CENTER,
         zoom: initialTarget ? 16 : 13,
+        pitch: 0,
         minZoom: 3,
         maxZoom: 20,
+        maxPitch: 0,
+        pitchWithRotate: false,
         attributionControl: true
       })
+
+      map.dragRotate.disable()
+      map.touchZoomRotate.disableRotation()
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
@@ -868,24 +894,57 @@ export default function MapPage() {
         shortName: getFirstWord(store.name),
         address: formatAddressParts(store),
         routeOrder: routeStopOrderById.get(String(store.id)) || '',
-        passed: passedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
+        passed: completedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
       },
     }))
 
-    // Generate combined marker images (house icon or route number + label in one canvas)
-    for (const f of features) {
-      const routeOrder = f.properties.routeOrder || ''
+    source.setData({ type: 'FeatureCollection', features })
+
+    // Add marker images in small batches to reduce main-thread blocking
+    const pendingImages = []
+    for (const feature of features) {
+      const routeOrder = feature.properties.routeOrder || ''
       const imgId = routeOrder
-        ? `smr-${f.properties.storeId}-${routeOrder}`
-        : `sm-${f.properties.storeId}`
+        ? `smr-${feature.properties.storeId}-${routeOrder}`
+        : `sm-${feature.properties.storeId}`
       if (!map.hasImage(imgId)) {
-        const img = createStoreMarker(f.properties.name, 13, 9, false, routeOrder)
-        map.addImage(imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+        pendingImages.push({
+          imgId,
+          text: feature.properties.name,
+          routeOrder,
+        })
       }
     }
 
-    source.setData({ type: 'FeatureCollection', features })
-  }, [mapReady, passedRouteStopIdSet, routeStopOrderById, visibleMapStores])
+    if (pendingImages.length === 0) return
+
+    let frameId = 0
+    let cancelled = false
+    let index = 0
+
+    const flushImageBatch = () => {
+      if (cancelled) return
+
+      const batchEnd = Math.min(index + 18, pendingImages.length)
+      for (; index < batchEnd; index += 1) {
+        const item = pendingImages[index]
+        if (map.hasImage(item.imgId)) continue
+        const img = getOrCreateStoreMarkerImage(item.text, 13, 9, false, item.routeOrder)
+        map.addImage(item.imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+      }
+
+      if (index < pendingImages.length) {
+        frameId = window.requestAnimationFrame(flushImageBatch)
+      }
+    }
+
+    frameId = window.requestAnimationFrame(flushImageBatch)
+
+    return () => {
+      cancelled = true
+      if (frameId) window.cancelAnimationFrame(frameId)
+    }
+  }, [completedRouteStopIdSet, mapReady, routeStopOrderById, visibleMapStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -987,9 +1046,14 @@ export default function MapPage() {
   }, [routeStops.length])
 
   useEffect(() => {
-    const validIds = new Set(routeStops.map((store) => String(store.id)))
-    setPassedRouteStopIds((prev) => prev.filter((id) => validIds.has(id)))
-    setActiveRouteStopId((prev) => (prev && validIds.has(String(prev)) ? String(prev) : null))
+    setRouteStopStatusById((prev) => {
+      const next = {}
+      for (const store of routeStops) {
+        const id = String(store.id)
+        next[id] = prev[id] || ROUTE_STOP_STATUS.PENDING
+      }
+      return next
+    })
     if (routeStops.length === 0) {
       followUserHeadingRef.current = false
       setFollowUserHeading(false)
@@ -1002,15 +1066,17 @@ export default function MapPage() {
       if (prev.some((item) => String(item.id) === String(store.id))) return prev
       return [...prev, store]
     })
-    setPassedRouteStopIds([])
-    setActiveRouteStopId(null)
+    setRouteStopStatusById({})
     setRouteError('')
   }, [])
 
   const removeRouteStop = useCallback((storeId) => {
     setRouteStops((prev) => prev.filter((store) => String(store.id) !== String(storeId)))
-    setPassedRouteStopIds((prev) => prev.filter((id) => id !== String(storeId)))
-    setActiveRouteStopId((prev) => (String(prev) === String(storeId) ? null : prev))
+    setRouteStopStatusById((prev) => {
+      const next = { ...prev }
+      delete next[String(storeId)]
+      return next
+    })
   }, [])
 
   const clearRoutePlan = useCallback(() => {
@@ -1018,8 +1084,7 @@ export default function MapPage() {
     setRouteGeojson(EMPTY_FEATURE_COLLECTION)
     setRouteSummary(null)
     setRouteError('')
-    setPassedRouteStopIds([])
-    setActiveRouteStopId(null)
+    setRouteStopStatusById({})
   }, [])
 
   const cancelPendingRouteDrag = useCallback(() => {
@@ -1042,8 +1107,7 @@ export default function MapPage() {
 
     if (!cancelled && fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
       setRouteStops((prev) => moveItem(prev, fromIndex, toIndex))
-      setPassedRouteStopIds([])
-      setActiveRouteStopId(null)
+      setRouteStopStatusById({})
     }
 
     setArmedRouteIndex(-1)
@@ -1234,9 +1298,13 @@ export default function MapPage() {
     const startPoint = FIXED_ROUTE_POINT
     const endPoint = FIXED_ROUTE_POINT
 
-    const passedSet = new Set(passedRouteStopIds)
+    const completedSet = new Set(
+      routeStops
+        .map((store) => String(store.id))
+        .filter((id) => (routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) === ROUTE_STOP_STATUS.COMPLETED)
+    )
     const stops = routeStops
-      .filter((store) => !passedSet.has(String(store.id)))
+      .filter((store) => !completedSet.has(String(store.id)))
       .map((store) => ({
       id: String(store.id),
       name: store.name || 'C\u1eeda h\u00e0ng',
@@ -1312,7 +1380,7 @@ export default function MapPage() {
     } finally {
       setRouteLoading(false)
     }
-  }, [isDesktop, passedRouteStopIds, routeStops])
+  }, [isDesktop, routeStopStatusById, routeStops])
 
   const optimizeRouteOrder = useCallback(async () => {
     if (routeStops.length < 2) {
@@ -1375,8 +1443,7 @@ export default function MapPage() {
       setRouteStops(nextRouteStops)
       setRouteGeojson(EMPTY_FEATURE_COLLECTION)
       setRouteSummary(null)
-      setPassedRouteStopIds([])
-      setActiveRouteStopId(null)
+      setRouteStopStatusById({})
     } catch (err) {
       console.error('Optimize route order failed:', err)
       setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng l\u00fac n\u00e0y.')
@@ -1396,7 +1463,7 @@ export default function MapPage() {
     const routeOrder = routeStopOrderById.get(String(store.id)) || ''
     const highlightedImageId = routeOrder ? `smrh-${store.id}-${routeOrder}` : hlId
     if (!map.hasImage(highlightedImageId)) {
-      const img = createStoreMarker(store.name || 'Cửa hàng', 13, 9, true, routeOrder)
+      const img = getOrCreateStoreMarkerImage(store.name || 'Cửa hàng', 13, 9, true, routeOrder)
       map.addImage(highlightedImageId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
     }
 
@@ -1414,7 +1481,7 @@ export default function MapPage() {
           shortName: getFirstWord(s.name),
           address: formatAddressParts(s),
           routeOrder: routeStopOrderById.get(String(s.id)) || '',
-          passed: passedRouteStopIdSet.has(String(s.id)) ? 'yes' : 'no',
+          passed: completedRouteStopIdSet.has(String(s.id)) ? 'yes' : 'no',
           highlighted: String(s.id) === storeId ? 'yes' : 'no',
         },
       }))
@@ -1430,7 +1497,7 @@ export default function MapPage() {
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [filteredStores, passedRouteStopIdSet, routeStopOrderById])
+  }, [completedRouteStopIdSet, filteredStores, routeStopOrderById])
 
   const handleSearch = useCallback(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1469,7 +1536,7 @@ export default function MapPage() {
           desiredAccuracy: 30,
           skipCache: forceFreshPosition,
         }),
-        requestCompassHeading().catch(() => ({ heading: null, error: '' })),
+        requestCompassHeading({ requestPermission: false }).catch(() => ({ heading: null, error: '' })),
       ])
 
       const { coords, error } = positionResult
@@ -1559,14 +1626,15 @@ export default function MapPage() {
     const map = mapRef.current
     if (!map) return
 
-    let heading = currentLocation?.heading ?? pendingHeadingRef.current ?? null
-    if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
-      const result = await requestCompassHeading().catch(() => null)
-      heading = normalizeHeading(result?.heading)
-      if (heading != null) {
-        pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
-        setUserLocation((prev) => (prev ? { ...prev, heading: pendingHeadingRef.current } : prev))
-      }
+    const headingResult = await requestCompassHeading({ requestPermission: true }).catch(() => ({ heading: null, error: '' }))
+    let heading = normalizeHeading(headingResult?.heading ?? currentLocation?.heading ?? pendingHeadingRef.current)
+    if (heading != null) {
+      pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
+      heading = pendingHeadingRef.current
+      setUserLocation((prev) => (prev ? { ...prev, heading } : prev))
+    }
+    if (headingResult?.error && heading == null) {
+      setLocationError(headingResult.error)
     }
 
     if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
@@ -1576,7 +1644,9 @@ export default function MapPage() {
 
     followUserHeadingRef.current = true
     setFollowUserHeading(true)
-    setLocationError('')
+    if (!headingResult?.error || heading != null) {
+      setLocationError('')
+    }
     setSelectedStore(null)
     map.stop()
     map.easeTo({
@@ -1585,76 +1655,109 @@ export default function MapPage() {
       duration: 900,
       essential: true,
     })
-    if (routeStops.length > 0) {
+    if (routeStops.length > 0 && routeGeojson.features.length === 0) {
       buildRoute()
     }
-  }, [buildRoute, followUserHeading, routeStops.length, setMapBearing, userLocation])
+  }, [buildRoute, followUserHeading, routeGeojson.features.length, routeStops.length, setMapBearing, userLocation])
 
   useEffect(() => {
     if (!followUserHeading) return
     if (!Number.isFinite(userLocation?.latitude) || !Number.isFinite(userLocation?.longitude)) return
     if (routeStops.length === 0) return
+    setRouteStopStatusById((prev) => {
+      const next = { ...prev }
+      let changed = false
 
-    const nextPassedSet = new Set(passedRouteStopIds)
+      const orderedStops = routeStops.map((store) => {
+        const id = String(store.id)
+        const status = next[id] || ROUTE_STOP_STATUS.PENDING
+        next[id] = status
+        return { id, store, status }
+      })
 
-    if (activeRouteStopId) {
-      const activeIndex = routeStopIndexById.get(String(activeRouteStopId))
-      if (activeIndex == null) {
-        setActiveRouteStopId(null)
-        return
-      }
+      const arrivedEntry = orderedStops.find((entry) => next[entry.id] === ROUTE_STOP_STATUS.ARRIVED) || null
 
-      const activeStop = routeStops[activeIndex]
-      const distanceFromActive = haversineKm(
-        userLocation.latitude,
-        userLocation.longitude,
-        activeStop.coords.lat,
-        activeStop.coords.lng
-      ) * 1000
+      if (arrivedEntry) {
+        const distanceFromArrived = haversineKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          arrivedEntry.store.coords.lat,
+          arrivedEntry.store.coords.lng
+        ) * 1000
 
-      if (distanceFromActive > NAV_LEAVE_DISTANCE_M) {
-        const activeId = String(activeStop.id)
-        if (!nextPassedSet.has(activeId)) {
-          setPassedRouteStopIds((prev) => (prev.includes(activeId) ? prev : [...prev, activeId]))
+        if (distanceFromArrived > NAV_LEAVE_DISTANCE_M) {
+          next[arrivedEntry.id] = ROUTE_STOP_STATUS.COMPLETED
+          changed = true
         }
-        setActiveRouteStopId(null)
       }
-      return
-    }
 
-    const firstRemainingStop = routeStops.find((store) => !nextPassedSet.has(String(store.id)))
-    if (!firstRemainingStop) return
+      const activeArrivedEntry = orderedStops.find((entry) => next[entry.id] === ROUTE_STOP_STATUS.ARRIVED) || null
+      if (!activeArrivedEntry) {
+        const firstRemaining = orderedStops.find((entry) => next[entry.id] !== ROUTE_STOP_STATUS.COMPLETED) || null
+        if (firstRemaining) {
+          const distanceToFirstRemaining = haversineKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            firstRemaining.store.coords.lat,
+            firstRemaining.store.coords.lng
+          ) * 1000
+          if (distanceToFirstRemaining <= NAV_ARRIVE_DISTANCE_M) {
+            next[firstRemaining.id] = ROUTE_STOP_STATUS.ARRIVED
+            changed = true
+          }
+        }
+      }
 
-    const distanceToNext = haversineKm(
-      userLocation.latitude,
-      userLocation.longitude,
-      firstRemainingStop.coords.lat,
-      firstRemainingStop.coords.lng
-    ) * 1000
+      let firstArrivedFound = false
+      for (const entry of orderedStops) {
+        if (next[entry.id] !== ROUTE_STOP_STATUS.ARRIVED) continue
+        if (!firstArrivedFound) {
+          firstArrivedFound = true
+          continue
+        }
+        next[entry.id] = ROUTE_STOP_STATUS.PENDING
+        changed = true
+      }
 
-    if (distanceToNext <= NAV_ARRIVE_DISTANCE_M) {
-      setActiveRouteStopId(String(firstRemainingStop.id))
-    }
+      return changed ? next : prev
+    })
   }, [
     followUserHeading,
     userLocation?.latitude,
     userLocation?.longitude,
     routeStops,
-    passedRouteStopIds,
-    activeRouteStopId,
-    routeStopIndexById,
   ])
 
   const navigationInfo = useMemo(() => {
     if (!followUserHeading || routeStops.length === 0) return null
 
-    const passedSet = new Set(passedRouteStopIds)
-    const activeIndex = activeRouteStopId ? routeStopIndexById.get(String(activeRouteStopId)) : -1
-    const activeStore = activeIndex != null && activeIndex >= 0 ? routeStops[activeIndex] : null
-    const firstRemainingIndex = routeStops.findIndex((store) => !passedSet.has(String(store.id)))
-    const nextStore = activeStore
-      ? routeStops.find((store, index) => index > activeIndex && !passedSet.has(String(store.id))) || null
-      : (firstRemainingIndex >= 0 ? routeStops[firstRemainingIndex] : null)
+    const orderedStops = routeStops.map((store) => {
+      const id = String(store.id)
+      return {
+        id,
+        store,
+        status: routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING,
+      }
+    })
+
+    const arrivedIndex = orderedStops.findIndex((entry) => entry.status === ROUTE_STOP_STATUS.ARRIVED)
+    const activeStore = arrivedIndex >= 0 ? orderedStops[arrivedIndex].store : null
+    const nextStore = arrivedIndex >= 0
+      ? (orderedStops.slice(arrivedIndex + 1).find((entry) => entry.status !== ROUTE_STOP_STATUS.COMPLETED)?.store || null)
+      : (orderedStops.find((entry) => entry.status !== ROUTE_STOP_STATUS.COMPLETED)?.store || null)
+    const distanceTargetStore = nextStore || activeStore || null
+    const canMeasureDistance = Number.isFinite(userLocation?.latitude) && Number.isFinite(userLocation?.longitude)
+    const distanceFromLat = canMeasureDistance ? userLocation.latitude : FIXED_ROUTE_POINT.lat
+    const distanceFromLng = canMeasureDistance ? userLocation.longitude : FIXED_ROUTE_POINT.lng
+    const targetLat = Number.isFinite(distanceTargetStore?.coords?.lat) ? distanceTargetStore.coords.lat : null
+    const targetLng = Number.isFinite(distanceTargetStore?.coords?.lng) ? distanceTargetStore.coords.lng : null
+    const rawNextDistanceMeters = (targetLat != null && targetLng != null)
+      ? haversineKm(distanceFromLat, distanceFromLng, targetLat, targetLng) * 1000
+      : 0
+    const nextDistanceMeters = Number.isFinite(rawNextDistanceMeters) ? rawNextDistanceMeters : 0
+
+    const completedStops = orderedStops.filter((entry) => entry.status === ROUTE_STOP_STATUS.COMPLETED)
+    const lastCompletedStore = completedStops.length > 0 ? completedStops[completedStops.length - 1].store : null
 
     const atWarehouse = Number.isFinite(userLocation?.latitude) && Number.isFinite(userLocation?.longitude)
       ? (haversineKm(
@@ -1670,25 +1773,25 @@ export default function MapPage() {
         currentLabel: 'Hiện tại',
         currentStore: activeStore,
         nextStore,
+        nextDistanceMeters,
       }
     }
-
-    const lastPassedId = passedRouteStopIds.length > 0 ? passedRouteStopIds[passedRouteStopIds.length - 1] : null
-    const lastPassedStore = lastPassedId ? routeStops.find((store) => String(store.id) === String(lastPassedId)) : null
 
     if (atWarehouse) {
       return {
         currentLabel: 'Hiện tại',
         currentText: 'Kho',
         nextStore,
+        nextDistanceMeters,
       }
     }
 
-    if (lastPassedStore) {
+    if (lastCompletedStore) {
       return {
         currentLabel: 'Đã qua',
-        currentStore: lastPassedStore,
+        currentStore: lastCompletedStore,
         nextStore,
+        nextDistanceMeters,
       }
     }
 
@@ -1696,13 +1799,12 @@ export default function MapPage() {
       currentLabel: 'Hiện tại',
       currentText: 'Đang di chuyển',
       nextStore,
+      nextDistanceMeters,
     }
   }, [
     followUserHeading,
     routeStops,
-    passedRouteStopIds,
-    activeRouteStopId,
-    routeStopIndexById,
+    routeStopStatusById,
     userLocation?.latitude,
     userLocation?.longitude,
   ])
@@ -1861,13 +1963,19 @@ export default function MapPage() {
                       <button
                         type="button"
                         className={`shrink-0 rounded-md border px-2 py-1 text-sm transition ${routeStopIds.has(String(store.id))
-                          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-200'
+                          ? 'border-red-500/40 bg-red-500/15 text-red-200 hover:border-red-400 hover:text-red-100'
                           : 'border-slate-600/70 bg-slate-950/80 text-slate-200 hover:border-sky-400 hover:text-sky-200'
                           }`}
                         onPointerDown={(e) => e.preventDefault()}
-                        onClick={() => addStoreToRoute(store)}
+                        onClick={() => {
+                          if (routeStopIds.has(String(store.id))) {
+                            removeRouteStop(store.id)
+                            return
+                          }
+                          addStoreToRoute(store)
+                        }}
                       >
-                        {routeStopIds.has(String(store.id)) ? 'Đã thêm' : 'Thêm'}
+                        {routeStopIds.has(String(store.id)) ? 'Bỏ khỏi tuyến' : 'Thêm'}
                       </button>
                     </div>
                   ))}
@@ -1890,7 +1998,7 @@ export default function MapPage() {
             className="pointer-events-none absolute left-3 z-10"
             style={{
               bottom: !isDesktop && showNavigationInfoPanel
-                ? (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 8.5rem)' : '8.5rem')
+                ? (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 13rem)' : '13rem')
                 : (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem'),
             }}
           >
@@ -2007,7 +2115,7 @@ export default function MapPage() {
                 ) : (
                   <div className="space-y-2">
                     {renderedRouteStops.map(({ store, originalIndex, displayIndex }) => (
-                      passedRouteStopIdSet.has(String(store.id)) ? null : (
+                      completedRouteStopIdSet.has(String(store.id)) ? null : (
                       <div
                         key={store.id}
                         ref={(element) => {
@@ -2016,7 +2124,7 @@ export default function MapPage() {
                         }}
                         onPointerDown={(event) => startRouteDrag(originalIndex, event)}
                         onContextMenu={(event) => event.preventDefault()}
-                        className={`rounded-lg border bg-slate-900/75 px-2.5 py-2 transition ${passedRouteStopIdSet.has(String(store.id)) ? 'opacity-45' : ''} ${originalIndex === draggedRouteIndex
+                        className={`rounded-lg border bg-slate-900/75 px-2.5 py-2 transition ${completedRouteStopIdSet.has(String(store.id)) ? 'opacity-45' : ''} ${originalIndex === draggedRouteIndex
                           ? 'border-slate-700/40 opacity-0'
                           : originalIndex === armedRouteIndex
                             ? 'border-sky-400/80 ring-1 ring-sky-400/50'
@@ -2040,8 +2148,8 @@ export default function MapPage() {
                         <div className="flex w-full items-start justify-between gap-2.5">
                           <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 flex-col">
-                              <span className={`truncate font-medium ${passedRouteStopIdSet.has(String(store.id)) ? 'text-slate-400' : 'text-slate-100'}`}>{store.name}</span>
-                              <span className={`truncate ${passedRouteStopIdSet.has(String(store.id)) ? 'text-slate-500' : 'text-slate-400'}`}>{formatShortAddress(store)}</span>
+                              <span className={`truncate font-medium ${completedRouteStopIdSet.has(String(store.id)) ? 'text-slate-400' : 'text-slate-100'}`}>{store.name}</span>
+                              <span className={`truncate ${completedRouteStopIdSet.has(String(store.id)) ? 'text-slate-500' : 'text-slate-400'}`}>{formatShortAddress(store)}</span>
                             </div>
                           </div>
                           <div className="flex shrink-0 items-start justify-end">
@@ -2141,7 +2249,9 @@ export default function MapPage() {
 
         <div
           className="pointer-events-none absolute right-3 sm:bottom-3 z-20"
-          style={!isDesktop ? { bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' } : undefined}
+          style={!isDesktop
+            ? { bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' }
+            : undefined}
         >
           <div className="pointer-events-auto flex flex-col items-end gap-2">
             {locationError && (
@@ -2181,7 +2291,7 @@ export default function MapPage() {
               </button>
             )}
             {showNavigationInfoPanel && navigationInfo && (
-              <div className={`rounded-xl border border-slate-700/70 bg-slate-950/95 shadow-lg backdrop-blur ${isDesktop ? 'w-[320px] px-4 py-3 text-sm' : 'w-[calc(100vw-1.5rem)] px-4 py-3 text-base'}`}>
+              <div className={`rounded-xl border border-slate-700/70 bg-slate-950/95 shadow-lg backdrop-blur ${isDesktop ? 'w-[320px] px-4 py-3 text-sm' : 'w-[calc(100vw-1rem)] px-4 py-3 text-base'}`}>
                 <div className="flex items-center justify-between">
                   <div className="font-semibold text-sky-200">Dẫn đường</div>
                   <button
@@ -2192,11 +2302,26 @@ export default function MapPage() {
                     Thoát
                   </button>
                 </div>
-                <div className="mt-2 text-slate-300">
-                  {navigationInfo.currentLabel}: <span className="font-medium text-slate-100">{navigationInfo.currentStore ? navigationInfo.currentStore.name : navigationInfo.currentText}</span>
-                </div>
-                <div className="mt-1 text-slate-300">
-                  Tiếp theo: <span className="font-medium text-slate-100">{navigationInfo.nextStore ? navigationInfo.nextStore.name : 'Đã hoàn thành tuyến'}</span>
+                <div className="mt-3 space-y-2.5">
+                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 px-3 py-2">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{navigationInfo.currentLabel}</div>
+                    <div className="mt-0.5 truncate text-[15px] font-semibold leading-tight text-slate-100">
+                      {navigationInfo.currentStore ? navigationInfo.currentStore.name : navigationInfo.currentText}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 px-3 py-2">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Tiếp theo</div>
+                    {navigationInfo.nextStore ? (
+                      <div className="mt-0.5 flex items-center justify-between gap-2">
+                        <span className="min-w-0 truncate text-[15px] font-semibold leading-tight text-slate-100">{navigationInfo.nextStore.name}</span>
+                        <span className="shrink-0 rounded-full border border-sky-400/35 bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-100">
+                          {Math.max(0, Math.round(navigationInfo.nextDistanceMeters || 0))}m
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-[15px] font-semibold leading-tight text-slate-100">Đã hoàn thành tuyến</div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -2356,6 +2481,8 @@ export default function MapPage() {
         open={!!selectedStore}
         onOpenChange={(open) => { if (!open) setSelectedStore(null) }}
         onAddToRoute={addStoreToRoute}
+        onRemoveFromRoute={removeRouteStop}
+        isInRoute={selectedStore ? routeStopIds.has(String(selectedStore.id)) : false}
       />
     </div>
   )

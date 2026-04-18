@@ -139,15 +139,19 @@ export function getGeoErrorMessage(err) {
  * Request a single compass heading sample from the device orientation API.
  * Collects up to 5 samples in 1.2 s and returns the circular mean in degrees.
  *
+ * @param {{requestPermission?: boolean}} options
  * @returns {Promise<{heading: number|null, error: string}>}
  */
-export async function requestCompassHeading() {
+export async function requestCompassHeading(options = {}) {
+  const { requestPermission = false } = options
+
   if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
     return { heading: null, error: '' }
   }
 
-  // iOS 13+ requires explicit permission
-  if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+  // iOS 13+ requires explicit permission and browsers only allow prompting
+  // inside a direct user gesture (click/tap).
+  if (requestPermission && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const res = await DeviceOrientationEvent.requestPermission()
       if (res !== 'granted') {
