@@ -32,11 +32,12 @@
 - SĐT 2 chỉ hiển thị khi đã bắt đầu nhập SĐT 1
 - Không cho phép SĐT 2 trùng với SĐT 1
 - Khi bước 1 đã lấy được GPS để kiểm tra trùng, hệ thống sẽ tự prefill quận/huyện + xã/phường của cửa hàng gần nhất ngay trong nền, bất kể kết quả trùng hay không trùng; sang bước 2 thì field đã sẵn sàng nếu chưa bị nhập tay
-- Có nút **Lưu luôn** ngay tại bước 2 chỉ khi là admin:
+- Với **telesale** (không phải admin), có nhánh **Lưu cửa hàng ở bước 2** (không cần bước 3):
   - vẫn bắt buộc `Quận/Huyện` + `Xã/Phường`
-  - **bắt buộc thêm số điện thoại hợp lệ**
+  - **bắt buộc** `SĐT 1` hợp lệ
   - trước khi lưu phải hỏi xác nhận việc lưu cửa hàng **không có vị trí**
-  - khi lưu theo nhánh này, store được tạo với `latitude = null`, `longitude = null`
+  - store được tạo với `latitude = null`, `longitude = null`
+  - store mới tạo mặc định `is_potential = true` (theo role telesale)
 
 ### Bước 3: Vị Trí
 - Auto lấy GPS khi vào bước 3
@@ -316,5 +317,5 @@ Huyện ngoài danh sách: user nhập tay (không có dropdown suggestion).
 - Nếu người tạo là `telesale`, store mới được tạo trực tiếp trong `stores` sẽ mặc định có `is_potential = true`.
 - Rule này áp dụng cho cả:
   - luồng tạo đủ 3 bước
-  - nhánh `Lưu luôn` ở bước 2
+  - nhánh lưu ở bước 2 (không có vị trí) dành cho telesale
 - `guest` và `admin` giữ nguyên hành vi cũ, không tự bật `is_potential` chỉ vì vừa tạo store.

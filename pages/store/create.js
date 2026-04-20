@@ -277,9 +277,9 @@ export default function AddStore() {
   // Handler for getting fresh GPS location
   const handleGetLocation = useCallback(async () => {
     try {
-      // Yêu cầu quyền la bàn ngay lập tức trước khi await để không bị mất context User Gesture trên iOS
+      // Xin quyền la bàn ngay lập tức trước khi await để không bị mất context User Gesture trên iOS/Safari
       compassOnceRef.current = false
-      refreshCompassHeading()
+      refreshCompassHeading({ requestPermission: true })
 
       setResolvingAddr(true)
 
@@ -317,12 +317,12 @@ export default function AddStore() {
   }, [])
 
   // Compass heading helper — delegates to extracted module
-  async function refreshCompassHeading() {
+  async function refreshCompassHeading({ requestPermission = false } = {}) {
     if (compassOnceRef.current) return
     compassOnceRef.current = true
     setCompassError('')
     try {
-      const { heading: h, error: e } = await requestCompassHeading()
+      const { heading: h, error: e } = await requestCompassHeading({ requestPermission })
       if (e) setCompassError(e)
       if (h != null) {
         // Cộng thêm 1 số rất nhỏ để ép React kích hoạt re-render nếu hướng trùng khớp hoàn toàn với trước đó
@@ -367,7 +367,9 @@ export default function AddStore() {
       const ok = window.confirm('Bạn có dữ liệu chưa lưu. Bạn có chắc muốn rời trang?')
       if (ok) return
       router.events.emit('routeChangeError')
-      throw 'Route change aborted by user'
+      const err = new Error('Route change aborted by user')
+      err.cancelled = true
+      throw err
     }
     router.events.on('routeChangeStart', onRouteChangeStart)
     return () => router.events.off('routeChangeStart', onRouteChangeStart)
@@ -637,9 +639,9 @@ export default function AddStore() {
       return true
     }
     
-    // Yêu cầu lấy hướng bàn ngay lập tức tại đây vì requestPermission trên iOS yêu cầu đồng bộ với thao tác click người dùng
+    // Yêu cầu lấy hướng/la bàn ngay lập tức tại đây vì iOS/Safari chỉ cho prompt quyền trong user gesture (click/tap)
     compassOnceRef.current = false
-    refreshCompassHeading()
+    refreshCompassHeading({ requestPermission: true })
     
     setCurrentStep(3)
     return true

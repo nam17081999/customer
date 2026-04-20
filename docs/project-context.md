@@ -114,7 +114,7 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/có SĐT/có ảnh/không có vị trí là multi-select.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
-15. **`/store/create` bước 2 có nhánh `Lưu luôn`**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
+15. **`/store/create` bước 2 có nhánh lưu nhanh cho telesale**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
 16. **`/store/create` bước 1-2**: bước 1 đã lấy GPS để check trùng; kết quả này được dùng để prefill quận/huyện + xã/phường của cửa hàng gần nhất trong nền trước khi sang bước 2.
 17. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
 18. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
@@ -237,4 +237,4 @@ Script SQL cap nhat moi truong duoc luu tai:
 ## Create Role Note
 
 - Khi `telesale` tạo cửa hàng mới ở `/store/create`, cửa hàng đó mặc định là `tiềm năng` (`is_potential = true`).
-- Rule này đi theo payload tạo store, nên áp dụng đồng nhất cho cả tạo đầy đủ vị trí và `Lưu luôn` không có vị trí.
+- Rule này đi theo payload tạo store, nên áp dụng đồng nhất cho cả tạo đầy đủ vị trí và nhánh lưu nhanh không có vị trí (telesale).

@@ -12,6 +12,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import StoreSupplementForm from '@/components/store/store-supplement-form'
 import { getCachedStores, updateStoreInCache } from '@/lib/storeCache'
+import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
@@ -450,6 +451,17 @@ export default function EditStore() {
         if (error) throw error
         const nextStore = { ...store, ...updates }
         await updateStoreInCache(id, updates)
+        try {
+          const changes = buildStoreDiff(store, updates)
+          await logStoreEditHistory({
+            storeId: id,
+            actionType: 'supplement',
+            actorUserId: user?.id,
+            changes,
+          })
+        } catch (err) {
+          console.error('store_edit_history supplement failed:', err)
+        }
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('storevis:stores-changed', {
@@ -524,6 +536,17 @@ export default function EditStore() {
       if (error) throw error
       const nextStore = { ...store, ...updates }
       await updateStoreInCache(id, updates)
+      try {
+        const changes = buildStoreDiff(store, updates)
+        await logStoreEditHistory({
+          storeId: id,
+          actionType: 'edit',
+          actorUserId: user?.id,
+          changes,
+        })
+      } catch (err) {
+        console.error('store_edit_history edit failed:', err)
+      }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
