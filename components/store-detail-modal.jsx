@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
-import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
+import { formatDistance, getStorePhoneNumbers, validateVietnamPhone } from '@/helper/validation'
 import { parseCoordinate } from '@/helper/coordinate'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
@@ -18,6 +18,7 @@ import { formatLastCalledText, getTelesaleResultLabel, hasReportedOrder } from '
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { supabase } from '@/lib/supabaseClient'
 import { removeStoreFromCache, updateStoreInCache } from '@/lib/storeCache'
+import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 
 const StoreLocationPicker = dynamic(
   () => import('@/components/map/store-location-picker'),
@@ -173,6 +174,17 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
       .update({ deleted_at: nowIso, updated_at: nowIso })
       .eq('id', store.id)
     if (!error) {
+      try {
+        const changes = buildStoreDiff(store, { deleted_at: nowIso })
+        await logStoreEditHistory({
+          storeId: store.id,
+          actionType: 'delete_soft',
+          actorUserId: user?.id,
+          changes,
+        })
+      } catch (err) {
+        console.error('store_edit_history delete_soft failed:', err)
+      }
       await removeStoreFromCache(store.id)
 
       if (typeof window !== 'undefined') {
@@ -184,7 +196,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
         window.dispatchEvent(new CustomEvent('storevis:flash-message'))
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'delete', id: store.id },
+            detail: { type: 'delete', id: store.id, shouldRefetchAll: true },
           })
         )
       }
@@ -201,6 +213,12 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     router.push(`/store/edit/${store.id}`)
   }
 
+  const handleOpenHistory = (e) => {
+    e.stopPropagation()
+    const from = router.asPath || '/'
+    router.push(`/store/history/${store.id}?from=${encodeURIComponent(from)}`)
+  }
+
   const handleSupplement = (e) => {
     e.stopPropagation()
     router.push(`/store/edit/${store.id}?mode=supplement`)
@@ -212,6 +230,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     const nextPotential = !isPotential
     const nowIso = new Date().toISOString()
     setPotentialSaving(true)
+    const actorRole = isAdmin ? 'admin' : isTelesale ? 'telesale' : 'guest'
 
     const { error } = await supabase
       .from('stores')
@@ -228,10 +247,22 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     setIsPotential(nextPotential)
     const nextStore = { ...store, is_potential: nextPotential, updated_at: nowIso }
     await updateStoreInCache(store.id, { is_potential: nextPotential, updated_at: nowIso })
+    try {
+      const changes = buildStoreDiff(store, { is_potential: nextPotential })
+      await logStoreEditHistory({
+        storeId: store.id,
+        actionType: 'telesale_potential_toggle',
+        actorUserId: user?.id,
+        actorRole,
+        changes,
+      })
+    } catch (err) {
+      console.error('store_edit_history telesale_potential_toggle failed:', err)
+    }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('storevis:stores-changed', {
-          detail: { type: 'update', id: store.id, store: nextStore },
+          detail: { type: 'update', id: store.id, store: nextStore, shouldRefetchAll: false },
         })
       )
     }
@@ -255,14 +286,16 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     return Number(value.toFixed(7))
   }
 
-  const buildProposedChanges = () => {
+  const buildProposedChanges = ({ normalizedPhoneOverride } = {}) => {
     const proposed = {}
     const normalizedName = toTitleCaseVI(reportName.trim())
     const normalizedStoreType = reportStoreType || DEFAULT_STORE_TYPE
     const normalizedDetail = reportAddressDetail.trim() ? toTitleCaseVI(reportAddressDetail.trim()) : null
     const normalizedWard = reportWard.trim() ? toTitleCaseVI(reportWard.trim()) : null
     const normalizedDistrict = reportDistrict.trim() ? toTitleCaseVI(reportDistrict.trim()) : null
-    const normalizedPhone = reportPhone.trim() || null
+    const normalizedPhone = normalizedPhoneOverride !== undefined
+      ? normalizedPhoneOverride
+      : (reportPhone.trim() || null)
     const normalizedNote = reportNote.trim() || null
 
     if (normalizedName && normalizedName !== (store.name || '')) proposed.name = normalizedName
@@ -334,7 +367,18 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
         setReportError('Vui lòng nhập đủ quận/huyện và xã/phường')
         return
       }
-      proposedChanges = buildProposedChanges()
+      const rawPhone = reportPhone.trim()
+      let normalizedPhoneOverride = undefined
+      if (rawPhone) {
+        const validation = validateVietnamPhone(rawPhone)
+        if (!validation.isValid) {
+          setReportError(validation.message || 'Số điện thoại không hợp lệ')
+          return
+        }
+        normalizedPhoneOverride = validation.normalized
+      }
+
+      proposedChanges = buildProposedChanges({ normalizedPhoneOverride })
       if (Object.keys(proposedChanges).length === 0) {
         setReportError('Bạn chưa thay đổi thông tin nào')
         return
@@ -353,7 +397,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     const { error } = await supabase.from('store_reports').insert([payload])
     if (error) {
       console.error(error)
-      setReportError('Khôgn gửi được báo cáo, vui lòng thử lại')
+      setReportError('Không gửi được báo cáo, vui lòng thử lại')
     } else {
       setReportOpen(false)
       setReportReasons([])
@@ -518,6 +562,11 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
             {isAdmin && (
               <Button variant="outline" className="w-full" onClick={handleEdit}>
                 Chỉnh sửa
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="outline" className="w-full" onClick={handleOpenHistory}>
+                Lịch sử chỉnh sửa
               </Button>
             )}
             {hasCoords && isInRoute && typeof onRemoveFromRoute === 'function' && (

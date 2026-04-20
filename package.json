@@ -13,7 +13,10 @@
     "lint:fix": "eslint . --ext .js,.jsx --fix --ignore-pattern .next --ignore-pattern node_modules",
     "text:check": "node scripts/check-mojibake.js",
     "text:check:staged": "node scripts/check-mojibake.js --staged",
-    "hooks:install": "node scripts/install-git-hooks.js"
+    "hooks:install": "node scripts/install-git-hooks.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -33,8 +36,10 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@vitest/coverage-v8": "^4.1.4",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "vitest": "^4.1.4"
   }
 }

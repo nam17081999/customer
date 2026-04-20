@@ -10,6 +10,7 @@ import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
+import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 
 const storeTypeLabelMap = {
   tap_hoa: 'Tạp hóa',
@@ -49,7 +50,7 @@ const formatValue = (key, value) => {
 
 export default function StoreReportsPage() {
   const router = useRouter()
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
+  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
   const [pageReady, setPageReady] = useState(false)
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
@@ -190,6 +191,17 @@ export default function StoreReportsPage() {
       setMessage('Đã duyệt cập nhật cửa hàng.')
       const nextStore = { ...(report.store || {}), ...storeUpdates }
       await updateStoreInCache(storeId, storeUpdates)
+      try {
+        const changes = buildStoreDiff(report.store || {}, storeUpdates)
+        await logStoreEditHistory({
+          storeId,
+          actionType: 'report_apply',
+          actorUserId: user?.id,
+          changes,
+        })
+      } catch (err) {
+        console.error('store_edit_history report_apply failed:', err)
+      }
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {

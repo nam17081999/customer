@@ -236,7 +236,7 @@ customer/
 ## Create Flow Mở Rộng
 
 - Ở bước 2 của `/store/create` có thêm nhánh **Lưu luôn**
-- Nhánh này dùng cho store chưa có vị trí:
+- Nhánh này (telesale-only) dùng cho store chưa có vị trí:
   - vẫn bắt buộc `quận/huyện`, `xã/phường`
   - bắt buộc thêm `số điện thoại` hợp lệ
   - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`

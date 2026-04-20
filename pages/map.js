@@ -11,6 +11,15 @@ import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/he
 import { parseCoordinate } from '@/helper/coordinate'
 import { formatAddressParts } from '@/lib/utils'
 import { haversineKm } from '@/helper/distance'
+import { buildStoreSearchIndex, createSearchQueryMeta, matchesSearchQuery } from '@/helper/storeSearch'
+import {
+  createUserHeadingFanImage,
+  ensureStoreMarkerImage,
+  getBaseMarkerImageId,
+  getHighlightedMarkerImageId,
+  removeMarkerImages,
+} from '@/helper/mapMarkerImages'
+
 function formatShortAddress(store) {
   if (!store) return ''
   const parts = []
@@ -22,7 +31,6 @@ function formatShortAddress(store) {
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const MAP_ROUTE_STORAGE_KEY = 'storevis:map-route-plan'
-const STORE_MARKER_IMAGE_CACHE = new Map()
 const FIXED_ROUTE_POINT = {
   lat: 21.0774332,
   lng: 105.6951599,
@@ -135,201 +143,13 @@ function toLatLng(store) {
   return { lat, lng }
 }
 
-/**
- * Pre-render house icon + store name into a single canvas image.
- * Returns { width, height, data, dpr, anchorY } for MapLibre addImage.
- */
-function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = false, routeOrder = '') {
-  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
-
-  // House icon dimensions
-  const iconSize = Math.round(38 * dpr) // circle diameter
-  const iconPad = Math.round(2 * dpr)   // space around circle
-  const hlPad = highlighted ? Math.round(5 * dpr) : 0 // extra space for highlight ring
-  const gap = Math.round(1 * dpr)       // gap between icon and label
-
-  // Label dimensions
-  const scaledFont = Math.round(fontSize * dpr)
-  const maxPxWidth = Math.round(maxWidthEm * fontSize * dpr)
-  const paddingX = Math.round(7 * dpr)
-  const paddingY = Math.round(3 * dpr)
-  const lineHeight = Math.round(scaledFont * 1.3)
-  const radius = Math.round(5 * dpr)
-
-  // Measure & word-wrap label text
-  const measure = document.createElement('canvas').getContext('2d')
-  measure.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
-  const words = text.split(/\s+/)
-  const lines = []
-  let cur = ''
-  for (const w of words) {
-    const test = cur ? `${cur} ${w}` : w
-    if (measure.measureText(test).width > maxPxWidth && cur) {
-      lines.push(cur)
-      cur = w
-    } else {
-      cur = test
-    }
-  }
-  if (cur) lines.push(cur)
-
-  const textW = Math.max(...lines.map((l) => Math.ceil(measure.measureText(l).width)))
-  const labelW = textW + paddingX * 2
-  const labelH = lines.length * lineHeight + paddingY * 2
-
-  // Combined canvas
-  const totalW = Math.max(iconSize + iconPad * 2 + hlPad * 2, labelW)
-  const iconBottom = iconSize + hlPad * 2
-  const totalH = iconBottom + gap + labelH
-  const canvas = document.createElement('canvas')
-  canvas.width = totalW
-  canvas.height = totalH
-  const ctx = canvas.getContext('2d')
-
-  // Draw house icon (centered horizontally)
-  const iconCX = totalW / 2
-  const iconCY = hlPad + iconPad + iconSize / 2
-  const r = iconSize / 2 - iconPad
-
-  // Highlight ring (if selected)
-  if (highlighted) {
-    ctx.beginPath()
-    ctx.arc(iconCX, iconCY, r + hlPad, 0, Math.PI * 2)
-    ctx.strokeStyle = '#38bdf8'
-    ctx.lineWidth = 3 * dpr
-    ctx.stroke()
-  }
-
-  // Circle bg
-  ctx.beginPath()
-  ctx.arc(iconCX, iconCY, r, 0, Math.PI * 2)
-  ctx.fillStyle = routeOrder ? '#f97316' : '#1f2937'
-  ctx.fill()
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 1.5 * dpr
-  ctx.stroke()
-
-  if (routeOrder) {
-    ctx.font = `bold ${Math.round(16 * dpr)}px "Open Sans", system-ui, sans-serif`
-    ctx.fillStyle = '#fff7ed'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(String(routeOrder), iconCX, iconCY + dpr * 0.25)
-  } else {
-    // House shape inside circle
-    const s = r * 0.52
-    ctx.fillStyle = '#ffffff'
-    ctx.strokeStyle = '#ffffff'
-    ctx.lineWidth = 0.8 * dpr
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-    ctx.beginPath()
-    ctx.moveTo(iconCX, iconCY - s * 0.9)
-    ctx.lineTo(iconCX - s, iconCY - s * 0.05)
-    ctx.lineTo(iconCX + s, iconCY - s * 0.05)
-    ctx.closePath()
-    ctx.fill()
-    ctx.fillRect(iconCX - s * 0.72, iconCY - s * 0.05, s * 1.44, s * 1.0)
-    ctx.fillStyle = '#1f2937'
-    ctx.fillRect(iconCX - s * 0.2, iconCY + s * 0.3, s * 0.4, s * 0.65)
-  }
-
-  // Draw label background (centered horizontally)
-  const lx = (totalW - labelW) / 2
-  const ly = iconBottom + gap
-  ctx.beginPath()
-  ctx.roundRect(lx, ly, labelW, labelH, radius)
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.94)'
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.13)'
-  ctx.lineWidth = dpr
-  ctx.stroke()
-
-  // Draw label text
-  ctx.font = `bold ${scaledFont}px "Open Sans", system-ui, sans-serif`
-  ctx.fillStyle = '#f1f5f9'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], totalW / 2, ly + paddingY + i * lineHeight)
-  }
-
-  return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
-}
-
-function getStoreMarkerCacheKey(text, fontSize, maxWidthEm, highlighted, routeOrder) {
-  return [text, fontSize, maxWidthEm, highlighted ? '1' : '0', routeOrder || ''].join('::')
-}
-
-function getOrCreateStoreMarkerImage(text, fontSize = 13, maxWidthEm = 9, highlighted = false, routeOrder = '') {
-  const cacheKey = getStoreMarkerCacheKey(text, fontSize, maxWidthEm, highlighted, routeOrder)
-  const cached = STORE_MARKER_IMAGE_CACHE.get(cacheKey)
-  if (cached) return cached
-
-  const nextImage = createStoreMarker(text, fontSize, maxWidthEm, highlighted, routeOrder)
-  STORE_MARKER_IMAGE_CACHE.set(cacheKey, nextImage)
-  return nextImage
-}
-
-function createUserHeadingFanImage() {
-  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
-  const size = 132 * dpr
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')
-  const center = size / 2
-  const innerRadius = 7 * dpr
-  const outerRadius = 58 * dpr
-  const outerSpread = (32 * Math.PI) / 180
-  const innerSpread = (16 * Math.PI) / 180
-  const startOuter = -Math.PI / 2 - outerSpread
-  const endOuter = -Math.PI / 2 + outerSpread
-  const startInner = -Math.PI / 2 - innerSpread
-  const endInner = -Math.PI / 2 + innerSpread
-
-  ctx.beginPath()
-  ctx.moveTo(center, center)
-  ctx.arc(center, center, outerRadius, startOuter, endOuter)
-  ctx.closePath()
-  ctx.fillStyle = 'rgba(59, 130, 246, 0.42)'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.moveTo(center, center)
-  ctx.arc(center, center, outerRadius, startOuter, endOuter)
-  ctx.closePath()
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.48)'
-  ctx.lineWidth = 2.2 * dpr
-  ctx.stroke()
-
-  ctx.beginPath()
-  ctx.moveTo(center, center)
-  ctx.arc(center, center, outerRadius * 0.72, startInner, endInner)
-  ctx.closePath()
-  ctx.fillStyle = 'rgba(96, 165, 250, 0.5)'
-  ctx.fill()
-
-  ctx.beginPath()
-  ctx.arc(center, center, innerRadius, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(37, 99, 235, 0.18)'
-  ctx.fill()
-
-  return {
-    width: size,
-    height: size,
-    data: ctx.getImageData(0, 0, size, size).data,
-    dpr,
-  }
-}
-
 export default function MapPage() {
   const router = useRouter()
   const mapContainerRef = useRef(null)
   const mapRef = useRef(null)
   const maplibreRef = useRef(null)
   const popupRef = useRef(null)
-  const highlightedStoreIdRef = useRef(null)
+  const activeMarkerImageIdsRef = useRef(new Set())
   const locatingUserRef = useRef(false)
   const pendingHeadingRef = useRef(null)
 
@@ -337,6 +157,7 @@ export default function MapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [highlightedStoreId, setHighlightedStoreId] = useState('')
   const [selectedStore, setSelectedStore] = useState(null)
   const [mapReady, setMapReady] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -482,6 +303,35 @@ export default function MapPage() {
     return filteredStores.filter((store) => routeStopIds.has(String(store.id)))
   }, [filteredStores, hideUnselectedStores, routeStopIds])
 
+  const indexedMapStores = useMemo(() => buildStoreSearchIndex(storesWithCoords), [storesWithCoords])
+
+  const storeFeatures = useMemo(() => {
+    const highlightedId = highlightedStoreId ? String(highlightedStoreId) : ''
+    const features = visibleMapStores.map((store) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [store.coords.lng, store.coords.lat] },
+      properties: {
+        storeId: String(store.id),
+        name: store.name || 'Cửa hàng',
+        shortName: getFirstWord(store.name),
+        address: formatAddressParts(store),
+        routeOrder: routeStopOrderById.get(String(store.id)) || '',
+        passed: completedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
+        highlighted: String(store.id) === highlightedId ? 'yes' : 'no',
+      },
+    }))
+
+    if (!highlightedId) return features
+
+    const highlightedIndex = features.findIndex((feature) => feature.properties.storeId === highlightedId)
+    if (highlightedIndex < 0) return features
+
+    const nextFeatures = features.slice()
+    const [highlightedFeature] = nextFeatures.splice(highlightedIndex, 1)
+    nextFeatures.push(highlightedFeature)
+    return nextFeatures
+  }, [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
+
   // Available wards based on selected districts
   const availableWards = useMemo(() => {
     if (selectedDistricts.length === 0) return []
@@ -547,10 +397,14 @@ export default function MapPage() {
   }, [])
 
   const suggestions = useMemo(() => {
-    const q = searchTerm.trim().toLowerCase()
-    if (!q) return []
-    return storesWithCoords.filter((s) => (s.name || '').toLowerCase().includes(q))
-  }, [searchTerm, storesWithCoords])
+    const queryMeta = createSearchQueryMeta(searchTerm)
+    if (!queryMeta.term) return []
+
+    return indexedMapStores
+      .filter((entry) => matchesSearchQuery(entry, queryMeta))
+      .map((entry) => entry.store)
+      .slice(0, 25)
+  }, [indexedMapStores, searchTerm])
 
   const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
 
@@ -725,6 +579,7 @@ export default function MapPage() {
           if (store) {
             const [lng, lat] = f.geometry.coordinates
             map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 })
+            setHighlightedStoreId(String(storeId))
             setSelectedStore(store)
           }
         })
@@ -773,6 +628,8 @@ export default function MapPage() {
     return () => {
       cancelled = true
       if (popupRef.current) popupRef.current.remove()
+      if (activeMap) removeMarkerImages(activeMap, activeMarkerImageIdsRef.current)
+      activeMarkerImageIdsRef.current = new Set()
       if (activeMap) activeMap.remove()
       mapRef.current = null
       setMapReady(false)
@@ -885,42 +742,47 @@ export default function MapPage() {
     const source = map.getSource('stores')
     if (!source) return
 
-    const features = visibleMapStores.map((store) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [store.coords.lng, store.coords.lat] },
-      properties: {
-        storeId: String(store.id),
-        name: store.name || 'Cửa hàng',
-        shortName: getFirstWord(store.name),
-        address: formatAddressParts(store),
-        routeOrder: routeStopOrderById.get(String(store.id)) || '',
-        passed: completedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
-      },
-    }))
+    source.setData({ type: 'FeatureCollection', features: storeFeatures })
 
-    source.setData({ type: 'FeatureCollection', features })
-
-    // Add marker images in small batches to reduce main-thread blocking
+    const desiredImageIds = new Set()
     const pendingImages = []
-    for (const feature of features) {
+    for (const feature of storeFeatures) {
+      const storeId = feature.properties.storeId
       const routeOrder = feature.properties.routeOrder || ''
-      const imgId = routeOrder
-        ? `smr-${feature.properties.storeId}-${routeOrder}`
-        : `sm-${feature.properties.storeId}`
-      if (!map.hasImage(imgId)) {
-        pendingImages.push({
-          imgId,
-          text: feature.properties.name,
-          routeOrder,
-        })
+      const name = feature.properties.name || 'Cửa hàng'
+      const highlighted = feature.properties.highlighted === 'yes'
+      const baseImageId = getBaseMarkerImageId(storeId, routeOrder)
+
+      desiredImageIds.add(baseImageId)
+      if (!map.hasImage(baseImageId)) {
+        pendingImages.push({ storeId, text: name, routeOrder, highlighted: false })
+      }
+
+      if (highlighted) {
+        const highlightedImageId = getHighlightedMarkerImageId(storeId, routeOrder)
+        desiredImageIds.add(highlightedImageId)
+        if (!map.hasImage(highlightedImageId)) {
+          pendingImages.push({ storeId, text: name, routeOrder, highlighted: true })
+        }
       }
     }
-
-    if (pendingImages.length === 0) return
 
     let frameId = 0
     let cancelled = false
     let index = 0
+
+    const removeStaleImages = () => {
+      const staleImageIds = Array.from(activeMarkerImageIdsRef.current).filter((imageId) => !desiredImageIds.has(imageId))
+      if (staleImageIds.length > 0) {
+        removeMarkerImages(map, staleImageIds)
+      }
+      activeMarkerImageIdsRef.current = desiredImageIds
+    }
+
+    if (pendingImages.length === 0) {
+      removeStaleImages()
+      return undefined
+    }
 
     const flushImageBatch = () => {
       if (cancelled) return
@@ -928,14 +790,15 @@ export default function MapPage() {
       const batchEnd = Math.min(index + 18, pendingImages.length)
       for (; index < batchEnd; index += 1) {
         const item = pendingImages[index]
-        if (map.hasImage(item.imgId)) continue
-        const img = getOrCreateStoreMarkerImage(item.text, 13, 9, false, item.routeOrder)
-        map.addImage(item.imgId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+        ensureStoreMarkerImage(map, item)
       }
 
       if (index < pendingImages.length) {
         frameId = window.requestAnimationFrame(flushImageBatch)
+        return
       }
+
+      removeStaleImages()
     }
 
     frameId = window.requestAnimationFrame(flushImageBatch)
@@ -944,7 +807,7 @@ export default function MapPage() {
       cancelled = true
       if (frameId) window.cancelAnimationFrame(frameId)
     }
-  }, [completedRouteStopIdSet, mapReady, routeStopOrderById, visibleMapStores])
+  }, [mapReady, storeFeatures, visibleMapStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -1456,61 +1319,25 @@ export default function MapPage() {
     if (!store?.coords) return
     const map = mapRef.current
     if (!map) return
+
+    setHighlightedStoreId(String(store.id))
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
-
-    // Generate highlighted image if not already cached
-    const hlId = `smh-${store.id}`
-    const routeOrder = routeStopOrderById.get(String(store.id)) || ''
-    const highlightedImageId = routeOrder ? `smrh-${store.id}-${routeOrder}` : hlId
-    if (!map.hasImage(highlightedImageId)) {
-      const img = getOrCreateStoreMarkerImage(store.name || 'Cửa hàng', 13, 9, true, routeOrder)
-      map.addImage(highlightedImageId, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
-    }
-
-    // Update features: set highlighted property and move highlighted store to end (renders on top)
-    highlightedStoreIdRef.current = String(store.id)
-    const source = map.getSource('stores')
-    if (source) {
-      const storeId = String(store.id)
-      const features = filteredStores.map((s) => ({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [s.coords.lng, s.coords.lat] },
-        properties: {
-          storeId: String(s.id),
-          name: s.name || 'Cửa hàng',
-          shortName: getFirstWord(s.name),
-          address: formatAddressParts(s),
-          routeOrder: routeStopOrderById.get(String(s.id)) || '',
-          passed: completedRouteStopIdSet.has(String(s.id)) ? 'yes' : 'no',
-          highlighted: String(s.id) === storeId ? 'yes' : 'no',
-        },
-      }))
-      // Move highlighted to end so it renders on top
-      const hlIdx = features.findIndex((f) => f.properties.storeId === storeId)
-      if (hlIdx >= 0) {
-        const [hl] = features.splice(hlIdx, 1)
-        features.push(hl)
-      }
-      source.setData({ type: 'FeatureCollection', features })
-    }
 
     setShowSuggestions(false)
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [completedRouteStopIdSet, filteredStores, routeStopOrderById])
+  }, [])
 
   const handleSearch = useCallback(() => {
-    const query = searchTerm.trim().toLowerCase()
-    if (!query) return
+    const queryMeta = createSearchQueryMeta(searchTerm)
+    if (!queryMeta.term) return
 
-    const matched = storesWithCoords.find((store) => {
-      const name = (store.name || '').toLowerCase()
-      return name === query || name.includes(query)
-    })
+    const matchedEntry = indexedMapStores.find((entry) => matchesSearchQuery(entry, queryMeta))
+    const matched = matchedEntry?.store || null
 
     if (matched) flyToStore(matched)
     setShowSuggestions(false)
-  }, [searchTerm, storesWithCoords, flyToStore])
+  }, [flyToStore, indexedMapStores, searchTerm])
 
   const setMapBearing = useCallback((bearing) => {
     const map = mapRef.current
@@ -1823,6 +1650,7 @@ export default function MapPage() {
     const matched = storesWithCoords.find((store) => String(store.id) === initialStoreId)
     if (!matched) return
 
+    setHighlightedStoreId(initialStoreId)
     flyToStore(matched)
   }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
 

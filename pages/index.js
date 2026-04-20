@@ -11,8 +11,8 @@ import Link from 'next/link'
 import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
-import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { parseCoordinate } from '@/helper/coordinate'
+import { buildStoreSearchIndex, createSearchQueryMeta, getSearchScore } from '@/helper/storeSearch'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -374,78 +374,60 @@ export default function HomePage() {
   }, [applyStoreChange, loadAllStores])
 
   // Local filtering
+  const indexedStores = useMemo(() => buildStoreSearchIndex(allStores, {
+    getHasCoords: hasStoreCoordinates,
+  }), [allStores])
+
   const searchResults = useMemo(() => {
     if (!storesLoaded) return []
 
-    let results = allStores
-    const hasTextSearch = Boolean(searchTerm.trim())
+    let results = indexedStores
+    const queryMeta = createSearchQueryMeta(searchTerm)
+    const hasTextSearch = Boolean(queryMeta.term)
 
     // District filter
     if (selectedDistrict) {
-      results = results.filter((s) => s.district === selectedDistrict)
+      results = results.filter(({ store }) => store.district === selectedDistrict)
     }
     // Ward filter
     if (selectedWard) {
-      results = results.filter((s) => s.ward === selectedWard)
+      results = results.filter(({ store }) => store.ward === selectedWard)
     }
     if (selectedStoreTypes.length > 0) {
-      results = results.filter((s) => selectedStoreTypes.includes(s.store_type || ''))
+      results = results.filter(({ store }) => selectedStoreTypes.includes(store.store_type || ''))
     }
     if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)) {
-      results = results.filter((s) => Boolean(String(s.phone || '').trim()))
+      results = results.filter((entry) => entry.hasPhone)
     }
     if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE)) {
-      results = results.filter((s) => Boolean(String(s.image_url || '').trim()))
+      results = results.filter((entry) => entry.hasImage)
     }
     if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION)) {
-      results = results.filter((s) => !hasStoreCoordinates(s))
+      results = results.filter((entry) => !entry.hasCoords)
     }
     if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)) {
-      results = results.filter((s) => Boolean(s.is_potential))
+      results = results.filter(({ store }) => Boolean(store.is_potential))
     }
-    // Text search (supports Vietnamese without tones + any word order)
+
     if (hasTextSearch) {
-      const term = searchTerm.trim().toLowerCase()
-      const normTerm = removeVietnameseTones(term)
-      const phoneticTerm = normalizeVietnamesePhonetics(term)
-      // Split into individual words for word-order-independent matching
-      const words = normTerm.split(/\s+/).filter(Boolean)
-      const phoneticWords = phoneticTerm.split(/\s+/).filter(Boolean)
-
-      // Score: 2 = exact substring match, 1 = all words present (any order), 0 = any word present
       results = results
-        .map((s) => {
-          const name = (s.name || '').toLowerCase()
-          const normName = removeVietnameseTones(name)
-          const phoneticName = normalizeVietnamesePhonetics(name)
-
-          const hasExactLike = name.includes(term) || normName.includes(normTerm) || phoneticName.includes(phoneticTerm)
-          if (hasExactLike) return { ...s, _score: 2 }
-
-          const allWordsMatch = words.length > 1 && words.every((w, idx) => {
-            const phoneticWord = phoneticWords[idx] || normalizeVietnamesePhonetics(w)
-            return normName.includes(w) || phoneticName.includes(phoneticWord)
-          })
-          if (allWordsMatch) return { ...s, _score: 1 }
-
-          const anyWordMatch = words.some((w, idx) => {
-            const phoneticWord = phoneticWords[idx] || normalizeVietnamesePhonetics(w)
-            return normName.includes(w) || phoneticName.includes(phoneticWord)
-          })
-          if (anyWordMatch) return { ...s, _score: 0 }
-          return null
+        .map((entry) => {
+          const score = getSearchScore(entry, queryMeta)
+          if (score == null) return null
+          return { entry, score }
         })
         .filter(Boolean)
+    } else {
+      results = results.map((entry) => ({ entry, score: 2 }))
     }
 
-    // Add distance
     const refLoc = currentLocation
-    results = results.map((s) => ({
-      ...s,
-      distance: computeDistance(s, refLoc)
+    results = results.map(({ entry, score }) => ({
+      ...entry.store,
+      _score: score,
+      distance: computeDistance(entry.store, refLoc)
     }))
 
-    // Sort: match score first (if any), then near-to-far, then active, then newest
     results = results.slice().sort((a, b) => {
       if (hasTextSearch) {
         const sa = a._score ?? 2
@@ -467,7 +449,7 @@ export default function HomePage() {
 
     return results
   }, [
-    allStores,
+    indexedStores,
     storesLoaded,
     searchTerm,
     selectedDistrict,
@@ -770,10 +752,10 @@ export default function HomePage() {
                 ref={virtuosoRef}
                 style={{ height: '100%' }}
                 data={searchResults}
-                computeItemKey={(index, item) => `${item.id}:${item.distance == null ? 'x' : item.distance.toFixed(3)}`}
+                computeItemKey={(index, item) => String(item.id)}
                 overscan={300}
                 itemContent={(index, store) => (
-                  <div className="mb-3" key={`${store.id}-${store.distance == null ? 'x' : store.distance.toFixed(3)}`}>
+                  <div className="mb-3" key={store.id}>
                     <SearchStoreCard
                       store={store}
                       distance={store.distance}

@@ -11,10 +11,11 @@ import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
+import { buildStoreDiff, logStoreEditHistoryBatch } from '@/lib/storeEditHistory'
 
 export default function VerifyStorePage() {
   const router = useRouter()
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
+  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
 
   const [pageReady, setPageReady] = useState(false)
   const [stores, setStores] = useState([])
@@ -184,6 +185,25 @@ export default function VerifyStorePage() {
       return next
     })
     await updateStoresInCache(ids.map((storeId) => ({ id: storeId, active: true, updated_at: updatedAt })))
+
+    try {
+      const beforeById = new Map(stores.map((s) => [String(s?.id), s]))
+      const rows = ids.map((storeId) => {
+        const before = beforeById.get(String(storeId)) || {}
+        const changes = buildStoreDiff(before, { active: true })
+        return {
+          store_id: storeId,
+          action_type: 'verify',
+          actor_user_id: user?.id,
+          actor_role: 'admin',
+          changes,
+        }
+      })
+      await logStoreEditHistoryBatch(rows)
+    } catch (err) {
+      console.error('store_edit_history verify batch failed:', err)
+    }
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('storevis:stores-changed', {
