@@ -41,8 +41,9 @@ export default async function handler(req, res) {
     const users = []
     const perPage = 100
     let page = 1
+    const maxPages = 200 // safety cap: 20,000 users
 
-    while (true) {
+    while (page <= maxPages) {
       const { data, error: usersError } = await adminSupabase.auth.admin.listUsers({ page, perPage })
 
       if (usersError) {

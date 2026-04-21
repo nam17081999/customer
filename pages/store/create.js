@@ -265,7 +265,6 @@ export default function AddStore() {
       if (nearestLocationPrefilledRef.current || district.trim() || ward.trim()) {
         return
       }
-      if (districtRef.current.trim() || wardRef.current.trim()) return
       setDistrict(nextDistrict)
       setWard(nextWard)
       setFieldErrors((prev) => ({
