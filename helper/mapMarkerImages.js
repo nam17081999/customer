@@ -199,12 +199,6 @@ export function createUserHeadingFanImage() {
   ctx.lineWidth = 2.2 * dpr
   ctx.stroke()
 
-  ctx.beginPath()
-  ctx.moveTo(center, center)
-  ctx.arc(center, center, outerRadius * 0.72, startInner, endInner)
-  ctx.closePath()
-  ctx.fillStyle = 'rgba(96, 165, 250, 0.5)'
-  ctx.fill()
 
   ctx.beginPath()
   ctx.arc(center, center, innerRadius, 0, Math.PI * 2)
