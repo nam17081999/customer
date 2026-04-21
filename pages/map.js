@@ -180,6 +180,7 @@ export default function MapPage() {
   const [routePanelOpen, setRoutePanelOpen] = useState(false)
   const [hideUnselectedStores, setHideUnselectedStores] = useState(false)
   const [routeStopStatusById, setRouteStopStatusById] = useState({})
+  const [navLoading, setNavLoading] = useState(false)
   const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
   const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
   const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
@@ -1453,37 +1454,43 @@ export default function MapPage() {
     const map = mapRef.current
     if (!map) return
 
-    const headingResult = await requestCompassHeading({ requestPermission: true }).catch(() => ({ heading: null, error: '' }))
-    let heading = normalizeHeading(headingResult?.heading ?? currentLocation?.heading ?? pendingHeadingRef.current)
-    if (heading != null) {
-      pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
-      heading = pendingHeadingRef.current
-      setUserLocation((prev) => (prev ? { ...prev, heading } : prev))
-    }
-    if (headingResult?.error && heading == null) {
-      setLocationError(headingResult.error)
-    }
+    setNavLoading(true)
+    try {
+      const headingResult = await requestCompassHeading({ requestPermission: true }).catch(() => ({ heading: null, error: '' }))
+      let heading = normalizeHeading(headingResult?.heading ?? currentLocation?.heading ?? pendingHeadingRef.current)
+      if (heading != null) {
+        pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
+        heading = pendingHeadingRef.current
+        setUserLocation((prev) => (prev ? { ...prev, heading } : prev))
+      }
+      if (headingResult?.error && heading == null) {
+        setLocationError(headingResult.error)
+      }
 
-    if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
-      setLocationError('Không lấy được hướng hiện tại của thiết bị.')
-      return
-    }
+      if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
+        setLocationError('Không lấy được hướng hiện tại của thiết bị.')
+        return
+      }
 
-    followUserHeadingRef.current = true
-    setFollowUserHeading(true)
-    if (!headingResult?.error || heading != null) {
-      setLocationError('')
-    }
-    setSelectedStore(null)
-    map.stop()
-    map.easeTo({
-      center: [currentLocation.longitude, currentLocation.latitude],
-      bearing: pendingHeadingRef.current ?? heading ?? 0,
-      duration: 900,
-      essential: true,
-    })
-    if (routeStops.length > 0 && routeGeojson.features.length === 0) {
-      buildRoute()
+      followUserHeadingRef.current = true
+      setFollowUserHeading(true)
+      if (routeStops.length > 0) setHideUnselectedStores(true)
+      if (!headingResult?.error || heading != null) {
+        setLocationError('')
+      }
+      setSelectedStore(null)
+      map.stop()
+      map.easeTo({
+        center: [currentLocation.longitude, currentLocation.latitude],
+        bearing: pendingHeadingRef.current ?? heading ?? 0,
+        duration: 900,
+        essential: true,
+      })
+      if (routeStops.length > 0 && routeGeojson.features.length === 0) {
+        buildRoute()
+      }
+    } finally {
+      setNavLoading(false)
     }
   }, [buildRoute, followUserHeading, routeGeojson.features.length, routeStops.length, setMapBearing, userLocation])
 
@@ -1725,6 +1732,19 @@ export default function MapPage() {
       {/* Map area */}
       <div className="relative flex-1 h-full">
         <div ref={mapContainerRef} className="absolute inset-0" />
+
+        {/* Dark loading overlay */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950 transition-opacity duration-500"
+          style={{ opacity: mapReady ? 0 : 1 }}
+        >
+          <svg className="h-8 w-8 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-60" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <p className="mt-3 text-sm text-slate-500">Đang tải bản đồ…</p>
+        </div>
 
         {!showNavigationInfoPanel && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
@@ -2091,18 +2111,28 @@ export default function MapPage() {
               <button
                 type="button"
                 onClick={toggleUserHeadingRotation}
-                title={followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
-                aria-label={followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+                disabled={navLoading}
+                title={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+                aria-label={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
                 aria-pressed={followUserHeading}
                 className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur transition ${
-                  followUserHeading
+                  navLoading
+                    ? 'border-sky-400/50 bg-sky-500/10 text-sky-300 opacity-80 cursor-wait'
+                    : followUserHeading
                     ? 'border-sky-400 bg-sky-500/20 text-sky-100'
                     : 'border-slate-600/70 bg-slate-950/90 text-slate-100 hover:border-sky-400 hover:text-sky-300'
                 }`}
               >
-                <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-9 16-7-7 16-1.7-6.3L9 20z" />
-                </svg>
+                {navLoading ? (
+                  <svg className="h-4.5 w-4.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-9 16-7-7 16-1.7-6.3L9 20z" />
+                  </svg>
+                )}
               </button>
             )}
             {!showNavigationInfoPanel && (
