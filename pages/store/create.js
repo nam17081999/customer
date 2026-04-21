@@ -250,7 +250,7 @@ export default function AddStore() {
           }
         })
         .filter(Boolean)
-      .sort((a, b) => a.distance - b.distance)[0]
+        .sort((a, b) => a.distance - b.distance)[0]
 
       if (!nearestStore) return
       if (districtRef.current.trim() || wardRef.current.trim()) return
@@ -638,11 +638,11 @@ export default function AddStore() {
       })
       return true
     }
-    
+
     // Yêu cầu lấy hướng/la bàn ngay lập tức tại đây vì iOS/Safari chỉ cho prompt quyền trong user gesture (click/tap)
     compassOnceRef.current = false
     refreshCompassHeading({ requestPermission: true })
-    
+
     setCurrentStep(3)
     return true
   }
@@ -821,10 +821,10 @@ export default function AddStore() {
       let insertedRows = null
       let insertError = null
 
-      ;({ data: insertedRows, error: insertError } = await supabase
-        .from('stores')
-        .insert([insertPayload])
-        .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note'))
+        ; ({ data: insertedRows, error: insertError } = await supabase
+          .from('stores')
+          .insert([insertPayload])
+          .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note'))
 
       if (insertError) {
         console.error(insertError)
@@ -1018,11 +1018,10 @@ export default function AddStore() {
                           type="button"
                           onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
                           aria-pressed={selected}
-                          className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
-                            selected
+                          className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${selected
                               ? 'border-blue-500 bg-blue-500/10 text-blue-100'
                               : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                          }`}
+                            }`}
                         >
                           {type.label}
                         </button>
@@ -1064,11 +1063,10 @@ export default function AddStore() {
                         type="button"
                         onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
                         aria-pressed={selected}
-                        className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
-                          selected
+                        className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${selected
                             ? 'border-blue-500 bg-blue-500/10 text-blue-100'
                             : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                        }`}
+                          }`}
                       >
                         {type.label}
                       </button>
@@ -1100,7 +1098,7 @@ export default function AddStore() {
             </>
           )}
 
-            {/* Step 2: Address + Optional info */}
+          {/* Step 2: Address + Optional info */}
           {currentStep === 2 && (
             <>
               {/* Quận/Huyện */}
@@ -1112,8 +1110,8 @@ export default function AddStore() {
                       key={d}
                       type="button"
                       className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(d).toLowerCase()
-                          ? 'bg-blue-600 text-white border border-blue-600'
-                          : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
+                        ? 'bg-blue-600 text-white border border-blue-600'
+                        : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                         }`}
                       onClick={() => {
                         setDistrict(d)
@@ -1140,8 +1138,8 @@ export default function AddStore() {
                         key={w}
                         type="button"
                         className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(w).toLowerCase()
-                            ? 'bg-blue-600 text-white border border-blue-600'
-                            : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
+                          ? 'bg-blue-600 text-white border border-blue-600'
+                          : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                           }`}
                         onClick={() => {
                           setWard(w)

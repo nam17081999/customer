@@ -90,6 +90,12 @@ export default function AccountScreen() {
                       <Button asChild variant="outline">
                         <Link href="/store/export">Màn xuất dữ liệu</Link>
                       </Button>
+                      <Button asChild variant="outline">
+                        <Link href="/admin/users">Quản lý tài khoản</Link>
+                      </Button>
+                      <Button asChild variant="outline">
+                        <Link href="/store/deduplicate">Gộp cửa hàng trùng lặp</Link>
+                      </Button>
                     </>
                   )}
                 </div>
