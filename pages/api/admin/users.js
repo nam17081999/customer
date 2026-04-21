@@ -37,11 +37,26 @@ export default async function handler(req, res) {
     // Initialize Admin Supabase
     const adminSupabase = getSupabaseAdmin()
 
-    // Get users
-    const { data: { users }, error: usersError } = await adminSupabase.auth.admin.listUsers()
+    // Get users (paginate to retrieve all)
+    const users = []
+    const perPage = 100
+    let page = 1
 
-    if (usersError) {
-      throw usersError
+    while (true) {
+      const { data, error: usersError } = await adminSupabase.auth.admin.listUsers({ page, perPage })
+
+      if (usersError) {
+        throw usersError
+      }
+
+      const pageUsers = data?.users ?? []
+      users.push(...pageUsers)
+
+      if (pageUsers.length < perPage) {
+        break
+      }
+
+      page += 1
     }
 
     const mappedUsers = users.map(u => ({

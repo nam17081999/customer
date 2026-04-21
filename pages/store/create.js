@@ -235,28 +235,36 @@ export default function AddStore() {
     nearestLocationPrefillRunningRef.current = true
     try {
       const stores = await getOrRefreshStores()
-      const nearestStore = stores
-        .map((store) => {
-          const storeLat = parseCoordinate(store?.latitude)
-          const storeLng = parseCoordinate(store?.longitude)
-          const storeDistrict = String(store?.district || '').trim()
-          const storeWard = String(store?.ward || '').trim()
-          if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng) || !storeDistrict || !storeWard) {
-            return null
-          }
+      const nearestStore = stores.reduce((nearest, store) => {
+        const storeLat = parseCoordinate(store?.latitude)
+        const storeLng = parseCoordinate(store?.longitude)
+        const storeDistrict = String(store?.district || '').trim()
+        const storeWard = String(store?.ward || '').trim()
+
+        if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng) || !storeDistrict || !storeWard) {
+          return nearest
+        }
+
+        const distance = haversineKm(originLat, originLng, storeLat, storeLng)
+
+        if (!nearest || distance < nearest.distance) {
           return {
             store,
-            distance: haversineKm(originLat, originLng, storeLat, storeLng),
+            distance,
           }
-        })
-        .filter(Boolean)
-        .sort((a, b) => a.distance - b.distance)[0]
+        }
 
+        return nearest
+      }, null)
       if (!nearestStore) return
       if (districtRef.current.trim() || wardRef.current.trim()) return
       const nextDistrict = toTitleCaseVI(String(nearestStore.store.district || '').trim())
       const nextWard = toTitleCaseVI(String(nearestStore.store.ward || '').trim())
 
+      // Re-check before applying prefill to avoid overwriting user input typed during async fetch
+      if (nearestLocationPrefilledRef.current || district.trim() || ward.trim()) {
+        return
+      }
       if (districtRef.current.trim() || wardRef.current.trim()) return
       setDistrict(nextDistrict)
       setWard(nextWard)

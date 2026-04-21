@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from '@/lib/AuthContext'
@@ -132,7 +132,7 @@ export default function DeduplicatePage() {
 
     if (!primaryStore || secondaryStores.length === 0) return
 
-    setActionLoading(prev => ({ ...prev, [clusterIndex]: true }))
+    setActionLoading(prev => ({ ...prev, [primaryStoreId]: true }))
     setError('')
     setMessage('')
 
@@ -160,9 +160,11 @@ export default function DeduplicatePage() {
          if (updatesTemp.phone !== phonesArr[1]) updatesTemp.phone_secondary = phonesArr[1]
       }
 
-      // location merging
-      if (!Number.isFinite(parseCoordinate(primaryStore.latitude))) {
-         const secWithLoc = secondaryStores.find(s => Number.isFinite(parseCoordinate(s.latitude)))
+      // location merging - treat lat/lng as a pair; validate both before using
+      if (!Number.isFinite(parseCoordinate(primaryStore.latitude)) || !Number.isFinite(parseCoordinate(primaryStore.longitude))) {
+         const secWithLoc = secondaryStores.find(s =>
+           Number.isFinite(parseCoordinate(s.latitude)) && Number.isFinite(parseCoordinate(s.longitude))
+         )
          if (secWithLoc) {
             updatesTemp.latitude = secWithLoc.latitude
             updatesTemp.longitude = secWithLoc.longitude
@@ -208,7 +210,7 @@ export default function DeduplicatePage() {
       console.error(err)
       setError('Hợp nhất thất bại, vui lòng kiểm tra kết nối mạng.')
     } finally {
-      setActionLoading(prev => ({ ...prev, [clusterIndex]: false }))
+      setActionLoading(prev => ({ ...prev, [primaryStoreId]: false }))
     }
   }
 
@@ -271,7 +273,7 @@ export default function DeduplicatePage() {
 
           <div className="space-y-6">
             {clusters.map((cluster, cIndex) => {
-               const isLoading = actionLoading[cIndex]
+               const isLoading = cluster.some(s => actionLoading[s.id])
                return (
                   <div key={cIndex} className="p-3 bg-gray-900/40 rounded-xl border border-gray-800 space-y-3">
                      <div className="text-sm font-semibold text-gray-300">Nhóm {cIndex + 1}</div>

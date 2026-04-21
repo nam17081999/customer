@@ -31,6 +31,15 @@ export default async function handler(req, res) {
     // Verify the caller's role
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!supabaseUrl) {
+      return res.status(500).json({ error: 'Hệ thống thiếu biến môi trường NEXT_PUBLIC_SUPABASE_URL. Vui lòng bổ sung vào .env.' })
+    }
+
+    if (!supabaseAnonKey) {
+      return res.status(500).json({ error: 'Hệ thống thiếu biến môi trường NEXT_PUBLIC_SUPABASE_ANON_KEY. Vui lòng bổ sung vào .env.' })
+    }
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey)
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token)
 
