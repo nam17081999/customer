@@ -56,13 +56,16 @@ export default function StoreSupplementForm({
   supplementLocks,
   pickedLat,
   pickedLng,
-  locationSectionOpen,
-  openLocationSection,
   onLocationChange,
   mapEditable,
   setMapEditable,
+  mapKey,
+  heading,
+  compassError,
+  geoBlocked,
   resolvingAddr,
   handleGetLocation,
+  onReload,
   mapsLink,
   mapsLinkLoading,
   mapsLinkError,
@@ -343,66 +346,80 @@ export default function StoreSupplementForm({
 
           {currentStep === 3 && (
             <>
-              {!locationSectionOpen && pickedLat == null && pickedLng == null ? (
-                <div className="flex min-h-[45vh] flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-gray-700 bg-gray-900/50 px-5 py-10 text-center">
-                  <Button type="button" className="h-11 px-6" onClick={openLocationSection}>
-                    Thêm vị trí
-                  </Button>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-gray-200">Nếu không thêm vị trí, hãy bấm hoàn thành bổ sung.</p>
-                    <p className="text-sm text-gray-400">Bạn có thể bỏ qua bước này nếu chưa xác định được vị trí chính xác.</p>
-                  </div>
+              {resolvingAddr && (
+                <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
+                  <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
                 </div>
-              ) : (
-                <>
-                  {resolvingAddr && (
-                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
-                      <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
-                    </div>
-                  )}
-
-                  {!resolvingAddr && pickedLat != null && pickedLng != null && (
-                    <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
-                      <p className="text-sm text-green-700 dark:text-green-300">
-                        Đã xác định vị trí. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
-                    <StoreLocationPicker
-                      initialLat={pickedLat}
-                      initialLng={pickedLng}
-                      onChange={onLocationChange}
-                      editable={mapEditable}
-                      onToggleEditable={() => setMapEditable((value) => !value)}
-                      onGetLocation={handleGetLocation}
-                      height="65vh"
-                      resolvingAddr={resolvingAddr}
-                      dark={false}
-                    />
-                  </div>
-
-                  <div className="space-y-2 pt-2">
-                    <StoreMapsLinkFields
-                      value={mapsLink}
-                      loading={mapsLinkLoading}
-                      error={mapsLinkError}
-                      mobile
-                      onChange={setMapsLink}
-                      onSubmit={() => handleMapsLink(mapsLink)}
-                    />
-                  </div>
-                </>
               )}
+
+              {!resolvingAddr && pickedLat != null && pickedLng != null && !geoBlocked && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    Đã xác định vị trí. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.
+                  </p>
+                </div>
+              )}
+
+              {geoBlocked && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-800 dark:bg-red-900/20">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    Không lấy được vị trí GPS. Hãy bấm <strong>Lấy lại vị trí</strong> hoặc dán link Google Maps bên dưới.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <StoreLocationPicker
+                  mapKey={`step2-${mapKey}`}
+                  initialLat={pickedLat}
+                  initialLng={pickedLng}
+                  onChange={onLocationChange}
+                  editable={mapEditable}
+                  onToggleEditable={() => setMapEditable((value) => !value)}
+                  onGetLocation={handleGetLocation}
+                  heading={heading}
+                  height="65vh"
+                  compassError={compassError}
+                  geoBlocked={geoBlocked}
+                  onReload={onReload}
+                  resolvingAddr={resolvingAddr}
+                  dark={false}
+                />
+              </div>
+
+              <div className="pt-2 md:hidden space-y-2">
+                <StoreMapsLinkFields
+                  value={mapsLink}
+                  loading={mapsLinkLoading}
+                  error={mapsLinkError}
+                  mobile
+                  onChange={setMapsLink}
+                  onSubmit={() => handleMapsLink(mapsLink)}
+                />
+              </div>
+
+              <div className="hidden md:block pt-2 space-y-1.5">
+                <StoreMapsLinkFields
+                  value={mapsLink}
+                  loading={mapsLinkLoading}
+                  error={mapsLinkError}
+                  onChange={setMapsLink}
+                  onSubmit={() => handleMapsLink(mapsLink)}
+                />
+              </div>
 
               <div className="hidden gap-2 pt-2 sm:flex">
                 <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
-                <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={handlePrimaryAction}
+                  disabled={saving || resolvingAddr || geoBlocked}
+                >
                   {renderPrimaryLabel()}
                 </Button>
               </div>
@@ -439,7 +456,7 @@ export default function StoreSupplementForm({
           {currentStep === 3 && (
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
-              <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
+              <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving || resolvingAddr || geoBlocked}>
                 {renderPrimaryLabel()}
               </Button>
             </div>

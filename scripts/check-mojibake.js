@@ -34,7 +34,6 @@ const SKIP_DIRS = new Set([
 ])
 
 const SKIP_FILES = new Set([
-  'docs/ai-rules.md',
   'scripts/check-mojibake.js',
 ])
 
@@ -58,6 +57,36 @@ const BAD_PATTERNS = [
   'â‰',
   '\uFFFD',
 ]
+
+const SUSPICIOUS_QUESTION_MARK_PATTERN = /\p{L}+\?+\p{L}+/u
+
+function findSuspiciousQuestionMarkToken(line) {
+  const tokens = line.split(/\s+/).filter(Boolean)
+  for (const token of tokens) {
+    if (
+      token.includes('http://') ||
+      token.includes('https://') ||
+      token.includes('/login?') ||
+      token.includes('/map?') ||
+      token.includes('?from=') ||
+      token.includes('?q=') ||
+      token.includes('?utm_') ||
+      token.includes('?sponsor=') ||
+      token.includes('router.replace(') ||
+      token.includes('router.push(') ||
+      token.includes('window.open(') ||
+      token.includes('href=') ||
+      token.includes('src=')
+    ) {
+      continue
+    }
+
+    if (/[/:=&$`{}()[\]<>]/.test(token)) continue
+    if (!SUSPICIOUS_QUESTION_MARK_PATTERN.test(token)) continue
+    return token
+  }
+  return null
+}
 
 function normalizeSlashes(input) {
   return input.split(path.sep).join('/')
@@ -125,6 +154,15 @@ function scanFile(relativePath) {
         })
         break
       }
+    }
+
+    const suspiciousToken = findSuspiciousQuestionMarkToken(line)
+    if (suspiciousToken) {
+      findings.push({
+        pattern: 'SUSPICIOUS_QUESTION_MARK',
+        line: index + 1,
+        excerpt: line.trim().slice(0, 180),
+      })
     }
   })
 

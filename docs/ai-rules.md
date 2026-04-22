@@ -21,10 +21,9 @@ Quy tắc bắt buộc khi sinh code cho project NPP Hà Công. Đọc file này
 - Tất cả file source/docs có tiếng Việt phải giữ **UTF-8**.
 - Ưu tiên `apply_patch` khi chỉ sửa một phần file có tiếng Việt.
 - Tránh rewrite cả file bằng PowerShell `Set-Content`, `Out-File`, hoặc pipeline text nếu chưa kiểm soát rõ encoding đầu ra.
-- Khi buộc phải tạo file mới, giữ literal tiếng Việt chuẩn trong source; không chấp nhận mojibake như `Ã`, `Ä`, `áº`, `á»`.
+- Khi buộc phải tạo file mới, giữ literal tiếng Việt chuẩn trong source; không chấp nhận các chuỗi mojibake phổ biến hay ký tự thay thế.
 - Trước khi commit, chạy `npm run text:check:staged`. Khi cần quét toàn repo, chạy `npm run text:check`.
 - Repo dùng hook `.githooks/pre-commit` để chặn commit nếu file staged còn dấu hiệu mojibake. Sau khi clone repo hoặc reset Git config cục bộ, chạy lại `npm run hooks:install`.
-- `docs/ai-rules.md` là ngoại lệ duy nhất có thể chứa ví dụ mojibake để minh họa rule cấm. Không dùng file này làm bằng chứng rằng repo còn lỗi encoding.
 - Sau khi sửa text tiếng Việt:
   1. kiểm tra lại `git diff`
   2. nếu là UI text, ưu tiên reload màn hình để xác nhận
@@ -187,13 +186,21 @@ const { coords, error } = await getBestPosition({ maxWaitTime: 2000, desiredAccu
 
 ```js
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { findNearbySimilarStores, findGlobalExactNameMatches, mergeDuplicateCandidates } from '@/helper/duplicateCheck'
+import { findStoreDuplicateCandidates } from '@/helper/duplicateCheck'
 
-const [near, global] = await Promise.all([
-  findNearbySimilarStores(lat, lng, name),
-  findGlobalExactNameMatches(name),
-])
-const dupes = mergeDuplicateCandidates(near, global, lat, lng)
+const dupes = await findStoreDuplicateCandidates({
+  name,
+  district,
+  ward,
+  addressDetail,
+  phone,
+  phoneSecondary,
+})
+
+// Rule hiện tại:
+// - certain duplicate: trùng số điện thoại
+// - possible duplicate: cùng xã hoặc xã lân cận trong cùng quận + trùng ít nhất 1 từ tên đã lọc từ rác
+// - không dùng bán kính để quyết định trùng
 ```
 
 ```js
@@ -306,12 +313,18 @@ if (!user) router.replace('/login?from=/account')
 - **Search card phone link**: vùng click gọi điện chỉ ôm đúng số điện thoại, không stretch ra khoảng trống bên phải.
 
 ```js
-// Duplicate panel ở `/store/create`
+// Duplicate panel ở step kiểm tra trùng của `/store/create`
 // nếu candidate chưa có vị trí thì card được phép truyền action phụ:
 <SearchStoreCard
   compact
   compactActionLabel="Bổ sung"
   onCompactAction={(store) => router.push(`/store/edit/${store.id}?mode=supplement`)}
+/>
+
+// Trong lúc check trùng ở bước 2, phải khóa toàn bộ form bằng overlay:
+<FullPageLoading
+  visible={loading || step2DuplicateLoading}
+  message={step2DuplicateLoading ? 'Đang kiểm tra tên trùng...' : 'Đang tạo cửa hàng…'}
 />
 ```
 

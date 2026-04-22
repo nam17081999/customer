@@ -10,20 +10,16 @@
 
 ---
 
-## 2. Tạo Cửa Hàng — 3 Bước
+## 2. Tạo Cửa Hàng — Luồng Từng Bước
 
 ### Bước 1: Tên
 - Chọn **loại cửa hàng** ở một khối riêng phía trên ô tên
 - Loại hiển thị dạng nút chọn, mobile hiển thị **2 loại / 1 hàng**
 - Mặc định loại = `Tạp hóa`
 - Giá trị loại lấy từ `STORE_TYPE_OPTIONS` trong `lib/constants.js`
+- Nút loại cửa hàng ở màn tạo dùng cùng icon meta với màn tìm kiếm (`getStoreTypeMeta()`)
 - Bắt buộc nhập tên
 - Tự động convert sang **Title Case VI** (`toTitleCaseVI()`)
-- **Kiểm tra trùng tên** (bắt buộc trước khi sang bước 2):
-  - `findNearbySimilarStores()`: bán kính 100m, ít nhất 1 từ khóa trùng
-  - `findGlobalExactNameMatches()`: toàn hệ thống, tất cả từ khóa trùng
-  - `mergeDuplicateCandidates(near, global, lat, lng)`: gộp 2 nguồn và bổ sung khoảng cách cho cả match toàn hệ thống nếu có tọa độ
-  - Nếu có → cảnh báo + cần xác nhận "Vẫn tạo" mới tiếp tục
 
 ### Bước 2: Thông Tin
 - **Bắt buộc**: Quận/Huyện + Xã/Phường (từ danh sách `DISTRICT_WARD_SUGGESTIONS`)
@@ -31,7 +27,8 @@
 - SĐT: format VN (`0xxx` hoặc `+84xxx`, 9-10 số sau prefix)
 - SĐT 2 chỉ hiển thị khi đã bắt đầu nhập SĐT 1
 - Không cho phép SĐT 2 trùng với SĐT 1
-- Khi bước 1 đã lấy được GPS để kiểm tra trùng, hệ thống sẽ tự prefill quận/huyện + xã/phường của cửa hàng gần nhất ngay trong nền, bất kể kết quả trùng hay không trùng; sang bước 2 thì field đã sẵn sàng nếu chưa bị nhập tay
+- Khi bấm **Tiếp theo** ở bước 2, hệ thống mới chạy duplicate check chính
+- Trong lúc check trùng ở bước 2, UI hiển thị **full-page loading** che toàn bộ form đang nhập
 - Với **telesale** (không phải admin), có nhánh **Lưu cửa hàng ở bước 2** (không cần bước 3):
   - vẫn bắt buộc `Quận/Huyện` + `Xã/Phường`
   - **bắt buộc** `SĐT 1` hợp lệ
@@ -39,17 +36,24 @@
   - store được tạo với `latitude = null`, `longitude = null`
   - store mới tạo mặc định `is_potential = true` (theo role telesale)
 
-### Bước 3: Vị Trí
-- Auto lấy GPS khi vào bước 3
+### Bước 3: Kiểm Tra Trùng (chỉ xuất hiện khi có candidate)
+- Màn tạo không còn UI step indicator; chỉ render nội dung của step hiện tại
+- Step này chỉ xuất hiện khi duplicate check ở bước 2 hoặc lúc lưu cuối phát hiện candidate
+- Danh sách nghi trùng vẫn hiển thị như flow cũ
+- Candidate còn thiếu dữ liệu có thể mở flow **Bổ sung**
+- Nhấn **Tiếp theo** để xác nhận vẫn tạo store mới
+
+### Bước 4: Vị Trí
+- Auto lấy GPS khi vào bước 4
 - User có thể: kéo map / paste Google Maps link / lấy GPS mới
 - Nếu là admin và đang dùng mobile, phần dán **Google Maps link** hiển thị mặc định ngay dưới bản đồ
 - **Ưu tiên tọa độ**: edited map > GPS ban đầu > GPS hiện tại
 
 ### Khi Submit
-1. Duplicate check lần cuối bằng tọa độ final
+1. Chạy validate dữ liệu cuối và duplicate check lại bằng cùng rule của bước 2 nếu chưa được người dùng xác nhận vượt qua
 2. INSERT Supabase (`active = isAdmin`, lưu thêm `store_type`)
 3. `appendStoreToCache(newStore)`
-4. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối theo tọa độ, vì store chưa có vị trí
+4. Ngoại lệ: nếu **Lưu luôn** ở bước 2 thì bỏ duplicate check cuối, vì người dùng đã xác nhận ở bước 2 và store chưa có vị trí
 
 ---
 
@@ -218,9 +222,15 @@ Bỏ qua các từ chung khi so sánh (`IGNORED_NAME_TERMS`):
 
 **Ví dụ**: "Cửa hàng Minh Anh" → từ khóa so sánh là **"Minh Anh"**
 
-**Khoảng cách trong duplicate check**:
-- Chỉ store có `latitude` và `longitude` hợp lệ mới được gắn `distance`
-- Store không có vị trí vẫn có thể xuất hiện trong match toàn hệ thống, nhưng **không được hiển thị khoảng cách giả**
+**Rule duplicate hiện tại**:
+- `certain duplicate`: trùng chính xác ít nhất 1 số điện thoại với store đang có
+- `possible duplicate`: cùng quận, và:
+  - cùng xã, hoặc
+  - xã lân cận theo draft map trong `helper/duplicateCheck.js`
+  - đồng thời trùng ít nhất 1 từ có nghĩa trong tên sau khi lọc từ rác
+- `address_detail` chỉ dùng để cộng điểm ưu tiên, không phải điều kiện bắt buộc để match
+- Không dùng bán kính/khoảng cách để quyết định trùng
+- Kết quả được sort ưu tiên: `certain` trước, rồi theo `duplicateScore`
 
 ---
 

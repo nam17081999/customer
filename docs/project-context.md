@@ -65,7 +65,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `lib/constants.js` | Danh sách huyện/xã cố định |
 | `helper/duplicateCheck.js` | Phát hiện cửa hàng trùng tên |
 | `helper/geolocation.js` | Lấy GPS, compass |
-| `pages/store/create.js` | Form tạo cửa hàng 3 bước |
+| `pages/store/create.js` | Form tạo cửa hàng theo luồng từng bước, chèn màn kiểm tra trùng khi cần |
 | `pages/store/edit/[id].js` | Chỉnh sửa store + chế độ `supplement` theo step để chỉ bổ sung dữ liệu còn thiếu |
 | `pages/store/import.js` | Nhập nhiều store từ CSV mẫu, preview lỗi và nghi trùng trước khi insert |
 | `pages/store/export.js` | Xuất CSV toàn bộ store đang có + VCF theo số điện thoại |
@@ -115,9 +115,9 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
 15. **`/store/create` bước 2 có nhánh lưu nhanh cho telesale**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.
-16. **`/store/create` bước 1-2**: bước 1 đã lấy GPS để check trùng; kết quả này được dùng để prefill quận/huyện + xã/phường của cửa hàng gần nhất trong nền trước khi sang bước 2.
-17. **Duplicate check**: store không có tọa độ vẫn có thể xuất hiện ở match toàn hệ thống nhưng không được có `distance` giả.
-18. **Duplicate panel**: candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
+16. **`/store/create` bước 2**: chỉ check trùng sau khi người dùng nhập xong thông tin và bấm **Tiếp theo**.
+17. **Duplicate check**: dùng `findStoreDuplicateCandidates()`; trùng chắc chắn nếu trùng số điện thoại, hoặc trùng khả nghi nếu cùng xã/xã lân cận trong cùng quận và trùng ít nhất 1 từ tên đã lọc từ rác; không dùng bán kính để quyết định trùng.
+18. **Duplicate panel**: chỉ xuất hiện khi có candidate; candidate còn thiếu dữ liệu có thể có nút `Bổ sung` để mở `/store/edit/[id]?mode=supplement`.
 19. **`/store/edit/[id]?mode=supplement`**: luôn bắt đầu từ bước 1, khóa dữ liệu đã có, chỉ cho nhập phần thiếu; nếu store đã có vị trí thì flow chỉ còn 2 bước, nếu chưa có vị trí thì bước 3 sẽ tự lấy GPS một lần; người chưa đăng nhập gửi `store_report`, admin thì cập nhật trực tiếp.
 20. **Layout desktop**: dùng `scrollbar-gutter: stable` để tránh xê dịch khi chuyển giữa trang có/không có scrollbar.
 21. **`/store/import`**: dùng file mẫu CSV, parse ở client và preview theo từng dòng trước khi insert; không import thẳng file chưa qua kiểm tra.

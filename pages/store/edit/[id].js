@@ -21,7 +21,7 @@ import {
 } from '@/lib/constants'
 import { toTitleCaseVI } from '@/lib/utils'
 import { findDuplicatePhoneStores, validateVietnamPhone } from '@/helper/validation'
-import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
+import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 
 const StoreLocationPicker = dynamic(
@@ -64,6 +64,10 @@ export default function EditStore() {
   const [userHasEditedMap, setUserHasEditedMap] = useState(false)
   const [mapEditable, setMapEditable] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
+  const [heading, setHeading] = useState(null)
+  const [compassError, setCompassError] = useState('')
+  const [geoBlocked, setGeoBlocked] = useState(false)
+  const [step2Key, setStep2Key] = useState(0)
 
 
   // Map link
@@ -76,7 +80,6 @@ export default function EditStore() {
   const [currentStep, setCurrentStep] = useState(1)
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMode, setSuccessMode] = useState('')
-  const [supplementLocationOpen, setSupplementLocationOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState({
     open: false,
     type: '',
@@ -84,7 +87,7 @@ export default function EditStore() {
   })
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
   const msgTimerRef = useRef(null)
-  const autoLocationRequestedRef = useRef(false)
+  const compassOnceRef = useRef(false)
 
   const pushSearchWithNotice = useCallback(async (text, type = 'success') => {
     if (typeof window !== 'undefined') {
@@ -98,14 +101,14 @@ export default function EditStore() {
     await router.push('/')
   }, [router])
 
-  function showMessage(type, text, duration = 3000) {
+  const showMessage = useCallback((type, text, duration = 3000) => {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
     setMsgState({ type, text, show: true })
     msgTimerRef.current = setTimeout(
       () => setMsgState((s) => ({ ...s, show: false })),
       duration
     )
-  }
+  }, [])
 
   // Auth guard
   useEffect(() => {
@@ -150,8 +153,9 @@ export default function EditStore() {
       setCurrentStep(1)
       setShowSuccess(false)
       setSuccessMode('')
-      setSupplementLocationOpen(false)
-      autoLocationRequestedRef.current = false
+      setHeading(null)
+      setCompassError('')
+      compassOnceRef.current = false
     }
     fetchStore()
   }, [router.isReady, id, pageReady])
@@ -166,6 +170,8 @@ export default function EditStore() {
 
   const handleGetLocation = useCallback(async () => {
     try {
+      compassOnceRef.current = false
+      refreshCompassHeading({ requestPermission: true })
       setResolvingAddr(true)
       const { coords, error } = await getBestPosition({
         maxWaitTime: 2000,
@@ -173,9 +179,11 @@ export default function EditStore() {
         skipCache: true,
       })
       if (!coords) {
+        setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
         return
       }
+      setGeoBlocked(false)
       setInitialGPSLat(coords.latitude)
       setInitialGPSLng(coords.longitude)
       setPickedLat(coords.latitude)
@@ -184,23 +192,27 @@ export default function EditStore() {
       showMessage('success', 'Đã cập nhật vị trí GPS mới!')
     } catch (err) {
       console.error('Get location error:', err)
+      setGeoBlocked(true)
       showMessage('error', getGeoErrorMessage(err))
     } finally {
       setResolvingAddr(false)
     }
   }, [showMessage])
 
-  useEffect(() => {
-    if (!pageReady || !store || !isSupplementMode) return
-    if (autoLocationRequestedRef.current) return
-    if (currentStep !== 3) return
-    if (!supplementLocationOpen) return
-    if (hasStoreCoordinates(store)) return
-    if (pickedLat != null && pickedLng != null) return
-
-    autoLocationRequestedRef.current = true
-    handleGetLocation()
-  }, [pageReady, store, isSupplementMode, currentStep, supplementLocationOpen, pickedLat, pickedLng, handleGetLocation])
+  async function refreshCompassHeading({ requestPermission = false } = {}) {
+    if (compassOnceRef.current) return
+    compassOnceRef.current = true
+    setCompassError('')
+    try {
+      const { heading: nextHeading, error } = await requestCompassHeading({ requestPermission })
+      if (error) setCompassError(error)
+      if (nextHeading != null) {
+        setHeading((prev) => (prev === nextHeading ? nextHeading + 0.000001 : nextHeading))
+      }
+    } catch {
+      // keep map usable even when heading permission is denied
+    }
+  }
 
   // Ward suggestions for selected district
   const wardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
@@ -232,6 +244,23 @@ export default function EditStore() {
     Object.values(supplementLocks).some((value) => value === false)
   ), [supplementLocks])
 
+  useEffect(() => {
+    if (!isSupplementMode || !canSupplementLocation) return
+    if (currentStep !== 3) return
+    setGeoBlocked(false)
+    setMapEditable(false)
+    setUserHasEditedMap(false)
+    setPickedLat(null)
+    setPickedLng(null)
+    setInitialGPSLat(null)
+    setInitialGPSLng(null)
+    setHeading(null)
+    setStep2Key((value) => value + 1)
+    if (!resolvingAddr) {
+      handleGetLocation()
+    }
+  }, [isSupplementMode, canSupplementLocation, currentStep, resolvingAddr, handleGetLocation])
+
   // Extract coords from Google Maps URL
   function extractCoordsFromUrl(url) {
     const patterns = [
@@ -239,6 +268,7 @@ export default function EditStore() {
       /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
       /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
       /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]center=(-?\d+\.\d+),(-?\d+\.\d+)/,
       /\/place\/[^/]*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
     ]
     for (const pattern of patterns) {
@@ -266,6 +296,8 @@ export default function EditStore() {
       setPickedLat(coords.lat)
       setPickedLng(coords.lng)
       setUserHasEditedMap(true)
+      setGeoBlocked(false)
+      setStep2Key((value) => value + 1)
       showMessage('success', `Đã lấy vị trí: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
       return
     }
@@ -292,6 +324,8 @@ export default function EditStore() {
         setPickedLat(coords.lat)
         setPickedLng(coords.lng)
         setUserHasEditedMap(true)
+        setGeoBlocked(false)
+        setStep2Key((value) => value + 1)
         showMessage('success', `Đã lấy vị trí: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
       } else {
         setMapsLinkError('Không tìm thấy tọa độ từ link')
@@ -712,13 +746,16 @@ export default function EditStore() {
         supplementLocks={supplementLocks}
         pickedLat={pickedLat}
         pickedLng={pickedLng}
-        locationSectionOpen={supplementLocationOpen}
-        openLocationSection={() => setSupplementLocationOpen(true)}
         onLocationChange={handleLocationChange}
         mapEditable={mapEditable}
         setMapEditable={setMapEditable}
+        mapKey={step2Key}
+        heading={heading}
+        compassError={compassError}
+        geoBlocked={geoBlocked}
         resolvingAddr={resolvingAddr}
         handleGetLocation={handleGetLocation}
+        onReload={() => window.location.reload()}
         mapsLink={mapsLink}
         mapsLinkLoading={mapsLinkLoading}
         mapsLinkError={mapsLinkError}
@@ -971,15 +1008,6 @@ export default function EditStore() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
 
 
 
