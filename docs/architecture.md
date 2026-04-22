@@ -169,7 +169,7 @@ customer/
 |---|---|---|
 | `/` | Tìm kiếm | Public |
 | `/map` | Bản đồ MapLibre | Public |
-| `/store/create` | Tạo cửa hàng (3 bước) | Public |
+| `/store/create` | Tạo cửa hàng theo luồng từng bước, có màn kiểm tra trùng tùy điều kiện | Public |
 | `/telesale/overview` | Danh sách gọi và tổng quan telesale | Telesale/Admin |
 | `/telesale/call/[id]` | Màn cập nhật kết quả gọi | Telesale/Admin |
 | `/store/import` | Nhập nhiều cửa hàng từ file mẫu CSV | Admin |
@@ -212,7 +212,7 @@ customer/
 
 - Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, hoặc vị trí):
   - `StoreDetailModal` hiển thị nút **Bổ sung**
-  - duplicate panel ở bước 1 của `/store/create` cũng có thể hiển thị nút **Bổ sung**
+  - duplicate panel của `/store/create` cũng có thể hiển thị nút **Bổ sung**
 - Nút này điều hướng sang `/store/edit/[id]?mode=supplement`
 - Ở chế độ `supplement`:
   - luôn bắt đầu từ **bước 1**
@@ -236,17 +236,24 @@ customer/
 ## Create Flow Mở Rộng
 
 - Ở bước 2 của `/store/create` có thêm nhánh **Lưu luôn**
+- Duplicate check chính chạy sau khi người dùng hoàn tất bước 2 và bấm **Tiếp theo**
+- Nếu có candidate, `/store/create` chèn thêm màn **kiểm tra trùng** trước bước vị trí; nếu không có candidate thì bỏ qua màn này
+- Màn tạo không còn hiển thị step indicator UI; chỉ render nội dung step hiện tại
+- Trong lúc kiểm tra trùng ở bước 2, form dùng `FullPageLoading` để khóa toàn bộ dữ liệu đang nhập
 - Nhánh này (telesale-only) dùng cho store chưa có vị trí:
   - vẫn bắt buộc `quận/huyện`, `xã/phường`
   - bắt buộc thêm `số điện thoại` hợp lệ
   - yêu cầu xác nhận trước khi lưu vì store sẽ không có `latitude/longitude`
-- Khi bước 1 đã có GPS để kiểm tra trùng, app sẽ prefetch quận/huyện + xã/phường của store gần nhất trong nền, bất kể kết quả trùng hay không trùng, để bước 2 có thể hiển thị ngay nếu 2 field còn trống
 - Form số điện thoại hỗ trợ 2 số:
   - mặc định chỉ hiện ô `SĐT 1`
   - khi người dùng bắt đầu nhập `SĐT 1`, hệ thống mới hiện thêm ô `SĐT 2`
   - `SĐT 2` không được trùng `SĐT 1`
-- Trong duplicate panel của bước 1:
-  - candidate còn thiếu dữ liệu có thể hiện nút **Bổ sung**
+- Logic phát hiện trùng hiện tại dùng `findStoreDuplicateCandidates()`:
+  - trùng chắc chắn nếu trùng số điện thoại
+  - trùng khả nghi nếu cùng xã hoặc xã lân cận trong cùng quận và trùng ít nhất 1 từ tên đã lọc từ rác
+  - không dùng bán kính để quyết định trùng
+- Trong duplicate panel:
+  - candidate còn thiếu dữ liệu có thể hiển thị nút **Bổ sung**
   - nút này chuyển sang `/store/edit/[id]?mode=supplement`
 
 ---

@@ -19,17 +19,15 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { findDuplicatePhoneStores, formatDistance, validateVietnamPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
-import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
+import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { haversineKm } from '@/helper/distance'
 import { parseCoordinate } from '@/helper/coordinate'
 import {
-  findNearbySimilarStores,
-  findGlobalExactNameMatches,
-  mergeDuplicateCandidates,
+  findStoreDuplicateCandidates,
 } from '@/helper/duplicateCheck'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
@@ -64,17 +62,10 @@ export default function AddStore() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
-  const [duplicateCandidates, setDuplicateCandidates] = useState([])
-  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
-  const [duplicateCheckError, setDuplicateCheckError] = useState('')
-  const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
-  const [nameValid, setNameValid] = useState(false)
-  const [allowDuplicate, setAllowDuplicate] = useState(false)
-  const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
-  const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
-  const duplicateCheckSeqRef = useRef(0)
-  const duplicateGeoRequestedRef = useRef(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Duplicate check, 4 = Location
+  const [allowStep2Duplicate, setAllowStep2Duplicate] = useState(false)
+  const [step2DuplicateCandidates, setStep2DuplicateCandidates] = useState([])
+  const [step2DuplicateLoading, setStep2DuplicateLoading] = useState(false)
   const nearestLocationPrefilledRef = useRef(false)
   const nearestLocationPrefillRunningRef = useRef(false)
 
@@ -391,13 +382,9 @@ export default function AddStore() {
     setPhone('')
     setPhoneSecondary('')
     setNote('')
-    setAllowDuplicate(false)
-    setDuplicateCandidates([])
-    setDuplicateCheckError('')
-    setDuplicateCheckLoading(false)
-    setDuplicateCheckLat(null)
-    setDuplicateCheckLng(null)
-    duplicateGeoRequestedRef.current = false
+    setAllowStep2Duplicate(false)
+    setStep2DuplicateCandidates([])
+    setStep2DuplicateLoading(false)
     setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
@@ -427,9 +414,9 @@ export default function AddStore() {
     }
   }
 
-  // Auto-fetch location when entering step 3
+  // Auto-fetch location when entering step 4
   useEffect(() => {
-    if (currentStep !== 3) return
+    if (currentStep !== 4) return
     // Reset map-related state to ensure a fresh GPS fetch each time
     setGeoBlocked(false)
     setMapEditable(false)
@@ -445,28 +432,9 @@ export default function AddStore() {
   }, [currentStep, isAdmin])
 
   useEffect(() => {
-    if (!name.trim()) {
-      setDuplicateCandidates([])
-      setDuplicateCheckError('')
-      setDuplicateCheckLoading(false)
-      setDuplicateCheckDone(false)
-      setDuplicateCheckLat(null)
-      setDuplicateCheckLng(null)
-      duplicateGeoRequestedRef.current = false
-      setNameValid(false)
-      return
-    }
-    setDuplicateCandidates([])
-    setDuplicateCheckError('')
-    setDuplicateCheckDone(false)
-    setNameValid(false)
-  }, [name])
-
-  useEffect(() => {
-    setAllowDuplicate(false)
-    setDuplicateCheckDone(false)
-    setNameValid(false)
-  }, [name])
+    setAllowStep2Duplicate(false)
+    setStep2DuplicateCandidates([])
+  }, [name, district, ward, addressDetail, phone, phoneSecondary])
 
   useEffect(() => {
     if (district && !DISTRICT_WARD_SUGGESTIONS[district]) {
@@ -474,78 +442,13 @@ export default function AddStore() {
     }
   }, [district])
 
-  async function runDuplicateCheckByButton() {
-    const trimmed = name.trim()
-    if (!trimmed) {
+  function handleStep1Next() {
+    if (!name.trim()) {
       setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
       return
     }
     setFieldErrors((prev) => ({ ...prev, name: '' }))
-    let checkLat = duplicateCheckLat
-    let checkLng = duplicateCheckLng
-    if (checkLat == null || checkLng == null) {
-      if (!duplicateGeoRequestedRef.current) {
-        duplicateGeoRequestedRef.current = true
-      }
-      try {
-        setDuplicateCheckLoading(true)
-        const { coords, error } = await getBestPosition({
-          maxWaitTime: 2000,
-          desiredAccuracy: 50,
-        })
-        if (!coords) {
-          setDuplicateCheckError(getGeoErrorMessage(error))
-          setDuplicateCheckLoading(false)
-          return
-        }
-        checkLat = coords.latitude
-        checkLng = coords.longitude
-        setDuplicateCheckLat(checkLat)
-        setDuplicateCheckLng(checkLng)
-      } catch (err) {
-        console.error('Get location error:', err)
-        setDuplicateCheckError(getGeoErrorMessage(err))
-        setDuplicateCheckLoading(false)
-        return
-      }
-    }
-
-    void autoFillNearestDistrictWard(checkLat, checkLng)
-
-    const seq = ++duplicateCheckSeqRef.current
-    setDuplicateCheckLoading(true)
-    setDuplicateCheckError('')
-    try {
-      const [nearMatches, globalMatches] = await Promise.all([
-        findNearbySimilarStores(checkLat, checkLng, trimmed),
-        findGlobalExactNameMatches(trimmed),
-      ])
-      const matches = mergeDuplicateCandidates(nearMatches, globalMatches, checkLat, checkLng)
-      if (seq !== duplicateCheckSeqRef.current) return
-      setDuplicateCandidates(matches)
-      setAllowDuplicate(false)
-      setDuplicateCheckDone(true)
-      const ok = matches.length === 0
-      setNameValid(ok)
-      if (ok) setCurrentStep(2)
-    } catch (err) {
-      if (seq !== duplicateCheckSeqRef.current) return
-      console.error('Duplicate check error:', err)
-      setDuplicateCandidates([])
-      setDuplicateCheckError('Không kiểm tra được trùng tên (gần đây/toàn hệ thống).')
-      setDuplicateCheckDone(false)
-      setNameValid(false)
-    } finally {
-      if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
-    }
-  }
-
-  function handleStep1Next() {
-    if (!duplicateCheckDone) {
-      runDuplicateCheckByButton()
-      return
-    }
-    if (nameValid || allowDuplicate) setCurrentStep(2)
+    setCurrentStep(2)
   }
 
   function buildDuplicatePhoneMessage(matches, label = 'Số điện thoại') {
@@ -623,14 +526,52 @@ export default function AddStore() {
       phone_secondary: errs.phone_secondary || '',
     }))
 
-    return { errs, normalizedPhone, normalizedPhoneSecondary }
+    return {
+      errs,
+      normalizedPhone,
+      normalizedPhoneSecondary,
+      validatedPhone,
+      validatedPhoneSecondary,
+    }
+  }
+
+  async function findStep2DuplicateCandidates({ validatedPhone = '', validatedPhoneSecondary = '' } = {}) {
+    return findStoreDuplicateCandidates({
+      name: toTitleCaseVI(name.trim()),
+      district: toTitleCaseVI(district.trim()),
+      ward: toTitleCaseVI(ward.trim()),
+      addressDetail: toTitleCaseVI(addressDetail.trim()),
+      phone: validatedPhone,
+      phoneSecondary: validatedPhoneSecondary,
+    })
   }
 
   async function validateStep2AndGoNext() {
-    const { errs } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
+    const { errs, validatedPhone, validatedPhoneSecondary } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
     if (Object.keys(errs).length > 0) {
       showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
+    }
+
+    setStep2DuplicateLoading(true)
+    let step2Candidates = []
+    try {
+      step2Candidates = await findStep2DuplicateCandidates({
+        validatedPhone,
+        validatedPhoneSecondary,
+      })
+    } catch (err) {
+      console.error('Step 2 duplicate check failed:', err)
+      setStep2DuplicateLoading(false)
+      showMessage('error', 'Khong kiem tra duoc trung nang cao o buoc 2. Vui long thu lai.')
+      return false
+    }
+    setStep2DuplicateLoading(false)
+    setStep2DuplicateCandidates(step2Candidates)
+
+    if (step2Candidates.length > 0 && !allowStep2Duplicate) {
+      setCurrentStep(3)
+      return true
     }
 
     if (telesaleNoStep3) {
@@ -646,67 +587,56 @@ export default function AddStore() {
       return true
     }
 
-    // Yêu cầu lấy hướng/la bàn ngay lập tức tại đây vì iOS/Safari chỉ cho prompt quyền trong user gesture (click/tap)
     compassOnceRef.current = false
     refreshCompassHeading({ requestPermission: true })
-
-    setCurrentStep(3)
+    setCurrentStep(4)
     return true
   }
 
-  function renderDuplicatePanel() {
-    if (allowDuplicate) return null
-    if (duplicateCheckError) {
-      return (
-        <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-orange-300">
-          {duplicateCheckError}
-        </div>
-      )
+  function handleStep3Next() {
+    if (step2DuplicateCandidates.length > 0) {
+      setAllowStep2Duplicate(true)
     }
-    if (duplicateCandidates.length === 0) return null
+    if (telesaleNoStep3) {
+      setConfirmCreate({
+        open: true,
+        type: 'quick-save',
+        payload: {
+          latitude: null,
+          longitude: null,
+          shouldCheckFinalDuplicates: false,
+        },
+      })
+      return
+    }
+    // Yêu cầu lấy hướng/la bàn ngay trong user gesture
+    compassOnceRef.current = false
+    refreshCompassHeading({ requestPermission: true })
+    setCurrentStep(4)
+  }
 
+  function renderStep3DuplicatePanel() {
     return (
       <>
         <div className="font-semibold text-sm text-gray-100 my-2">
-          Phát hiện cửa hàng có thể đã được tạo
+          Phát hiện trùng
         </div>
         <div className="space-y-2">
-          {duplicateCandidates.map((s) => (
+          {step2DuplicateCandidates.map((store) => (
             <SearchStoreCard
-              key={s.id}
-              store={s}
-              distance={s.distance}
+              key={store.id}
+              store={store}
+              distance={store.distance}
               compact
             />
           ))}
         </div>
         <div className="mt-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
-          Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
-        </div>
-        <div className="flex items-center gap-2 mt-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={() => resetCreateForm()}
-          >
-            Quay lại
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={() => {
-              setAllowDuplicate(true)
-              setCurrentStep(2)
-            }}
-          >
-            Vẫn tạo cửa hàng
-          </Button>
+          Phát hiện cửa hàng có thể đã được tạo. Nhấn tiếp theo nếu bạn vẫn muốn tạo mới.
         </div>
       </>
     )
   }
-
   async function persistStore({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) {
     const normalizedName = toTitleCaseVI(name.trim())
     const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
@@ -783,13 +713,16 @@ export default function AddStore() {
       }
 
       if (shouldCheckFinalDuplicates) {
-        let nearDupes = []
-        let globalDupes = []
+        let finalDuplicateCandidates = []
         try {
-          ;[nearDupes, globalDupes] = await Promise.all([
-            findNearbySimilarStores(latitude, longitude, normalizedName),
-            findGlobalExactNameMatches(normalizedName),
-          ])
+          finalDuplicateCandidates = await findStoreDuplicateCandidates({
+            name: normalizedName,
+            district: district.trim(),
+            ward: ward.trim(),
+            addressDetail: addressDetail.trim(),
+            phone: validatedPhone,
+            phoneSecondary: validatedPhoneSecondary,
+          })
         } catch (dupErr) {
           console.error('Duplicate check failed:', dupErr)
           showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
@@ -797,9 +730,9 @@ export default function AddStore() {
           return false
         }
 
-        const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
-        if (allDupes.length > 0 && !allowDuplicate) {
-          setDuplicateCandidates(allDupes)
+        if (finalDuplicateCandidates.length > 0 && !allowStep2Duplicate) {
+          setStep2DuplicateCandidates(finalDuplicateCandidates)
+          setCurrentStep(3)
           showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
           setLoading(false)
           return false
@@ -866,8 +799,8 @@ export default function AddStore() {
 
   async function handleConfirmCreate() {
     const payload = confirmCreate.payload
-    if (!payload) return
     setConfirmCreate({ open: false, type: '', payload: null })
+    if (!payload) return
     await persistStore(payload)
   }
 
@@ -908,11 +841,13 @@ export default function AddStore() {
   // Paste Google Maps link from clipboard
   async function handleSubmit(e) {
     e.preventDefault()
-    if (currentStep !== 3) {
+    if (currentStep !== 4) {
       if (currentStep === 1) {
-        runDuplicateCheckByButton()
+        handleStep1Next()
       } else if (currentStep === 2) {
         await validateStep2AndGoNext()
+      } else if (currentStep === 3) {
+        handleStep3Next()
       }
       return
     }
@@ -982,33 +917,21 @@ export default function AddStore() {
     })
   }
 
-
-
-  // Step indicator labels
-  const steps = telesaleNoStep3
-    ? [
-      { num: 1, label: 'Tên' },
-      { num: 2, label: 'Thông tin' },
-    ]
-    : [
-      { num: 1, label: 'Tên' },
-      { num: 2, label: 'Thông tin' },
-      { num: 3, label: 'Vị trí' },
-    ]
   const showMobileActionBar = (
-    (currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0)) ||
+    currentStep === 1 ||
     currentStep === 2 ||
-    currentStep === 3
+    currentStep === 3 ||
+    currentStep === 4
   )
 
   return (
     <div className="min-h-screen bg-black">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
-      <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
+      <FullPageLoading
+        visible={loading || step2DuplicateLoading}
+        message={step2DuplicateLoading ? 'Đang kiểm tra tên trùng...' : 'Đang tạo cửa hàng…'}
+      />
       <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
-        {/* Step indicator */}
-        <StoreFormStepIndicator steps={steps} currentStep={currentStep} />
-
         <form onSubmit={handleSubmit} className="space-y-3 pb-32 sm:pb-0">
           {/* Step 1: Name */}
           {currentStep === 1 && (
@@ -1019,6 +942,7 @@ export default function AddStore() {
                   <div className="grid grid-cols-2 gap-2">
                     {STORE_TYPE_OPTIONS.map((type) => {
                       const selected = storeType === type.value
+                      const typeMeta = getStoreTypeMeta(type.value)
                       return (
                         <button
                           key={`top-type-${type.value}`}
@@ -1030,7 +954,12 @@ export default function AddStore() {
                               : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
                             }`}
                         >
-                          {type.label}
+                          <span className="flex items-center gap-2">
+                            <span className="flex h-5 w-5 items-center justify-center">
+                              {typeMeta.icon}
+                            </span>
+                            <span>{type.label}</span>
+                          </span>
                         </button>
                       )
                     })}
@@ -1064,6 +993,7 @@ export default function AddStore() {
                 <div hidden className="grid grid-cols-2 gap-2">
                   {STORE_TYPE_OPTIONS.map((type) => {
                     const selected = storeType === type.value
+                    const typeMeta = getStoreTypeMeta(type.value)
                     return (
                       <button
                         key={`quick-type-${type.value}`}
@@ -1075,7 +1005,12 @@ export default function AddStore() {
                             : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
                           }`}
                       >
-                        {type.label}
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center">
+                            {typeMeta.icon}
+                          </span>
+                          <span>{type.label}</span>
+                        </span>
                       </button>
                     )
                   })}
@@ -1083,25 +1018,18 @@ export default function AddStore() {
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}
-                {duplicateCheckLoading && (
-                  <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
-                    Đang kiểm tra trùng tên gần đây và toàn hệ thống…
-                  </div>
-                )}
-                {renderDuplicatePanel()}
+                
               </div>
 
-              {(allowDuplicate || duplicateCandidates.length === 0) ? (
-                <div className="pt-2 hidden sm:block">
-                  <Button
-                    type="button"
-                    onClick={handleStep1Next}
-                    className="w-full"
-                  >
-                    Tiếp theo
-                  </Button>
-                </div>
-              ) : null}
+                            <div className="pt-2 hidden sm:block">
+                <Button
+                  type="button"
+                  onClick={handleStep1Next}
+                  className="w-full"
+                >
+                  Tiếp theo
+                </Button>
+              </div>
             </>
           )}
 
@@ -1245,6 +1173,31 @@ export default function AddStore() {
                   type="button"
                   className="flex-1"
                   onClick={() => validateStep2AndGoNext()}
+                  disabled={step2DuplicateLoading}
+                >
+                  Tiếp theo →
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* Step 3: Duplicate check */}
+          {currentStep === 3 && step2DuplicateCandidates.length > 0 && (
+            <>
+              {renderStep3DuplicatePanel()}
+
+              <div className="pt-2 hidden sm:flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  icon={<span>←</span>}
+                  onClick={() => setCurrentStep(2)}
+                />
+                <Button
+                  type="button"
+                  className="flex-1"
+                  onClick={handleStep3Next}
                 >
                   {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                 </Button>
@@ -1252,8 +1205,8 @@ export default function AddStore() {
             </>
           )}
 
-          {/* Step 3: Location */}
-          {currentStep === 3 && (
+          {/* Step 4: Location */}
+          {currentStep === 4 && (
             <>
               {/* Guidance text */}
               {resolvingAddr && (
@@ -1324,7 +1277,7 @@ export default function AddStore() {
                   variant="outline"
                   size="icon"
                   icon={<span>←</span>}
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => setCurrentStep(step2DuplicateCandidates.length > 0 ? 3 : 2)}
                 />
                 <Button
                   type="submit"
@@ -1347,7 +1300,7 @@ export default function AddStore() {
               style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
             >
               <div className="mx-auto max-w-screen-md px-3 py-2">
-                {currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0) ? (
+                {currentStep === 1 ? (
                   <Button
                     type="button"
                     onClick={handleStep1Next}
@@ -1370,8 +1323,9 @@ export default function AddStore() {
                       type="button"
                       className="flex-1"
                       onClick={() => validateStep2AndGoNext()}
+                      disabled={step2DuplicateLoading}
                     >
-                      {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
+                      Tiếp theo →
                     </Button>
                   </div>
                 )}
@@ -1384,6 +1338,25 @@ export default function AddStore() {
                       size="icon"
                       icon={<span>←</span>}
                       onClick={() => setCurrentStep(2)}
+                    />
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      onClick={handleStep3Next}
+                    >
+                      {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
+                    </Button>
+                  </div>
+                )}
+
+                {currentStep === 4 && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      icon={<span>←</span>}
+                      onClick={() => setCurrentStep(step2DuplicateCandidates.length > 0 ? 3 : 2)}
                     />
                     <Button
                       type="submit"
@@ -1403,7 +1376,7 @@ export default function AddStore() {
         </form>
       </div>
 
-      <ConfirmDialog
+            <ConfirmDialog
         open={confirmCreate.open}
         onOpenChange={(open) => {
           setConfirmCreate((prev) => (open ? prev : { open: false, type: '', payload: null }))
