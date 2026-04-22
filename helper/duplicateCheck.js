@@ -8,6 +8,36 @@
 import { getOrRefreshStores } from '@/lib/storeCache'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 
+function parseCoordinate(value) {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = typeof value === 'number' ? value : Number(String(value).trim())
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const aLat = parseCoordinate(lat1)
+  const aLon = parseCoordinate(lon1)
+  const bLat = parseCoordinate(lat2)
+  const bLon = parseCoordinate(lon2)
+
+  if ([aLat, aLon, bLat, bLon].some((value) => value === null)) {
+    return Infinity
+  }
+
+  const toRad = (deg) => (deg * Math.PI) / 180
+  const earthRadiusKm = 6371
+  const dLat = toRad(bLat - aLat)
+  const dLon = toRad(bLon - aLon)
+  const lat1Rad = toRad(aLat)
+  const lat2Rad = toRad(bLat)
+
+  const haversine =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+
+  const centralAngle = 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  return earthRadiusKm * centralAngle
+}
 // Draft adjacency map with human-readable ward names. It is normalized at runtime before matching.
 const ADJACENT_WARD_DRAFT = {
   // --- HUYỆN HOÀI ĐỨC (20 đơn vị) ---
