@@ -19,8 +19,27 @@ Build and maintain NPP Hà Công safely, with high correctness for:
 4. `docs/database.md`
 5. `docs/design-system.md`
 6. `docs/project-context.md`
-7. `docs/skills/storevis-project-execution.SKILL.md`
-8. `docs/skills/storevis-ai-collaboration.SKILL.md`
+7. `docs/current-work.md`
+8. `docs/regression-checklist.md`
+9. `docs/skills/storevis-project-execution.SKILL.md`
+10. `docs/skills/storevis-ai-collaboration.SKILL.md`
+
+## 2b. Daily Working Memory (mandatory)
+
+- `docs/current-work.md` is the short-term working memory for every task.
+- `docs/regression-checklist.md` is the required regression gate before claiming completion.
+- Before editing code or docs, update `docs/current-work.md` with:
+  - `Goal`
+  - `In Scope`
+  - `Out of Scope`
+  - `Must Preserve`
+  - `Plan`
+- Before closing a task, update `docs/current-work.md` with:
+  - `Done`
+  - `Verification`
+  - `Risks / Next`
+- For every task, explicitly choose the relevant sections in `docs/regression-checklist.md` and verify them before reporting success.
+- Do not rely on chat history as the source of truth when these files are present.
 
 ## 3. Default Skill Stack
 
@@ -68,10 +87,12 @@ Add when text/data can break Vietnamese output:
 ## 8. Working Process (every task)
 
 1. Restate goal and assumptions briefly.
-2. Scope impacted files/routes/components.
-3. Apply minimal, targeted code changes.
-4. Verify with the closest checks (`npm run lint`, focused smoke tests).
-5. Report result with changed files, verification evidence, and residual risk.
+2. Update `docs/current-work.md` before coding.
+3. Scope impacted files/routes/components and relevant checklist sections.
+4. Apply minimal, targeted code changes.
+5. Verify with the closest checks (`npm run lint`, focused smoke tests) plus the relevant items in `docs/regression-checklist.md`.
+6. Update `docs/current-work.md` with outcome, verification evidence, and residual risk.
+7. Report result with changed files, verification evidence, and residual risk.
 
 ## 9. Response Contract (agent output)
 
@@ -82,10 +103,12 @@ Always include:
 - Verification done
 - Risks or unverified parts
 
+Prefer to also include:
+- Checklist sections verified
+
 ## 10. Do Not
 
 - Do not make unrelated refactors during small fixes.
 - Do not silently change project conventions.
 - Do not claim success without fresh verification evidence.
 - Do not add new dependencies unless required and justified.
-

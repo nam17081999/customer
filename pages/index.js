@@ -8,11 +8,23 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Msg } from '@/components/ui/msg'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import Link from 'next/link'
-import { haversineKm } from '@/helper/distance'
 import SearchStoreCard from '@/components/search-store-card'
 import { getOrRefreshStores } from '@/lib/storeCache'
-import { parseCoordinate } from '@/helper/coordinate'
-import { buildStoreSearchIndex, createSearchQueryMeta, getSearchScore } from '@/helper/storeSearch'
+import { buildStoreSearchIndex } from '@/helper/storeSearch'
+import {
+  FILTER_FLAG_HAS_IMAGE,
+  FILTER_FLAG_HAS_PHONE,
+  FILTER_FLAG_NO_LOCATION,
+  FILTER_FLAG_POTENTIAL,
+  buildSearchRouteQuery,
+  buildSearchStateFromRouteQuery,
+  countActiveFilters,
+  filterAndSortSearchResults,
+  hasActiveSearchCriteria,
+  hasStoreCoordinates,
+  parseQueryList,
+  serializeRouteQuery,
+} from '@/helper/homeSearch'
 
 // Districts sorted alphabetically
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -23,55 +35,7 @@ const ALL_WARDS = Array.from(
 ).sort((a, b) => a.localeCompare(b, 'vi'))
 const LOCATION_REFRESH_INTERVAL_MS = 3 * 60 * 1000
 const LOCATION_REFRESH_COOLDOWN_MS = 5 * 1000
-const FILTER_FLAG_HAS_PHONE = 'has_phone'
-const FILTER_FLAG_HAS_IMAGE = 'has_image'
-const FILTER_FLAG_NO_LOCATION = 'has_no_location'
-const FILTER_FLAG_POTENTIAL = 'is_potential'
 const FLASH_MESSAGE_DURATION_MS = 3800
-
-function hasStoreCoordinates(store) {
-  return Number.isFinite(parseCoordinate(store?.latitude)) && Number.isFinite(parseCoordinate(store?.longitude))
-}
-
-function parseQueryList(rawValue) {
-  if (!rawValue) return []
-  const values = Array.isArray(rawValue) ? rawValue : [rawValue]
-  return Array.from(
-    new Set(
-      values
-        .flatMap((value) => String(value).split(','))
-        .map((value) => value.trim())
-        .filter(Boolean)
-    )
-  )
-}
-
-function buildSearchRouteQuery({
-  searchTerm,
-  selectedDistrict,
-  selectedWard,
-  selectedStoreTypes,
-  selectedDetailFlags,
-}) {
-  const query = {}
-  if (searchTerm.trim()) query.q = searchTerm.trim()
-  if (selectedDistrict) query.district = selectedDistrict
-  if (selectedWard) query.ward = selectedWard
-  if (selectedStoreTypes.length) query.types = selectedStoreTypes.join(',')
-  if (selectedDetailFlags.length) query.flags = selectedDetailFlags.join(',')
-  return query
-}
-
-function serializeRouteQuery(query) {
-  return JSON.stringify(
-    Object.keys(query)
-      .sort()
-      .reduce((acc, key) => {
-        acc[key] = query[key]
-        return acc
-      }, {})
-  )
-}
 
 function persistSearchRoute(query) {
   if (typeof window === 'undefined') return
@@ -100,32 +64,31 @@ export default function HomePage() {
   const initializedFromQuery = useRef(false)
   const lastLocationRequestAtRef = useRef(0)
   const lastSearchCriteriaRef = useRef('')
-  const hasSearchCriteria = Boolean(
-    searchTerm.trim()
-    || selectedDistrict
-    || selectedWard
-    || selectedStoreTypes.length
-    || selectedDetailFlags.length
-  )
-  const activeFilterCount = (selectedDistrict ? 1 : 0) + (selectedWard ? 1 : 0) + selectedStoreTypes.length + selectedDetailFlags.length
+  const hasSearchCriteria = hasActiveSearchCriteria({
+    searchTerm,
+    selectedDistrict,
+    selectedWard,
+    selectedStoreTypes,
+    selectedDetailFlags,
+  })
+  const activeFilterCount = countActiveFilters({
+    selectedDistrict,
+    selectedWard,
+    selectedStoreTypes,
+    selectedDetailFlags,
+  })
 
   // Restore state from URL query params on mount (for back-navigation)
   useEffect(() => {
     if (initializedFromQuery.current || !router.isReady) return
     initializedFromQuery.current = true
-    const { q, district, districts, ward, wards, types, flags } = router.query
-    if (q) setSearchTerm(q)
-    const restoredDistricts = parseQueryList(districts || district)
-    const restoredWards = parseQueryList(wards || ward)
-    const restoredTypes = parseQueryList(types)
-    const restoredFlags = parseQueryList(flags)
-    if (restoredDistricts.length) setSelectedDistrict(restoredDistricts[0])
-    if (restoredWards.length) setSelectedWard(restoredWards[0])
-    if (restoredTypes.length) setSelectedStoreTypes(restoredTypes)
-    if (restoredFlags.length) setSelectedDetailFlags(restoredFlags)
-    if (restoredDistricts.length || restoredWards.length || restoredTypes.length || restoredFlags.length) {
-      setShowDetailedFilters(true)
-    }
+    const restoredState = buildSearchStateFromRouteQuery(router.query)
+    setSearchTerm(restoredState.searchTerm)
+    setSelectedDistrict(restoredState.selectedDistrict)
+    setSelectedWard(restoredState.selectedWard)
+    setSelectedStoreTypes(restoredState.selectedStoreTypes)
+    setSelectedDetailFlags(restoredState.selectedDetailFlags)
+    setShowDetailedFilters(restoredState.showDetailedFilters)
   }, [router.isReady, router.query])
 
   useEffect(() => {
@@ -291,15 +254,6 @@ export default function HomePage() {
     }
   }, [refreshCurrentLocation])
 
-  // Helper: compute distance for a store given current reference
-  const computeDistance = useCallback((store, refLoc) => {
-    if (!refLoc) return null
-    const lat = parseCoordinate(store?.latitude)
-    const lng = parseCoordinate(store?.longitude)
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-    return haversineKm(refLoc.latitude, refLoc.longitude, lat, lng)
-  }, [])
-
   // Load all stores — always goes through storeCache (which handles 60s cooldown + dedup)
   const loadAllStores = useCallback(async () => {
     setLoading(true)
@@ -380,74 +334,15 @@ export default function HomePage() {
 
   const searchResults = useMemo(() => {
     if (!storesLoaded) return []
-
-    let results = indexedStores
-    const queryMeta = createSearchQueryMeta(searchTerm)
-    const hasTextSearch = Boolean(queryMeta.term)
-
-    // District filter
-    if (selectedDistrict) {
-      results = results.filter(({ store }) => store.district === selectedDistrict)
-    }
-    // Ward filter
-    if (selectedWard) {
-      results = results.filter(({ store }) => store.ward === selectedWard)
-    }
-    if (selectedStoreTypes.length > 0) {
-      results = results.filter(({ store }) => selectedStoreTypes.includes(store.store_type || ''))
-    }
-    if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)) {
-      results = results.filter((entry) => entry.hasPhone)
-    }
-    if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE)) {
-      results = results.filter((entry) => entry.hasImage)
-    }
-    if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION)) {
-      results = results.filter((entry) => !entry.hasCoords)
-    }
-    if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)) {
-      results = results.filter(({ store }) => Boolean(store.is_potential))
-    }
-
-    if (hasTextSearch) {
-      results = results
-        .map((entry) => {
-          const score = getSearchScore(entry, queryMeta)
-          if (score == null) return null
-          return { entry, score }
-        })
-        .filter(Boolean)
-    } else {
-      results = results.map((entry) => ({ entry, score: 2 }))
-    }
-
-    const refLoc = currentLocation
-    results = results.map(({ entry, score }) => ({
-      ...entry.store,
-      _score: score,
-      distance: computeDistance(entry.store, refLoc)
-    }))
-
-    results = results.slice().sort((a, b) => {
-      if (hasTextSearch) {
-        const sa = a._score ?? 2
-        const sb = b._score ?? 2
-        if (sb !== sa) return sb - sa
-      }
-
-      const aHasDistance = a.distance != null
-      const bHasDistance = b.distance != null
-      if (aHasDistance && bHasDistance && a.distance !== b.distance) {
-        return a.distance - b.distance
-      }
-      if (aHasDistance !== bHasDistance) return aHasDistance ? -1 : 1
-      if (a.active !== b.active) return a.active ? -1 : 1
-      const da = a.created_at || ''
-      const db = b.created_at || ''
-      return db.localeCompare(da)
+    return filterAndSortSearchResults({
+      indexedStores,
+      searchTerm,
+      selectedDistrict,
+      selectedWard,
+      selectedStoreTypes,
+      selectedDetailFlags,
+      currentLocation,
     })
-
-    return results
   }, [
     indexedStores,
     storesLoaded,
@@ -457,7 +352,6 @@ export default function HomePage() {
     selectedStoreTypes,
     selectedDetailFlags,
     currentLocation,
-    computeDistance,
   ])
 
   // Search triggers when name or filters change

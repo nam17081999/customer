@@ -6,29 +6,35 @@ import { useAuth } from '@/lib/AuthContext'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { toTitleCaseVI, formatAddressParts } from '@/lib/utils'
+import { toTitleCaseVI } from '@/lib/utils'
 import {
   DISTRICT_WARD_SUGGESTIONS,
   DISTRICT_SUGGESTIONS,
   STORE_TYPE_OPTIONS,
   DEFAULT_STORE_TYPE,
 } from '@/lib/constants'
-import { Msg } from '@/components/ui/msg'
-import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { findDuplicatePhoneStores, formatDistance, validateVietnamPhone } from '@/helper/validation'
 import SearchStoreCard from '@/components/search-store-card'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
+import StoreStepFormLayout from '@/components/store/store-step-form-layout'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
-import { haversineKm } from '@/helper/distance'
-import { parseCoordinate } from '@/helper/coordinate'
 import {
-  findStoreDuplicateCandidates,
+  findNearbySimilarStores,
+  findGlobalExactNameMatches,
+  mergeDuplicateCandidates,
 } from '@/helper/duplicateCheck'
+import {
+  buildCreateInsertPayload,
+  buildCreateSteps,
+  extractCoordsFromMapsUrl,
+  findNearestDistrictWard,
+  getCreateFinalCoordinates,
+  shouldShowCreateMobileActionBar,
+  validateStoreCreateStep2,
+} from '@/helper/storeCreateFlow'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
   ssr: false,
@@ -62,10 +68,17 @@ export default function AddStore() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Duplicate check, 4 = Location
-  const [allowStep2Duplicate, setAllowStep2Duplicate] = useState(false)
-  const [step2DuplicateCandidates, setStep2DuplicateCandidates] = useState([])
-  const [step2DuplicateLoading, setStep2DuplicateLoading] = useState(false)
+  const [currentStep, setCurrentStep] = useState(1) // 1 = Name, 2 = Info, 3 = Location
+  const [duplicateCandidates, setDuplicateCandidates] = useState([])
+  const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
+  const [duplicateCheckError, setDuplicateCheckError] = useState('')
+  const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
+  const [nameValid, setNameValid] = useState(false)
+  const [allowDuplicate, setAllowDuplicate] = useState(false)
+  const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
+  const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
+  const duplicateCheckSeqRef = useRef(0)
+  const duplicateGeoRequestedRef = useRef(false)
   const nearestLocationPrefilledRef = useRef(false)
   const nearestLocationPrefillRunningRef = useRef(false)
 
@@ -124,32 +137,6 @@ export default function AddStore() {
       currentStep !== 1
     )
   }, [name, storeType, addressDetail, ward, district, phone, phoneSecondary, note, pickedLat, pickedLng, currentStep, loading])
-
-
-  // Extract lat/lng from a Google Maps URL
-  function extractCoordsFromUrl(url) {
-    // Pattern: @lat,lng or !3dlat!4dlng or q=lat,lng or ll=lat,lng or center=lat,lng
-    const patterns = [
-      /@(-?\d+\.\d+),(-?\d+\.\d+)/,
-      /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
-      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
-      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
-      /[?&]center=(-?\d+\.\d+),(-?\d+\.\d+)/,
-      /\/place\/[^/]*\/@(-?\d+\.\d+),(-?\d+\.\d+)/,
-    ]
-    for (const pattern of patterns) {
-      const match = url.match(pattern)
-      if (match) {
-        const lat = parseFloat(match[1])
-        const lng = parseFloat(match[2])
-        if (isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-          return { lat, lng }
-        }
-      }
-    }
-    return null
-  }
-
   async function handleMapsLink(link) {
     const trimmed = (link || '').trim()
     setMapsLink(trimmed)
@@ -157,7 +144,7 @@ export default function AddStore() {
     if (!trimmed) return
 
     // Try extract directly first
-    let coords = extractCoordsFromUrl(trimmed)
+    let coords = extractCoordsFromMapsUrl(trimmed)
     if (coords) {
       applyMapsLinkCoords(coords.lat, coords.lng)
       return
@@ -182,7 +169,7 @@ export default function AddStore() {
         setMapsLinkError('Không mở được link')
         return
       }
-      coords = extractCoordsFromUrl(data.finalUrl)
+      coords = extractCoordsFromMapsUrl(data.finalUrl)
       if (coords) {
         applyMapsLinkCoords(coords.lat, coords.lng)
       } else {
@@ -226,31 +213,11 @@ export default function AddStore() {
     nearestLocationPrefillRunningRef.current = true
     try {
       const stores = await getOrRefreshStores()
-      const nearestStore = stores.reduce((nearest, store) => {
-        const storeLat = parseCoordinate(store?.latitude)
-        const storeLng = parseCoordinate(store?.longitude)
-        const storeDistrict = String(store?.district || '').trim()
-        const storeWard = String(store?.ward || '').trim()
-
-        if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng) || !storeDistrict || !storeWard) {
-          return nearest
-        }
-
-        const distance = haversineKm(originLat, originLng, storeLat, storeLng)
-
-        if (!nearest || distance < nearest.distance) {
-          return {
-            store,
-            distance,
-          }
-        }
-
-        return nearest
-      }, null)
+      const nearestStore = findNearestDistrictWard(stores, originLat, originLng)
       if (!nearestStore) return
       if (districtRef.current.trim() || wardRef.current.trim()) return
-      const nextDistrict = toTitleCaseVI(String(nearestStore.store.district || '').trim())
-      const nextWard = toTitleCaseVI(String(nearestStore.store.ward || '').trim())
+      const nextDistrict = nearestStore.district
+      const nextWard = nearestStore.ward
 
       // Re-check before applying prefill to avoid overwriting user input typed during async fetch
       if (nearestLocationPrefilledRef.current || district.trim() || ward.trim()) {
@@ -382,9 +349,13 @@ export default function AddStore() {
     setPhone('')
     setPhoneSecondary('')
     setNote('')
-    setAllowStep2Duplicate(false)
-    setStep2DuplicateCandidates([])
-    setStep2DuplicateLoading(false)
+    setAllowDuplicate(false)
+    setDuplicateCandidates([])
+    setDuplicateCheckError('')
+    setDuplicateCheckLoading(false)
+    setDuplicateCheckLat(null)
+    setDuplicateCheckLng(null)
+    duplicateGeoRequestedRef.current = false
     setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
@@ -414,9 +385,9 @@ export default function AddStore() {
     }
   }
 
-  // Auto-fetch location when entering step 4
+  // Auto-fetch location when entering step 3
   useEffect(() => {
-    if (currentStep !== 4) return
+    if (currentStep !== 3) return
     // Reset map-related state to ensure a fresh GPS fetch each time
     setGeoBlocked(false)
     setMapEditable(false)
@@ -432,9 +403,28 @@ export default function AddStore() {
   }, [currentStep, isAdmin])
 
   useEffect(() => {
-    setAllowStep2Duplicate(false)
-    setStep2DuplicateCandidates([])
-  }, [name, district, ward, addressDetail, phone, phoneSecondary])
+    if (!name.trim()) {
+      setDuplicateCandidates([])
+      setDuplicateCheckError('')
+      setDuplicateCheckLoading(false)
+      setDuplicateCheckDone(false)
+      setDuplicateCheckLat(null)
+      setDuplicateCheckLng(null)
+      duplicateGeoRequestedRef.current = false
+      setNameValid(false)
+      return
+    }
+    setDuplicateCandidates([])
+    setDuplicateCheckError('')
+    setDuplicateCheckDone(false)
+    setNameValid(false)
+  }, [name])
+
+  useEffect(() => {
+    setAllowDuplicate(false)
+    setDuplicateCheckDone(false)
+    setNameValid(false)
+  }, [name])
 
   useEffect(() => {
     if (district && !DISTRICT_WARD_SUGGESTIONS[district]) {
@@ -442,136 +432,107 @@ export default function AddStore() {
     }
   }, [district])
 
-  function handleStep1Next() {
-    if (!name.trim()) {
+  async function runDuplicateCheckByButton() {
+    const trimmed = name.trim()
+    if (!trimmed) {
       setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
       return
     }
     setFieldErrors((prev) => ({ ...prev, name: '' }))
-    setCurrentStep(2)
-  }
-
-  function buildDuplicatePhoneMessage(matches, label = 'Số điện thoại') {
-    const labels = matches.slice(0, 3).map((store) => store.name || 'Cửa hàng')
-    return `${label} đã tồn tại ở ${labels.join('; ')}`
-  }
-
-  function getBaseStep2Errors({ requirePhone = false } = {}) {
-    const errs = {}
-    if (!district.trim()) errs.district = 'Vui lòng nhập quận/huyện'
-    if (!ward.trim()) errs.ward = 'Vui lòng nhập xã/phường'
-    const normalizedPhone = phone.trim()
-    const normalizedPhoneSecondary = phoneSecondary.trim()
-    if (requirePhone && !normalizedPhone) {
-      errs.phone = 'Vui lòng nhập số điện thoại để lưu luôn'
+    let checkLat = duplicateCheckLat
+    let checkLng = duplicateCheckLng
+    if (checkLat == null || checkLng == null) {
+      if (!duplicateGeoRequestedRef.current) {
+        duplicateGeoRequestedRef.current = true
+      }
+      try {
+        setDuplicateCheckLoading(true)
+        const { coords, error } = await getBestPosition({
+          maxWaitTime: 2000,
+          desiredAccuracy: 50,
+        })
+        if (!coords) {
+          setDuplicateCheckError(getGeoErrorMessage(error))
+          setDuplicateCheckLoading(false)
+          return
+        }
+        checkLat = coords.latitude
+        checkLng = coords.longitude
+        setDuplicateCheckLat(checkLat)
+        setDuplicateCheckLng(checkLng)
+      } catch (err) {
+        console.error('Get location error:', err)
+        setDuplicateCheckError(getGeoErrorMessage(err))
+        setDuplicateCheckLoading(false)
+        return
+      }
     }
 
-    if (!normalizedPhone && normalizedPhoneSecondary) {
-      errs.phone = 'Vui lòng nhập số điện thoại 1 trước'
-    }
+    void autoFillNearestDistrictWard(checkLat, checkLng)
 
-    return { errs, normalizedPhone, normalizedPhoneSecondary }
+    const seq = ++duplicateCheckSeqRef.current
+    setDuplicateCheckLoading(true)
+    setDuplicateCheckError('')
+    try {
+      const [nearMatches, globalMatches] = await Promise.all([
+        findNearbySimilarStores(checkLat, checkLng, trimmed),
+        findGlobalExactNameMatches(trimmed),
+      ])
+      const matches = mergeDuplicateCandidates(nearMatches, globalMatches, checkLat, checkLng)
+      if (seq !== duplicateCheckSeqRef.current) return
+      setDuplicateCandidates(matches)
+      setAllowDuplicate(false)
+      setDuplicateCheckDone(true)
+      const ok = matches.length === 0
+      setNameValid(ok)
+      if (ok) setCurrentStep(2)
+    } catch (err) {
+      if (seq !== duplicateCheckSeqRef.current) return
+      console.error('Duplicate check error:', err)
+      setDuplicateCandidates([])
+      setDuplicateCheckError('Không kiểm tra được trùng tên (gần đây/toàn hệ thống).')
+      setDuplicateCheckDone(false)
+      setNameValid(false)
+    } finally {
+      if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
+    }
+  }
+
+  function handleStep1Next() {
+    if (!duplicateCheckDone) {
+      runDuplicateCheckByButton()
+      return
+    }
+    if (nameValid || allowDuplicate) setCurrentStep(2)
   }
 
   async function validateStep2Fields({ requirePhone = false } = {}) {
-    const { errs, normalizedPhone, normalizedPhoneSecondary } = getBaseStep2Errors({ requirePhone })
-    let validatedPhone = ''
-    let validatedPhoneSecondary = ''
-
-    if (!errs.phone && normalizedPhone) {
-      const phoneValidation = validateVietnamPhone(normalizedPhone)
-      if (!phoneValidation.isValid) {
-        errs.phone = phoneValidation.message
-      } else {
-        validatedPhone = phoneValidation.normalized
-      }
-    }
-
-    if (!errs.phone && !errs.phone_secondary && normalizedPhoneSecondary) {
-      const phoneSecondaryValidation = validateVietnamPhone(normalizedPhoneSecondary)
-      if (!phoneSecondaryValidation.isValid) {
-        errs.phone_secondary = phoneSecondaryValidation.message
-      } else {
-        validatedPhoneSecondary = phoneSecondaryValidation.normalized
-      }
-    }
-
-    if (!errs.phone && !errs.phone_secondary && validatedPhone && validatedPhoneSecondary && validatedPhone === validatedPhoneSecondary) {
-      errs.phone_secondary = 'Số điện thoại 2 không được trùng số điện thoại 1'
-    }
-
-    if (!errs.phone && !errs.phone_secondary && (validatedPhone || validatedPhoneSecondary)) {
-      const stores = await getOrRefreshStores()
-
-      if (validatedPhone) {
-        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhone)
-        if (duplicatePhoneStores.length > 0) {
-          errs.phone = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 1')
-        }
-      }
-
-      if (!errs.phone_secondary && validatedPhoneSecondary) {
-        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhoneSecondary)
-        if (duplicatePhoneStores.length > 0) {
-          errs.phone_secondary = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
-        }
-      }
-    }
+    const stores = (phone.trim() || phoneSecondary.trim()) ? await getOrRefreshStores() : []
+    const result = validateStoreCreateStep2({
+      district,
+      ward,
+      phone,
+      phoneSecondary,
+      stores,
+      requirePhone,
+    })
 
     setFieldErrors((prev) => ({
       ...prev,
-      district: errs.district || '',
-      ward: errs.ward || '',
-      phone: errs.phone || '',
-      phone_secondary: errs.phone_secondary || '',
+      district: result.fieldErrors.district || '',
+      ward: result.fieldErrors.ward || '',
+      phone: result.fieldErrors.phone || '',
+      phone_secondary: result.fieldErrors.phone_secondary || '',
     }))
 
-    return {
-      errs,
-      normalizedPhone,
-      normalizedPhoneSecondary,
-      validatedPhone,
-      validatedPhoneSecondary,
-    }
-  }
-
-  async function findStep2DuplicateCandidates({ validatedPhone = '', validatedPhoneSecondary = '' } = {}) {
-    return findStoreDuplicateCandidates({
-      name: toTitleCaseVI(name.trim()),
-      district: toTitleCaseVI(district.trim()),
-      ward: toTitleCaseVI(ward.trim()),
-      addressDetail: toTitleCaseVI(addressDetail.trim()),
-      phone: validatedPhone,
-      phoneSecondary: validatedPhoneSecondary,
-    })
+    return result
   }
 
   async function validateStep2AndGoNext() {
-    const { errs, validatedPhone, validatedPhoneSecondary } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
-    if (Object.keys(errs).length > 0) {
-      showMessage('error', errs.phone ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
+    const { fieldErrors } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
+    if (Object.keys(fieldErrors).length > 0) {
+      showMessage('error', fieldErrors.phone || fieldErrors.phone_secondary ? 'Vui lòng kiểm tra lại số điện thoại' : 'Vui lòng nhập đủ quận/huyện và xã/phường')
       return false
-    }
-
-    setStep2DuplicateLoading(true)
-    let step2Candidates = []
-    try {
-      step2Candidates = await findStep2DuplicateCandidates({
-        validatedPhone,
-        validatedPhoneSecondary,
-      })
-    } catch (err) {
-      console.error('Step 2 duplicate check failed:', err)
-      setStep2DuplicateLoading(false)
-      showMessage('error', 'Khong kiem tra duoc trung nang cao o buoc 2. Vui long thu lai.')
-      return false
-    }
-    setStep2DuplicateLoading(false)
-    setStep2DuplicateCandidates(step2Candidates)
-
-    if (step2Candidates.length > 0 && !allowStep2Duplicate) {
-      setCurrentStep(3)
-      return true
     }
 
     if (telesaleNoStep3) {
@@ -587,42 +548,31 @@ export default function AddStore() {
       return true
     }
 
+    // Yêu cầu lấy hướng/la bàn ngay lập tức tại đây vì iOS/Safari chỉ cho prompt quyền trong user gesture (click/tap)
     compassOnceRef.current = false
     refreshCompassHeading({ requestPermission: true })
-    setCurrentStep(4)
+    setCurrentStep(3)
     return true
   }
 
-  function handleStep3Next() {
-    if (step2DuplicateCandidates.length > 0) {
-      setAllowStep2Duplicate(true)
+  function renderDuplicatePanel() {
+    if (allowDuplicate) return null
+    if (duplicateCheckError) {
+      return (
+        <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-orange-300">
+          {duplicateCheckError}
+        </div>
+      )
     }
-    if (telesaleNoStep3) {
-      setConfirmCreate({
-        open: true,
-        type: 'quick-save',
-        payload: {
-          latitude: null,
-          longitude: null,
-          shouldCheckFinalDuplicates: false,
-        },
-      })
-      return
-    }
-    // Yêu cầu lấy hướng/la bàn ngay trong user gesture
-    compassOnceRef.current = false
-    refreshCompassHeading({ requestPermission: true })
-    setCurrentStep(4)
-  }
+    if (duplicateCandidates.length === 0) return null
 
-  function renderStep3DuplicatePanel() {
     return (
       <>
         <div className="font-semibold text-sm text-gray-100 my-2">
-          Phát hiện trùng
+          Phát hiện cửa hàng có thể đã được tạo
         </div>
         <div className="space-y-2">
-          {step2DuplicateCandidates.map((store) => (
+          {duplicateCandidates.map((store) => (
             <SearchStoreCard
               key={store.id}
               store={store}
@@ -632,16 +582,34 @@ export default function AddStore() {
           ))}
         </div>
         <div className="mt-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
-          Phát hiện cửa hàng có thể đã được tạo. Nhấn tiếp theo nếu bạn vẫn muốn tạo mới.
+          Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
+        </div>
+        <div className="flex items-center gap-2 mt-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => resetCreateForm()}
+          >
+            Quay lại
+          </Button>
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => {
+              setAllowDuplicate(true)
+              setCurrentStep(2)
+            }}
+          >
+            Vẫn tạo cửa hàng
+          </Button>
         </div>
       </>
     )
   }
+
   async function persistStore({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) {
     const normalizedName = toTitleCaseVI(name.trim())
-    const normalizedStoreType = storeType || DEFAULT_STORE_TYPE
-    const rawPhone = phone.trim()
-    const rawPhoneSecondary = phoneSecondary.trim()
     let validatedPhone = ''
     let validatedPhoneSecondary = ''
     let storesForPhoneDupes = null
@@ -656,73 +624,46 @@ export default function AddStore() {
     try {
       setLoading(true)
 
-      if (!rawPhone && rawPhoneSecondary) {
-        setFieldErrors((prev) => ({ ...prev, phone: 'Vui lòng nhập số điện thoại 1 trước' }))
-        showMessage('error', 'Vui lòng nhập số điện thoại 1 trước')
+      const stores = (phone.trim() || phoneSecondary.trim()) ? await getStoresForPhoneDupes() : []
+      const validationResult = validateStoreCreateStep2({
+        district,
+        ward,
+        phone,
+        phoneSecondary,
+        stores,
+        requirePhone: false,
+      })
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        district: validationResult.fieldErrors.district || '',
+        ward: validationResult.fieldErrors.ward || '',
+        phone: validationResult.fieldErrors.phone || '',
+        phone_secondary: validationResult.fieldErrors.phone_secondary || '',
+      }))
+
+      if (Object.keys(validationResult.fieldErrors).length > 0) {
+        const firstError = validationResult.fieldErrors.phone
+          || validationResult.fieldErrors.phone_secondary
+          || validationResult.fieldErrors.district
+          || validationResult.fieldErrors.ward
+          || 'Vui lòng kiểm tra lại thông tin'
+        showMessage('error', firstError)
         setLoading(false)
         return false
       }
 
-      if (rawPhone) {
-        const phoneValidation = validateVietnamPhone(rawPhone)
-        if (!phoneValidation.isValid) {
-          setFieldErrors((prev) => ({ ...prev, phone: phoneValidation.message }))
-          showMessage('error', phoneValidation.message)
-          setLoading(false)
-          return false
-        }
-        validatedPhone = phoneValidation.normalized
-
-        const stores = await getStoresForPhoneDupes()
-        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhone)
-        if (duplicatePhoneStores.length > 0) {
-          const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores)
-          setFieldErrors((prev) => ({ ...prev, phone: duplicateMessage }))
-          showMessage('error', duplicateMessage)
-          setLoading(false)
-          return false
-        }
-      }
-
-      if (rawPhoneSecondary) {
-        const phoneSecondaryValidation = validateVietnamPhone(rawPhoneSecondary)
-        if (!phoneSecondaryValidation.isValid) {
-          setFieldErrors((prev) => ({ ...prev, phone_secondary: phoneSecondaryValidation.message }))
-          showMessage('error', phoneSecondaryValidation.message)
-          setLoading(false)
-          return false
-        }
-        validatedPhoneSecondary = phoneSecondaryValidation.normalized
-
-        if (validatedPhone && validatedPhoneSecondary && validatedPhone === validatedPhoneSecondary) {
-          setFieldErrors((prev) => ({ ...prev, phone_secondary: 'Số điện thoại 2 không được trùng số điện thoại 1' }))
-          showMessage('error', 'Số điện thoại 2 không được trùng số điện thoại 1')
-          setLoading(false)
-          return false
-        }
-
-        const stores = await getStoresForPhoneDupes()
-        const duplicatePhoneStores = findDuplicatePhoneStores(stores, validatedPhoneSecondary)
-        if (duplicatePhoneStores.length > 0) {
-          const duplicateMessage = buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
-          setFieldErrors((prev) => ({ ...prev, phone_secondary: duplicateMessage }))
-          showMessage('error', duplicateMessage)
-          setLoading(false)
-          return false
-        }
-      }
+      validatedPhone = validationResult.normalizedPhone
+      validatedPhoneSecondary = validationResult.normalizedPhoneSecondary
 
       if (shouldCheckFinalDuplicates) {
-        let finalDuplicateCandidates = []
+        let nearDupes = []
+        let globalDupes = []
         try {
-          finalDuplicateCandidates = await findStoreDuplicateCandidates({
-            name: normalizedName,
-            district: district.trim(),
-            ward: ward.trim(),
-            addressDetail: addressDetail.trim(),
-            phone: validatedPhone,
-            phoneSecondary: validatedPhoneSecondary,
-          })
+          ;[nearDupes, globalDupes] = await Promise.all([
+            findNearbySimilarStores(latitude, longitude, normalizedName),
+            findGlobalExactNameMatches(normalizedName),
+          ])
         } catch (dupErr) {
           console.error('Duplicate check failed:', dupErr)
           showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
@@ -730,33 +671,31 @@ export default function AddStore() {
           return false
         }
 
-        if (finalDuplicateCandidates.length > 0 && !allowStep2Duplicate) {
-          setStep2DuplicateCandidates(finalDuplicateCandidates)
-          setCurrentStep(3)
+        const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
+        if (allDupes.length > 0 && !allowDuplicate) {
+          setDuplicateCandidates(allDupes)
           showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
           setLoading(false)
           return false
         }
       }
 
-      const normalizedDetail = toTitleCaseVI(addressDetail.trim())
-      const normalizedWard = toTitleCaseVI(ward.trim())
-      const normalizedDistrict = toTitleCaseVI(district.trim())
-
-      const insertPayload = {
-        name: normalizedName,
-        store_type: normalizedStoreType,
-        address_detail: normalizedDetail,
-        ward: normalizedWard,
-        district: normalizedDistrict,
-        active: isAdmin,
-        is_potential: Boolean(isTelesale),
-        note: note.trim() || null,
-        phone: validatedPhone || null,
-        phone_secondary: validatedPhoneSecondary || null,
+      const insertPayload = buildCreateInsertPayload({
+        values: {
+          name: normalizedName,
+          storeType: storeType || DEFAULT_STORE_TYPE,
+          addressDetail,
+          ward,
+          district,
+          note,
+        },
+        validatedPhone,
+        validatedPhoneSecondary,
         latitude,
         longitude,
-      }
+        isAdmin,
+        isTelesale,
+      })
 
       let insertedRows = null
       let insertError = null
@@ -799,8 +738,8 @@ export default function AddStore() {
 
   async function handleConfirmCreate() {
     const payload = confirmCreate.payload
-    setConfirmCreate({ open: false, type: '', payload: null })
     if (!payload) return
+    setConfirmCreate({ open: false, type: '', payload: null })
     await persistStore(payload)
   }
 
@@ -841,13 +780,11 @@ export default function AddStore() {
   // Paste Google Maps link from clipboard
   async function handleSubmit(e) {
     e.preventDefault()
-    if (currentStep !== 4) {
+    if (currentStep !== 3) {
       if (currentStep === 1) {
-        handleStep1Next()
+        runDuplicateCheckByButton()
       } else if (currentStep === 2) {
         await validateStep2AndGoNext()
-      } else if (currentStep === 3) {
-        handleStep3Next()
       }
       return
     }
@@ -864,22 +801,15 @@ export default function AddStore() {
     // Priority:
     // 1. If user unlocked map and edited → use edited position (pickedLat/Lng)
     // 2. Otherwise → use initial GPS position (initialGPSLat/Lng)
-    let latitude = null
-    let longitude = null
+    let { latitude, longitude } = getCreateFinalCoordinates({
+      userHasEditedMap,
+      pickedLat,
+      pickedLng,
+      initialGPSLat,
+      initialGPSLng,
+    })
 
-    if (userHasEditedMap && pickedLat != null && pickedLng != null) {
-      // User unlocked and edited map → use edited position
-      latitude = pickedLat
-      longitude = pickedLng
-    } else if (initialGPSLat != null && initialGPSLng != null) {
-      // User did NOT edit map → use initial GPS
-      latitude = initialGPSLat
-      longitude = initialGPSLng
-    } else if (pickedLat != null && pickedLng != null) {
-      // Fallback: use whatever is on map
-      latitude = pickedLat
-      longitude = pickedLng
-    } else {
+    if (latitude == null || longitude == null) {
       // Last resort: get current GPS
       try {
         const { coords, error } = await getBestPosition({ maxWaitTime: 3000, desiredAccuracy: 15 })
@@ -917,22 +847,79 @@ export default function AddStore() {
     })
   }
 
-  const showMobileActionBar = (
-    currentStep === 1 ||
-    currentStep === 2 ||
-    currentStep === 3 ||
-    currentStep === 4
-  )
+  // Step indicator labels
+  const steps = buildCreateSteps(telesaleNoStep3)
+  const showMobileActionBar = shouldShowCreateMobileActionBar({
+    currentStep,
+    allowDuplicate,
+    duplicateCandidates,
+  })
+  const mobileActionBar = showMobileActionBar ? (
+    <>
+      {currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0) ? (
+        <Button
+          type="button"
+          onClick={handleStep1Next}
+          className="w-full"
+        >
+          Tiếp theo
+        </Button>
+      ) : null}
+
+      {currentStep === 2 && (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            icon={<span>←</span>}
+            onClick={() => setCurrentStep(1)}
+          />
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => validateStep2AndGoNext()}
+          >
+            {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
+          </Button>
+        </div>
+      )}
+
+      {currentStep === 3 && (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            icon={<span>←</span>}
+            onClick={() => setCurrentStep(2)}
+          />
+          <Button
+            type="submit"
+            disabled={loading || resolvingAddr || geoBlocked}
+            className="flex-1"
+            leftIcon={(resolvingAddr || loading) ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : undefined}
+          >
+            {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
+          </Button>
+        </div>
+      )}
+    </>
+  ) : null
 
   return (
-    <div className="min-h-screen bg-black">
-      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
-      <FullPageLoading
-        visible={loading || step2DuplicateLoading}
-        message={step2DuplicateLoading ? 'Đang kiểm tra tên trùng...' : 'Đang tạo cửa hàng…'}
-      />
-      <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3 max-w-screen-md mx-auto">
-        <form onSubmit={handleSubmit} className="space-y-3 pb-32 sm:pb-0">
+    <>
+      <StoreStepFormLayout
+        msgState={msgState}
+        loading={loading}
+        loadingMessage="Đang tạo cửa hàng…"
+        steps={steps}
+        currentStep={currentStep}
+        onSubmit={handleSubmit}
+        mobileActionBar={mobileActionBar}
+      >
           {/* Step 1: Name */}
           {currentStep === 1 && (
             <>
@@ -1018,10 +1005,16 @@ export default function AddStore() {
                 {fieldErrors.name && (
                   <div className="text-xs text-red-600">{fieldErrors.name}</div>
                 )}
-                
+                {duplicateCheckLoading && (
+                  <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
+                    Đang kiểm tra trùng tên gần đây và toàn hệ thống…
+                  </div>
+                )}
+                {renderDuplicatePanel()}
               </div>
 
-                            <div className="pt-2 hidden sm:block">
+              {(allowDuplicate || duplicateCandidates.length === 0) ? (
+                <div className="pt-2 hidden sm:block">
                 <Button
                   type="button"
                   onClick={handleStep1Next}
@@ -1029,7 +1022,8 @@ export default function AddStore() {
                 >
                   Tiếp theo
                 </Button>
-              </div>
+                </div>
+              ) : null}
             </>
           )}
 
@@ -1173,31 +1167,6 @@ export default function AddStore() {
                   type="button"
                   className="flex-1"
                   onClick={() => validateStep2AndGoNext()}
-                  disabled={step2DuplicateLoading}
-                >
-                  Tiếp theo →
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Step 3: Duplicate check */}
-          {currentStep === 3 && step2DuplicateCandidates.length > 0 && (
-            <>
-              {renderStep3DuplicatePanel()}
-
-              <div className="pt-2 hidden sm:flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  icon={<span>←</span>}
-                  onClick={() => setCurrentStep(2)}
-                />
-                <Button
-                  type="button"
-                  className="flex-1"
-                  onClick={handleStep3Next}
                 >
                   {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
                 </Button>
@@ -1205,8 +1174,8 @@ export default function AddStore() {
             </>
           )}
 
-          {/* Step 4: Location */}
-          {currentStep === 4 && (
+          {/* Step 3: Location */}
+          {currentStep === 3 && (
             <>
               {/* Guidance text */}
               {resolvingAddr && (
@@ -1277,7 +1246,7 @@ export default function AddStore() {
                   variant="outline"
                   size="icon"
                   icon={<span>←</span>}
-                  onClick={() => setCurrentStep(step2DuplicateCandidates.length > 0 ? 3 : 2)}
+                  onClick={() => setCurrentStep(2)}
                 />
                 <Button
                   type="submit"
@@ -1293,90 +1262,9 @@ export default function AddStore() {
             </>
           )}
 
-          {/* Mobile fixed action bar */}
-          {showMobileActionBar && (
-            <div
-              className="sm:hidden fixed inset-x-0 z-[55] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md"
-              style={{ bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' }}
-            >
-              <div className="mx-auto max-w-screen-md px-3 py-2">
-                {currentStep === 1 ? (
-                  <Button
-                    type="button"
-                    onClick={handleStep1Next}
-                    className="w-full"
-                  >
-                    Tiếp theo
-                  </Button>
-                ) : null}
+      </StoreStepFormLayout>
 
-                {currentStep === 2 && (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      icon={<span>←</span>}
-                      onClick={() => setCurrentStep(1)}
-                    />
-                    <Button
-                      type="button"
-                      className="flex-1"
-                      onClick={() => validateStep2AndGoNext()}
-                      disabled={step2DuplicateLoading}
-                    >
-                      Tiếp theo →
-                    </Button>
-                  </div>
-                )}
-
-                {currentStep === 3 && (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      icon={<span>←</span>}
-                      onClick={() => setCurrentStep(2)}
-                    />
-                    <Button
-                      type="button"
-                      className="flex-1"
-                      onClick={handleStep3Next}
-                    >
-                      {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
-                    </Button>
-                  </div>
-                )}
-
-                {currentStep === 4 && (
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      icon={<span>←</span>}
-                      onClick={() => setCurrentStep(step2DuplicateCandidates.length > 0 ? 3 : 2)}
-                    />
-                    <Button
-                      type="submit"
-                      disabled={loading || resolvingAddr || geoBlocked}
-                      className="flex-1"
-                      leftIcon={(resolvingAddr || loading) ? (
-                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                      ) : undefined}
-                    >
-                      {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </form>
-      </div>
-
-            <ConfirmDialog
+      <ConfirmDialog
         open={confirmCreate.open}
         onOpenChange={(open) => {
           setConfirmCreate((prev) => (open ? prev : { open: false, type: '', payload: null }))
@@ -1391,6 +1279,6 @@ export default function AddStore() {
         loading={loading}
         onConfirm={handleConfirmCreate}
       />
-    </div>
+    </>
   )
 }
