@@ -91,12 +91,17 @@ Quy ước bắt buộc:
 - Gộp các logic trước đó được đánh dấu là "có thể đã sót" vào cùng chuẩn xử lý với màn create nếu thực chất không nên khác.
 - Hợp nhất `create`, `edit`, `supplement` về cùng kiểu layout step-based như màn create hiện tại, nhưng vẫn giữ nguyên business branch cũ của từng flow.
 - Chỉ dùng chung phần nào thực sự chung; không xóa khác biệt nghiệp vụ giữa create, edit, supplement.
+- Tiếp tục bước 4 bằng cách tách orchestration/controller khỏi page:
+  - tách `create` trước
+  - tách `edit/supplement` sau
+  - thêm test bù cho phần orchestration vừa tách
 
 ### In Scope
 - `pages/store/create.js`.
 - `pages/store/edit/[id].js`.
 - `components/store/store-supplement-form.jsx` hoặc component layout thay thế.
 - Helper flow dùng chung giữa create/edit/supplement.
+- Hook/controller mới nếu cần để kéo side effects ra khỏi page.
 - Test helper và test browser cần cập nhật theo phạm vi refactor này.
 - Cập nhật lại `docs/current-work.md` theo task hiện tại.
 
@@ -142,18 +147,13 @@ Quy ước bắt buộc:
 
 ### Plan
 - Cập nhật working memory rồi mới sửa code.
-- Chuẩn hóa shared helper giữa create/edit/supplement trước:
-  - parse Google Maps URL
-  - chọn tọa độ cuối
-  - message trùng số điện thoại
-  - normalize/update rule nào thực chất nên giống create
-  - nguồn stores dùng cho duplicate phone nếu cần đồng bộ theo create
-- Tạo layout/component step form dùng chung và chuyển `edit` + `supplement` sang cùng kiểu layout của create.
+- Tách orchestration của `create` khỏi `pages/store/create.js` sang hook/controller riêng, chỉ để page giữ render + wiring UI.
+- Tách orchestration của `edit/supplement` khỏi `pages/store/edit/[id].js` theo cùng hướng, giữ riêng business branch của edit và supplement.
 - Giữ riêng các branch nghiệp vụ:
   - create duplicate gate + quick-save
   - supplement locks + guest report branch
   - edit direct update
-- Cập nhật test helper/browser theo vùng bị ảnh hưởng.
+- Cập nhật test helper/browser theo vùng orchestration bị ảnh hưởng.
 - Verify theo checklist `Checklist chung`, `Create Flow`, `Edit / Supplement / Report`, `Stores Read / Cache`, `Map Flow`, `Tiếng Việt / UI Safety`.
 
 ### Progress
@@ -201,6 +201,20 @@ Quy ước bắt buộc:
 - Đã chuyển `pages/store/edit/[id].js` sang step-based layout 3 bước cho edit, và giữ supplement dùng cùng layout/component step.
 - Đã thêm `components/store/store-step-form-layout.jsx` để `create` và `edit/supplement` dùng cùng khung layout.
 - Đã cập nhật browser E2E cho `edit` và `supplement`.
+- Đã xác nhận sau đợt trước `pages/store/create.js` và `pages/store/edit/[id].js` vẫn còn chứa khá nhiều side effect/controller logic; đây là phần còn lại của bước 4 cần làm tiếp.
+- Đã tách orchestration của `create` sang `helper/useStoreCreateController.js` và giữ `pages/store/create.js` chủ yếu còn render + wiring UI.
+- Đã tách orchestration của `edit/supplement` sang `helper/useStoreEditController.js` và giữ `pages/store/edit/[id].js` chủ yếu còn render + wiring UI.
+- Đã chạy lại verify sau đợt tách orchestration:
+  - `npm.cmd run lint`
+  - `npm.cmd test`
+  - `npm.cmd run text:check`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js`
+- Đang bổ sung thêm browser coverage cho orchestration mới tách, ưu tiên các nhánh controller chưa được khóa trước đó:
+  - supplement 2 bước khi store đã có tọa độ
+  - redirect guard khi guest mở màn edit thường
+- Đã bổ sung thêm 2 browser tests cho orchestration `edit/supplement`:
+  - supplement 2 bước khi store đã có tọa độ, không render step location và không gửi lại lat/lng
+  - guest mở màn edit thường bị redirect sang login
 
 ### Done
 - Khôi phục logic create flow theo commit `3400fd95d740af79b1e4910a8c1decad9dd42909` ở phạm vi `pages/store/create.js`.
@@ -228,6 +242,10 @@ Quy ước bắt buộc:
 - Hoàn tất thêm browser smoke test cho:
   - admin edit flow
   - guest supplement flow
+- Hoàn tất tách controller/orchestration của `create` và `edit/supplement` ra khỏi page để page mỏng hơn, dễ đọc hơn.
+- Hoàn tất test bù cho orchestration mới tách ở nhánh `edit/supplement`:
+  - supplement 2 bước khi store đã có tọa độ
+  - redirect guard khi guest vào `edit` không đúng quyền
 
 ### Verification
 - Đã chạy:
@@ -236,9 +254,12 @@ Quy ước bắt buộc:
   - `npm.cmd run text:check`
   - `npm.cmd run test:e2e -- e2e/store-create.spec.js`
   - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js`
+  - `npm.cmd run lint -- --quiet e2e/store-edit.spec.js`
+  - `npm.cmd run test:e2e -- e2e/store-edit.spec.js`
 - Kết quả gần nhất:
   - `npm.cmd test`: `9 passed (9)` files, `196 passed (196)` tests
-  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js`: `5 passed (5)`
+  - `npm.cmd run test:e2e -- e2e/store-edit.spec.js`: `4 passed (4)`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js`: `7 passed (7)`
   - `npm.cmd run text:check`: không phát hiện lỗi mã hóa trong repo
 
 ### Open Questions
@@ -249,3 +270,4 @@ Quy ước bắt buộc:
 - Harness E2E hiện đã phủ `create`, `edit`, `supplement`, nhưng `reports`, `verify`, `search/map` vẫn chưa có browser coverage.
 - Test network vẫn mock ở lớp Playwright; nếu payload/response Supabase thay đổi, cần cập nhật fixture response trong test.
 - Browser test hiện đang dùng test double cho map picker; phù hợp để khóa business flow, nhưng chưa thay cho việc kiểm tra map thật ở vài smoke test thủ công.
+- Controller đã được tách khỏi page, nhưng hiện chưa có unit-test mức hook vì repo chưa có harness React hook test; coverage orchestration đang dựa trên browser smoke + helper unit tests.

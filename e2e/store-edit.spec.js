@@ -158,3 +158,68 @@ test('guest supplement giữ flow step và gửi store report', async ({ page })
     longitude: 105.80482,
   })
 })
+
+test('guest supplement store đã có tọa độ chỉ đi 2 bước và không gửi lại location', async ({ page }) => {
+  await setupEditFlow(page, {
+    auth: { role: 'guest' },
+    stores: [
+      buildStore({
+        id: 'supplement-store-2',
+        name: 'Tạp hóa Đã Có Vị Trí',
+        store_type: 'Tạp hóa',
+        address_detail: '',
+        phone: '',
+        note: '',
+        latitude: 21.03123,
+        longitude: 105.79991,
+      }),
+    ],
+  })
+
+  let reportPayload = null
+  await page.route('**/rest/v1/store_reports*', async (route) => {
+    const request = route.request()
+    if (request.method() !== 'POST') {
+      await route.continue()
+      return
+    }
+
+    const payloads = JSON.parse(request.postData() || '[]')
+    reportPayload = Array.isArray(payloads) ? payloads[0] : payloads
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify([{ id: 'report-2' }]),
+    })
+  })
+
+  await page.goto('/store/edit/supplement-store-2?mode=supplement')
+
+  await expect(page.getByText('Bổ sung cửa hàng')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Tiếp theo' }).click()
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await expect(page.getByTestId('e2e-store-location-picker')).toHaveCount(0)
+  await page.getByLabel('Số điện thoại').fill('0901234568')
+  await expect(page.getByRole('button', { name: 'Gửi bổ sung' })).toBeVisible()
+  await page.getByRole('button', { name: 'Gửi bổ sung' }).click()
+  await expect(page.getByText('Xác nhận bổ sung cửa hàng')).toBeVisible()
+  await page.getByRole('button', { name: 'Lưu bổ sung' }).click()
+
+  await page.waitForURL('**/')
+  await expect(page.getByText('Đã gửi đề xuất bổ sung để admin duyệt!')).toBeVisible()
+  expect(reportPayload.proposed_changes).toMatchObject({
+    phone: '0901234568',
+  })
+  expect(reportPayload.proposed_changes.latitude).toBeUndefined()
+  expect(reportPayload.proposed_changes.longitude).toBeUndefined()
+})
+
+test('guest mở màn edit thường bị chuyển sang login', async ({ page }) => {
+  await setupEditFlow(page, {
+    auth: { role: 'guest' },
+  })
+
+  await page.goto('/store/edit/seed-store-1')
+  await page.waitForURL(/\/login\?from=/)
+})
