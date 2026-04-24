@@ -34,19 +34,32 @@ Quy tắc bắt buộc khi sinh code cho project NPP Hà Công. Đọc file này
 ## 1c. Working Memory & Regression Gate
 
 - Trước khi code, bắt buộc đọc thêm:
+  - `docs/ai-task-template.md`
+  - `docs/ai-task-types.md`
   - `docs/current-work.md`
   - `docs/regression-checklist.md`
+- Trước khi sửa file, bắt buộc chọn 1 `Task Type` chính theo `docs/ai-task-types.md`.
+- Trước khi sửa file, bắt buộc chuẩn hóa task theo `docs/ai-task-template.md`.
+- Nếu prompt của user chưa theo template, AI phải tự vẽ lại task theo đúng template trước khi implement.
 - Trước khi sửa file, bắt buộc cập nhật `docs/current-work.md` ít nhất các mục:
   - `Goal`
   - `In Scope`
   - `Out of Scope`
   - `Must Preserve`
   - `Plan`
+- Không được bắt đầu implement nếu task chuẩn hóa còn thiếu:
+  - `Goal`
+  - `Task Type`
+  - `In Scope`
+  - `Out of Scope`
+  - `Must Preserve`
+  - `Required Verification`
 - Trước khi kết luận xong task, bắt buộc:
   - đi lại các section phù hợp trong `docs/regression-checklist.md`
   - cập nhật `docs/current-work.md` với `Done`, `Verification`, `Risks / Next`
 - Không dùng chat history làm nguồn sự thật duy nhất nếu 2 file trên đã có dữ liệu mới hơn.
 - Nếu task bị đổi hướng giữa chừng, cập nhật lại `docs/current-work.md` trước khi làm tiếp.
+- Nếu 1 yêu cầu trộn `bugfix`, `refactor`, `feature`, phải tách phase và chỉ giữ 1 `Task Type` chính cho phase đang làm.
 
 ## 2. Đọc Stores — Bắt Buộc Qua Cache
 

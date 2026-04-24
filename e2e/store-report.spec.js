@@ -66,11 +66,42 @@ test('nút báo cáo trong detail modal luôn chuyển sang route report riêng'
   await page.getByRole('button', { name: /Điểm Bán Điều Hướng Report/i }).click()
 
   const detailModal = page.getByRole('dialog')
-  await expect(detailModal.getByText('Phản hồi')).toBeVisible()
-  await detailModal.getByRole('button', { name: 'Báo cáo cửa hàng' }).click()
+  await expect(detailModal.getByText('Thao tác')).toBeVisible()
+  await detailModal.getByRole('button', { name: 'Báo cáo' }).click()
 
   await page.waitForURL('**/store/report/report-route-1?from=*')
   await expect(page.getByRole('heading', { name: 'Báo cáo cửa hàng' })).toBeVisible()
+})
+
+test('guest thấy Bổ sung và không thấy Sửa trong detail modal', async ({ page }) => {
+  await setupReportFlow(page, {
+    auth: { role: 'guest' },
+    stores: [buildStore({ id: 'modal-action-guest', name: 'Điểm Bán Guest Action' })],
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: /Điểm Bán Guest Action/i }).click()
+
+  const detailModal = page.getByRole('dialog')
+  await expect(detailModal.getByRole('button', { name: 'Bổ sung' })).toBeVisible()
+  await expect(detailModal.getByRole('button', { name: 'Sửa' })).toBeHidden()
+  await detailModal.getByRole('button', { name: 'Bổ sung' }).click()
+  await page.waitForURL('**/store/edit/modal-action-guest?mode=supplement')
+})
+
+test('admin thấy Sửa và không thấy Bổ sung trong detail modal', async ({ page }) => {
+  await setupReportFlow(page, {
+    auth: { role: 'admin' },
+    stores: [buildStore({ id: 'modal-action-admin', name: 'Điểm Bán Admin Action' })],
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: /Điểm Bán Admin Action/i }).click()
+
+  const detailModal = page.getByRole('dialog')
+  await expect(detailModal.getByRole('button', { name: 'Bổ sung' })).toBeHidden()
+  await detailModal.getByRole('button', { name: 'Sửa' }).click()
+  await page.waitForURL('**/store/edit/modal-action-admin')
 })
 
 test('user gửi edit report với payload đã chuẩn hóa và tọa độ mới', async ({ page }) => {

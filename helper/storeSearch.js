@@ -1,4 +1,6 @@
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
+import { haversineKm } from '@/helper/distance'
+import { parseCoordinate } from '@/helper/coordinate'
 
 export function createSearchQueryMeta(rawValue) {
   const term = String(rawValue || '').trim().toLowerCase()
@@ -67,4 +69,66 @@ export function getSearchScore(entry, queryMeta) {
 
 export function matchesSearchQuery(entry, queryMeta) {
   return getSearchScore(entry, queryMeta) != null
+}
+
+function computeDistance(store, currentLocation) {
+  if (!currentLocation) return null
+
+  const lat = parseCoordinate(store?.latitude)
+  const lng = parseCoordinate(store?.longitude)
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+
+  return haversineKm(currentLocation.latitude, currentLocation.longitude, lat, lng)
+}
+
+function compareRankedStores(a, b, hasTextSearch) {
+  if (hasTextSearch) {
+    const scoreA = a._score ?? 2
+    const scoreB = b._score ?? 2
+    if (scoreB !== scoreA) return scoreB - scoreA
+  }
+
+  const aHasDistance = a.distance != null
+  const bHasDistance = b.distance != null
+  if (aHasDistance && bHasDistance && a.distance !== b.distance) {
+    return a.distance - b.distance
+  }
+  if (aHasDistance !== bHasDistance) return aHasDistance ? -1 : 1
+  if (a.active !== b.active) return a.active ? -1 : 1
+
+  const createdAtA = a.created_at || ''
+  const createdAtB = b.created_at || ''
+  return createdAtB.localeCompare(createdAtA)
+}
+
+export function rankStoreSearchResults({
+  indexedStores,
+  searchTerm,
+  currentLocation,
+  limit,
+}) {
+  const safeIndexedStores = Array.isArray(indexedStores) ? indexedStores : []
+  const queryMeta = createSearchQueryMeta(searchTerm)
+  const hasTextSearch = Boolean(queryMeta.term)
+
+  const rankedResults = (hasTextSearch
+    ? safeIndexedStores
+      .map((entry) => {
+        const score = getSearchScore(entry, queryMeta)
+        if (score == null) return null
+        return { entry, score }
+      })
+      .filter(Boolean)
+    : safeIndexedStores.map((entry) => ({ entry, score: 2 }))
+  )
+    .map(({ entry, score }) => ({
+      ...entry.store,
+      _score: score,
+      distance: computeDistance(entry.store, currentLocation),
+    }))
+    .sort((a, b) => compareRankedStores(a, b, hasTextSearch))
+
+  return Number.isInteger(limit) && limit >= 0
+    ? rankedResults.slice(0, limit)
+    : rankedResults
 }

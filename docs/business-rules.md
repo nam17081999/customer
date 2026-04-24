@@ -178,7 +178,8 @@ Hàm hỗ trợ: `normalizeVietnamesePhonetics()` (được dùng ở trang tìm
 - Trong `StoreDetailModal`, `loại cửa hàng` hiển thị phía trên tên
 - Dùng cỡ chữ nhỏ hơn tên để giữ hierarchy
 - Nếu store chưa có tọa độ thì hiển thị nhãn **Chưa có vị trí**
-- Nếu store còn thiếu dữ liệu quan trọng thì có nút **Bổ sung** để mở `/store/edit/[id]?mode=supplement`
+- User không phải admin thấy nút **Bổ sung** để mở `/store/edit/[id]?mode=supplement`
+- Admin không thấy **Bổ sung** trong modal, thay vào đó thấy nút **Sửa** để mở `/store/edit/[id]`
 - Ở màn tạo store, duplicate panel có thể hiện nút **Bổ sung** để mở supplement flow của store nghi trùng
 
 ---

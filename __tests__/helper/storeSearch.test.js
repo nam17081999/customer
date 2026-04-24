@@ -4,6 +4,7 @@ import {
   createSearchQueryMeta,
   getSearchScore,
   matchesSearchQuery,
+  rankStoreSearchResults,
 } from '@/helper/storeSearch'
 import { parseCoordinate } from '@/helper/coordinate'
 
@@ -288,5 +289,49 @@ describe('matchesSearchQuery', () => {
     const entry = makeEntry('Cửa Hàng Giang')
     const meta = createSearchQueryMeta('dang')
     expect(matchesSearchQuery(entry, meta)).toBe(true)
+  })
+})
+
+describe('rankStoreSearchResults', () => {
+  it('ưu tiên kết quả khớp mạnh hơn trước dù store khớp yếu đứng trước trong dữ liệu', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({
+        id: 1,
+        name: 'Tạp Hóa Minh',
+        created_at: '2026-04-01T00:00:00.000Z',
+      }),
+      makeStore({
+        id: 2,
+        name: 'Tạp Hóa Minh Anh',
+        created_at: '2026-04-02T00:00:00.000Z',
+      }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = rankStoreSearchResults({
+      indexedStores,
+      searchTerm: 'minh anh',
+      currentLocation: null,
+    })
+
+    expect(results.map((store) => store.id)).toEqual([2, 1])
+    expect(results[0]._score).toBeGreaterThan(results[1]._score)
+  })
+
+  it('giới hạn kết quả sau khi đã sort theo cùng rule chung', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp Hóa Minh', created_at: '2026-04-01T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Tạp Hóa Minh Anh', created_at: '2026-04-02T00:00:00.000Z' }),
+      makeStore({ id: 3, name: 'Minh Anh Số 3', created_at: '2026-04-03T00:00:00.000Z' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = rankStoreSearchResults({
+      indexedStores,
+      searchTerm: 'minh anh',
+      currentLocation: null,
+      limit: 2,
+    })
+
+    expect(results).toHaveLength(2)
+    expect(results.map((store) => store.id)).toEqual([3, 2])
   })
 })
