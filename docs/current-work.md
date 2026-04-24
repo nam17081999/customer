@@ -88,70 +88,58 @@ Quy ước bắt buộc:
 ## Current Snapshot
 
 ### Task Type
-- Bug Fix
+- Feature
 
 ### Goal
-- Viết test trước rồi sửa 3 lỗi cache/UI đã phát hiện: local patch che update từ user khác, badge admin stale, event deduplicate không buộc refetch.
+- Tinh chỉnh modal chi tiết: bỏ đường kẻ ngăn giữa header và thông tin, đồng thời bao quanh khối thông tin cửa hàng bằng một đường viền rõ hơn.
+
+### Why
+- Giao diện cần liền mạch hơn giữa header và nội dung, nhưng phần thông tin vẫn cần có viền gom nhóm để dễ đọc.
 
 ### In Scope
-- `lib/storeCache.js`
-- `components/layout/app-navbar.jsx`
-- `pages/store/deduplicate.js`
-- `helper/useStoreReportsController.js`
-- Helper/test liên quan đến cache mutation, navbar sync, deduplicate event, report event.
+- `components/store-detail-modal.jsx`
+- Border dưới header modal chi tiết.
+- Border bao quanh danh sách thông tin cửa hàng.
 
 ### Out of Scope
-- Không đổi business rule create/edit/delete/verify/report/import.
-- Không refactor lớn page store/map/search ngoài phần cần để test hoặc sửa lỗi.
-- Không sửa các thay đổi đang có sẵn ngoài scope: `e2e/store-map.spec.js`, import-flow files.
+- Không đổi layout/action khác ngoài hai chỉnh sửa viền.
+- Không đổi luồng quản lý admin: bổ sung, chỉnh sửa, lịch sử, báo cáo, xóa mềm.
+- Không đổi route `/map` nội bộ, cache, database, create/edit/report/verify logic.
 - Không thêm dependency mới.
 
 ### Must Preserve
-- Public store reads vẫn đi qua `getOrRefreshStores()`.
-- Soft delete vẫn dùng `deleted_at`, không hard delete.
-- Store cache vẫn chỉ cache rows `deleted_at IS NULL`.
-- Local cache mutation vẫn hỗ trợ UI cập nhật nhanh sau thao tác thành công.
-- Vietnamese text trong UI/test không bị hỏng encoding.
-- Event `storevis:stores-changed` vẫn đồng bộ được home/map/telesale khi cần.
+- Giữ link Google Maps chỉ hiện khi cửa hàng có tọa độ hợp lệ.
+- Giữ link gọi điện dùng số điện thoại hiện có và không làm hỏng tiếng Việt trong UI.
+- Giữ nút bản đồ nội bộ `/map?storeId=...&lat=...&lng=...` nếu đang cần cho flow điều hướng trong app.
+- Giữ các action admin/tuyến/báo cáo hoạt động đúng, chỉ đổi cách trình bày.
+- Giữ kích thước nút đủ dễ bấm và tương phản theo dark theme, không dùng text quá nhỏ cho thông tin chính.
 
 ### Required Verification
-- Test mới phải fail trước khi sửa và pass sau khi sửa.
-- Chạy test cache helper, navbar sync, deduplicate event, report event.
 - Chạy lint cho file bị sửa nếu khả thi.
-- Đối chiếu checklist: Stores Read / Cache, Store Create/Edit/Delete/Verify/Report, Import/Deduplicate, Tiếng Việt / UI Safety.
+- Chạy kiểm tra text/encoding nếu có command sẵn.
+- Đối chiếu checklist: Tiếng Việt / UI Safety, Map Flow, Verify / Delete / Admin Actions.
 
 ### Plan
-- Thêm test tái hiện từng finding.
-- Chạy test để xác nhận fail trước sửa.
-- Sửa root cause tối thiểu.
-- Chạy lại test và lint liên quan.
-- Cập nhật Done/Verification/Risks trước khi báo cáo.
+- Bỏ class border dưới header sticky.
+- Thêm border cho wrapper danh sách thông tin cửa hàng.
+- Chạy verification liên quan và cập nhật kết quả.
 
 ### Progress
-- Đã viết test trước cho cache reconcile, navbar counts, deduplicate event, report event.
-- Đã chạy test trước khi sửa và xác nhận fail đúng các behavior mong muốn.
-- Đã sửa cache local mutation để giữ mốc sync cũ và buộc reconcile server.
-- Đã thêm helper/event để navbar refresh counts khi stores/reports đổi.
-- Đã sửa deduplicate event để yêu cầu refetch toàn bộ sau invalidate cache.
+- Đã bỏ border dưới header sticky.
+- Đã thêm border bao quanh danh sách thông tin cửa hàng.
 
 ### Done
-- `lib/storeCache.js`: local append/update/remove không đẩy `lastSyncedAt` vượt mốc server đã sync; cache được đánh dấu `needsServerReconcile` để lần đọc kế tiếp merge thay đổi server còn thiếu.
-- `components/layout/app-navbar.jsx`: badge admin đọc qua `getOrRefreshStores()` và refresh khi có `storevis:stores-changed`, `storevis:reports-changed`, `pageshow`.
-- `pages/store/deduplicate.js`: sau merge dispatch `shouldRefetchAll: true`.
-- `helper/useStoreReportsController.js`: approve/reject report dispatch event report changed để navbar refresh.
-- Đã thêm test helper cho các behavior mới.
+- `components/store-detail-modal.jsx`: header modal không còn đường kẻ ngăn với phần thông tin.
+- `components/store-detail-modal.jsx`: danh sách thông tin cửa hàng được bao quanh bởi `border border-gray-800`.
 
 ### Verification
-- Trước sửa: `npm.cmd test -- --run __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js` fail đúng kỳ vọng: helper mới chưa có và `lastSyncedAt` bị đẩy lên mốc local patch.
-- Sau sửa: `npm.cmd test -- --run __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js __tests__/helper/storeReportEvents.test.js` passed 4 files / 13 tests.
-- Lint: `npm.cmd run lint -- lib/storeCache.js components/layout/app-navbar.jsx pages/store/deduplicate.js helper/useStoreReportsController.js helper/appNavbarCounts.js helper/storeDeduplicateEvents.js helper/storeReportEvents.js __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js __tests__/helper/storeReportEvents.test.js` passed.
+- `npm.cmd run lint -- components/store-detail-modal.jsx` passed.
 - `npm.cmd run text:check` passed: không phát hiện lỗi mã hóa trong repo.
+- Đối chiếu checklist: Tiếng Việt / UI Safety không đổi text/cỡ chữ chính; Map Flow và Admin Actions không đổi logic/nút hành động.
 
 ### Open Questions
-- Không có blocker.
+- Không có blocker; giả định vẫn giữ nút bản đồ nội bộ và nút tuyến vì khác mục đích với GG Maps/gọi điện.
 
 ### Risks / Next
-- Chưa chạy E2E browser thực tế cho create/edit/delete/verify/report/deduplicate.
-- Worktree vẫn có thay đổi cũ ngoài scope ở import/map; không tính vào task cache này.
-- Checklist đã đối chiếu: Stores Read / Cache, Store Create/Edit/Delete/Verify/Report, Import/Deduplicate, Tiếng Việt / UI Safety.
+- Chưa chạy browser smoke test thực tế; nên mở modal để xác nhận khoảng cách giữa header và khối thông tin nhìn cân đối.
 
