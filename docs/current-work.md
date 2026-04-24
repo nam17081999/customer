@@ -1,4 +1,4 @@
-# Current Work
+﻿# Current Work
 
 ## Mục đích
 
@@ -91,79 +91,67 @@ Quy ước bắt buộc:
 - Bug Fix
 
 ### Goal
-- Sửa lỗi trên desktop của màn `/map`: loading overlay `Đang tải bản đồ…` bị treo dù bản đồ đã hiển thị.
-- Sửa thêm regression runtime mới trên desktop của màn `/map`: `RangeError mismatched image size` khi tạo `user-heading-fan`.
-- Làm theo hướng test-first: viết test tái hiện đúng lỗi người dùng còn gặp, để chỉ sửa khi test đã chứng minh bug.
+- Viết test trước rồi sửa 3 lỗi cache/UI đã phát hiện: local patch che update từ user khác, badge admin stale, event deduplicate không buộc refetch.
 
 ### In Scope
-- Cập nhật `docs/current-work.md` cho task bugfix này.
-- Viết test tái hiện bug desktop loading overlay trên `/map`.
-- Viết test tái hiện bug kích thước ảnh marker heading khi `devicePixelRatio` là số lẻ trên desktop Chrome.
-- Chạy test để xác nhận đang fail trước khi sửa.
-- Sửa logic tạo asset map liên quan trong `helper/mapMarkerImages.js` và verify hẹp cho bug desktop `/map`.
-- Chạy lại test mục tiêu và verify hẹp cho bug desktop loading overlay trên `/map`.
+- `lib/storeCache.js`
+- `components/layout/app-navbar.jsx`
+- `pages/store/deduplicate.js`
+- `helper/useStoreReportsController.js`
+- Helper/test liên quan đến cache mutation, navbar sync, deduplicate event, report event.
 
 ### Out of Scope
-- Không thay đổi search, route planning, filter khu vực, navigation follow mode hay marker logic ngoài phần cần cho bug loading này.
-- Không refactor lớn `pages/map.js` hay đổi kiến trúc controller map.
-- Không đụng các file đang bẩn sẵn ngoài phần tối thiểu phục vụ fix.
+- Không đổi business rule create/edit/delete/verify/report/import.
+- Không refactor lớn page store/map/search ngoài phần cần để test hoặc sửa lỗi.
+- Không sửa các thay đổi đang có sẵn ngoài scope: `e2e/store-map.spec.js`, import-flow files.
+- Không thêm dependency mới.
 
 ### Must Preserve
-- `/map` vẫn nhận đúng query `storeId`, `lat`, `lng` và giữ hành vi focus/highlight hiện tại.
-- Chỉ store có tọa độ hợp lệ mới hiển thị trên map; không làm ảnh hưởng blue dot, điều hướng, route drawing.
-- Overlay loading chỉ biến mất khi map đã đủ sẵn sàng để user tương tác; không bỏ qua lỗi khởi tạo map thật.
-- Asset marker/heading vẫn phải hiển thị đúng trên DPR nguyên và không làm hỏng render khi DPR desktop là số lẻ do zoom.
-- Text tiếng Việt giữ UTF-8 an toàn; ưu tiên patch nhỏ.
+- Public store reads vẫn đi qua `getOrRefreshStores()`.
+- Soft delete vẫn dùng `deleted_at`, không hard delete.
+- Store cache vẫn chỉ cache rows `deleted_at IS NULL`.
+- Local cache mutation vẫn hỗ trợ UI cập nhật nhanh sau thao tác thành công.
+- Vietnamese text trong UI/test không bị hỏng encoding.
+- Event `storevis:stores-changed` vẫn đồng bộ được home/map/telesale khi cần.
+
+### Required Verification
+- Test mới phải fail trước khi sửa và pass sau khi sửa.
+- Chạy test cache helper, navbar sync, deduplicate event, report event.
+- Chạy lint cho file bị sửa nếu khả thi.
+- Đối chiếu checklist: Stores Read / Cache, Store Create/Edit/Delete/Verify/Report, Import/Deduplicate, Tiếng Việt / UI Safety.
 
 ### Plan
-- Viết test desktop tái hiện lỗi người dùng còn thấy.
-- Chạy test để chốt trạng thái đỏ trước khi sửa.
-- Sửa tối thiểu theo đúng tín hiệu test fail.
-- Chạy lint hoặc focused verification phù hợp, đi lại checklist `Checklist chung` và `Map Flow`.
-- Cập nhật `Done`, `Verification`, `Risks / Next` sau khi verify xong.
+- Thêm test tái hiện từng finding.
+- Chạy test để xác nhận fail trước sửa.
+- Sửa root cause tối thiểu.
+- Chạy lại test và lint liên quan.
+- Cập nhật Done/Verification/Risks trước khi báo cáo.
 
 ### Progress
-- Đã đọc đầy đủ bộ docs bắt buộc và skill docs trong repo cho task này.
-- Đã phân loại task là `Bug Fix`.
-- Đã quay lại pha test-first theo yêu cầu mới của user vì bug vẫn còn xuất hiện ngoài thực tế.
-- Đã thêm test desktop riêng `desktop /map vẫn tắt loading overlay khi canvas asset marker bị lỗi` trong `e2e/store-map.spec.js`.
-- Đã chạy lại test mục tiêu trên nhánh hiện tại và test đang fail: overlay `Đang tải bản đồ…` vẫn visible dù map UI đã lên.
-- Đã khoanh vùng root cause khả dĩ ở `pages/map.js`: `setMapReady(true)` đang nằm sau nhánh tạo asset canvas tùy chọn (`user-heading-fan` và marker image), nên nếu desktop Chrome lỗi canvas phụ thì loading overlay không bao giờ tắt.
-- Đã vá `pages/map.js` để coi base map là sẵn sàng trước các asset canvas tùy chọn, đồng thời bọc fallback an toàn cho heading asset và batch tạo marker image.
-- Đã chạy lại hai test desktop mục tiêu sau khi sửa và cả hai đều pass.
-- Đã nhận bug runtime mới từ user: `RangeError mismatched image size` ở `map.addImage('user-heading-fan', ...)`.
-- Đã khoanh vùng root cause mới ở `helper/mapMarkerImages.js`: `createUserHeadingFanImage()` đang trả `width/height` theo số float khi `window.devicePixelRatio` là số lẻ, trong khi buffer canvas thực tế dùng kích thước integer.
-- Đã thêm unit test hẹp `__tests__/helper/mapMarkerImages.test.js` để tái hiện case `devicePixelRatio = 0.9`; test fail trước khi sửa vì `image.width` không phải integer.
-- Đã vá `helper/mapMarkerImages.js` để `createUserHeadingFanImage()` dùng kích thước integer và trả đúng `canvas.width`, `canvas.height`, `ImageData` đồng nhất.
-- Đã chạy lại test helper mới, hai regression Playwright của `/map`, và lint vùng sửa; tất cả đều pass.
+- Đã viết test trước cho cache reconcile, navbar counts, deduplicate event, report event.
+- Đã chạy test trước khi sửa và xác nhận fail đúng các behavior mong muốn.
+- Đã sửa cache local mutation để giữ mốc sync cũ và buộc reconcile server.
+- Đã thêm helper/event để navbar refresh counts khi stores/reports đổi.
+- Đã sửa deduplicate event để yêu cầu refetch toàn bộ sau invalidate cache.
 
 ### Done
-- Đã khóa regression `mismatched image size` theo hướng test-first:
-  - test helper đỏ trước khi sửa với DPR lẻ
-  - vá tối thiểu ở `helper/mapMarkerImages.js`
-  - test helper và các regression desktop `/map` đều xanh
-- Nhánh `user-heading-fan` không còn nổ `RangeError` do width/height float lệch buffer ảnh trên desktop Chrome.
+- `lib/storeCache.js`: local append/update/remove không đẩy `lastSyncedAt` vượt mốc server đã sync; cache được đánh dấu `needsServerReconcile` để lần đọc kế tiếp merge thay đổi server còn thiếu.
+- `components/layout/app-navbar.jsx`: badge admin đọc qua `getOrRefreshStores()` và refresh khi có `storevis:stores-changed`, `storevis:reports-changed`, `pageshow`.
+- `pages/store/deduplicate.js`: sau merge dispatch `shouldRefetchAll: true`.
+- `helper/useStoreReportsController.js`: approve/reject report dispatch event report changed để navbar refresh.
+- Đã thêm test helper cho các behavior mới.
 
 ### Verification
-- Đã chạy `npx.cmd playwright test e2e/store-map.spec.js --grep "desktop /map vẫn tắt loading overlay khi canvas asset marker bị lỗi"`:
-  - trước khi sửa: fail, do `getByText('Đang tải bản đồ…')` vẫn visible
-  - sau khi sửa: pass (`1 passed`)
-- Đã chạy `npx.cmd playwright test e2e/store-map.spec.js --grep "desktop /map ẩn loading overlay sau khi bản đồ đã sẵn sàng"`: pass (`1 passed`).
-- Đã chạy `npx.cmd eslint pages/map.js e2e/store-map.spec.js --ext .js,.jsx --quiet`: pass.
-- Đã chạy `npx.cmd vitest run __tests__/helper/mapMarkerImages.test.js`:
-  - trước khi sửa: fail, vì `image.width` không phải integer ở DPR lẻ
-  - sau khi sửa: pass (`1 passed`)
-- Đã chạy `npx.cmd playwright test e2e/store-map.spec.js --grep "desktop /map vẫn tắt loading overlay khi canvas asset marker bị lỗi|desktop /map ẩn loading overlay sau khi bản đồ đã sẵn sàng"`: pass (`2 passed`).
-- Đã chạy `npx.cmd eslint helper/mapMarkerImages.js __tests__/helper/mapMarkerImages.test.js pages/map.js e2e/store-map.spec.js --ext .js,.jsx --quiet`: pass.
-- Checklist đã đi lại:
-  - `Checklist chung`
-  - `Map Flow`
+- Trước sửa: `npm.cmd test -- --run __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js` fail đúng kỳ vọng: helper mới chưa có và `lastSyncedAt` bị đẩy lên mốc local patch.
+- Sau sửa: `npm.cmd test -- --run __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js __tests__/helper/storeReportEvents.test.js` passed 4 files / 13 tests.
+- Lint: `npm.cmd run lint -- lib/storeCache.js components/layout/app-navbar.jsx pages/store/deduplicate.js helper/useStoreReportsController.js helper/appNavbarCounts.js helper/storeDeduplicateEvents.js helper/storeReportEvents.js __tests__/helper/storeCache.test.js __tests__/helper/appNavbarCounts.test.js __tests__/helper/storeDeduplicateEvents.test.js __tests__/helper/storeReportEvents.test.js` passed.
+- `npm.cmd run text:check` passed: không phát hiện lỗi mã hóa trong repo.
 
 ### Open Questions
-- Không có blocker mới; test-first đã xác nhận bug nằm trên nhánh loading overlay của `/map`, không cần đoán thêm.
+- Không có blocker.
 
 ### Risks / Next
-- Worktree đang có thay đổi sẵn ở `pages/map.js` và `helper/useMapRouteController.js`; khi patch phải tránh ghi đè phần không liên quan.
-- Còn `1` test map ngoài scope đang fail về thứ tự search suggestion; cần tránh để nó che mất tín hiệu của test loading mới.
-- Chưa rerun toàn bộ `e2e/store-map.spec.js` vì file này đang có một test ngoài scope đã biết là fail; bằng chứng xanh hiện tập trung ở 2 regression desktop liên quan trực tiếp tới loading overlay.
-- Desktop Chrome có thể tạo `devicePixelRatio` số lẻ khi zoom, nên mọi asset canvas trả về cho MapLibre cần dùng width/height integer khớp tuyệt đối với buffer ảnh.
+- Chưa chạy E2E browser thực tế cho create/edit/delete/verify/report/deduplicate.
+- Worktree vẫn có thay đổi cũ ngoài scope ở import/map; không tính vào task cache này.
+- Checklist đã đối chiếu: Stores Read / Cache, Store Create/Edit/Delete/Verify/Report, Import/Deduplicate, Tiếng Việt / UI Safety.
+

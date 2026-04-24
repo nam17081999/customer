@@ -10,6 +10,7 @@ import { haversineKm } from '@/helper/distance'
 import { extractWords, isSimilarNameByWords, containsAllInputWords } from '@/helper/duplicateCheck'
 import { parseCoordinate } from '@/helper/coordinate'
 import { formatAddressParts } from '@/lib/utils'
+import { buildMergeDeduplicateStoresChangedDetail } from '@/helper/storeDeduplicateEvents'
 
 export default function DeduplicatePage() {
   const router = useRouter()
@@ -201,7 +202,7 @@ export default function DeduplicatePage() {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'merge_deduplicate' },
+            detail: buildMergeDeduplicateStoresChangedDetail(),
           })
         )
       }

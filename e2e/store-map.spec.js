@@ -162,7 +162,7 @@ async function dragRouteItem(page, itemName, targetName) {
   const sourceBox = await sourceCard.boundingBox()
   const targetBox = await targetCard.boundingBox()
   if (!sourceBox || !targetBox) {
-    throw new Error('KhÃ´ng láº¥y Ä‘Æ°á»£c vá»‹ trÃ­ pháº§n tá»­ drag route trong test.')
+    throw new Error('Không lấy được vị trí phần tử drag route trong test.')
   }
 
   await page.mouse.move(sourceBox.x + (sourceBox.width / 2), sourceBox.y + (sourceBox.height / 2))

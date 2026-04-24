@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
 import { getPendingReportCount } from '@/api/reports/report-stats-client'
-import { getCachedStores } from '@/lib/storeCache'
+import { getOrRefreshStores } from '@/lib/storeCache'
+import { getAdminNavbarCounts, shouldRefreshNavbarCountsForEvent } from '@/helper/appNavbarCounts'
 import {
   AccountIcon,
   DashboardIcon,
@@ -63,16 +64,15 @@ export default function AppNavbar() {
       }
 
       try {
-        const [cachedStoresResult, pendingReportCount] = await Promise.all([
-          getCachedStores(),
-          getPendingReportCount(),
-        ])
+        const counts = await getAdminNavbarCounts({
+          isAdmin,
+          getStores: getOrRefreshStores,
+          getPendingReports: getPendingReportCount,
+        })
 
         if (!alive) return
-        const stores = Array.isArray(cachedStoresResult?.data) ? cachedStoresResult.data : []
-        const pendingStoreCount = stores.filter((store) => store.active !== true).length
-        setPendingStores(pendingStoreCount)
-        setPendingReports(pendingReportCount)
+        setPendingStores(counts.pendingStores)
+        setPendingReports(counts.pendingReports)
       } catch {
         if (!alive) return
         setPendingStores(0)
@@ -81,8 +81,30 @@ export default function AppNavbar() {
     }
 
     loadCounts()
+
+    const handleCountsChanged = (event) => {
+      if (shouldRefreshNavbarCountsForEvent(event?.type)) {
+        void loadCounts()
+      }
+    }
+
+    const handlePageShow = () => {
+      void loadCounts()
+    }
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storevis:stores-changed', handleCountsChanged)
+      window.addEventListener('storevis:reports-changed', handleCountsChanged)
+      window.addEventListener('pageshow', handlePageShow)
+    }
+
     return () => {
       alive = false
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storevis:stores-changed', handleCountsChanged)
+        window.removeEventListener('storevis:reports-changed', handleCountsChanged)
+        window.removeEventListener('pageshow', handlePageShow)
+      }
     }
   }, [isAdmin])
 
