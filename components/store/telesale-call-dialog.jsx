@@ -58,7 +58,7 @@ export default function TelesaleCallDialog({ store, trigger }) {
     <>
       {triggerNode}
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden rounded-xl p-0 z-300">
+    <DialogContent className="max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden rounded-xl p-0 z-[310]">
           <div className="border-b border-gray-800 px-4 py-3">
             <DialogTitle className="text-base font-semibold text-gray-100">Chọn số để gọi</DialogTitle>
             <DialogDescription className="mt-1 text-sm text-gray-400">

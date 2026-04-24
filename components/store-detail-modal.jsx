@@ -1,18 +1,12 @@
 import { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import dynamic from 'next/dynamic'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
-import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
-import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, STORE_TYPE_OPTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
-import { formatDistance, getStorePhoneNumbers, validateVietnamPhone } from '@/helper/validation'
-import { parseCoordinate } from '@/helper/coordinate'
+import { formatAddressParts } from '@/lib/utils'
+import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
-import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
 import { useAuth } from '@/lib/AuthContext'
 import { formatLastCalledText, getTelesaleResultLabel, hasReportedOrder } from '@/helper/telesale'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
@@ -20,47 +14,17 @@ import { supabase } from '@/lib/supabaseClient'
 import { removeStoreFromCache, updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 
-const StoreLocationPicker = dynamic(
-  () => import('@/components/map/store-location-picker'),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center bg-gray-900 rounded-md" style={{ height: '45vh' }}>
-        <span className="text-sm text-gray-400 animate-pulse">Đang tải bản đồ…</span>
-      </div>
-    ),
-  }
-)
-
 export default function StoreDetailModal({ store, trigger, open, onOpenChange, onAddToRoute, onRemoveFromRoute, isInRoute = false }) {
   const router = useRouter()
   const { user, isAdmin, isTelesale } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [reportOpen, setReportOpen] = useState(false)
-  const [reportMode, setReportMode] = useState('')
-  const [reportReasons, setReportReasons] = useState([])
-  const [reportSubmitting, setReportSubmitting] = useState(false)
-  const [reportError, setReportError] = useState('')
-  const [reportSuccess, setReportSuccess] = useState('')
   const [detailNotice, setDetailNotice] = useState('')
   const [isPotential, setIsPotential] = useState(false)
   const [potentialSaving, setPotentialSaving] = useState(false)
   const detailNoticeTimerRef = useRef(null)
-  const [reportName, setReportName] = useState('')
-  const [reportStoreType, setReportStoreType] = useState(DEFAULT_STORE_TYPE)
-  const [reportAddressDetail, setReportAddressDetail] = useState('')
-  const [reportWard, setReportWard] = useState('')
-  const [reportDistrict, setReportDistrict] = useState('')
-  const [reportPhone, setReportPhone] = useState('')
-  const [reportNote, setReportNote] = useState('')
-  const [reportLat, setReportLat] = useState(null)
-  const [reportLng, setReportLng] = useState(null)
-  const [reportMapEditable, setReportMapEditable] = useState(false)
-  const [reportResolving, setReportResolving] = useState(false)
   const suppressNextOpenRef = useRef(false)
-  const initializedStoreIdRef = useRef('')
 
   const isControlled = open !== undefined
   const resolvedOpen = isControlled ? open : internalOpen
@@ -101,14 +65,6 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     if (!store) return
 
     if (!resolvedOpen) {
-      initializedStoreIdRef.current = ''
-      setReportOpen(false)
-      setReportMode('')
-      setReportReasons([])
-      setReportSubmitting(false)
-      setReportError('')
-      setReportSuccess('')
-      setReportMapEditable(false)
       setDetailNotice('')
       if (detailNoticeTimerRef.current) {
         clearTimeout(detailNoticeTimerRef.current)
@@ -117,22 +73,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
       return
     }
 
-    const storeIdKey = String(store.id || '')
-    if (!storeIdKey || initializedStoreIdRef.current === storeIdKey) return
-    initializedStoreIdRef.current = storeIdKey
-
-    const lat = parseCoordinate(store.latitude)
-    const lng = parseCoordinate(store.longitude)
     setIsPotential(Boolean(store.is_potential))
-    setReportName(store.name || '')
-    setReportStoreType(store.store_type || DEFAULT_STORE_TYPE)
-    setReportAddressDetail(store.address_detail || '')
-    setReportWard(store.ward || '')
-    setReportDistrict(store.district || '')
-    setReportPhone(store.phone || '')
-    setReportNote(store.note || '')
-    setReportLat(Number.isFinite(lat) ? lat : null)
-    setReportLng(Number.isFinite(lng) ? lng : null)
   }, [resolvedOpen, store])
 
   const canPrefetchMap = Boolean(
@@ -270,150 +211,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     setPotentialSaving(false)
   }
 
-  const wardSuggestions = reportDistrict
-    ? (DISTRICT_WARD_SUGGESTIONS[reportDistrict] || [])
-    : []
-
-  const toggleReason = (code) => {
-    setReportReasons((prev) => {
-      if (prev.includes(code)) return prev.filter((item) => item !== code)
-      return [...prev, code]
-    })
-  }
-
-  const normalizeCoord = (value) => {
-    if (typeof value !== 'number' || !isFinite(value)) return null
-    return Number(value.toFixed(7))
-  }
-
-  const buildProposedChanges = ({ normalizedPhoneOverride } = {}) => {
-    const proposed = {}
-    const normalizedName = toTitleCaseVI(reportName.trim())
-    const normalizedStoreType = reportStoreType || DEFAULT_STORE_TYPE
-    const normalizedDetail = reportAddressDetail.trim() ? toTitleCaseVI(reportAddressDetail.trim()) : null
-    const normalizedWard = reportWard.trim() ? toTitleCaseVI(reportWard.trim()) : null
-    const normalizedDistrict = reportDistrict.trim() ? toTitleCaseVI(reportDistrict.trim()) : null
-    const normalizedPhone = normalizedPhoneOverride !== undefined
-      ? normalizedPhoneOverride
-      : (reportPhone.trim() || null)
-    const normalizedNote = reportNote.trim() || null
-
-    if (normalizedName && normalizedName !== (store.name || '')) proposed.name = normalizedName
-    if ((store.store_type || DEFAULT_STORE_TYPE) !== normalizedStoreType) proposed.store_type = normalizedStoreType
-    if ((store.address_detail || null) !== normalizedDetail) proposed.address_detail = normalizedDetail
-    if ((store.ward || null) !== normalizedWard) proposed.ward = normalizedWard
-    if ((store.district || null) !== normalizedDistrict) proposed.district = normalizedDistrict
-    if ((store.phone || null) !== normalizedPhone) proposed.phone = normalizedPhone
-    if ((store.note || null) !== normalizedNote) proposed.note = normalizedNote
-
-    const currentLat = normalizeCoord(store.latitude)
-    const currentLng = normalizeCoord(store.longitude)
-    const nextLat = normalizeCoord(reportLat)
-    const nextLng = normalizeCoord(reportLng)
-    if (currentLat !== nextLat) proposed.latitude = nextLat
-    if (currentLng !== nextLng) proposed.longitude = nextLng
-
-    return proposed
-  }
-
-  const handleReportGetLocation = async () => {
-    try {
-      setReportResolving(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 15,
-        skipCache: true,
-      })
-      if (!coords) {
-        setReportError(getGeoErrorMessage(error))
-        return
-      }
-      setReportLat(coords.latitude)
-      setReportLng(coords.longitude)
-      setReportError('')
-      setReportSuccess('Đã cập nhật vị trí GPS mới')
-    } catch (err) {
-      console.error('Get location error:', err)
-      setReportError(getGeoErrorMessage(err))
-    } finally {
-      setReportResolving(false)
-    }
-  }
-
-  const handleSubmitReport = async () => {
-    if (reportSubmitting) return
-    setReportError('')
-    setReportSuccess('')
-
-    if (!reportMode) {
-      setReportError('Vui lòng chọn loại báo cáo')
-      return
-    }
-
-    if (reportMode === 'reason') {
-      if (reportReasons.length === 0) {
-        setReportError('Vui lòng chọn ít nhất một lý do')
-        return
-      }
-    }
-
-    let proposedChanges = null
-    if (reportMode === 'edit') {
-      if (!reportName.trim()) {
-        setReportError('Tên cửa hàng không được để trống')
-        return
-      }
-      if (!reportDistrict.trim() || !reportWard.trim()) {
-        setReportError('Vui lòng nhập đủ quận/huyện và xã/phường')
-        return
-      }
-      const rawPhone = reportPhone.trim()
-      let normalizedPhoneOverride = undefined
-      if (rawPhone) {
-        const validation = validateVietnamPhone(rawPhone)
-        if (!validation.isValid) {
-          setReportError(validation.message || 'Số điện thoại không hợp lệ')
-          return
-        }
-        normalizedPhoneOverride = validation.normalized
-      }
-
-      proposedChanges = buildProposedChanges({ normalizedPhoneOverride })
-      if (Object.keys(proposedChanges).length === 0) {
-        setReportError('Bạn chưa thay đổi thông tin nào')
-        return
-      }
-    }
-
-    setReportSubmitting(true)
-    const payload = {
-      store_id: store.id,
-      report_type: reportMode === 'edit' ? 'edit' : 'reason_only',
-      reason_codes: reportMode === 'reason' ? reportReasons : null,
-      proposed_changes: reportMode === 'edit' ? proposedChanges : null,
-      reporter_id: user?.id || null,
-    }
-
-    const { error } = await supabase.from('store_reports').insert([payload])
-    if (error) {
-      console.error(error)
-      setReportError('Không gửi được báo cáo, vui lòng thử lại')
-    } else {
-      setReportOpen(false)
-      setReportReasons([])
-      setReportMode('')
-      setDetailNotice('Đã gửi báo cáo. Admin sẽ xem xét và cập nhật.')
-      if (detailNoticeTimerRef.current) clearTimeout(detailNoticeTimerRef.current)
-      detailNoticeTimerRef.current = setTimeout(() => {
-        setDetailNotice('')
-        detailNoticeTimerRef.current = null
-      }, 3000)
-    }
-    setReportSubmitting(false)
-  }
-
   const detailContent = (
-    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh] z-300">
+    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh] z-[310]">
       <div className="flex flex-col max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 z-10 border-b border-gray-800 bg-gray-950/95 backdrop-blur pt-5 pb-4 px-3">
           <div className="flex items-start justify-between gap-3">
@@ -740,269 +539,11 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     </DialogContent>
   )
 
-  const reportContent = (
-    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh]">
-      <div className="flex flex-col max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center gap-2 border-b border-gray-800 px-4 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            }
-            onClick={() => {
-              setReportOpen(false)
-              setReportMode('')
-              setReportError('')
-              setReportSuccess('')
-            }}
-          />
-          <div className="min-w-0">
-            <p className="text-sm text-gray-400">Báo cáo cửa hàng</p>
-            <OverflowMarquee
-              text={store.name}
-              textClassName="text-base font-semibold text-gray-100"
-            />
-          </div>
-          <DialogClose className="ml-auto w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/60 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </DialogClose>
-        </div>
-
-        <div className="px-4 py-4 space-y-4">
-          <div className="rounded-lg border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-300">
-            Báo cáo cửa hàng sẽ được admin duyệt khi cập nhật.
-          </div>
-
-          {!reportMode && (
-            <div className="space-y-2">
-              <Button type="button" className="w-full" onClick={() => setReportMode('edit')}>
-                Sửa thông tin
-              </Button>
-              <Button type="button" variant="outline" className="w-full" onClick={() => setReportMode('reason')}>
-                Chọn báo cáo
-              </Button>
-            </div>
-          )}
-
-          {reportMode === 'reason' && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-sm text-gray-300">Chọn lý do (có thể chọn nhiều)</Label>
-                <div className="space-y-2">
-                  {REPORT_REASON_OPTIONS.map((opt) => {
-                    const active = reportReasons.includes(opt.code)
-                    return (
-                      <button
-                        key={opt.code}
-                        type="button"
-                        className={`w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors flex items-center justify-between ${active
-                            ? 'bg-blue-600/20 text-blue-200 border-blue-500'
-                            : 'border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                          }`}
-                        onClick={() => toggleReason(opt.code)}
-                        aria-pressed={active}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${active ? 'border-blue-400 bg-blue-500 text-white' : 'border-gray-600 text-gray-400'
-                            }`}>
-                            {active ? (
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                              </svg>
-                            ) : null}
-                          </span>
-                          <span>{opt.label}</span>
-                        </span>
-                        {active && <span className="text-sm text-blue-300">Đã chọn</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="text-sm text-gray-400">
-                  Đã chọn {reportReasons.length} lý do
-                </div>
-              </div>
-            </>
-          )}
-
-          {reportMode === 'edit' && (
-            <>
-              <div className="space-y-1.5">
-                <Label htmlFor="report-store-type" className="text-sm text-gray-300">Loại cửa hàng</Label>
-                <select
-                  id="report-store-type"
-                  value={reportStoreType}
-                  onChange={(e) => setReportStoreType(e.target.value || DEFAULT_STORE_TYPE)}
-                  className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {STORE_TYPE_OPTIONS.map((type) => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-                <Label htmlFor="report-name" className="text-sm text-gray-300">Tên cửa hàng</Label>
-                <Input
-                  id="report-name"
-                  value={reportName}
-                  onChange={(e) => setReportName(e.target.value)}
-                  placeholder="VD: Tạp hóa Minh Anh"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm text-gray-300">Huyện / Quận</Label>
-                <select
-                  value={reportDistrict}
-                  onChange={(e) => { setReportDistrict(e.target.value); setReportWard('') }}
-                  className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Chọn huyện / quận</option>
-                  {DISTRICT_SUGGESTIONS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-sm text-gray-300">Xã / Phường / Thị trấn</Label>
-                {wardSuggestions.length > 0 ? (
-                  <select
-                    value={reportWard}
-                    onChange={(e) => setReportWard(e.target.value)}
-                    className="w-full h-11 rounded-xl border border-gray-700 bg-gray-900 text-sm px-3 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Chọn xã / phường</option>
-                    {wardSuggestions.map((w) => (
-                      <option key={w} value={w}>{w}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    value={reportWard}
-                    onChange={(e) => setReportWard(e.target.value)}
-                    placeholder="VD: Minh Khai"
-                  />
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="report-address" className="text-sm text-gray-300">Địa chỉ chi tiết</Label>
-                <Input
-                  id="report-address"
-                  value={reportAddressDetail}
-                  onChange={(e) => setReportAddressDetail(e.target.value)}
-                  placeholder="Số nhà, đường, thôn/xóm/đội..."
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="report-phone" className="text-sm text-gray-300">Số điện thoại</Label>
-                <Input
-                  id="report-phone"
-                  type="tel"
-                  value={reportPhone}
-                  onChange={(e) => setReportPhone(e.target.value)}
-                  placeholder="0901 234 567"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="report-note" className="text-sm text-gray-300">Ghi chú</Label>
-                <Input
-                  id="report-note"
-                  value={reportNote}
-                  onChange={(e) => setReportNote(e.target.value)}
-                  placeholder="VD: Mở cửa từ 6:00 - 22:00"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm text-gray-300">Vị trí trên bản đồ</Label>
-                {reportLat != null && reportLng != null && (
-                  <p className="text-sm text-gray-400">
-                    Tọa độ: {reportLat.toFixed(6)}, {reportLng.toFixed(6)}
-                  </p>
-                )}
-                <div className="flex gap-2 sm:hidden">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    disabled={reportResolving}
-                    onClick={handleReportGetLocation}
-                  >
-                    {reportResolving ? 'Đang lấy...' : 'Lấy lại vị trí'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => setReportMapEditable((v) => !v)}
-                  >
-                    {reportMapEditable ? 'Khóa bản đồ' : 'Mở khóa'}
-                  </Button>
-                </div>
-                <div className="rounded-2xl overflow-hidden border border-gray-800" style={{ height: '45vh' }}>
-                  <StoreLocationPicker
-                    initialLat={reportLat}
-                    initialLng={reportLng}
-                    editable={reportMapEditable}
-                    onToggleEditable={() => setReportMapEditable((v) => !v)}
-                    onChange={(lat, lng) => { setReportLat(lat); setReportLng(lng) }}
-                    onGetLocation={handleReportGetLocation}
-                    resolvingAddr={reportResolving}
-                    dark={false}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {(reportError || reportSuccess) && (
-            <div className={`rounded-lg border px-3 py-2 text-sm ${reportError ? 'border-red-900 text-red-300 bg-red-950/20' : 'border-green-900 text-green-300 bg-green-950/20'}`}>
-              {reportError || reportSuccess}
-            </div>
-          )}
-
-          {reportMode && (
-            <div className="flex gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  setReportMode('')
-                  setReportError('')
-                  setReportSuccess('')
-                }}
-              >
-                Quay lại
-              </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                disabled={reportSubmitting}
-                onClick={handleSubmitReport}
-              >
-                {reportSubmitting ? 'Đang gửi...' : 'Gửi báo cáo'}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </DialogContent>
-  )
-
-  const content = reportOpen ? reportContent : detailContent
-
   return (
     <>
       <Dialog open={resolvedOpen} onOpenChange={handleDetailOpenChange}>
         {triggerNode || null}
-        {content}
+        {detailContent}
       </Dialog>
 
       <ConfirmDialog

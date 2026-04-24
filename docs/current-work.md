@@ -88,35 +88,33 @@ Quy ước bắt buộc:
 ## Current Snapshot
 
 ### Goal
-- Gộp các logic trước đó được đánh dấu là "có thể đã sót" vào cùng chuẩn xử lý với màn create nếu thực chất không nên khác.
-- Hợp nhất `create`, `edit`, `supplement` về cùng kiểu layout step-based như màn create hiện tại, nhưng vẫn giữ nguyên business branch cũ của từng flow.
-- Chỉ dùng chung phần nào thực sự chung; không xóa khác biệt nghiệp vụ giữa create, edit, supplement.
-- Tiếp tục bước 4 bằng cách tách orchestration/controller khỏi page:
-  - tách `create` trước
-  - tách `edit/supplement` sau
-  - thêm test bù cho phần orchestration vừa tách
-- Điều tra regression mới ở bước cuối màn create: người dùng không thể hoàn thành step vị trí trong một số điều kiện thực tế dù E2E vẫn pass.
-- Audit lại toàn bộ test hiện có để xác nhận chúng thực sự chạy đúng, không pass giả, và chỉ ra khoảng hở coverage còn lại.
+- Chuyển sang vùng tiếp theo của bước 4: màn tìm kiếm `/`.
+- Viết test trước cho các nhánh search/home dễ vỡ nhưng hiện chưa có browser coverage:
+  - load store từ cache public và hiển thị danh sách
+  - tìm kiếm tiếng Việt theo tên
+  - đồng bộ filter/search state lên URL mà không vỡ route
+  - mở detail modal từ search result vẫn giữ đúng hành vi hiện tại
+- Sau khi test khóa đủ nhánh chính, tách bớt orchestration/filter/search-state khỏi `pages/index.js` để page mỏng hơn.
+- Giữ hướng làm: test đủ thực chiến trước, rồi mới refactor tối thiểu.
 
 ### In Scope
-- `pages/store/create.js`.
-- `e2e/store-create.spec.js`.
-- toàn bộ script test/lint/e2e hiện có trong repo.
-- các file test dưới `__tests__/` và `e2e/`.
-- `pages/store/edit/[id].js`.
-- `components/store/store-supplement-form.jsx` hoặc component layout thay thế.
-- Helper flow dùng chung giữa create/edit/supplement.
-- Hook/controller mới nếu cần để kéo side effects ra khỏi page.
-- Test helper và test browser cần cập nhật theo phạm vi refactor này.
-- Cập nhật lại `docs/current-work.md` theo task hiện tại.
+- `pages/index.js`.
+- `components/search-store-card.jsx` nếu search flow cần chạm để test/refactor.
+- `helper/homeSearch.js`.
+- `helper/storeSearch.js`.
+- Helper/controller mới cho search/home nếu cần.
+- Browser test cho search/home.
+- `docs/current-work.md` cho pha làm việc này.
 
 ### Out of Scope
-- Không đổi rule nghiệp vụ của duplicate detection, create quick-save, supplement guest/admin, hay edit trực tiếp.
-- Không refactor các flow khác như search, map, verify, reports, import/export ngoài phần helper/layout bị dùng chung bắt buộc phải chạm.
-- Không gom logic khác nhau một cách cơ học nếu đó là khác biệt nghiệp vụ thật.
-- Không thêm dependency mới ngoài phạm vi test/tooling đã có.
-- Không mở rộng sửa map thật ngoài phạm vi cần thiết để khôi phục khả năng hoàn thành bước cuối của create.
-- Không biến audit test thành refactor lớn ngoài phạm vi phát hiện vấn đề thật sự.
+- Không đổi lại create/edit/supplement/report vừa ổn định nếu search flow không buộc phải chạm.
+- Không refactor `map`, `verify`, `import/export`, `telesale` trong vòng này.
+- Không thay rule nghiệp vụ của search:
+  - tiếng Việt có dấu/không dấu/phát âm phải giữ nguyên
+  - route query hiện tại phải giữ tương thích
+  - public read vẫn đi qua `getOrRefreshStores()`
+- Không thêm dependency mới.
+- Không làm refactor lớn ngoài search/home flow.
 
 ### Must Preserve
 - Route dùng Pages Router trong `pages/`.
@@ -152,28 +150,62 @@ Quy ước bắt buộc:
   - vẫn cập nhật cache local + sync event sau khi lưu
 - Nếu có layout dùng chung thì chỉ đổi phần trình bày/chia bước; side effects, cache, auth branch, redirect, confirm dialog phải giữ đúng behavior cũ.
 - Giữ fallback hoàn thành bước cuối create qua dán Google Maps link khi GPS không lấy được.
+- Report edit vẫn bắt buộc `district` + `ward`, không cho submit nếu không có thay đổi.
+- Report `reason_only` vẫn chỉ gửi lý do, không gửi `proposed_changes`.
+- Admin approve edit report mới được cập nhật `stores`, cập nhật cache local và phát `storevis:stores-changed`.
+- Admin approve reason-only chỉ cập nhật trạng thái report, không patch `stores`.
+- Nút report trong detail modal vẫn đi vào flow report hiện tại `/store/report/[id]`.
 
 ### Plan
-- Investigate why store creation still cannot be completed from the final location step, reproduce it with browser-level checks, identify the exact break point, then add regression coverage for the real failing path.
-- Fix repeated GPS bootstrap on location step by running auto-location only once per step entry, then cover it with regression checks for create/supplement and re-review edit path.
- - Lock ESLint away from generated artifacts (`test-results`, `playwright-report`, `coverage`) so repo-wide lint stays deterministic.
 - Cập nhật working memory rồi mới sửa code.
-- Tái hiện và chỉ ra vì sao E2E hiện tại không bắt được bug ở bước cuối create.
-- Vá đúng nhánh UI khiến người dùng thật không còn đường hoàn thành bước cuối.
-- Thêm browser test cho case bị bỏ sót hiện tại.
-- Chạy lại toàn bộ test/lint/e2e hiện có.
-- Rà cấu hình và mã test để phát hiện `skip/only`, mock quá mạnh, hay test double che mất đường logic thật.
-- Báo rõ test nào đáng tin, test nào còn khoảng hở.
-- Tách orchestration của `create` khỏi `pages/store/create.js` sang hook/controller riêng, chỉ để page giữ render + wiring UI.
-- Tách orchestration của `edit/supplement` khỏi `pages/store/edit/[id].js` theo cùng hướng, giữ riêng business branch của edit và supplement.
-- Giữ riêng các branch nghiệp vụ:
-  - create duplicate gate + quick-save
-  - supplement locks + guest report branch
-  - edit direct update
-- Cập nhật test helper/browser theo vùng orchestration bị ảnh hưởng.
-- Verify theo checklist `Checklist chung`, `Create Flow`, `Edit / Supplement / Report`, `Stores Read / Cache`, `Map Flow`, `Tiếng Việt / UI Safety`.
+- Đọc `pages/index.js` và helper liên quan để xác định nhánh behavior nào đang còn nằm trong page.
+- Viết browser test trước cho search/home.
+- Nếu cần, bổ sung unit test cho helper search thuần.
+- Tách orchestration/search state/filter URL sync khỏi `pages/index.js` theo thay đổi tối thiểu.
+- Verify theo checklist `Checklist chung`, `Search Flow`, `Stores Read / Cache`, `Tiếng Việt / UI Safety`.
 
 ### Progress
+- Đã thêm browser coverage mới cho search/home tại `e2e/store-search.spec.js`, khóa 4 nhánh người dùng thật:
+  - load store public từ cache override và hiển thị danh sách
+  - tìm kiếm tiếng Việt không dấu vẫn match tên có dấu
+  - sync search/filter lên URL rồi khôi phục lại state từ route
+  - mở detail modal từ search result vẫn hiển thị đúng thông tin cửa hàng
+- Đã tách orchestration của màn `/` sang `helper/useHomeSearchController.js`, gom:
+  - restore state từ route query
+  - sync query ngược lại lên URL
+  - geolocation bootstrap + refresh
+  - load store công khai qua cache
+  - sync `storevis:stores-changed`
+  - build search results + filter state + scroll reset
+- `pages/index.js` hiện chủ yếu còn render UI search/filter/list, không còn tự gánh toàn bộ side effect và search-state orchestration.
+- Đã thêm smoke test browser cho đường đi search -> detail modal -> nút report -> route `/store/report/[id]`.
+- Đã xóa toàn bộ khối report cũ khỏi `components/store-detail-modal.jsx`, gồm state/form submit cũ, map picker cũ, và import/helper không còn dùng.
+- `store-detail-modal` hiện chỉ còn render chi tiết cửa hàng và điều hướng sang màn report riêng; không còn giữ implementation report thứ hai trong modal.
+- Đã chốt đợt này chỉ còn một việc report flow chưa khóa bằng test: đường đi từ search -> detail modal -> nút report -> route `/store/report/[id]`.
+- Đã đọc lại `components/store-detail-modal.jsx` và xác nhận khối report cũ hiện hoàn toàn là code chết:
+  - user path thật chỉ `router.push('/store/report/[id]')`
+  - state `reportOpen`, `reportMode`, `reportReasons`, `reportSubmitting`, `reportError`, `reportSuccess` không còn là đường dùng thật
+  - khối form report/map picker trong modal là bản lặp cũ của màn route riêng
+- Đã thêm browser coverage mới cho report flow tại `e2e/store-report.spec.js`, khóa 5 nhánh thực tế:
+  - user gửi `edit` report với payload chuẩn hóa và tọa độ mới
+  - user gửi `reason_only` report không kèm `proposed_changes`
+  - chặn submit khi số điện thoại sai
+  - chặn submit khi không có thay đổi
+  - admin approve/reject đúng nhánh mutation
+- Đã xác nhận bug UI thật ở admin reports: `DialogContent` mặc định nằm dưới overlay (`z-50` dưới `z-300`), khiến dialog xác nhận có thể hiện nhưng không click được; đã sửa z-index dùng chung ở primitive dialog.
+- Đã tách logic thuần của report sang `helper/storeReportFlow.js`, gom:
+  - normalize tọa độ
+  - build `proposed_changes`
+  - validate submit cho `edit` / `reason_only`
+  - build payload `store_reports`
+  - summary cho admin reports
+- Đã tách controller của form report sang `helper/useStoreReportFormController.js`; `components/store-report-form.jsx` hiện chủ yếu còn render UI và bind state/handler.
+- Đã tách orchestration admin reports sang `helper/useStoreReportsController.js`; `pages/store/reports.js` hiện chủ yếu còn render list/card/dialog.
+- Đã thêm unit test cho helper report tại `__tests__/helper/storeReportFlow.test.js`.
+- Đã xác nhận flow report hiện tại không còn submit trong modal chi tiết nữa; nút report trên `store-detail-modal` chuyển sang route riêng `/store/report/[id]`.
+- Đã xác nhận `components/store-detail-modal.jsx` vẫn còn giữ nguyên cả một khối report state + submit logic cũ, tức đang có logic chết/lặp với `components/store-report-form.jsx`.
+- Đã xác nhận `components/store-report-form.jsx` hiện là nơi user thật dùng để gửi report, nhưng đang tự giữ toàn bộ normalize/validate/build payload trong component.
+- Đã xác nhận `pages/store/reports.js` vẫn đang tự gánh toàn bộ load pending reports, approve/reject, apply `proposed_changes`, cache sync và confirm dialog.
 - Confirmed the mobile-save failure path with a browser regression test: the create action bar CTA was visually correct but functionally outside the form, so clicking it never triggered the final submit handler.
 - Identified a second root cause on the create screen: the mobile final-step CTA is rendered outside the form by `StoreStepFormLayout`, so `type="submit"` on that button does not actually submit the form.
 - New bug report under investigation: user still cannot finish saving from the create flow even after the GPS-loop fix, so the next step is to trace the final-step submit path end to end.
@@ -246,6 +278,20 @@ Quy ước bắt buộc:
 - Đã thêm browser test cho path mobile bị bỏ sót: guest mobile vẫn thấy fallback Google Maps ở bước vị trí.
 
 ### Done
+- Hoàn tất test-first cho search/home bằng browser tests sát hành vi thật ở trang `/`.
+- Hoàn tất tách controller/orchestration của `pages/index.js` sang `helper/useHomeSearchController.js` để page mỏng hơn và dễ kiểm soát regression hơn.
+- Hoàn tất smoke test browser cho nút report trong detail modal, khóa đúng đường người dùng thật từ trang tìm kiếm sang route report riêng.
+- Hoàn tất dọn code chết ở `components/store-detail-modal.jsx`; modal không còn giữ một implementation report thứ hai bị lệch với flow thật.
+- Hoàn tất test-first cho report flow bằng browser tests đủ sát hành vi thật, không chỉ mock unit-level.
+- Hoàn tất fix validation bị thiếu ở report form:
+  - số điện thoại sai không còn submit được
+  - case không có thay đổi không còn lọt qua
+- Hoàn tất fix bug click dialog confirm ở admin reports bằng cách nâng `DialogContent` lên trên overlay ở primitive dùng chung.
+- Hoàn tất tách logic report sang helper/controller:
+  - `helper/storeReportFlow.js`
+  - `helper/useStoreReportFormController.js`
+  - `helper/useStoreReportsController.js`
+- Hoàn tất làm mỏng `components/store-report-form.jsx` và `pages/store/reports.js` theo hướng render + wiring UI.
 - Fixed the mobile final-step save path by moving the shared mobile action bar inside `StoreStepFormLayout`'s form, so submit-capable CTAs now participate in the real form submit flow.
 - Fixed repeated GPS fetching and map reload on the location step by introducing a shared one-shot step-entry hook and applying it to create/supplement; regular edit was verified to stay at zero auto-GPS calls on step entry.
 - Locked ESLint config to ignore generated artifacts from Next/Playwright/coverage so full-repo lint no longer depends on transient folders.
@@ -285,6 +331,50 @@ Quy ước bắt buộc:
 - Hoàn tất vá fallback UI ở bước cuối create để người dùng mobile vẫn có đường hoàn thành qua Google Maps link.
 
 ### Verification
+- Đã verify lại sau khi tách logic search/home:
+  - `npm.cmd run test:e2e -- e2e/store-search.spec.js`
+  - `npm.cmd test -- __tests__/helper/homeSearch.test.js __tests__/helper/storeSearch.test.js`
+  - `npx.cmd eslint pages/index.js helper/useHomeSearchController.js e2e/store-search.spec.js --ext .js,.jsx --quiet`
+  - `npm.cmd run lint`
+  - `npm.cmd test`
+  - `npm.cmd run text:check`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js e2e/store-report.spec.js e2e/store-search.spec.js`
+- Kết quả mới nhất:
+  - search E2E: `4 passed (4)`
+  - helper search tests: `2 passed (2)` files, `50 passed (50)` tests
+  - `npm.cmd run lint`: pass
+  - `npm.cmd test`: `10 passed (10)` files, `206 passed (206)` tests
+  - `npm.cmd run text:check`: không phát hiện lỗi mã hóa trong repo
+  - combined E2E create/edit/report/search: `19 passed (19)`
+- Checklist đã đi lại thêm:
+  - `Search Flow`
+- Đã verify lại sau khi xóa report logic cũ khỏi detail modal:
+  - `npm.cmd run lint`
+  - `npm.cmd test`
+  - `npm.cmd run text:check`
+  - `npm.cmd run test:e2e -- e2e/store-report.spec.js`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js e2e/store-report.spec.js`
+- Kết quả mới nhất:
+  - `npm.cmd run lint`: pass
+  - `npm.cmd test`: `10 passed (10)` files, `206 passed (206)` tests
+  - `npm.cmd run text:check`: không phát hiện lỗi mã hóa trong repo
+  - `npm.cmd run test:e2e -- e2e/store-report.spec.js`: `6 passed (6)`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js e2e/store-report.spec.js`: `15 passed (15)`
+- Checklist đã đi lại:
+  - `Checklist chung`
+  - `Edit / Supplement / Report`
+  - `Stores Read / Cache`
+  - `Tiếng Việt / UI Safety`
+- Đã chạy mới sau đợt tách logic report:
+  - `npm.cmd run lint`
+  - `npm.cmd test`
+  - `npm.cmd run text:check`
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js e2e/store-report.spec.js`
+- Kết quả mới:
+  - `npm.cmd run lint`: pass
+  - `npm.cmd test`: `10 passed (10)` files, `206 passed (206)` tests
+  - `npm.cmd run text:check`: không phát hiện lỗi mã hóa
+  - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js e2e/store-report.spec.js`: `14 passed (14)`
 - Verified the mobile final-step save fix with:
   - `npm.cmd run test:e2e -- e2e/store-create.spec.js`
   - `npm.cmd run lint`
@@ -323,11 +413,14 @@ Quy ước bắt buộc:
 - Không có blocker mới; hướng hiện tại là thêm harness E2E hẹp thay vì phụ thuộc dịch vụ thật.
 
 ### Risks / Next
+- `pages/map.js` vẫn là màn nặng nhất còn lại và hiện chưa có browser coverage; đây là ứng viên tiếp theo của bước 4 nếu làm tiếp theo thứ tự giá trị/rủi ro.
+- `pages/store/verify.js` cũng chưa có browser coverage dù có nhánh admin mutation và sync cache, nên nên đi sau search/map.
+- Report flow đã sạch hơn ở `store-detail-modal`, nhưng `pages/store/report/[id].js` hiện vẫn phụ thuộc controller + helper mới mà chưa có hook-level unit test; coverage cho orchestration vẫn chủ yếu dựa vào browser smoke và helper unit tests.
 - The fixed mobile submit path is covered for create; edit/supplement currently use direct `onClick` mobile actions, so they were regression-checked via the shared E2E suite after the layout change and remain green.
 - Regression coverage for the loop fix is still E2E-harness-based; it proves call counts for mocked geolocation, but not real browser GPS provider behavior.
 - E2E is green, but it still runs with `window.__STOREVIS_E2E__` and mocked network writes, so it validates form orchestration better than backend integration.
 - `pages/store/create.js` có text tiếng Việt hiển thị trực tiếp nên patch cần tránh làm hỏng UTF-8.
-- Harness E2E hiện đã phủ `create`, `edit`, `supplement`, nhưng `reports`, `verify`, `search/map` vẫn chưa có browser coverage.
+- Harness E2E hiện đã phủ `create`, `edit`, `supplement`, `report`, `search`, nhưng `map`, `verify`, `import/export` vẫn chưa có browser coverage.
 - Test network vẫn mock ở lớp Playwright; nếu payload/response Supabase thay đổi, cần cập nhật fixture response trong test.
 - Browser test hiện đang dùng test double cho map picker; phù hợp để khóa business flow, nhưng chưa thay cho việc kiểm tra map thật ở vài smoke test thủ công.
 - Controller đã được tách khỏi page, nhưng hiện chưa có unit-test mức hook vì repo chưa có harness React hook test; coverage orchestration đang dựa trên browser smoke + helper unit tests.
