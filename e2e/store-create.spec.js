@@ -112,16 +112,34 @@ async function fillStep2(page, { district = 'Hoài Đức', ward = 'An Khánh', 
   }
 }
 
+async function resetGeoCallCount(page) {
+  await page.evaluate(() => {
+    if (window.__STOREVIS_E2E__?.geolocation) {
+      window.__STOREVIS_E2E__.geolocation.callCount = 0
+    }
+  })
+}
+
+async function expectGeoCallCount(page, expectedCount) {
+  await expect.poll(async () => {
+    return page.evaluate(() => window.__STOREVIS_E2E__?.geolocation?.callCount || 0)
+  }).toBe(expectedCount)
+}
+
 test('tạo cửa hàng đầy đủ qua browser flow và redirect về trang chủ', async ({ page }) => {
   await setupCreateFlow(page)
 
   await completeStep1(page, 'Bách hóa Lan Chi')
   await fillStep2(page)
+  await resetGeoCallCount(page)
 
   await page.getByRole('button', { name: 'Tiếp theo →' }).click()
 
   await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
   await expect(page.getByTestId('e2e-store-location-coords')).not.toHaveText('Chưa có tọa độ')
+  await expectGeoCallCount(page, 1)
+  await page.waitForTimeout(300)
+  await expectGeoCallCount(page, 1)
 
   await page.getByRole('button', { name: /Lưu cửa hàng/i }).click()
   await expect(page.getByText('Xác nhận tạo cửa hàng')).toBeVisible()
@@ -173,6 +191,44 @@ test('telesale có thể quick-save ở bước 2 mà không cần vào bước 
   await page.getByRole('button', { name: 'Lưu cửa hàng' }).click()
   await expect(page.getByText('Xác nhận lưu không vị trí')).toBeVisible()
   await page.getByRole('button', { name: 'Lưu luôn' }).click()
+
+  await page.waitForURL('**/')
+  await expect(page.getByText('Tạo cửa hàng thành công!')).toBeVisible()
+})
+
+test('mobile guest vẫn thấy fallback dán Google Maps ở bước vị trí', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await setupCreateFlow(page, {
+    stores: [],
+  })
+
+  await completeStep1(page, 'Cửa hàng Mobile Fallback')
+  await fillStep2(page)
+  await resetGeoCallCount(page)
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expect(page.locator('label:visible').filter({ hasText: 'Dán đường dẫn Google Maps' })).toBeVisible()
+  await expect(page.locator('button:visible').filter({ hasText: 'Lấy vị trí' })).toBeVisible()
+  await expectGeoCallCount(page, 1)
+  await page.waitForTimeout(300)
+  await expectGeoCallCount(page, 1)
+})
+
+test('mobile create có thể mở confirm và lưu từ action bar bước vị trí', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await setupCreateFlow(page, {
+    stores: [],
+  })
+
+  await completeStep1(page, 'Cửa hàng Mobile Save')
+  await fillStep2(page)
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await page.getByRole('button', { name: /Lưu cửa hàng/i }).click()
+  await expect(page.getByText('Xác nhận tạo cửa hàng')).toBeVisible()
+  await page.getByRole('button', { name: 'Tạo cửa hàng' }).click()
 
   await page.waitForURL('**/')
   await expect(page.getByText('Tạo cửa hàng thành công!')).toBeVisible()

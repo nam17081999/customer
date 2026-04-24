@@ -3,7 +3,7 @@
  * user-friendly error messages, and compass heading.
  */
 
-import { getE2EGeolocationOverride } from '@/lib/e2e-test-mode'
+import { getE2EGeolocationOverride, incrementE2EGeolocationCallCount } from '@/lib/e2e-test-mode'
 
 /**
  * Get the best GPS position using watchPosition for progressive accuracy.
@@ -33,6 +33,7 @@ export async function getBestPosition({
 } = {}) {
   const e2eGeolocation = getE2EGeolocationOverride()
   if (e2eGeolocation.hasOverride) {
+    incrementE2EGeolocationCallCount()
     if (e2eGeolocation.coords) {
       return { coords: e2eGeolocation.coords, error: null }
     }

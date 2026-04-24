@@ -53,6 +53,20 @@ async function setupEditFlow(page, overrides = {}) {
   }, state)
 }
 
+async function resetGeoCallCount(page) {
+  await page.evaluate(() => {
+    if (window.__STOREVIS_E2E__?.geolocation) {
+      window.__STOREVIS_E2E__.geolocation.callCount = 0
+    }
+  })
+}
+
+async function expectGeoCallCount(page, expectedCount) {
+  await expect.poll(async () => {
+    return page.evaluate(() => window.__STOREVIS_E2E__?.geolocation?.callCount || 0)
+  }).toBe(expectedCount)
+}
+
 test('admin edit dùng layout step và lưu thành công', async ({ page }) => {
   await setupEditFlow(page)
 
@@ -80,9 +94,12 @@ test('admin edit dùng layout step và lưu thành công', async ({ page }) => {
 
   await expect(page.getByText('Quận / Huyện')).toBeVisible()
   await page.getByLabel('Địa chỉ cụ thể (không bắt buộc)').fill('xóm chợ mới')
+  await resetGeoCallCount(page)
   await page.getByRole('button', { name: 'Tiếp theo →' }).click()
 
   await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await page.waitForTimeout(300)
+  await expectGeoCallCount(page, 0)
   await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
   await expect(page.getByText('Xác nhận chỉnh sửa cửa hàng')).toBeVisible()
   await page.getByRole('button', { name: 'Lưu thay đổi' }).click()
@@ -139,9 +156,13 @@ test('guest supplement giữ flow step và gửi store report', async ({ page })
 
   await expect(page.getByText('Quận / Huyện')).toBeVisible()
   await page.getByLabel('Số điện thoại').fill('0901234567')
+  await resetGeoCallCount(page)
   await page.getByRole('button', { name: 'Tiếp theo →' }).click()
 
   await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expectGeoCallCount(page, 1)
+  await page.waitForTimeout(300)
+  await expectGeoCallCount(page, 1)
   await page.getByRole('button', { name: 'Gửi bổ sung' }).click()
   await expect(page.getByText('Xác nhận bổ sung cửa hàng')).toBeVisible()
   await page.getByRole('button', { name: 'Lưu bổ sung' }).click()

@@ -18,6 +18,7 @@ import {
   getCreateFinalCoordinates,
   validateStoreCreateStep2,
 } from '@/helper/storeCreateFlow'
+import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 
 export function useStoreCreateController() {
   const router = useRouter()
@@ -387,8 +388,7 @@ export function useStoreCreateController() {
     }
   }, [showMessage])
 
-  useEffect(() => {
-    if (currentStep !== 3) return
+  const bootstrapCreateLocationStep = useCallback(async () => {
     setGeoBlocked(false)
     setMapEditable(false)
     setUserHasEditedMap(false)
@@ -398,10 +398,10 @@ export function useStoreCreateController() {
     setInitialGPSLng(null)
     setHeading(null)
     setStep2Key((value) => value + 1)
-    if (!resolvingAddr) {
-      void handleFillAddress()
-    }
-  }, [currentStep, resolvingAddr, handleFillAddress])
+    await handleFillAddress()
+  }, [handleFillAddress])
+
+  useStepEntryEffect(currentStep === 3, bootstrapCreateLocationStep)
 
   useEffect(() => {
     if (!name.trim()) {

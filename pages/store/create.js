@@ -28,6 +28,7 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
 })
 
 export default function AddStore() {
+  const createFormId = 'store-create-form'
   const {
     isAdmin,
     telesaleNoStep3,
@@ -208,6 +209,7 @@ export default function AddStore() {
         steps={steps}
         currentStep={currentStep}
         onSubmit={handleSubmit}
+        formId={createFormId}
         mobileActionBar={mobileActionBar}
       >
         {currentStep === 1 && (
@@ -514,18 +516,16 @@ export default function AddStore() {
               />
             </div>
 
-            {isAdmin ? (
-              <div className="space-y-2 pt-2 md:hidden">
-                <StoreMapsLinkFields
-                  value={mapsLink}
-                  loading={mapsLinkLoading}
-                  error={mapsLinkError}
-                  mobile
-                  onChange={setMapsLink}
-                  onSubmit={() => handleMapsLink(mapsLink)}
-                />
-              </div>
-            ) : null}
+            <div className="space-y-2 pt-2 md:hidden">
+              <StoreMapsLinkFields
+                value={mapsLink}
+                loading={mapsLinkLoading}
+                error={mapsLinkError}
+                mobile
+                onChange={setMapsLink}
+                onSubmit={() => handleMapsLink(mapsLink)}
+              />
+            </div>
 
             <div className="hidden space-y-1.5 pt-2 md:block">
               <StoreMapsLinkFields
@@ -545,11 +545,12 @@ export default function AddStore() {
                 icon={<span>←</span>}
                 onClick={() => setCurrentStep(2)}
               />
-              <Button
-                type="submit"
-                disabled={loading || resolvingAddr || geoBlocked}
-                className="flex-1"
-                leftIcon={(resolvingAddr || loading) ? (
+        <Button
+          type="submit"
+          form={createFormId}
+          disabled={loading || resolvingAddr || geoBlocked}
+          className="flex-1"
+          leftIcon={(resolvingAddr || loading) ? (
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

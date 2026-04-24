@@ -18,6 +18,7 @@ import {
   hasEditableSupplementFields,
   validateStoreEditPhones,
 } from '@/helper/storeEditFlow'
+import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 
 function getCoordinateValue(value) {
   return Number.isFinite(value) ? value : null
@@ -204,9 +205,7 @@ export function useStoreEditController() {
   const editSteps = useMemo(() => buildEditSteps(), [])
   const hasEditableFields = useMemo(() => hasEditableSupplementFields(supplementLocks), [supplementLocks])
 
-  useEffect(() => {
-    if (!isSupplementMode || !canSupplementLocation) return
-    if (currentStep !== 3) return
+  const bootstrapSupplementLocationStep = useCallback(async () => {
     setGeoBlocked(false)
     setMapEditable(false)
     setUserHasEditedMap(false)
@@ -216,10 +215,13 @@ export function useStoreEditController() {
     setInitialGPSLng(null)
     setHeading(null)
     setStep2Key((value) => value + 1)
-    if (!resolvingAddr) {
-      void handleGetLocation()
-    }
-  }, [isSupplementMode, canSupplementLocation, currentStep, resolvingAddr, handleGetLocation])
+    await handleGetLocation()
+  }, [handleGetLocation])
+
+  useStepEntryEffect(
+    isSupplementMode && canSupplementLocation && currentStep === 3,
+    bootstrapSupplementLocationStep
+  )
 
   const applyMapsLinkCoords = useCallback((lat, lng) => {
     setInitialGPSLat(lat)
