@@ -7,11 +7,18 @@ import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
-import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { parseCoordinate } from '@/helper/coordinate'
 import { formatAddressParts } from '@/lib/utils'
-import { haversineKm } from '@/helper/distance'
 import { buildStoreSearchIndex, createSearchQueryMeta, matchesSearchQuery } from '@/helper/storeSearch'
+import { filterMapStoresByAreaSelection } from '@/helper/mapFilter'
+import {
+  formatRouteDistance,
+  formatRouteDuration,
+  formatShortAddress,
+  moveItem,
+} from '@/helper/mapRoute'
+import { useMapNavigationController } from '@/helper/useMapNavigationController'
+import { useMapRouteController } from '@/helper/useMapRouteController'
 import {
   createUserHeadingFanImage,
   ensureStoreMarkerImage,
@@ -20,78 +27,8 @@ import {
   removeMarkerImages,
 } from '@/helper/mapMarkerImages'
 
-function formatShortAddress(store) {
-  if (!store) return ''
-  const parts = []
-  if (store.ward) parts.push(store.ward)
-  if (store.district) parts.push(store.district)
-  return parts.join(', ')
-}
-
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
-const MAP_ROUTE_STORAGE_KEY = 'storevis:map-route-plan'
-const FIXED_ROUTE_POINT = {
-  lat: 21.0774332,
-  lng: 105.6951599,
-  name: 'Điểm xuất phát',
-}
-
-const HEADING_JITTER_DEG = 6
-const HEADING_SMOOTHING_ALPHA = 0.22
-const NAV_ARRIVE_DISTANCE_M = 45
-const NAV_LEAVE_DISTANCE_M = 90
-const NAV_WAREHOUSE_DISTANCE_M = 55
-const ROUTE_STOP_STATUS = {
-  PENDING: 'pending',
-  ARRIVED: 'arrived',
-  COMPLETED: 'completed',
-}
-
-function normalizeHeading(deg) {
-  if (!Number.isFinite(deg)) return null
-  return ((deg % 360) + 360) % 360
-}
-
-function shortestHeadingDelta(from, to) {
-  return ((((to - from) % 360) + 540) % 360) - 180
-}
-
-function smoothHeading(previous, next) {
-  const prev = normalizeHeading(previous)
-  const nextNorm = normalizeHeading(next)
-  if (nextNorm == null) return null
-  if (prev == null) return nextNorm
-
-  const delta = shortestHeadingDelta(prev, nextNorm)
-  if (Math.abs(delta) <= HEADING_JITTER_DEG) return prev
-
-  return normalizeHeading(prev + (delta * HEADING_SMOOTHING_ALPHA))
-}
-
-function formatRouteDistance(distanceMeters) {
-  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return ''
-  if (distanceMeters < 1000) return `${Math.round(distanceMeters)} m`
-  return `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)} km`
-}
-
-function formatRouteDuration(durationSeconds) {
-  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return ''
-  const totalMinutes = Math.round(durationSeconds / 60)
-  if (totalMinutes < 60) return `${totalMinutes} phút`
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-  if (minutes === 0) return `${hours} giờ`
-  return `${hours} giờ ${minutes} phút`
-}
-
-function moveItem(list, fromIndex, toIndex) {
-  if (toIndex < 0 || toIndex >= list.length || fromIndex === toIndex) return list
-  const next = [...list]
-  const [item] = next.splice(fromIndex, 1)
-  next.splice(toIndex, 0, item)
-  return next
-}
 
 const ROUTE_DRAG_HOLD_MS = 220
 const ROUTE_DRAG_CANCEL_PX = 10
@@ -150,8 +87,6 @@ export default function MapPage() {
   const maplibreRef = useRef(null)
   const popupRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
-  const locatingUserRef = useRef(false)
-  const pendingHeadingRef = useRef(null)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -168,25 +103,12 @@ export default function MapPage() {
   const [selectedDistricts, setSelectedDistricts] = useState([])
   const [selectedWards, setSelectedWards] = useState([])
   const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
-  const [locationError, setLocationError] = useState('')
-  const [userLocation, setUserLocation] = useState(null)
-  const [followUserHeading, setFollowUserHeading] = useState(false)
-  const [routeStops, setRouteStops] = useState([])
-  const [routeGeojson, setRouteGeojson] = useState(EMPTY_FEATURE_COLLECTION)
-  const [routeSummary, setRouteSummary] = useState(null)
-  const [routeLoading, setRouteLoading] = useState(false)
-  const [routeSorting, setRouteSorting] = useState(false)
-  const [routeError, setRouteError] = useState('')
-  const [routePanelOpen, setRoutePanelOpen] = useState(false)
-  const [hideUnselectedStores, setHideUnselectedStores] = useState(false)
-  const [routeStopStatusById, setRouteStopStatusById] = useState({})
-  const [navLoading, setNavLoading] = useState(false)
   const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
   const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
   const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
   const [dragRouteOffset, setDragRouteOffset] = useState({ x: 0, y: 0 })
   const [dragRouteBox, setDragRouteBox] = useState(null)
-  const [routePlanHydrated, setRoutePlanHydrated] = useState(false)
+  const [routePanelOpen, setRoutePanelOpen] = useState(false)
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
@@ -196,8 +118,6 @@ export default function MapPage() {
   const pendingRouteDragRef = useRef(null)
   const routeAutoScrollRef = useRef(null)
   const suppressMapInteractionUntilRef = useRef(0)
-  const restoredRoutePlanRef = useRef(false)
-  const followUserHeadingRef = useRef(false)
 
   const initialTarget = useMemo(() => {
     if (!router.isReady) return null
@@ -216,48 +136,26 @@ export default function MapPage() {
     return rawStoreId ? String(rawStoreId) : ''
   }, [router.isReady, router.query.storeId])
 
+  const clearSelectedStore = useCallback(() => {
+    setSelectedStore(null)
+  }, [])
+
+  const {
+    locationError,
+    userLocation,
+    followUserHeading,
+    navLoading,
+    recenterToUserLocation,
+    toggleUserHeadingRotation,
+    disableFollowUserHeading,
+  } = useMapNavigationController({
+    mapRef,
+    mapReady,
+    initialHasRouteTarget: Boolean(initialTarget || initialStoreId),
+    clearSelectedStore,
+  })
+
   // Detect desktop via pointer capability (not screen width)
-  const routeStopIds = useMemo(
-    () => new Set(routeStops.map((store) => String(store.id))),
-    [routeStops]
-  )
-
-  const routeStopOrderById = useMemo(
-    () => {
-      const remainingStops = routeStops.filter((store) => {
-        const id = String(store.id)
-        return (routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) !== ROUTE_STOP_STATUS.COMPLETED
-      })
-      return new Map(remainingStops.map((store, index) => [String(store.id), String(index + 1)]))
-    },
-    [routeStops, routeStopStatusById]
-  )
-  const completedRouteStopIdSet = useMemo(() => {
-    const ids = []
-    for (const store of routeStops) {
-      const id = String(store.id)
-      if ((routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) === ROUTE_STOP_STATUS.COMPLETED) {
-        ids.push(id)
-      }
-    }
-    return new Set(ids)
-  }, [routeStops, routeStopStatusById])
-
-  const renderedRouteStops = useMemo(() => {
-    const items = routeStops.map((store, index) => ({ store, originalIndex: index }))
-    if (draggedRouteIndex < 0 || dragOverRouteIndex < 0) {
-      return items.map((item, displayIndex) => ({ ...item, displayIndex }))
-    }
-
-    return moveItem(items, draggedRouteIndex, dragOverRouteIndex)
-      .map((item, displayIndex) => ({ ...item, displayIndex }))
-  }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
-
-  const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
-
-  useEffect(() => {
-    followUserHeadingRef.current = followUserHeading
-  }, [followUserHeading])
 
   useEffect(() => {
     const mq = window.matchMedia('(hover: hover) and (pointer: fine)')
@@ -285,12 +183,8 @@ export default function MapPage() {
   }, [stores])
 
   const storesAfterAreaFilters = useMemo(() => {
-    if (selectedWards.length === 0) return storesWithCoords
-    return storesWithCoords.filter((store) => {
-      const w = (store.ward || '').trim()
-      return selectedWards.includes(w)
-    })
-  }, [storesWithCoords, selectedWards])
+    return filterMapStoresByAreaSelection(storesWithCoords, selectedDistricts, selectedWards)
+  }, [storesWithCoords, selectedDistricts, selectedWards])
 
   const filteredStores = useMemo(() => {
     return storesAfterAreaFilters.filter((store) => {
@@ -298,6 +192,47 @@ export default function MapPage() {
       return typeMatched
     })
   }, [storesAfterAreaFilters, selectedStoreTypes])
+
+  const {
+    routeStops,
+    setRouteStops,
+    routeGeojson,
+    routeSummary,
+    routeLoading,
+    routeSorting,
+    routeError,
+    hideUnselectedStores,
+    setHideUnselectedStores,
+    routeStopIds,
+    routeStopOrderById,
+    completedRouteStopIdSet,
+    navigationInfo,
+    addStoreToRoute,
+    removeRouteStop,
+    clearRoutePlan,
+    buildRoute,
+    optimizeRouteOrder,
+    resetRouteProgress,
+  } = useMapRouteController({
+    loading,
+    storesWithCoords,
+    userLocation,
+    followUserHeading,
+    mapRef,
+    isDesktop,
+  })
+
+  const renderedRouteStops = useMemo(() => {
+    const items = routeStops.map((store, index) => ({ store, originalIndex: index }))
+    if (draggedRouteIndex < 0 || dragOverRouteIndex < 0) {
+      return items.map((item, displayIndex) => ({ ...item, displayIndex }))
+    }
+
+    return moveItem(items, draggedRouteIndex, dragOverRouteIndex)
+      .map((item, displayIndex) => ({ ...item, displayIndex }))
+  }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
+
+  const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
 
   const visibleMapStores = useMemo(() => {
     if (!hideUnselectedStores || routeStopIds.size === 0) return filteredStores
@@ -835,121 +770,12 @@ export default function MapPage() {
   }, [mapReady, userLocation])
 
   useEffect(() => {
-    const latestById = new Map(storesWithCoords.map((store) => [String(store.id), store]))
-    setRouteStops((prev) => prev
-      .map((store) => latestById.get(String(store.id)) || null)
-      .filter(Boolean)
-    )
-  }, [storesWithCoords])
-
-  useEffect(() => {
-    if (restoredRoutePlanRef.current) return
-    if (typeof window === 'undefined') return
-    if (loading) return
-
-    try {
-      const raw = window.localStorage.getItem(MAP_ROUTE_STORAGE_KEY)
-      if (!raw) {
-        restoredRoutePlanRef.current = true
-        return
-      }
-
-      const parsed = JSON.parse(raw)
-      const savedIds = Array.isArray(parsed?.routeStopIds) ? parsed.routeStopIds.map(String) : []
-      const byId = new Map(storesWithCoords.map((store) => [String(store.id), store]))
-      const restoredStops = savedIds
-        .map((id) => byId.get(id) || null)
-        .filter(Boolean)
-
-      // Wait for the first non-loading store payload before finalizing restore.
-      if (savedIds.length > 0 && restoredStops.length === 0 && stores.length === 0) return
-
-      restoredRoutePlanRef.current = true
-      setRouteStops(restoredStops)
-      if (typeof parsed?.hideUnselectedStores === 'boolean') setHideUnselectedStores(parsed.hideUnselectedStores)
-    } catch (error) {
-      restoredRoutePlanRef.current = true
-      console.error('Restore route plan failed:', error)
-    } finally {
-      if (restoredRoutePlanRef.current) {
-        setRoutePlanHydrated(true)
-      }
-    }
-  }, [loading, stores, storesWithCoords])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!routePlanHydrated) return
-
-    try {
-      window.localStorage.setItem(MAP_ROUTE_STORAGE_KEY, JSON.stringify({
-        routeStopIds: routeStops.map((store) => String(store.id)),
-        hideUnselectedStores,
-      }))
-    } catch (error) {
-      console.error('Persist route plan failed:', error)
-    }
-  }, [routePlanHydrated, routeStops, hideUnselectedStores])
-
-  useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
 
     const routeSource = map.getSource('route-path')
     if (routeSource) routeSource.setData(routeGeojson)
   }, [mapReady, routeGeojson])
-
-  useEffect(() => {
-    setRouteGeojson(EMPTY_FEATURE_COLLECTION)
-    setRouteSummary(null)
-    setRouteError('')
-  }, [routeStops])
-
-  useEffect(() => {
-    if (routeStops.length === 0) setHideUnselectedStores(false)
-  }, [routeStops.length])
-
-  useEffect(() => {
-    setRouteStopStatusById((prev) => {
-      const next = {}
-      for (const store of routeStops) {
-        const id = String(store.id)
-        next[id] = prev[id] || ROUTE_STOP_STATUS.PENDING
-      }
-      return next
-    })
-    if (routeStops.length === 0) {
-      followUserHeadingRef.current = false
-      setFollowUserHeading(false)
-    }
-  }, [routeStops])
-
-  const addStoreToRoute = useCallback((store) => {
-    if (!store?.coords) return
-    setRouteStops((prev) => {
-      if (prev.some((item) => String(item.id) === String(store.id))) return prev
-      return [...prev, store]
-    })
-    setRouteStopStatusById({})
-    setRouteError('')
-  }, [])
-
-  const removeRouteStop = useCallback((storeId) => {
-    setRouteStops((prev) => prev.filter((store) => String(store.id) !== String(storeId)))
-    setRouteStopStatusById((prev) => {
-      const next = { ...prev }
-      delete next[String(storeId)]
-      return next
-    })
-  }, [])
-
-  const clearRoutePlan = useCallback(() => {
-    setRouteStops([])
-    setRouteGeojson(EMPTY_FEATURE_COLLECTION)
-    setRouteSummary(null)
-    setRouteError('')
-    setRouteStopStatusById({})
-  }, [])
 
   const cancelPendingRouteDrag = useCallback(() => {
     if (!pendingRouteDragRef.current) return
@@ -971,7 +797,7 @@ export default function MapPage() {
 
     if (!cancelled && fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
       setRouteStops((prev) => moveItem(prev, fromIndex, toIndex))
-      setRouteStopStatusById({})
+      resetRouteProgress()
     }
 
     setArmedRouteIndex(-1)
@@ -979,7 +805,7 @@ export default function MapPage() {
     setDragOverRouteIndex(-1)
     setDragRouteOffset({ x: 0, y: 0 })
     setDragRouteBox(null)
-  }, [cancelPendingRouteDrag])
+  }, [cancelPendingRouteDrag, resetRouteProgress, setRouteStops])
 
   const updateRouteDragTarget = useCallback((clientY) => {
     const entries = Array.from(routeItemRefs.current.entries())
@@ -1158,164 +984,6 @@ export default function MapPage() {
     }
   }, [cancelPendingRouteDrag])
 
-  const buildRoute = useCallback(async () => {
-    const startPoint = FIXED_ROUTE_POINT
-    const endPoint = FIXED_ROUTE_POINT
-
-    const completedSet = new Set(
-      routeStops
-        .map((store) => String(store.id))
-        .filter((id) => (routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING) === ROUTE_STOP_STATUS.COMPLETED)
-    )
-    const stops = routeStops
-      .filter((store) => !completedSet.has(String(store.id)))
-      .map((store) => ({
-      id: String(store.id),
-      name: store.name || 'C\u1eeda h\u00e0ng',
-      lat: store.coords.lat,
-      lng: store.coords.lng,
-      }))
-
-    if (stops.length < 1) {
-      setRouteError('Chọn ít nhất 1 cửa hàng để vẽ tuyến.')
-      return
-    }
-
-    setRouteLoading(true)
-    setRouteError('')
-
-    try {
-      const response = await fetch('/api/route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          start: startPoint,
-          end: endPoint,
-          stops,
-        }),
-      })
-
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Kh\u00f4ng l\u1ea5y \u0111\u01b0\u1ee3c tuy\u1ebfn \u0111\u01b0\u1eddng.')
-      }
-
-      const routeFeature = {
-        type: 'Feature',
-        geometry: payload.geometry,
-        properties: {
-          distance: payload.distance,
-          duration: payload.duration,
-        },
-      }
-
-      setRouteGeojson({
-        type: 'FeatureCollection',
-        features: [routeFeature],
-      })
-      setRouteSummary({
-        distance: payload.distance,
-        duration: payload.duration,
-        returnsToFixedPoint: true,
-      })
-
-      const map = mapRef.current
-      const bounds = payload.geometry?.coordinates?.reduce((acc, [lng, lat]) => {
-        if (!acc) return [[lng, lat], [lng, lat]]
-        return [
-          [Math.min(acc[0][0], lng), Math.min(acc[0][1], lat)],
-          [Math.max(acc[1][0], lng), Math.max(acc[1][1], lat)],
-        ]
-      }, null)
-
-      if (map && bounds) {
-        map.fitBounds(bounds, {
-          padding: isDesktop
-            ? { top: 110, right: 370, bottom: 70, left: 70 }
-            : { top: 110, right: 40, bottom: 220, left: 40 },
-          duration: 900,
-        })
-      }
-    } catch (err) {
-      console.error('Build route failed:', err)
-      setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 v\u1ebd tuy\u1ebfn \u0111\u01b0\u1eddng ngay l\u00fac n\u00e0y.')
-    } finally {
-      setRouteLoading(false)
-    }
-  }, [isDesktop, routeStopStatusById, routeStops])
-
-  const optimizeRouteOrder = useCallback(async () => {
-    if (routeStops.length < 2) {
-      setRouteError('Chọn ít nhất 2 cửa hàng để sắp xếp.')
-      return
-    }
-
-    const confirmed = typeof window === 'undefined'
-      ? true
-      : window.confirm('Sắp xếp lại thứ tự cửa hàng cho tuyến đi và quay về điểm xuất phát cố định? Thứ tự hiện tại sẽ được thay đổi.')
-
-    if (!confirmed) return
-
-    const startPoint = FIXED_ROUTE_POINT
-    const endPoint = FIXED_ROUTE_POINT
-
-    const stops = routeStops.map((store) => ({
-      id: String(store.id),
-      name: store.name || 'C\u1eeda h\u00e0ng',
-      lat: store.coords.lat,
-      lng: store.coords.lng,
-    }))
-
-    setRouteSorting(true)
-    setRouteError('')
-
-    try {
-      const response = await fetch('/api/route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mode: 'optimize',
-          start: startPoint,
-          end: endPoint,
-          stops,
-        }),
-      })
-
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng.')
-      }
-
-      const orderedStopIds = Array.isArray(payload?.orderedStopIds) ? payload.orderedStopIds.map(String) : []
-      if (orderedStopIds.length !== routeStops.length) {
-        throw new Error('Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp l\u1ea1i \u0111\u1ea7y \u0111\u1ee7 danh s\u00e1ch c\u1eeda h\u00e0ng.')
-      }
-
-      const storeById = new Map(routeStops.map((store) => [String(store.id), store]))
-      const nextRouteStops = orderedStopIds
-        .map((id) => storeById.get(id) || null)
-        .filter(Boolean)
-
-      if (nextRouteStops.length !== routeStops.length) {
-        throw new Error('Kh\u00f4ng th\u1ec3 kh\u00f4i ph\u1ee5c \u0111\u1ea7y \u0111\u1ee7 danh s\u00e1ch sau khi s\u1eafp x\u1ebfp.')
-      }
-
-      setRouteStops(nextRouteStops)
-      setRouteGeojson(EMPTY_FEATURE_COLLECTION)
-      setRouteSummary(null)
-      setRouteStopStatusById({})
-    } catch (err) {
-      console.error('Optimize route order failed:', err)
-      setRouteError(err?.message || 'Kh\u00f4ng th\u1ec3 s\u1eafp x\u1ebfp danh s\u00e1ch c\u1eeda h\u00e0ng l\u00fac n\u00e0y.')
-    } finally {
-      setRouteSorting(false)
-    }
-  }, [routeStops])
-
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
     const map = mapRef.current
@@ -1340,315 +1008,7 @@ export default function MapPage() {
     setShowSuggestions(false)
   }, [flyToStore, indexedMapStores, searchTerm])
 
-  const setMapBearing = useCallback((bearing) => {
-    const map = mapRef.current
-    if (!map) return
-
-    map.easeTo({
-      bearing,
-      duration: 900,
-      essential: true,
-    })
-  }, [])
-
-  const refreshUserLocation = useCallback(async ({ shouldRecenter = false, forceFreshPosition = false } = {}) => {
-    if (locatingUserRef.current) return null
-
-    locatingUserRef.current = true
-    setLocationError('')
-
-    try {
-      const [positionResult, headingResult] = await Promise.all([
-        getBestPosition({
-          maxWaitTime: 2500,
-          desiredAccuracy: 30,
-          skipCache: forceFreshPosition,
-        }),
-        requestCompassHeading({ requestPermission: false }).catch(() => ({ heading: null, error: '' })),
-      ])
-
-      const { coords, error } = positionResult
-      const compassHeading = typeof headingResult?.heading === 'number'
-        ? ((headingResult.heading % 360) + 360) % 360
-        : null
-      const gpsHeading = typeof coords?.heading === 'number' && Number.isFinite(coords.heading)
-        ? ((coords.heading % 360) + 360) % 360
-        : null
-      const heading = compassHeading ?? gpsHeading ?? pendingHeadingRef.current
-
-      if (!coords) {
-        setLocationError(getGeoErrorMessage(error))
-        return null
-      }
-
-      const normalizedHeading = normalizeHeading(heading)
-      const smoothedHeading = smoothHeading(pendingHeadingRef.current, normalizedHeading)
-
-      const nextLocation = {
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        accuracy: coords.accuracy ?? null,
-        heading: smoothedHeading,
-      }
-      if (smoothedHeading != null) {
-        pendingHeadingRef.current = smoothedHeading
-      }
-      setUserLocation((prev) => ({
-        ...nextLocation,
-        heading: smoothedHeading ?? prev?.heading ?? null,
-      }))
-
-      if (shouldRecenter) {
-        const map = mapRef.current
-        if (map) {
-          setSelectedStore(null)
-          map.stop()
-          map.easeTo({
-            center: [coords.longitude, coords.latitude],
-            duration: 900,
-            essential: true,
-          })
-        }
-      }
-
-      return nextLocation
-    } catch (err) {
-      console.error('Recenter to user failed:', err)
-      setLocationError(getGeoErrorMessage(err))
-      return null
-    } finally {
-      locatingUserRef.current = false
-    }
-  }, [])
-
-  const recenterToUserLocation = useCallback(() => {
-    if (!userLocation || !Number.isFinite(userLocation.latitude) || !Number.isFinite(userLocation.longitude)) {
-      setLocationError('Chưa có vị trí hiện tại để quay về.')
-      return null
-    }
-
-    const map = mapRef.current
-    if (!map) return null
-
-    setLocationError('')
-    setSelectedStore(null)
-    map.stop()
-    map.easeTo({
-      center: [userLocation.longitude, userLocation.latitude],
-      duration: 900,
-      essential: true,
-    })
-
-    return null
-  }, [userLocation])
-
-  const toggleUserHeadingRotation = useCallback(async () => {
-    if (followUserHeading) {
-      followUserHeadingRef.current = false
-      setFollowUserHeading(false)
-      setMapBearing(0)
-      return
-    }
-
-    const currentLocation = userLocation
-    const map = mapRef.current
-    if (!map) return
-
-    setNavLoading(true)
-    try {
-      const headingResult = await requestCompassHeading({ requestPermission: true }).catch(() => ({ heading: null, error: '' }))
-      let heading = normalizeHeading(headingResult?.heading ?? currentLocation?.heading ?? pendingHeadingRef.current)
-      if (heading != null) {
-        pendingHeadingRef.current = smoothHeading(pendingHeadingRef.current, heading)
-        heading = pendingHeadingRef.current
-        setUserLocation((prev) => (prev ? { ...prev, heading } : prev))
-      }
-      if (headingResult?.error && heading == null) {
-        setLocationError(headingResult.error)
-      }
-
-      if (!currentLocation || !Number.isFinite(currentLocation.latitude) || !Number.isFinite(currentLocation.longitude)) {
-        setLocationError('Không lấy được hướng hiện tại của thiết bị.')
-        return
-      }
-
-      followUserHeadingRef.current = true
-      setFollowUserHeading(true)
-      if (routeStops.length > 0) setHideUnselectedStores(true)
-      if (!headingResult?.error || heading != null) {
-        setLocationError('')
-      }
-      setSelectedStore(null)
-      map.stop()
-      map.easeTo({
-        center: [currentLocation.longitude, currentLocation.latitude],
-        bearing: pendingHeadingRef.current ?? heading ?? 0,
-        duration: 900,
-        essential: true,
-      })
-      if (routeStops.length > 0 && routeGeojson.features.length === 0) {
-        buildRoute()
-      }
-    } finally {
-      setNavLoading(false)
-    }
-  }, [buildRoute, followUserHeading, routeGeojson.features.length, routeStops.length, setMapBearing, userLocation])
-
-  useEffect(() => {
-    if (!followUserHeading) return
-    if (!Number.isFinite(userLocation?.latitude) || !Number.isFinite(userLocation?.longitude)) return
-    if (routeStops.length === 0) return
-    setRouteStopStatusById((prev) => {
-      const next = { ...prev }
-      let changed = false
-
-      const orderedStops = routeStops.map((store) => {
-        const id = String(store.id)
-        const status = next[id] || ROUTE_STOP_STATUS.PENDING
-        next[id] = status
-        return { id, store, status }
-      })
-
-      const arrivedEntry = orderedStops.find((entry) => next[entry.id] === ROUTE_STOP_STATUS.ARRIVED) || null
-
-      if (arrivedEntry) {
-        const distanceFromArrived = haversineKm(
-          userLocation.latitude,
-          userLocation.longitude,
-          arrivedEntry.store.coords.lat,
-          arrivedEntry.store.coords.lng
-        ) * 1000
-
-        if (distanceFromArrived > NAV_LEAVE_DISTANCE_M) {
-          next[arrivedEntry.id] = ROUTE_STOP_STATUS.COMPLETED
-          changed = true
-        }
-      }
-
-      const activeArrivedEntry = orderedStops.find((entry) => next[entry.id] === ROUTE_STOP_STATUS.ARRIVED) || null
-      if (!activeArrivedEntry) {
-        const firstRemaining = orderedStops.find((entry) => next[entry.id] !== ROUTE_STOP_STATUS.COMPLETED) || null
-        if (firstRemaining) {
-          const distanceToFirstRemaining = haversineKm(
-            userLocation.latitude,
-            userLocation.longitude,
-            firstRemaining.store.coords.lat,
-            firstRemaining.store.coords.lng
-          ) * 1000
-          if (distanceToFirstRemaining <= NAV_ARRIVE_DISTANCE_M) {
-            next[firstRemaining.id] = ROUTE_STOP_STATUS.ARRIVED
-            changed = true
-          }
-        }
-      }
-
-      let firstArrivedFound = false
-      for (const entry of orderedStops) {
-        if (next[entry.id] !== ROUTE_STOP_STATUS.ARRIVED) continue
-        if (!firstArrivedFound) {
-          firstArrivedFound = true
-          continue
-        }
-        next[entry.id] = ROUTE_STOP_STATUS.PENDING
-        changed = true
-      }
-
-      return changed ? next : prev
-    })
-  }, [
-    followUserHeading,
-    userLocation?.latitude,
-    userLocation?.longitude,
-    routeStops,
-  ])
-
-  const navigationInfo = useMemo(() => {
-    if (!followUserHeading || routeStops.length === 0) return null
-
-    const orderedStops = routeStops.map((store) => {
-      const id = String(store.id)
-      return {
-        id,
-        store,
-        status: routeStopStatusById[id] || ROUTE_STOP_STATUS.PENDING,
-      }
-    })
-
-    const arrivedIndex = orderedStops.findIndex((entry) => entry.status === ROUTE_STOP_STATUS.ARRIVED)
-    const activeStore = arrivedIndex >= 0 ? orderedStops[arrivedIndex].store : null
-    const nextStore = arrivedIndex >= 0
-      ? (orderedStops.slice(arrivedIndex + 1).find((entry) => entry.status !== ROUTE_STOP_STATUS.COMPLETED)?.store || null)
-      : (orderedStops.find((entry) => entry.status !== ROUTE_STOP_STATUS.COMPLETED)?.store || null)
-    const distanceTargetStore = nextStore || activeStore || null
-    const canMeasureDistance = Number.isFinite(userLocation?.latitude) && Number.isFinite(userLocation?.longitude)
-    const distanceFromLat = canMeasureDistance ? userLocation.latitude : FIXED_ROUTE_POINT.lat
-    const distanceFromLng = canMeasureDistance ? userLocation.longitude : FIXED_ROUTE_POINT.lng
-    const targetLat = Number.isFinite(distanceTargetStore?.coords?.lat) ? distanceTargetStore.coords.lat : null
-    const targetLng = Number.isFinite(distanceTargetStore?.coords?.lng) ? distanceTargetStore.coords.lng : null
-    const rawNextDistanceMeters = (targetLat != null && targetLng != null)
-      ? haversineKm(distanceFromLat, distanceFromLng, targetLat, targetLng) * 1000
-      : 0
-    const nextDistanceMeters = Number.isFinite(rawNextDistanceMeters) ? rawNextDistanceMeters : 0
-
-    const completedStops = orderedStops.filter((entry) => entry.status === ROUTE_STOP_STATUS.COMPLETED)
-    const lastCompletedStore = completedStops.length > 0 ? completedStops[completedStops.length - 1].store : null
-
-    const atWarehouse = Number.isFinite(userLocation?.latitude) && Number.isFinite(userLocation?.longitude)
-      ? (haversineKm(
-        userLocation.latitude,
-        userLocation.longitude,
-        FIXED_ROUTE_POINT.lat,
-        FIXED_ROUTE_POINT.lng
-      ) * 1000) <= NAV_WAREHOUSE_DISTANCE_M
-      : false
-
-    if (activeStore) {
-      return {
-        currentLabel: 'Hiện tại',
-        currentStore: activeStore,
-        nextStore,
-        nextDistanceMeters,
-      }
-    }
-
-    if (atWarehouse) {
-      return {
-        currentLabel: 'Hiện tại',
-        currentText: 'Kho',
-        nextStore,
-        nextDistanceMeters,
-      }
-    }
-
-    if (lastCompletedStore) {
-      return {
-        currentLabel: 'Đã qua',
-        currentStore: lastCompletedStore,
-        nextStore,
-        nextDistanceMeters,
-      }
-    }
-
-    return {
-      currentLabel: 'Hiện tại',
-      currentText: 'Đang di chuyển',
-      nextStore,
-      nextDistanceMeters,
-    }
-  }, [
-    followUserHeading,
-    routeStops,
-    routeStopStatusById,
-    userLocation?.latitude,
-    userLocation?.longitude,
-  ])
   const showNavigationInfoPanel = followUserHeading && Boolean(navigationInfo)
-
-  useEffect(() => {
-    if (!mapReady) return
-    const hasRouteTarget = Boolean(initialTarget || initialStoreId)
-    refreshUserLocation({ shouldRecenter: !hasRouteTarget })
-  }, [mapReady, refreshUserLocation, initialTarget, initialStoreId])
 
   useEffect(() => {
     if (!router.isReady) return
@@ -1662,49 +1022,19 @@ export default function MapPage() {
   }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
 
   useEffect(() => {
-    if (!mapReady) return
-    const map = mapRef.current
-    if (!map) return
-
-    if (followUserHeading) {
-      map.dragPan.disable()
-    } else {
-      map.dragPan.enable()
+    if (routeStops.length === 0) {
+      disableFollowUserHeading()
     }
+  }, [disableFollowUserHeading, routeStops.length])
 
-    return () => {
-      map.dragPan.enable()
-    }
-  }, [followUserHeading, mapReady])
-
-  useEffect(() => {
-    if (!followUserHeading) return
-    if (!mapReady) return
-    if (!Number.isFinite(userLocation?.latitude) || !Number.isFinite(userLocation?.longitude)) return
-
-    const map = mapRef.current
-    if (!map) return
-
-    setSelectedStore(null)
-    map.stop()
-    map.easeTo({
-      center: [userLocation.longitude, userLocation.latitude],
-      ...(userLocation.heading != null ? { bearing: userLocation.heading } : {}),
-      duration: 900,
-      essential: true,
+  const handleToggleUserHeadingRotation = useCallback(() => {
+    toggleUserHeadingRotation({
+      routeStopsLength: routeStops.length,
+      routeFeatureCount: routeGeojson.features.length,
+      buildRoute,
+      onEnableRouteMode: () => setHideUnselectedStores(true),
     })
-  }, [followUserHeading, mapReady, userLocation?.latitude, userLocation?.longitude, userLocation?.heading])
-
-  useEffect(() => {
-    if (!mapReady) return undefined
-
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState !== 'visible') return
-      refreshUserLocation({ shouldRecenter: false, forceFreshPosition: true })
-    }, 3000)
-
-    return () => window.clearInterval(intervalId)
-  }, [mapReady, refreshUserLocation])
+  }, [buildRoute, routeGeojson.features.length, routeStops.length, setHideUnselectedStores, toggleUserHeadingRotation])
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -2110,7 +1440,7 @@ export default function MapPage() {
             {routeStops.length > 0 && !showNavigationInfoPanel && (
               <button
                 type="button"
-                onClick={toggleUserHeadingRotation}
+                onClick={handleToggleUserHeadingRotation}
                 disabled={navLoading}
                 title={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
                 aria-label={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
@@ -2154,7 +1484,7 @@ export default function MapPage() {
                   <div className="font-semibold text-sky-200">Dẫn đường</div>
                   <button
                     type="button"
-                    onClick={toggleUserHeadingRotation}
+                    onClick={handleToggleUserHeadingRotation}
                     className="flex h-9 items-center justify-center rounded-md border border-red-500/60 bg-red-500/20 px-3 text-sm font-semibold text-red-100 transition hover:border-red-400 hover:bg-red-500/30 hover:text-white"
                   >
                     Thoát

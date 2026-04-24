@@ -88,33 +88,23 @@ Quy ước bắt buộc:
 ## Current Snapshot
 
 ### Goal
-- Chuyển sang vùng tiếp theo của bước 4: màn tìm kiếm `/`.
-- Viết test trước cho các nhánh search/home dễ vỡ nhưng hiện chưa có browser coverage:
-  - load store từ cache public và hiển thị danh sách
-  - tìm kiếm tiếng Việt theo tên
-  - đồng bộ filter/search state lên URL mà không vỡ route
-  - mở detail modal từ search result vẫn giữ đúng hành vi hiện tại
-- Sau khi test khóa đủ nhánh chính, tách bớt orchestration/filter/search-state khỏi `pages/index.js` để page mỏng hơn.
-- Giữ hướng làm: test đủ thực chiến trước, rồi mới refactor tối thiểu.
+- Tiếp tục bước 4 cho `map` theo đúng thứ tự: tăng test rồi tách thêm logic khỏi `pages/map.js`.
+- Sau khi đã fix bug camera của `Dẫn đường`, tách tiếp cụm logic điều hướng/bám người dùng (GPS, heading, recenter, follow mode, timer refresh) ra helper/hook riêng.
+- Giữ nguyên rule hiện tại: chế độ `Dẫn đường` phải ưu tiên bám vị trí người dùng và khóa kéo map.
 
 ### In Scope
-- `pages/index.js`.
-- `components/search-store-card.jsx` nếu search flow cần chạm để test/refactor.
-- `helper/homeSearch.js`.
-- `helper/storeSearch.js`.
-- Helper/controller mới cho search/home nếu cần.
-- Browser test cho search/home.
+- `pages/map.js`.
+- Helper/hook mới cho logic điều hướng/bám người dùng của map.
+- Unit test cho logic thuần mới được tách khỏi cụm navigation.
+- Browser test map liên quan trực tiếp tới `Dẫn đường`, GPS, camera nếu cần.
 - `docs/current-work.md` cho pha làm việc này.
 
 ### Out of Scope
-- Không đổi lại create/edit/supplement/report vừa ổn định nếu search flow không buộc phải chạm.
-- Không refactor `map`, `verify`, `import/export`, `telesale` trong vòng này.
-- Không thay rule nghiệp vụ của search:
-  - tiếng Việt có dấu/không dấu/phát âm phải giữ nguyên
-  - route query hiện tại phải giữ tương thích
-  - public read vẫn đi qua `getOrRefreshStores()`
+- Không thay đổi UI/behavior nghiệp vụ của map ngoài bug dẫn đường vừa sửa và phần refactor/tăng test trực tiếp liên quan tới navigation của map.
+- Không đổi `create/edit/supplement/report/search` nếu không bị logic map dùng chung bắt buộc.
+- Không đổi rule route query của map (`storeId`, `lat`, `lng`).
 - Không thêm dependency mới.
-- Không làm refactor lớn ngoài search/home flow.
+- Không tách toàn bộ MapLibre rendering layer khỏi page trong đợt này nếu không thật sự cần.
 
 ### Must Preserve
 - Route dùng Pages Router trong `pages/`.
@@ -158,13 +148,62 @@ Quy ước bắt buộc:
 
 ### Plan
 - Cập nhật working memory rồi mới sửa code.
-- Đọc `pages/index.js` và helper liên quan để xác định nhánh behavior nào đang còn nằm trong page.
-- Viết browser test trước cho search/home.
-- Nếu cần, bổ sung unit test cho helper search thuần.
-- Tách orchestration/search state/filter URL sync khỏi `pages/index.js` theo thay đổi tối thiểu.
-- Verify theo checklist `Checklist chung`, `Search Flow`, `Stores Read / Cache`, `Tiếng Việt / UI Safety`.
+- Viết thêm unit test cho logic thuần của cụm navigation/camera/heading.
+- Tách helper thuần trước, rồi tách orchestration điều hướng/bám người dùng sang hook riêng.
+- Nối lại `pages/map.js` với thay đổi tối thiểu, giữ nguyên behavior hiện tại.
+- Verify theo checklist `Checklist chung`, `Map Flow`, `Stores Read / Cache`, `Tiếng Việt / UI Safety`.
 
 ### Progress
+- Đã thêm helper thuần mới `helper/mapNavigation.js`, gom:
+  - chuẩn hóa heading
+  - tính delta heading ngắn nhất
+  - smooth heading
+  - hợp nhất heading hiện tại từ compass/GPS/heading cũ
+  - kiểm tra vị trí người dùng hợp lệ
+  - build camera payload về vị trí người dùng
+  - quyết định có cần build route khi vừa bật follow
+- Đã thêm unit test mới `__tests__/helper/mapNavigation.test.js` để khóa cụm logic thuần của navigation/camera.
+- Đã tách orchestration điều hướng/bám người dùng ra `helper/useMapNavigationController.js`, gồm:
+  - refresh GPS
+  - recenter về người dùng
+  - bật/tắt chế độ dẫn đường
+  - khóa/mở dragPan theo follow mode
+  - bám camera theo userLocation
+  - timer refresh GPS mỗi 3 giây khi map mở
+- `pages/map.js` hiện không còn tự giữ cụm logic GPS/heading/follow/camera lớn như trước; page chủ yếu còn wiring UI, search/filter, drag route, và MapLibre render.
+- Đã bắt và sửa một regression trong quá trình tách:
+  - callback `clearSelectedStore` truyền inline làm `refreshUserLocation` đổi identity
+  - effect GPS/timer bị dựng lại nhiều lần
+  - kết quả là test race-condition cũ tăng call count sai
+  - đã fix bằng callback ổn định `useCallback`
+- Đã chốt cụm nên tách tiếp khỏi `pages/map.js` sau đợt fix bug camera:
+  - normalize/smooth heading
+  - refresh GPS và hợp nhất heading
+  - recenter về người dùng
+  - bật/tắt chế độ dẫn đường
+  - effect khóa kéo map, effect bám camera theo user, interval refresh GPS
+- Đang thêm unit test cho logic thuần của cụm này trước khi kéo orchestration ra hook riêng.
+- Đã thêm browser test hồi quy mới cho case:
+  - bật `Dẫn đường` khi route plan đã có điểm dừng nhưng chưa có geometry
+  - app vẫn build route thành công
+  - camera không bị `fitBounds` toàn tuyến, chỉ giữ camera bám vị trí người dùng
+- Đã vá orchestration route:
+  - `buildRoute()` nhận option để bỏ qua `fitBounds` khi cần
+  - nhánh bật `Dẫn đường` gọi `buildRoute({ skipFitBounds: true })`
+  - nhánh nút `Vẽ` và các flow build route thường vẫn giữ `fitBounds` như cũ
+- Đã thêm ghi nhận camera event trong test mode E2E để khóa regression chính xác ở mức hành vi camera.
+- Đã xác định nhánh bug mới:
+  - `toggleUserHeadingRotation()` bật `followUserHeading = true`, đưa camera về vị trí người dùng.
+  - nếu lúc đó chưa có `routeGeojson`, hàm này gọi `buildRoute()`.
+  - `buildRoute()` trong hook luôn `fitBounds` toàn tuyến sau khi API route trả về.
+  - effect bám người dùng chỉ chạy lại khi `userLocation` đổi, nên nếu không có đợt GPS mới ngay sau đó thì camera bị kẹt ở trạng thái fit toàn tuyến dù đã ở mode dẫn đường.
+- Đang thêm test để khóa đúng case này trước khi vá.
+- Đã đối chiếu trace runtime mới báo với mã hiện tại của `pages/map.js`.
+- Xác nhận file hiện tại không còn thứ tự gây TDZ:
+  - `useMapRouteController(...)` đang khai báo `routeStops` ở khoảng dòng 218.
+  - `renderedRouteStops` đang được tính ở khoảng dòng 248.
+- Log terminal cho thấy đã từng có một lần compile/runtime của bản cũ nơi `renderedRouteStops` đứng trước `routeStops`, sau đó Turbopack full-reload và `/map` quay lại `200`.
+- Điều này cho thấy lỗi mới báo nhiều khả năng đến từ snapshot build/hot-reload cũ thay vì state mã hiện tại trên đĩa; đang chạy verify tập trung để chốt lại.
 - Đã thêm browser coverage mới cho search/home tại `e2e/store-search.spec.js`, khóa 4 nhánh người dùng thật:
   - load store public từ cache override và hiển thị danh sách
   - tìm kiếm tiếng Việt không dấu vẫn match tên có dấu
@@ -276,6 +315,16 @@ Quy ước bắt buộc:
   - viewport mặc định là desktop, nên path mobile ở bước vị trí chưa từng được kiểm tra
 - Đã vá màn create để mobile step vị trí luôn hiện fallback dán Google Maps, không chỉ riêng admin.
 - Đã thêm browser test cho path mobile bị bỏ sót: guest mobile vẫn thấy fallback Google Maps ở bước vị trí.
+- Đã xác nhận root cause của bug `Dẫn đường` trên `map`:
+  - `toggleUserHeadingRotation()` lấy snapshot `userLocation` cũ trước khi chờ promise GPS
+  - `refreshUserLocation()` trước đó trả `null` ngay nếu đang có request GPS chạy dở
+  - khi người dùng bấm bật dẫn đường đúng lúc request GPS đầu trang còn đang chạy, màn hình có thể không lấy được vị trí để bám theo dù GPS sau đó vẫn trả về
+- Đã tách rule lọc khu vực của `map` sang `helper/mapFilter.js` và khóa bằng unit test.
+- Đã bổ sung browser coverage mới cho `map` tại `e2e/store-map.spec.js`, gồm:
+  - rule quận/huyện và xã/phường mới trên sidebar
+  - case bật `Dẫn đường` khi lần lấy GPS đầu trang còn đang chạy dở
+- Đã mở rộng harness E2E geolocation bằng `delayMs` để tái hiện đúng race condition của màn `map`.
+- Đã ổn định lại 1 test search E2E cũ bằng cách chờ URL sync bằng polling thay vì phụ thuộc event điều hướng debounce của `router.replace`.
 
 ### Done
 - Hoàn tất test-first cho search/home bằng browser tests sát hành vi thật ở trang `/`.
@@ -329,6 +378,26 @@ Quy ước bắt buộc:
   - suite cũ không cover geolocation failure ở step vị trí
   - suite cũ bypass map picker thật bằng test double
 - Hoàn tất vá fallback UI ở bước cuối create để người dùng mobile vẫn có đường hoàn thành qua Google Maps link.
+- Hoàn tất fix màn `map` để bật `Dẫn đường` vẫn bám được vị trí người dùng ngay cả khi request GPS trước đó còn đang chạy dở.
+- Hoàn tất đổi rule lọc khu vực trên `map`:
+  - chọn quận/huyện mà chưa chọn xã trong quận đó thì hiện toàn bộ quận/huyện
+  - nếu đã chọn xã trong quận đó thì chỉ hiện các xã đã chọn
+- Hoàn tất thêm test hồi quy cho `map` ở cả mức unit và browser.
+- Hoàn tất ổn định lại full E2E suite sau khi phát hiện 1 case `search` bị flaky do chờ `waitForURL`.
+- Hoàn tất xác minh lỗi runtime `Cannot access 'routeStops' before initialization` trên `/map`:
+  - đối chiếu trace lỗi với mã hiện tại
+  - xác nhận mã hiện tại đã ở đúng thứ tự khai báo
+  - xác nhận `/map` render lại bình thường qua browser test hiện tại
+  - chốt đây là lỗi phát sinh từ snapshot compile/hot-reload cũ trong lúc Turbopack đang refresh, không phải do thứ tự mã hiện tại đang còn sai trên file
+- Hoàn tất fix bug camera của `/map` khi bật `Dẫn đường` lúc chưa có tuyến vẽ sẵn:
+  - route vẫn được build để có geometry thật
+  - camera không còn bị `fitBounds` sang toàn tuyến trong lúc đang vào chế độ bám người dùng
+  - sau khi thoát dẫn đường, route panel vẫn hiển thị summary như cũ
+- Hoàn tất thêm test và tách tiếp logic navigation của `map`:
+  - thêm unit test cho helper navigation mới
+  - tách helper thuần `mapNavigation.js`
+  - tách hook orchestration `useMapNavigationController.js`
+  - nối lại `pages/map.js` với behavior cũ và giữ xanh các test map hiện có
 
 ### Verification
 - Đã verify lại sau khi tách logic search/home:
@@ -408,20 +477,73 @@ Quy ước bắt buộc:
   - `npm.cmd run test:e2e -- e2e/store-create.spec.js`: `4 passed (4)`
   - `npm.cmd run test:e2e -- e2e/store-create.spec.js e2e/store-edit.spec.js`: `8 passed (8)`
   - `npm.cmd run text:check`: không phát hiện lỗi mã hóa trong repo
+- Đã chạy mới cho đợt fix `map`:
+  - `npx.cmd eslint pages/map.js helper/mapFilter.js __tests__/helper/mapFilter.test.js helper/geolocation.js lib/e2e-test-mode.js e2e/store-map.spec.js e2e/store-search.spec.js --ext .js,.jsx --quiet`
+  - `npm.cmd test -- __tests__/helper/mapFilter.test.js`
+  - `npm.cmd run lint`
+  - `npm.cmd test`
+  - `npm.cmd run text:check`
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js`
+  - `npm.cmd run test:e2e -- e2e/store-search.spec.js --grep "search và filter sync lên URL rồi khôi phục lại state từ route"`
+  - `npm.cmd run test:e2e`
+- Kết quả mới nhất:
+  - map helper test: `1 passed (1)` file, `5 passed (5)` tests
+  - `npm.cmd run lint`: pass
+  - `npm.cmd test`: `11 passed (11)` files, `211 passed (211)` tests
+  - `npm.cmd run text:check`: không phát hiện lỗi mã hóa trong repo
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js`: `2 passed (2)`
+  - full `npm.cmd run test:e2e`: `21 passed (21)`
+- Checklist đã đi lại thêm:
+  - `Checklist chung`
+  - `Map Flow`
+  - `Stores Read / Cache`
+  - `Tiếng Việt / UI Safety`
+- Đã chạy thêm để xác minh lỗi runtime `/map` sau báo lỗi:
+  - `npm.cmd run lint -- --quiet pages/map.js helper/useMapRouteController.js helper/mapRoute.js helper/mapFilter.js e2e/store-map.spec.js __tests__/helper/mapRoute.test.js __tests__/helper/mapFilter.test.js`
+  - `npm.cmd test -- __tests__/helper/mapRoute.test.js __tests__/helper/mapFilter.test.js`
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js`
+- Kết quả mới nhất:
+  - lint phần `map`: pass
+  - unit test `mapRoute` + `mapFilter`: `2 passed (2)` files, `14 passed (14)` tests
+  - browser test `map`: `6 passed (6)`
+- Đã chạy thêm cho bug `Dẫn đường` + camera:
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js --grep "bật dẫn đường khi chưa có tuyến vẽ sẵn"`
+  - `npx.cmd eslint pages/map.js helper/useMapRouteController.js lib/e2e-test-mode.js e2e/store-map.spec.js --ext .js,.jsx --quiet`
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js`
+  - `npm.cmd run lint`
+- Kết quả mới nhất:
+  - test mới bug `Dẫn đường`: `1 passed (1)`
+  - full browser test `map`: `7 passed (7)`
+  - targeted eslint: pass
+  - full `npm.cmd run lint`: pass
+- Đã chạy thêm sau đợt tách logic navigation:
+  - `npm.cmd test -- __tests__/helper/mapNavigation.test.js __tests__/helper/mapRoute.test.js __tests__/helper/mapFilter.test.js`
+  - `npx.cmd eslint pages/map.js helper/useMapNavigationController.js helper/mapNavigation.js helper/useMapRouteController.js lib/e2e-test-mode.js e2e/store-map.spec.js __tests__/helper/mapNavigation.test.js --ext .js,.jsx --quiet`
+  - `npm.cmd run test:e2e -- e2e/store-map.spec.js`
+  - `npm.cmd run lint`
+- Kết quả mới nhất:
+  - helper tests navigation/route/filter: `3 passed (3)` files, `20 passed (20)` tests
+  - full browser test `map`: `7 passed (7)`
+  - full `npm.cmd run lint`: pass
 
 ### Open Questions
 - Không có blocker mới; hướng hiện tại là thêm harness E2E hẹp thay vì phụ thuộc dịch vụ thật.
 
 ### Risks / Next
-- `pages/map.js` vẫn là màn nặng nhất còn lại và hiện chưa có browser coverage; đây là ứng viên tiếp theo của bước 4 nếu làm tiếp theo thứ tự giá trị/rủi ro.
+- `pages/map.js` vẫn là màn nặng nhất còn lại; hiện đã có browser coverage cho 2 nhánh dễ vỡ mới fix, nhưng vẫn chưa phủ hết các nhánh route panel, marker interaction, search suggestion, và route optimize/build lỗi.
 - `pages/store/verify.js` cũng chưa có browser coverage dù có nhánh admin mutation và sync cache, nên nên đi sau search/map.
 - Report flow đã sạch hơn ở `store-detail-modal`, nhưng `pages/store/report/[id].js` hiện vẫn phụ thuộc controller + helper mới mà chưa có hook-level unit test; coverage cho orchestration vẫn chủ yếu dựa vào browser smoke và helper unit tests.
 - The fixed mobile submit path is covered for create; edit/supplement currently use direct `onClick` mobile actions, so they were regression-checked via the shared E2E suite after the layout change and remain green.
 - Regression coverage for the loop fix is still E2E-harness-based; it proves call counts for mocked geolocation, but not real browser GPS provider behavior.
 - E2E is green, but it still runs with `window.__STOREVIS_E2E__` and mocked network writes, so it validates form orchestration better than backend integration.
 - `pages/store/create.js` có text tiếng Việt hiển thị trực tiếp nên patch cần tránh làm hỏng UTF-8.
-- Harness E2E hiện đã phủ `create`, `edit`, `supplement`, `report`, `search`, nhưng `map`, `verify`, `import/export` vẫn chưa có browser coverage.
+- Harness E2E hiện đã phủ `create`, `edit`, `supplement`, `report`, `search`, `map`; `verify`, `import/export` vẫn chưa có browser coverage.
 - Test network vẫn mock ở lớp Playwright; nếu payload/response Supabase thay đổi, cần cập nhật fixture response trong test.
 - Browser test hiện đang dùng test double cho map picker; phù hợp để khóa business flow, nhưng chưa thay cho việc kiểm tra map thật ở vài smoke test thủ công.
 - Controller đã được tách khỏi page, nhưng hiện chưa có unit-test mức hook vì repo chưa có harness React hook test; coverage orchestration đang dựa trên browser smoke + helper unit tests.
 - Case geolocation "success ở bước 1 nhưng timeout ở bước vị trí" hiện mới được xác định bằng phân tích code/path coverage, chưa có browser test tái hiện đầy đủ vì harness E2E geolocation override đang là static.
+- Nếu dev server còn giữ snapshot cũ của Turbopack, người dùng vẫn có thể gặp lại stack trace cũ cho đến khi full reload hoặc restart server; đây là rủi ro môi trường dev, không phải do thứ tự khai báo hiện còn sai trong file hiện tại.
+- Camera regression mới được khóa ở test mode bằng camera events tự ghi nhận từ code gọi `easeTo` / `fitBounds`; điều này đủ để chặn bug orchestration hiện tại nhưng chưa thay thế hoàn toàn cho smoke test thủ công với MapLibre thật.
+- `pages/map.js` vẫn còn 2 cụm lớn chưa tách tiếp:
+  - search/suggestion/filter panel
+  - drag-and-drop route list / auto-scroll

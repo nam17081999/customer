@@ -34,6 +34,10 @@ export async function getBestPosition({
   const e2eGeolocation = getE2EGeolocationOverride()
   if (e2eGeolocation.hasOverride) {
     incrementE2EGeolocationCallCount()
+    const delayMs = Number(e2eGeolocation?.delayMs || 0)
+    if (Number.isFinite(delayMs) && delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
     if (e2eGeolocation.coords) {
       return { coords: e2eGeolocation.coords, error: null }
     }

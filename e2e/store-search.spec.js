@@ -135,10 +135,17 @@ test('search và filter sync lên URL rồi khôi phục lại state từ route'
   await filterPanel.locator('select').nth(0).selectOption('Hoài Đức')
   await filterPanel.locator('select').nth(1).selectOption('An Khánh')
 
-  await page.waitForURL((url) => {
-    return url.searchParams.get('q') === 'minh'
-      && url.searchParams.get('district') === 'Hoài Đức'
-      && url.searchParams.get('ward') === 'An Khánh'
+  await expect.poll(() => {
+    const currentUrl = new URL(page.url())
+    return {
+      q: currentUrl.searchParams.get('q'),
+      district: currentUrl.searchParams.get('district'),
+      ward: currentUrl.searchParams.get('ward'),
+    }
+  }).toEqual({
+    q: 'minh',
+    district: 'Hoài Đức',
+    ward: 'An Khánh',
   })
 
   await page.reload()
