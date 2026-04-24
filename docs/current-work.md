@@ -88,21 +88,22 @@ Quy ước bắt buộc:
 ## Current Snapshot
 
 ### Task Type
-- Feature
+- Review / Regression Check
 
 ### Goal
-- Tinh chỉnh modal chi tiết: bỏ đường kẻ ngăn giữa header và thông tin, đồng thời bao quanh khối thông tin cửa hàng bằng một đường viền rõ hơn.
+- Rà test và tài liệu để xác nhận đã phản ánh các thay đổi modal chi tiết gần đây; cập nhật phần còn thiếu nếu có.
 
 ### Why
-- Giao diện cần liền mạch hơn giữa header và nội dung, nhưng phần thông tin vẫn cần có viền gom nhóm để dễ đọc.
+- Modal chi tiết đã đổi UI/action nhiều lần; test hoặc tài liệu cũ có thể không còn khớp behavior hiện tại.
 
 ### In Scope
 - `components/store-detail-modal.jsx`
-- Border dưới header modal chi tiết.
-- Border bao quanh danh sách thông tin cửa hàng.
+- Test/e2e liên quan modal chi tiết, edit/supplement/report/map nếu có.
+- Docs liên quan UI modal, admin/non-admin action, telesale hiển thị trong modal.
 
 ### Out of Scope
-- Không đổi layout/action khác ngoài hai chỉnh sửa viền.
+- Không đổi behavior modal trừ khi phát hiện test/docs yêu cầu fix nhỏ để khớp behavior vừa chốt.
+- Không thêm dependency mới.
 - Không đổi luồng quản lý admin: bổ sung, chỉnh sửa, lịch sử, báo cáo, xóa mềm.
 - Không đổi route `/map` nội bộ, cache, database, create/edit/report/verify logic.
 - Không thêm dependency mới.
@@ -111,35 +112,41 @@ Quy ước bắt buộc:
 - Giữ link Google Maps chỉ hiện khi cửa hàng có tọa độ hợp lệ.
 - Giữ link gọi điện dùng số điện thoại hiện có và không làm hỏng tiếng Việt trong UI.
 - Giữ nút bản đồ nội bộ `/map?storeId=...&lat=...&lng=...` nếu đang cần cho flow điều hướng trong app.
-- Giữ các action admin/tuyến/báo cáo hoạt động đúng, chỉ đổi cách trình bày.
+- Giữ các action tuyến/báo cáo/xóa hoạt động đúng.
+- Admin vẫn vào `/store/edit/[id]`; non-admin bổ sung vẫn vào `/store/edit/[id]?mode=supplement`.
 - Giữ kích thước nút đủ dễ bấm và tương phản theo dark theme, không dùng text quá nhỏ cho thông tin chính.
 
 ### Required Verification
-- Chạy lint cho file bị sửa nếu khả thi.
-- Chạy kiểm tra text/encoding nếu có command sẵn.
-- Đối chiếu checklist: Tiếng Việt / UI Safety, Map Flow, Verify / Delete / Admin Actions.
+- Rà grep/search test và docs liên quan modal/action.
+- Nếu cập nhật test/docs, chạy test/lint phù hợp và `text:check`.
+- Đối chiếu checklist: Edit / Supplement / Report, Map Flow, Telesale, Tiếng Việt / UI Safety, Verify / Delete / Admin Actions.
 
 ### Plan
-- Bỏ class border dưới header sticky.
-- Thêm border cho wrapper danh sách thông tin cửa hàng.
+- Tìm test/e2e đang chạm modal chi tiết hoặc button `Bổ sung`/`Sửa`.
+- Tìm docs nhắc tới modal chi tiết, telesale, action admin/non-admin.
+- Cập nhật test/docs tối thiểu nếu phát hiện thiếu/sai.
 - Chạy verification liên quan và cập nhật kết quả.
 
 ### Progress
-- Đã bỏ border dưới header sticky.
-- Đã thêm border bao quanh danh sách thông tin cửa hàng.
+- Đã rà e2e/docs liên quan modal chi tiết, action `Bổ sung`/`Sửa`, report route và supplement flow.
+- Đã phát hiện e2e `store-report` còn dùng label modal cũ `Báo cáo cửa hàng` và thiếu coverage role action mới.
+- Đã phát hiện docs `architecture`, `business-rules`, `project-context` còn mô tả `Bổ sung` trong modal theo điều kiện thiếu dữ liệu cũ.
 
 ### Done
-- `components/store-detail-modal.jsx`: header modal không còn đường kẻ ngăn với phần thông tin.
-- `components/store-detail-modal.jsx`: danh sách thông tin cửa hàng được bao quanh bởi `border border-gray-800`.
+- `e2e/store-report.spec.js`: cập nhật test report modal dùng nút `Báo cáo` hiện tại.
+- `e2e/store-report.spec.js`: thêm coverage guest thấy `Bổ sung`, không thấy `Sửa`, và click đi tới `mode=supplement`.
+- `e2e/store-report.spec.js`: thêm coverage admin thấy `Sửa`, không thấy `Bổ sung`, và click đi tới `/store/edit/[id]`.
+- `docs/architecture.md`, `docs/business-rules.md`, `docs/project-context.md`: cập nhật mô tả modal action theo role hiện tại.
 
 ### Verification
-- `npm.cmd run lint -- components/store-detail-modal.jsx` passed.
+- `npm.cmd run lint -- components/store-detail-modal.jsx e2e/store-report.spec.js` passed.
 - `npm.cmd run text:check` passed: không phát hiện lỗi mã hóa trong repo.
-- Đối chiếu checklist: Tiếng Việt / UI Safety không đổi text/cỡ chữ chính; Map Flow và Admin Actions không đổi logic/nút hành động.
+- `npx.cmd playwright test e2e/store-report.spec.js --grep "nút báo cáo|guest thấy|admin thấy"` passed 3 tests.
+- Đối chiếu checklist: Edit / Supplement / Report, Map Flow, Telesale, Tiếng Việt / UI Safety, Verify / Delete / Admin Actions.
 
 ### Open Questions
 - Không có blocker; giả định vẫn giữ nút bản đồ nội bộ và nút tuyến vì khác mục đích với GG Maps/gọi điện.
 
 ### Risks / Next
-- Chưa chạy browser smoke test thực tế; nên mở modal để xác nhận khoảng cách giữa header và khối thông tin nhìn cân đối.
+- Chưa chạy toàn bộ e2e suite; chỉ chạy 3 case modal/report liên quan trực tiếp.
 

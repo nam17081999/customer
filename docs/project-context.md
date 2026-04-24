@@ -30,6 +30,7 @@
 Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 → Click card → xem chi tiết (modal)
 → Báo cáo cửa hàng (từ modal)
+→ Bổ sung thông tin từ modal (`/store/edit/[id]?mode=supplement`)
 → Xem bản đồ (/map)
 → Thêm cửa hàng (/store/create) → chờ duyệt
 ```
@@ -50,8 +51,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 → Nhập dữ liệu (/store/import)
 → Xuất dữ liệu (/store/export)
 → Duyệt báo cáo cửa hàng (/store/reports)
-→ Sửa store (/store/edit/[id])
-→ Bổ sung dữ liệu còn thiếu cho store (`/store/edit/[id]?mode=supplement`, public cũng mở được)
+→ Sửa store từ modal hoặc trang quản trị (/store/edit/[id])
 → Thêm store → active ngay
 ```
 
@@ -75,7 +75,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | `pages/map.js` | Bản đồ MapLibre, custom markers, focus theo query, nút về GPS, nút xoay theo hướng, chấm xanh vị trí hiện tại, sidebar lọc, modal tuyến đường mobile/desktop |
 | `pages/index.js` | Tìm kiếm local với scoring, bộ lọc chi tiết, refresh vị trí định kỳ, filter `Không có vị trí` |
 | `components/navbar.jsx` | Top nav desktop tối giản + bottom tab mobile |
-| `components/store-detail-modal.jsx` | Modal chi tiết + báo cáo + nút chuyển sang /map + loại cửa hàng phía trên tên + nút `Bổ sung` |
+| `components/store-detail-modal.jsx` | Modal chi tiết + thông tin liên hệ + báo cáo + nút chuyển sang /map + action theo role (`Bổ sung` cho non-admin, `Sửa` cho admin) |
 | `lib/authz.js` | Helpers quyền theo `role` để ẩn/hiện hành động đúng vai trò |
 
 ---

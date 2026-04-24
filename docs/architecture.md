@@ -210,10 +210,10 @@ customer/
 
 ## Luồng Bổ Sung Dữ Liệu
 
-- Nếu store còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, hoặc vị trí):
-  - `StoreDetailModal` hiển thị nút **Bổ sung**
-  - duplicate panel của `/store/create` cũng có thể hiển thị nút **Bổ sung**
-- Nút này điều hướng sang `/store/edit/[id]?mode=supplement`
+- Trong `StoreDetailModal`:
+  - user không phải admin thấy nút **Bổ sung**, điều hướng sang `/store/edit/[id]?mode=supplement`
+  - admin không thấy **Bổ sung**, thay vào đó thấy nút **Sửa**, điều hướng sang `/store/edit/[id]`
+- Duplicate panel của `/store/create` vẫn có thể hiển thị nút **Bổ sung** cho candidate còn thiếu dữ liệu quan trọng (`store_type`, `address_detail`, `ward`, `district`, `phone`, hoặc vị trí).
 - Ở chế độ `supplement`:
   - luôn bắt đầu từ **bước 1**
   - dữ liệu đã có sẵn bị khóa, không cho chỉnh sửa
