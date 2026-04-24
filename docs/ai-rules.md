@@ -31,6 +31,23 @@ Quy tắc bắt buộc khi sinh code cho project NPP Hà Công. Đọc file này
 
 ---
 
+## 1c. Working Memory & Regression Gate
+
+- Trước khi code, bắt buộc đọc thêm:
+  - `docs/current-work.md`
+  - `docs/regression-checklist.md`
+- Trước khi sửa file, bắt buộc cập nhật `docs/current-work.md` ít nhất các mục:
+  - `Goal`
+  - `In Scope`
+  - `Out of Scope`
+  - `Must Preserve`
+  - `Plan`
+- Trước khi kết luận xong task, bắt buộc:
+  - đi lại các section phù hợp trong `docs/regression-checklist.md`
+  - cập nhật `docs/current-work.md` với `Done`, `Verification`, `Risks / Next`
+- Không dùng chat history làm nguồn sự thật duy nhất nếu 2 file trên đã có dữ liệu mới hơn.
+- Nếu task bị đổi hướng giữa chừng, cập nhật lại `docs/current-work.md` trước khi làm tiếp.
+
 ## 2. Đọc Stores — Bắt Buộc Qua Cache
 
 ```js

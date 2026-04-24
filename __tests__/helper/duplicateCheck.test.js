@@ -17,6 +17,8 @@ import {
   extractWords,
   isSimilarNameByWords,
   containsAllInputWords,
+  evaluateDuplicateCandidate,
+  findStoreDuplicateCandidates,
   mergeDuplicateCandidates,
   findNearbySimilarStores,
   findGlobalExactNameMatches,
@@ -205,6 +207,83 @@ describe('IGNORED_NAME_TERMS', () => {
   })
 })
 
+describe('evaluateDuplicateCandidate', () => {
+  it('đánh dấu certain duplicate khi trùng số điện thoại dù khác địa bàn', () => {
+    const candidate = evaluateDuplicateCandidate(
+      {
+        name: 'Tạp hóa Minh Anh',
+        district: 'Hoài Đức',
+        ward: 'An Khánh',
+        phone: '0901234567',
+        phoneSecondary: '',
+      },
+      {
+        id: 99,
+        name: 'Quán nước hoàn toàn khác',
+        district: 'Quốc Oai',
+        ward: 'Yên Sơn',
+        phone: '0901234567',
+        phone_secondary: '',
+      }
+    )
+
+    expect(candidate).toMatchObject({
+      id: 99,
+      duplicateKind: 'certain',
+    })
+    expect(candidate.duplicateReasons.phoneMatch).toBe(true)
+    expect(candidate.duplicateReasons.sameDistrict).toBe(false)
+  })
+
+  it('đánh dấu possible duplicate khi cùng quận, xã liền kề và trùng ít nhất một từ có nghĩa', () => {
+    const candidate = evaluateDuplicateCandidate(
+      {
+        name: 'Tạp hóa Minh Lan',
+        district: 'Hoài Đức',
+        ward: 'An Khánh',
+        addressDetail: '',
+      },
+      {
+        id: 101,
+        name: 'Cửa hàng Minh Phúc',
+        district: 'Hoài Đức',
+        ward: 'An Thượng',
+        address_detail: '',
+        phone: '',
+        phone_secondary: '',
+      }
+    )
+
+    expect(candidate).toMatchObject({
+      id: 101,
+      duplicateKind: 'possible',
+    })
+    expect(candidate.duplicateReasons.phoneMatch).toBe(false)
+    expect(candidate.duplicateReasons.adjacentWard).toBe(true)
+    expect(candidate.duplicateReasons.oneWordNameMatch).toBe(true)
+  })
+
+  it('trả về null khi không có phone match và cũng không có name match đủ điều kiện', () => {
+    const candidate = evaluateDuplicateCandidate(
+      {
+        name: 'Tạp hóa Minh Lan',
+        district: 'Hoài Đức',
+        ward: 'An Khánh',
+      },
+      {
+        id: 202,
+        name: 'Cửa hàng Phúc Lộc',
+        district: 'Hoài Đức',
+        ward: 'An Thượng',
+        phone: '',
+        phone_secondary: '',
+      }
+    )
+
+    expect(candidate).toBeNull()
+  })
+})
+
 // ── mergeDuplicateCandidates ──────────────────────────────────────────────────
 
 describe('mergeDuplicateCandidates', () => {
@@ -354,5 +433,55 @@ describe('findGlobalExactNameMatches', () => {
     const results = await findGlobalExactNameMatches('Đức')
     const ids = results.map((s) => s.id)
     expect(ids).toContain(3) // store 3 không có tọa độ nhưng vẫn có trong global search
+  })
+})
+
+describe('findStoreDuplicateCandidates', () => {
+  it('sort certain trước possible, rồi theo duplicateScore giảm dần', async () => {
+    const candidates = await findStoreDuplicateCandidates(
+      {
+        name: 'Tạp hóa Minh Lan',
+        district: 'Hoài Đức',
+        ward: 'An Khánh',
+        phone: '0901234567',
+        phoneSecondary: '',
+        addressDetail: 'Xóm Chợ',
+      },
+      {
+        stores: [
+          {
+            id: 1,
+            name: 'Cửa hàng Minh Lan',
+            district: 'Hoài Đức',
+            ward: 'An Thượng',
+            address_detail: 'Xóm Chợ',
+            phone: '',
+            phone_secondary: '',
+          },
+          {
+            id: 2,
+            name: 'Tạp hóa bất kỳ',
+            district: 'Quốc Oai',
+            ward: 'Yên Sơn',
+            address_detail: '',
+            phone: '0901234567',
+            phone_secondary: '',
+          },
+          {
+            id: 3,
+            name: 'Tạp hóa Minh Lan',
+            district: 'Hoài Đức',
+            ward: 'An Khánh',
+            address_detail: 'Xóm Chợ',
+            phone: '',
+            phone_secondary: '',
+          },
+        ],
+      }
+    )
+
+    expect(candidates.map((item) => item.id)).toEqual([2, 3, 1])
+    expect(candidates[0].duplicateKind).toBe('certain')
+    expect(candidates[1].duplicateScore).toBeGreaterThan(candidates[2].duplicateScore)
   })
 })

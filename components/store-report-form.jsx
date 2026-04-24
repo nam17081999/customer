@@ -1,13 +1,14 @@
-import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS, REPORT_REASON_OPTIONS, DEFAULT_STORE_TYPE, STORE_TYPE_OPTIONS } from '@/lib/constants'
-import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
-import { hasValidCoordinates, parseCoordinate } from '@/helper/coordinate'
-import { toTitleCaseVI } from '@/lib/utils'
-import { supabase } from '@/lib/supabaseClient'
+import {
+  DEFAULT_STORE_TYPE,
+  DISTRICT_SUGGESTIONS,
+  REPORT_REASON_OPTIONS,
+  STORE_TYPE_OPTIONS,
+} from '@/lib/constants'
+import { useStoreReportFormController } from '@/helper/useStoreReportFormController'
 
 const StoreLocationPicker = dynamic(
   () => import('@/components/map/store-location-picker'),
@@ -21,165 +22,42 @@ const StoreLocationPicker = dynamic(
   }
 )
 
-function normalizeCoord(value) {
-  const parsed = parseCoordinate(value)
-  if (!Number.isFinite(parsed)) return null
-  return Number(parsed.toFixed(7))
-}
-
 export default function StoreReportForm({ store, user, onSubmitted }) {
-  const [mode, setMode] = useState('')
-  const [reasons, setReasons] = useState([])
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [reportName, setReportName] = useState(store?.name || '')
-  const [reportStoreType, setReportStoreType] = useState(store?.store_type || DEFAULT_STORE_TYPE)
-  const [reportAddressDetail, setReportAddressDetail] = useState(store?.address_detail || '')
-  const [reportWard, setReportWard] = useState(store?.ward || '')
-  const [reportDistrict, setReportDistrict] = useState(store?.district || '')
-  const [reportPhone, setReportPhone] = useState(store?.phone || '')
-  const [reportNote, setReportNote] = useState(store?.note || '')
-  const [reportLat, setReportLat] = useState(normalizeCoord(store?.latitude))
-  const [reportLng, setReportLng] = useState(normalizeCoord(store?.longitude))
-  const [mapEditable, setMapEditable] = useState(false)
-  const [resolving, setResolving] = useState(false)
-
-  const wardSuggestions = useMemo(() => (
-    reportDistrict ? (DISTRICT_WARD_SUGGESTIONS[reportDistrict] || []) : []
-  ), [reportDistrict])
-
-  const resetFeedback = () => {
-    setError('')
-    setSuccess('')
-  }
-
-  const toggleReason = (code) => {
-    setReasons((prev) => (
-      prev.includes(code)
-        ? prev.filter((item) => item !== code)
-        : [...prev, code]
-    ))
-  }
-
-  const buildProposedChanges = () => {
-    const proposed = {}
-    const normalizedName = toTitleCaseVI(reportName.trim())
-    const normalizedStoreType = reportStoreType || DEFAULT_STORE_TYPE
-    const normalizedDetail = reportAddressDetail.trim() ? toTitleCaseVI(reportAddressDetail.trim()) : null
-    const normalizedWard = reportWard.trim() ? toTitleCaseVI(reportWard.trim()) : null
-    const normalizedDistrict = reportDistrict.trim() ? toTitleCaseVI(reportDistrict.trim()) : null
-    const normalizedPhone = reportPhone.trim() || null
-    const normalizedNote = reportNote.trim() || null
-
-    if (normalizedName && normalizedName !== (store.name || '')) proposed.name = normalizedName
-    if ((store.store_type || DEFAULT_STORE_TYPE) !== normalizedStoreType) proposed.store_type = normalizedStoreType
-    if ((store.address_detail || null) !== normalizedDetail) proposed.address_detail = normalizedDetail
-    if ((store.ward || null) !== normalizedWard) proposed.ward = normalizedWard
-    if ((store.district || null) !== normalizedDistrict) proposed.district = normalizedDistrict
-    if ((store.phone || null) !== normalizedPhone) proposed.phone = normalizedPhone
-    if ((store.note || null) !== normalizedNote) proposed.note = normalizedNote
-
-    const currentLat = normalizeCoord(store.latitude)
-    const currentLng = normalizeCoord(store.longitude)
-    const nextLat = normalizeCoord(reportLat)
-    const nextLng = normalizeCoord(reportLng)
-
-    if (currentLat !== nextLat) proposed.latitude = nextLat
-    if (currentLng !== nextLng) proposed.longitude = nextLng
-
-    return proposed
-  }
-
-  const handleGetLocation = async () => {
-    try {
-      setResolving(true)
-      resetFeedback()
-      const { coords, error: geoError } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 15,
-        skipCache: true,
-      })
-
-      if (!coords) {
-        setError(getGeoErrorMessage(geoError))
-        return
-      }
-
-      setReportLat(coords.latitude)
-      setReportLng(coords.longitude)
-      setSuccess('Đã cập nhật vị trí GPS mới.')
-    } catch (err) {
-      console.error('Get location error:', err)
-      setError(getGeoErrorMessage(err))
-    } finally {
-      setResolving(false)
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (submitting) return
-    resetFeedback()
-
-    if (!mode) {
-      setError('Vui lòng chọn loại báo cáo.')
-      return
-    }
-
-    if (mode === 'reason' && reasons.length === 0) {
-      setError('Vui lòng chọn ít nhất một lý do.')
-      return
-    }
-
-    let proposedChanges = null
-    if (mode === 'edit') {
-      if (!reportName.trim()) {
-        setError('Tên cửa hàng không được để trống.')
-        return
-      }
-      if (!reportDistrict.trim() || !reportWard.trim()) {
-        setError('Vui lòng nhập đủ quận/huyện và xã/phường.')
-        return
-      }
-
-      const nextLat = normalizeCoord(reportLat)
-      const nextLng = normalizeCoord(reportLng)
-      const hasOneCoord = nextLat != null || nextLng != null
-      if (hasOneCoord && !hasValidCoordinates(nextLat, nextLng)) {
-        setError('Vị trí chưa hợp lệ. Vui lòng chọn lại trên bản đồ.')
-        return
-      }
-
-      proposedChanges = buildProposedChanges()
-      if (Object.keys(proposedChanges).length === 0) {
-        setError('Bạn chưa thay đổi thông tin nào.')
-        return
-      }
-    }
-
-    setSubmitting(true)
-    const payload = {
-      store_id: store.id,
-      report_type: mode === 'edit' ? 'edit' : 'reason_only',
-      reason_codes: mode === 'reason' ? reasons : null,
-      proposed_changes: mode === 'edit' ? proposedChanges : null,
-      reporter_id: user?.id || null,
-    }
-
-    const { error: submitError } = await supabase.from('store_reports').insert([payload])
-
-    if (submitError) {
-      console.error(submitError)
-      setError('Không gửi được báo cáo, vui lòng thử lại.')
-      setSubmitting(false)
-      return
-    }
-
-    const doneMessage = 'Đã gửi báo cáo. Admin sẽ xem xét và cập nhật.'
-    setSuccess(doneMessage)
-    onSubmitted?.(doneMessage)
-    setSubmitting(false)
-  }
+  const controller = useStoreReportFormController({ store, user, onSubmitted })
+  const {
+    mode,
+    setMode,
+    reasons,
+    submitting,
+    error,
+    success,
+    reportName,
+    setReportName,
+    reportStoreType,
+    setReportStoreType,
+    reportAddressDetail,
+    setReportAddressDetail,
+    reportWard,
+    setReportWard,
+    reportDistrict,
+    setReportDistrict,
+    reportPhone,
+    setReportPhone,
+    reportNote,
+    setReportNote,
+    reportLat,
+    setReportLat,
+    reportLng,
+    setReportLng,
+    mapEditable,
+    setMapEditable,
+    resolving,
+    wardSuggestions,
+    toggleReason,
+    resetFeedback,
+    handleGetLocation,
+    handleSubmit,
+  } = controller
 
   return (
     <div className="space-y-4">

@@ -1,5 +1,6 @@
 import LocationPicker from '@/components/map/location-picker'
 import { Button } from '@/components/ui/button'
+import { isE2ETestModeEnabled } from '@/lib/e2e-test-mode'
 
 /**
  * StoreLocationPicker - Reusable map picker for store create/edit pages
@@ -42,6 +43,68 @@ export default function StoreLocationPicker({
   showControls = true,
   dark = true,
 }) {
+  if (isE2ETestModeEnabled()) {
+    return (
+      <div className={`relative ${className}`}>
+        {showControls && (
+          <div className="absolute top-3 right-2 z-[100] flex flex-col gap-1.5 items-end">
+            {onGetLocation && (
+              <button
+                type="button"
+                onClick={onGetLocation}
+                disabled={resolvingAddr}
+                className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 shadow-lg text-xs font-medium text-gray-200 disabled:opacity-50"
+                title="Lấy lại vị trí hiện tại"
+              >
+                {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {showControls && onToggleEditable && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[100]">
+            <button
+              type="button"
+              onClick={onToggleEditable}
+              className={`border rounded-lg px-3 py-1.5 shadow-lg text-xs font-medium ${
+                editable
+                  ? 'bg-orange-500 border-orange-500 text-white'
+                  : 'bg-gray-800 border-gray-600 text-gray-200'
+              }`}
+            >
+              {editable ? 'Khóa' : 'Mở khóa'}
+            </button>
+          </div>
+        )}
+
+        <div
+          data-testid="e2e-store-location-picker"
+          className="flex items-center justify-center rounded-md border border-dashed border-gray-700 bg-gray-950 text-gray-200"
+          style={{ height, width: '100%' }}
+        >
+          <div className="space-y-3 text-center">
+            <div className="text-sm font-medium text-gray-100">Bản đồ test double</div>
+            <div data-testid="e2e-store-location-coords" className="text-xs text-gray-400">
+              {initialLat != null && initialLng != null
+                ? `${Number(initialLat).toFixed(5)}, ${Number(initialLng).toFixed(5)}`
+                : 'Chưa có tọa độ'}
+            </div>
+            {editable && onChange && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onChange(21.02851, 105.80482)}
+              >
+                Chọn vị trí thử
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`relative ${className}`}>
       {/* Control buttons - top right inside map */}

@@ -58,6 +58,11 @@ describe('createSearchQueryMeta', () => {
     expect(meta.phoneticWords).toEqual(expect.arrayContaining(['sanh']))
   })
 
+  it('chuẩn hóa tương đương d/gi/r và l/n cho phoneticWords', () => {
+    const meta = createSearchQueryMeta('Giang Rạng Nam')
+    expect(meta.phoneticWords).toEqual(['dang', 'dang', 'lam'])
+  })
+
   it('xử lý chuỗi rỗng', () => {
     const meta = createSearchQueryMeta('')
     expect(meta.term).toBe('')
@@ -126,6 +131,13 @@ describe('buildStoreSearchIndex', () => {
   it('hasImage = false khi không có ảnh', () => {
     const store = makeStore({ image_url: '' })
     const [entry] = buildStoreSearchIndex([store])
+    expect(entry.hasImage).toBe(false)
+  })
+
+  it('trim khoảng trắng khi tính hasPhone và hasImage', () => {
+    const store = makeStore({ phone: '   ', image_url: '   ' })
+    const [entry] = buildStoreSearchIndex([store])
+    expect(entry.hasPhone).toBe(false)
     expect(entry.hasImage).toBe(false)
   })
 
@@ -236,6 +248,20 @@ describe('getSearchScore', () => {
     const score = getSearchScore(entry, meta)
     expect(score).not.toBeNull()
   })
+
+  it('hỗ trợ tìm theo phiên âm (d/gi/r)', () => {
+    const entry = makeEntry('Gà Rán Minh')
+    const meta = createSearchQueryMeta('Da Rán')
+    const score = getSearchScore(entry, meta)
+    expect(score).not.toBeNull()
+  })
+
+  it('hỗ trợ tìm theo phiên âm (l/n)', () => {
+    const entry = makeEntry('Nâm Quán')
+    const meta = createSearchQueryMeta('Lâm')
+    const score = getSearchScore(entry, meta)
+    expect(score).not.toBeNull()
+  })
 })
 
 // ── matchesSearchQuery ────────────────────────────────────────────────────────
@@ -256,5 +282,11 @@ describe('matchesSearchQuery', () => {
     const entry = makeEntry('Cửa Hàng ABC')
     const meta = createSearchQueryMeta('xyz zyx')
     expect(matchesSearchQuery(entry, meta)).toBe(false)
+  })
+
+  it('trả về true khi khớp qua normalized hoặc phonetic query', () => {
+    const entry = makeEntry('Cửa Hàng Giang')
+    const meta = createSearchQueryMeta('dang')
+    expect(matchesSearchQuery(entry, meta)).toBe(true)
   })
 })

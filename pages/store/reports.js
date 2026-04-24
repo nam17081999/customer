@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
 import Head from 'next/head'
-import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
-import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { formatAddressParts } from '@/lib/utils'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
-import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
+import { formatAddressParts } from '@/lib/utils'
+import { summarizeStoreReport, STORE_REPORT_EDIT_FIELDS } from '@/helper/storeReportFlow'
 import { formatDateTime } from '@/helper/validation'
-import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
+import { useStoreReportsController } from '@/helper/useStoreReportsController'
 
 const storeTypeLabelMap = {
   tap_hoa: 'Tạp hóa',
@@ -25,19 +21,7 @@ const reasonLabelMap = REPORT_REASON_OPTIONS.reduce((acc, item) => {
   return acc
 }, {})
 
-const EDIT_FIELDS = [
-  { key: 'name', label: 'Tên' },
-  { key: 'store_type', label: 'Loại cửa hàng' },
-  { key: 'address_detail', label: 'Địa chỉ chi tiết' },
-  { key: 'ward', label: 'Xã/Phường' },
-  { key: 'district', label: 'Quận/Huyện' },
-  { key: 'phone', label: 'Số điện thoại' },
-  { key: 'note', label: 'Ghi chú' },
-  { key: 'latitude', label: 'Vĩ độ' },
-  { key: 'longitude', label: 'Kinh độ' },
-]
-
-const formatValue = (key, value) => {
+function formatValue(key, value) {
   if (value === null || value === undefined || value === '') return '—'
   if (key === 'store_type') return storeTypeLabelMap[value] || String(value)
   if (key === 'latitude' || key === 'longitude') {
@@ -49,195 +33,24 @@ const formatValue = (key, value) => {
 }
 
 export default function StoreReportsPage() {
-  const router = useRouter()
-  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
-  const [pageReady, setPageReady] = useState(false)
-  const [reports, setReports] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [message, setMessage] = useState('')
-  const [actionLoading, setActionLoading] = useState({})
-  const [pendingStoreCount, setPendingStoreCount] = useState(0)
-  const [confirmAction, setConfirmAction] = useState({ open: false, type: '', report: null })
-
-  useEffect(() => {
-    if (authLoading) return
-    if (!isAuthenticated) {
-      setPageReady(false)
-      void router.replace('/login?from=/store/reports').catch((err) => {
-        if (!err?.cancelled) console.error('Redirect to login failed:', err)
-      })
-      return
-    }
-    if (!isAdmin) {
-      setPageReady(false)
-      void router.replace('/account').catch((err) => {
-        if (!err?.cancelled) console.error('Redirect to account failed:', err)
-      })
-      return
-    }
-    setPageReady(true)
-  }, [authLoading, isAuthenticated, isAdmin, router])
-
-  const loadReports = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    setMessage('')
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('store_reports')
-        .select('id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)')
-        .eq('status', 'pending')
-        .is('stores.deleted_at', null)
-        .order('created_at', { ascending: false })
-
-      if (fetchError) throw fetchError
-      setReports(data || [])
-    } catch (err) {
-      console.error(err)
-      setReports([])
-      setError('Không tải được danh sách báo cáo. Vui lòng thử lại.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const loadPendingStoreCount = useCallback(async () => {
-    try {
-      const allStores = await getOrRefreshStores()
-      const count = (allStores || []).filter((store) => store.active !== true).length
-      setPendingStoreCount(count)
-    } catch {
-      setPendingStoreCount(0)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!pageReady) return
-    loadReports()
-    loadPendingStoreCount()
-  }, [pageReady, loadReports, loadPendingStoreCount])
-
-  const handleReject = async (reportId) => {
-    setActionLoading((prev) => ({ ...prev, [reportId]: true }))
-    const { error: updateError } = await supabase
-      .from('store_reports')
-      .update({ status: 'rejected', updated_at: new Date().toISOString() })
-      .eq('id', reportId)
-
-    if (updateError) {
-      setError('Từ chối thất bại. Vui lòng thử lại.')
-    } else {
-      setReports((prev) => prev.filter((item) => item.id !== reportId))
-      setMessage('Đã từ chối báo cáo.')
-    }
-    setActionLoading((prev) => ({ ...prev, [reportId]: false }))
-  }
-
-  const handleApproveReason = async (reportId) => {
-    setActionLoading((prev) => ({ ...prev, [reportId]: true }))
-    const { error: updateError } = await supabase
-      .from('store_reports')
-      .update({ status: 'approved', updated_at: new Date().toISOString() })
-      .eq('id', reportId)
-
-    if (updateError) {
-      setError('Cập nhật thất bại. Vui lòng thử lại.')
-    } else {
-      setReports((prev) => prev.filter((item) => item.id !== reportId))
-      setMessage('Đã đánh dấu báo cáo.')
-    }
-    setActionLoading((prev) => ({ ...prev, [reportId]: false }))
-  }
-
-  const handleApproveEdit = async (report) => {
-    const reportId = report.id
-    setActionLoading((prev) => ({ ...prev, [reportId]: true }))
-    setError('')
-
-    const proposed = report.proposed_changes || {}
-    const storeId = report.store_id
-
-    if (!storeId || Object.keys(proposed).length === 0) {
-      setError('Không có thay đổi để cập nhật.')
-      setActionLoading((prev) => ({ ...prev, [reportId]: false }))
-      return
-    }
-
-    const updatedAt = new Date().toISOString()
-    const storeUpdates = { ...proposed, updated_at: updatedAt }
-
-    const { error: updateStoreError } = await supabase
-      .from('stores')
-      .update(storeUpdates)
-      .eq('id', storeId)
-
-    if (updateStoreError) {
-      console.error(updateStoreError)
-      setError('Không cập nhật được cửa hàng. Vui lòng thử lại.')
-      setActionLoading((prev) => ({ ...prev, [reportId]: false }))
-      return
-    }
-
-    const { error: updateReportError } = await supabase
-      .from('store_reports')
-      .update({ status: 'approved', updated_at: new Date().toISOString() })
-      .eq('id', reportId)
-
-    if (updateReportError) {
-      setError('Cập nhật trạng thái báo cáo thất bại.')
-    } else {
-      setReports((prev) => prev.filter((item) => item.id !== reportId))
-      setMessage('Đã duyệt cập nhật cửa hàng.')
-      const nextStore = { ...(report.store || {}), ...storeUpdates }
-      await updateStoreInCache(storeId, storeUpdates)
-      try {
-        const changes = buildStoreDiff(report.store || {}, storeUpdates)
-        await logStoreEditHistory({
-          storeId,
-          actionType: 'report_apply',
-          actorUserId: user?.id,
-          changes,
-        })
-      } catch (err) {
-        console.error('store_edit_history report_apply failed:', err)
-      }
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('storevis:stores-changed', {
-            detail: { type: 'update', id: storeId, store: nextStore },
-          })
-        )
-      }
-    }
-
-    setActionLoading((prev) => ({ ...prev, [reportId]: false }))
-  }
-
-  const openConfirmAction = (type, report) => {
-    setConfirmAction({ open: true, type, report })
-  }
-
-  const closeConfirmAction = () => {
-    setConfirmAction({ open: false, type: '', report: null })
-  }
-
-  const getReportSummary = (report) => {
-    const proposed = report?.proposed_changes || {}
-    const keys = Object.keys(proposed)
-    const hasLocation = keys.includes('latitude') || keys.includes('longitude')
-    const fieldCount = keys.filter((key) => !['latitude', 'longitude'].includes(key)).length + (hasLocation ? 1 : 0)
-    return { hasLocation, fieldCount, proposed }
-  }
+  const {
+    authLoading,
+    pageReady,
+    reports,
+    loading,
+    error,
+    message,
+    actionLoading,
+    confirmAction,
+    loadReports,
+    handleReject,
+    openConfirmAction,
+    closeConfirmAction,
+    handleConfirmAction,
+  } = useStoreReportsController()
 
   const pendingCount = reports.length
   const hasReports = pendingCount > 0
-
-  const emptyState = (
-    <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 text-sm text-gray-400">
-      Hiện chưa có báo cáo cần xử lý.
-    </div>
-  )
 
   if (authLoading) {
     return (
@@ -270,6 +83,7 @@ export default function StoreReportsPage() {
                   {loading ? 'Đang tải...' : 'Làm mới'}
                 </Button>
               </div>
+
               <div className="rounded-xl bg-blue-950/30 border border-blue-900 p-3">
                 <p className="text-sm text-blue-200">Báo cáo chờ xử lý</p>
                 <p className="text-2xl font-bold text-blue-100">{pendingCount}</p>
@@ -288,7 +102,11 @@ export default function StoreReportsPage() {
             </CardContent>
           </Card>
 
-          {!loading && !hasReports && emptyState}
+          {!loading && !hasReports && (
+            <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 text-sm text-gray-400">
+              Hiện chưa có báo cáo cần xử lý.
+            </div>
+          )}
 
           <div className="space-y-3">
             {reports.map((report) => {
@@ -296,15 +114,15 @@ export default function StoreReportsPage() {
               const reportId = report.id
               const isLoading = Boolean(actionLoading[reportId])
               const isEdit = report.report_type === 'edit'
-              const proposed = report.proposed_changes || {}
-              const changedKeys = Object.keys(proposed)
-              const baseFields = EDIT_FIELDS.filter((field) => !['latitude', 'longitude'].includes(field.key))
-              const changedFields = baseFields.filter((field) => changedKeys.includes(field.key))
-              const hasLocationChange = changedKeys.includes('latitude') || changedKeys.includes('longitude')
+              const reportSummary = summarizeStoreReport(report)
+              const changedKeys = Object.keys(reportSummary.proposed)
+              const changedFields = STORE_REPORT_EDIT_FIELDS
+                .filter((field) => !['latitude', 'longitude'].includes(field.key))
+                .filter((field) => changedKeys.includes(field.key))
               const currentLat = store?.latitude
               const currentLng = store?.longitude
-              const nextLat = proposed.latitude ?? currentLat
-              const nextLng = proposed.longitude ?? currentLng
+              const nextLat = reportSummary.proposed.latitude ?? currentLat
+              const nextLng = reportSummary.proposed.longitude ?? currentLng
               const canShowDirection = Number.isFinite(Number(nextLat)) && Number.isFinite(Number(nextLng))
               const locationOld = `${formatValue('latitude', currentLat)}, ${formatValue('longitude', currentLng)}`
               const locationNew = `${formatValue('latitude', nextLat)}, ${formatValue('longitude', nextLng)}`
@@ -339,9 +157,10 @@ export default function StoreReportsPage() {
 
                     {isEdit && (
                       <div className="space-y-2">
-                        {changedFields.length === 0 && !hasLocationChange && (
+                        {changedFields.length === 0 && !reportSummary.hasLocation && (
                           <div className="text-sm text-gray-400">Không có thay đổi cụ thể.</div>
                         )}
+
                         {changedFields.map((field) => (
                           <div key={field.key} className="rounded-lg border border-gray-800 bg-gray-950 p-3">
                             <p className="text-sm font-medium text-gray-200">{field.label}</p>
@@ -349,18 +168,20 @@ export default function StoreReportsPage() {
                               {formatValue(field.key, store?.[field.key])}
                             </p>
                             <p className="text-sm text-green-300">
-                              {formatValue(field.key, proposed[field.key])}
+                              {formatValue(field.key, reportSummary.proposed[field.key])}
                             </p>
                           </div>
                         ))}
-                        {hasLocationChange && (
+
+                        {reportSummary.hasLocation && (
                           <div className="rounded-lg border border-gray-800 bg-gray-950 p-3">
                             <p className="text-sm font-medium text-gray-200">Vị trí</p>
                             <p className="text-sm text-gray-500 line-through">{locationOld}</p>
                             <p className="text-sm text-green-300">{locationNew}</p>
                           </div>
                         )}
-                        {hasLocationChange && canShowDirection && (
+
+                        {reportSummary.hasLocation && canShowDirection && (
                           <Button
                             type="button"
                             variant="outline"
@@ -410,7 +231,11 @@ export default function StoreReportsPage() {
           </div>
         </div>
       </div>
-      <Dialog open={confirmAction.open} onOpenChange={(open) => setConfirmAction((prev) => ({ ...prev, open }))}>
+
+      <Dialog open={confirmAction.open} onOpenChange={(open) => {
+        if (open) return
+        closeConfirmAction()
+      }}>
         <DialogContent className="max-w-sm w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden">
           <div className="p-4 space-y-3">
             <DialogTitle className="text-base font-semibold text-gray-100">Xác nhận duyệt</DialogTitle>
@@ -419,16 +244,16 @@ export default function StoreReportsPage() {
                 ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
                 : 'Đánh dấu báo cáo này là đã xử lý?'}
             </DialogDescription>
+
             {confirmAction.report && (
               <div className="rounded-lg border border-gray-800 bg-gray-950 p-3 space-y-1">
                 <p className="text-sm text-gray-200">
                   Cửa hàng: {confirmAction.report.store?.name || 'Không rõ'}
                 </p>
                 {confirmAction.type === 'edit' && (() => {
-                  const summary = getReportSummary(confirmAction.report)
-                  const proposed = summary.proposed || {}
-                  const nextLat = proposed.latitude ?? confirmAction.report.store?.latitude
-                  const nextLng = proposed.longitude ?? confirmAction.report.store?.longitude
+                  const summary = summarizeStoreReport(confirmAction.report)
+                  const nextLat = summary.proposed.latitude ?? confirmAction.report.store?.latitude
+                  const nextLng = summary.proposed.longitude ?? confirmAction.report.store?.longitude
                   return (
                     <>
                       <p className="text-sm text-gray-400">Số thay đổi: {summary.fieldCount}</p>
@@ -442,22 +267,12 @@ export default function StoreReportsPage() {
                 })()}
               </div>
             )}
+
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={closeConfirmAction}>
                 Hủy
               </Button>
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={() => {
-                  const report = confirmAction.report
-                  const type = confirmAction.type
-                  closeConfirmAction()
-                  if (!report) return
-                  if (type === 'edit') handleApproveEdit(report)
-                  if (type === 'reason') handleApproveReason(report.id)
-                }}
-              >
+              <Button type="button" className="flex-1" onClick={handleConfirmAction}>
                 Xác nhận
               </Button>
             </div>

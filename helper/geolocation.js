@@ -3,6 +3,8 @@
  * user-friendly error messages, and compass heading.
  */
 
+import { getE2EGeolocationOverride, incrementE2EGeolocationCallCount } from '@/lib/e2e-test-mode'
+
 /**
  * Get the best GPS position using watchPosition for progressive accuracy.
  * Returns the first position that meets desiredAccuracy, or the best one
@@ -29,6 +31,22 @@ export async function getBestPosition({
   attempts,
   timeout,
 } = {}) {
+  const e2eGeolocation = getE2EGeolocationOverride()
+  if (e2eGeolocation.hasOverride) {
+    incrementE2EGeolocationCallCount()
+    const delayMs = Number(e2eGeolocation?.delayMs || 0)
+    if (Number.isFinite(delayMs) && delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+    if (e2eGeolocation.coords) {
+      return { coords: e2eGeolocation.coords, error: null }
+    }
+    return {
+      coords: null,
+      error: e2eGeolocation.error ? new Error(String(e2eGeolocation.error)) : new Error('Không lấy được vị trí'),
+    }
+  }
+
   if (!navigator.geolocation) {
     return { coords: null, error: new Error('Geolocation not supported') }
   }
@@ -144,6 +162,13 @@ export function getGeoErrorMessage(err) {
  */
 export async function requestCompassHeading(options = {}) {
   const { requestPermission = false } = options
+  const e2eGeolocation = getE2EGeolocationOverride()
+  if (e2eGeolocation.hasOverride) {
+    return {
+      heading: e2eGeolocation.heading,
+      error: '',
+    }
+  }
 
   if (typeof window === 'undefined' || !('DeviceOrientationEvent' in window)) {
     return { heading: null, error: '' }
