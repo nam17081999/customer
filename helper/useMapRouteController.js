@@ -83,9 +83,8 @@ export function useMapRouteController({
         .filter(Boolean)
 
       setRouteStops(restoredStops)
-      if (typeof parsed?.hideUnselectedStores === 'boolean') {
-        setHideUnselectedStores(parsed.hideUnselectedStores)
-      }
+      // Always start /map with out-of-route stores visible, regardless of the previous session toggle.
+      setHideUnselectedStores(false)
     } catch (error) {
       restoredRoutePlanRef.current = true
       console.error('Restore route plan failed:', error)
@@ -225,8 +224,9 @@ export function useMapRouteController({
         })
       }
     } catch (err) {
-      console.error('Build route failed:', err)
-      setRouteError(err?.message || 'Không thể vẽ tuyến đường ngay lúc này.')
+      const errorMessage = err?.message || 'Không thể vẽ tuyến đường ngay lúc này.'
+      console.error(`Build route failed: ${errorMessage}`)
+      setRouteError(errorMessage)
     } finally {
       setRouteLoading(false)
     }
@@ -271,8 +271,9 @@ export function useMapRouteController({
       setRouteSummary(null)
       setRouteStopStatusById({})
     } catch (err) {
-      console.error('Optimize route order failed:', err)
-      setRouteError(err?.message || 'Không thể sắp xếp danh sách cửa hàng lúc này.')
+      const errorMessage = err?.message || 'Không thể sắp xếp danh sách cửa hàng lúc này.'
+      console.error(`Optimize route order failed: ${errorMessage}`)
+      setRouteError(errorMessage)
     } finally {
       setRouteSorting(false)
     }

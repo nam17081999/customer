@@ -56,6 +56,16 @@ async function setupMapPage(page, overrides = {}) {
   const routePlan = overrides.routePlan || { routeStopIds: [], hideUnselectedStores: false }
   const routeApi = overrides.routeApi || {}
 
+  if (overrides.forceCanvas2dFailure) {
+    await page.addInitScript(() => {
+      const originalGetContext = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function patchedGetContext(type, ...args) {
+        if (type === '2d') return null
+        return originalGetContext.call(this, type, ...args)
+      }
+    })
+  }
+
   await page.addInitScript(({ value, storageKey, savedRoutePlan }) => {
     window.__STOREVIS_E2E__ = value
     window.localStorage.setItem(storageKey, JSON.stringify(savedRoutePlan))
@@ -120,6 +130,7 @@ async function setupMapPage(page, overrides = {}) {
 
   await page.goto('/map')
   await expect(page.getByPlaceholder('Tìm cửa hàng...')).toBeVisible()
+  await expect(page.getByText('Đang tải bản đồ…')).toBeHidden()
 }
 
 async function expectGeoCallCount(page, expectedCount) {
@@ -142,6 +153,25 @@ async function getMapCameraEvents(page) {
   return page.evaluate(() => window.__STOREVIS_E2E__?.map?.cameraEvents || [])
 }
 
+async function dragRouteItem(page, itemName, targetName) {
+  const sourceButton = page.locator(`button[aria-label*="${itemName}"]`).first()
+  const targetButton = page.locator(`button[aria-label*="${targetName}"]`).first()
+  const sourceCard = sourceButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-slate-900/75")]').first()
+  const targetCard = targetButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-slate-900/75")]').first()
+
+  const sourceBox = await sourceCard.boundingBox()
+  const targetBox = await targetCard.boundingBox()
+  if (!sourceBox || !targetBox) {
+    throw new Error('KhÃ´ng láº¥y Ä‘Æ°á»£c vá»‹ trÃ­ pháº§n tá»­ drag route trong test.')
+  }
+
+  await page.mouse.move(sourceBox.x + (sourceBox.width / 2), sourceBox.y + (sourceBox.height / 2))
+  await page.mouse.down()
+  await page.waitForTimeout(260)
+  await page.mouse.move(targetBox.x + (targetBox.width / 2), targetBox.y + (targetBox.height * 0.8), { steps: 8 })
+  await page.mouse.up()
+}
+
 async function openRoutePanel(page) {
   await page.getByRole('button', { name: 'Tuyến đường' }).dispatchEvent('click')
   await expect(page.getByRole('button', { name: /Ẩn bảng tuyến đường/i })).toBeVisible()
@@ -152,6 +182,31 @@ async function getRouteItemLabels(page) {
     return buttons.map((button) => button.getAttribute('aria-label'))
   })
 }
+
+test('desktop /map ẩn loading overlay sau khi bản đồ đã sẵn sàng', async ({ page }) => {
+  await setupMapPage(page, {
+    stores: [
+      buildStore({ id: 'desktop-map-store-1', name: 'Tạp hóa Desktop 1' }),
+      buildStore({ id: 'desktop-map-store-2', name: 'Tạp hóa Desktop 2', latitude: 21.02911, longitude: 105.80511 }),
+    ],
+  })
+
+  await expect(page.getByText('Bộ lọc khu vực')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Tuyến đường' })).toBeVisible()
+})
+
+test('desktop /map vẫn tắt loading overlay khi canvas asset marker bị lỗi', async ({ page }) => {
+  await setupMapPage(page, {
+    forceCanvas2dFailure: true,
+    stores: [
+      buildStore({ id: 'desktop-map-store-1', name: 'Tạp hóa Desktop 1' }),
+      buildStore({ id: 'desktop-map-store-2', name: 'Tạp hóa Desktop 2', latitude: 21.02911, longitude: 105.80511 }),
+    ],
+  })
+
+  await expect(page.getByText('Bộ lọc khu vực')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Tuyến đường' })).toBeVisible()
+})
 
 test('lọc quận xã trên map giữ đúng rule: quận không có xã chọn thì hiện cả quận, có xã chọn thì chỉ hiện xã đó', async ({ page }) => {
   await setupMapPage(page, {
@@ -262,6 +317,28 @@ test('search suggestion trên map chỉ hiện store có tọa độ hợp lệ 
   await page.getByRole('button', { name: 'Thêm' }).click()
   await openRoutePanel(page)
   await expect(page.getByRole('button', { name: 'Loại bỏ cửa hàng Tạp hóa Hợp Lệ khỏi tuyến' })).toBeVisible()
+})
+
+test('search trên map dùng cùng thứ tự ưu tiên với màn tìm kiếm khi bấm Enter', async ({ page }) => {
+  await setupMapPage(page, {
+    stores: [
+      buildStore({ id: 'weak-match', name: 'Tạp hóa Minh', created_at: '2026-04-20T02:00:00.000Z' }),
+      buildStore({ id: 'strong-match', name: 'Tạp hóa Minh Anh', created_at: '2026-04-19T02:00:00.000Z', latitude: 21.02911, longitude: 105.80511 }),
+      buildStore({ id: 'newest-strong-match', name: 'Minh Anh Số 3', created_at: '2026-04-21T02:00:00.000Z', latitude: 21.02951, longitude: 105.80551 }),
+    ],
+  })
+
+  const searchInput = page.getByPlaceholder('Tìm cửa hàng...')
+  await searchInput.fill('minh anh')
+
+  const suggestionButtons = page.locator('div.max-h-64 button.min-w-0.flex-1.text-left')
+  await expect(suggestionButtons).toHaveCount(3)
+  await expect(suggestionButtons.nth(0)).toContainText('Minh Anh Số 3')
+  await expect(suggestionButtons.nth(1)).toContainText('Tạp hóa Minh Anh')
+  await expect(suggestionButtons.nth(2)).toContainText('Tạp hóa Minh')
+
+  await searchInput.press('Enter')
+  await expect(searchInput).toHaveValue('Minh Anh Số 3')
 })
 
 test('vẽ tuyến trên map hiển thị summary sau khi build thành công', async ({ page }) => {

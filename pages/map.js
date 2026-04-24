@@ -9,14 +9,14 @@ import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { parseCoordinate } from '@/helper/coordinate'
 import { formatAddressParts } from '@/lib/utils'
-import { buildStoreSearchIndex, createSearchQueryMeta, matchesSearchQuery } from '@/helper/storeSearch'
-import { filterMapStoresByAreaSelection } from '@/helper/mapFilter'
+import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
   formatRouteDistance,
   formatRouteDuration,
   formatShortAddress,
-  moveItem,
 } from '@/helper/mapRoute'
+import { useMapSearchPanelController } from '@/helper/useMapSearchPanelController'
+import { useMapRouteDragController } from '@/helper/useMapRouteDragController'
 import { useMapNavigationController } from '@/helper/useMapNavigationController'
 import { useMapRouteController } from '@/helper/useMapRouteController'
 import {
@@ -30,8 +30,6 @@ import {
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 
-const ROUTE_DRAG_HOLD_MS = 220
-const ROUTE_DRAG_CANCEL_PX = 10
 const MAP_INTERACTION_SUPPRESS_MS = 500
 
 /**
@@ -87,36 +85,20 @@ export default function MapPage() {
   const maplibreRef = useRef(null)
   const popupRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
+  const markerImageSetupFailedRef = useRef(false)
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [searchTerm, setSearchTerm] = useState('')
   const [highlightedStoreId, setHighlightedStoreId] = useState('')
   const [selectedStore, setSelectedStore] = useState(null)
   const [mapReady, setMapReady] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  const [activeSuggestion, setActiveSuggestion] = useState(-1)
-  const [canScrollDown, setCanScrollDown] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const [isStandalonePwa, setIsStandalonePwa] = useState(false)
-  const [selectedDistricts, setSelectedDistricts] = useState([])
-  const [selectedWards, setSelectedWards] = useState([])
-  const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
-  const [armedRouteIndex, setArmedRouteIndex] = useState(-1)
-  const [draggedRouteIndex, setDraggedRouteIndex] = useState(-1)
-  const [dragOverRouteIndex, setDragOverRouteIndex] = useState(-1)
-  const [dragRouteOffset, setDragRouteOffset] = useState({ x: 0, y: 0 })
-  const [dragRouteBox, setDragRouteBox] = useState(null)
   const [routePanelOpen, setRoutePanelOpen] = useState(false)
   const searchWrapperRef = useRef(null)
   const inputRef = useRef(null)
   const suggestionsRef = useRef(null)
-  const routeListScrollRef = useRef(null)
-  const routeItemRefs = useRef(new Map())
-  const routeDragStateRef = useRef(null)
-  const pendingRouteDragRef = useRef(null)
-  const routeAutoScrollRef = useRef(null)
   const suppressMapInteractionUntilRef = useRef(0)
 
   const initialTarget = useMemo(() => {
@@ -182,17 +164,6 @@ export default function MapPage() {
       .filter((store) => store.coords)
   }, [stores])
 
-  const storesAfterAreaFilters = useMemo(() => {
-    return filterMapStoresByAreaSelection(storesWithCoords, selectedDistricts, selectedWards)
-  }, [storesWithCoords, selectedDistricts, selectedWards])
-
-  const filteredStores = useMemo(() => {
-    return storesAfterAreaFilters.filter((store) => {
-      const typeMatched = selectedStoreTypes.length === 0 || selectedStoreTypes.includes(store.store_type || '')
-      return typeMatched
-    })
-  }, [storesAfterAreaFilters, selectedStoreTypes])
-
   const {
     routeStops,
     setRouteStops,
@@ -221,25 +192,60 @@ export default function MapPage() {
     mapRef,
     isDesktop,
   })
+  const {
+    armedRouteIndex,
+    draggedRouteIndex,
+    dragOverRouteIndex,
+    dragRouteOffset,
+    dragRouteBox,
+    routeListScrollRef,
+    renderedRouteStops,
+    draggedRouteStore,
+    setRouteItemRef,
+    startRouteDrag,
+  } = useMapRouteDragController({
+    routeStops,
+    setRouteStops,
+    resetRouteProgress,
+  })
 
-  const renderedRouteStops = useMemo(() => {
-    const items = routeStops.map((store, index) => ({ store, originalIndex: index }))
-    if (draggedRouteIndex < 0 || dragOverRouteIndex < 0) {
-      return items.map((item, displayIndex) => ({ ...item, displayIndex }))
-    }
-
-    return moveItem(items, draggedRouteIndex, dragOverRouteIndex)
-      .map((item, displayIndex) => ({ ...item, displayIndex }))
-  }, [routeStops, draggedRouteIndex, dragOverRouteIndex])
-
-  const draggedRouteStore = draggedRouteIndex >= 0 ? routeStops[draggedRouteIndex] : null
+  const indexedMapStores = useMemo(() => buildStoreSearchIndex(storesWithCoords), [storesWithCoords])
+  const {
+    searchTerm,
+    setSearchTerm,
+    showSuggestions,
+    activeSuggestion,
+    canScrollDown,
+    selectedDistricts,
+    selectedWards,
+    selectedStoreTypes,
+    storesAfterAreaFilters,
+    filteredStores,
+    availableWards,
+    storeCounts,
+    storeTypeCounts,
+    suggestions,
+    filtersActive,
+    handleSearchInputChange,
+    handleSearchFocus,
+    closeSuggestions,
+    moveActiveSuggestion,
+    handleSuggestionsScroll,
+    syncSuggestionScrollHint,
+    toggleDistrict,
+    toggleWard,
+    toggleStoreType,
+    clearFilters,
+  } = useMapSearchPanelController({
+    storesWithCoords,
+    indexedMapStores,
+    currentLocation: userLocation,
+  })
 
   const visibleMapStores = useMemo(() => {
     if (!hideUnselectedStores || routeStopIds.size === 0) return filteredStores
     return filteredStores.filter((store) => routeStopIds.has(String(store.id)))
   }, [filteredStores, hideUnselectedStores, routeStopIds])
-
-  const indexedMapStores = useMemo(() => buildStoreSearchIndex(storesWithCoords), [storesWithCoords])
 
   const storeFeatures = useMemo(() => {
     const highlightedId = highlightedStoreId ? String(highlightedStoreId) : ''
@@ -268,80 +274,6 @@ export default function MapPage() {
     return nextFeatures
   }, [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
 
-  // Available wards based on selected districts
-  const availableWards = useMemo(() => {
-    if (selectedDistricts.length === 0) return []
-    const wards = []
-    for (const d of selectedDistricts) {
-      if (DISTRICT_WARD_SUGGESTIONS[d]) wards.push(...DISTRICT_WARD_SUGGESTIONS[d])
-    }
-    return wards
-  }, [selectedDistricts])
-
-  // Count stores per district and ward for display
-  const storeCounts = useMemo(() => {
-    const districtCounts = {}
-    const wardCounts = {}
-    for (const store of storesWithCoords) {
-      const d = (store.district || '').trim()
-      const w = (store.ward || '').trim()
-      if (d) districtCounts[d] = (districtCounts[d] || 0) + 1
-      if (w) wardCounts[w] = (wardCounts[w] || 0) + 1
-    }
-    return { districtCounts, wardCounts }
-  }, [storesWithCoords])
-
-  const storeTypeCounts = useMemo(() => {
-    const counts = {}
-    for (const store of storesAfterAreaFilters) {
-      const key = store.store_type || ''
-      if (!key) continue
-      counts[key] = (counts[key] || 0) + 1
-    }
-    return counts
-  }, [storesAfterAreaFilters])
-
-  const toggleDistrict = useCallback((district) => {
-    setSelectedDistricts(prev => {
-      if (prev.includes(district)) {
-        const next = prev.filter(d => d !== district)
-        // Also remove wards belonging to unselected district
-        const removedWards = DISTRICT_WARD_SUGGESTIONS[district] || []
-        setSelectedWards(w => w.filter(x => !removedWards.includes(x)))
-        return next
-      }
-      return [...prev, district]
-    })
-  }, [])
-
-  const toggleWard = useCallback((ward) => {
-    setSelectedWards(prev =>
-      prev.includes(ward) ? prev.filter(w => w !== ward) : [...prev, ward]
-    )
-  }, [])
-
-  const toggleStoreType = useCallback((storeType) => {
-    setSelectedStoreTypes((prev) =>
-      prev.includes(storeType) ? prev.filter((value) => value !== storeType) : [...prev, storeType]
-    )
-  }, [])
-
-  const clearFilters = useCallback(() => {
-    setSelectedDistricts([])
-    setSelectedWards([])
-    setSelectedStoreTypes([])
-  }, [])
-
-  const suggestions = useMemo(() => {
-    const queryMeta = createSearchQueryMeta(searchTerm)
-    if (!queryMeta.term) return []
-
-    return indexedMapStores
-      .filter((entry) => matchesSearchQuery(entry, queryMeta))
-      .map((entry) => entry.store)
-      .slice(0, 25)
-  }, [indexedMapStores, searchTerm])
-
   const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
 
   useEffect(() => {
@@ -349,6 +281,8 @@ export default function MapPage() {
 
     let cancelled = false
     let activeMap = null
+    let detachMapSetupListeners = null
+    markerImageSetupFailedRef.current = false
 
     const initMap = async () => {
       const maplibreModule = await import('maplibre-gl')
@@ -387,9 +321,13 @@ export default function MapPage() {
 
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
-      // Add GeoJSON source
-      map.on('load', () => {
-        if (cancelled) return
+      let mapInitialized = false
+      const initializeMapOverlays = () => {
+        const styleReady = typeof map.isStyleLoaded === 'function' ? map.isStyleLoaded() : map.loaded()
+        if (cancelled || mapInitialized || !styleReady) return
+
+        mapInitialized = true
+        detachMapSetupListeners?.()
 
         map.addSource('stores', {
           type: 'geojson',
@@ -470,29 +408,6 @@ export default function MapPage() {
           },
         })
 
-        if (!map.hasImage('user-heading-fan')) {
-          const img = createUserHeadingFanImage()
-          map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
-        }
-
-        map.addLayer({
-          id: 'user-location-heading',
-          type: 'symbol',
-          source: 'user-location',
-          layout: {
-            'icon-image': 'user-heading-fan',
-            'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
-            'icon-rotate': ['get', 'heading'],
-            'icon-rotation-alignment': 'map',
-            'icon-anchor': 'center',
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
-          },
-          paint: {
-            'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
-          },
-        })
-
         map.addLayer({
           id: 'user-location-dot',
           type: 'circle',
@@ -504,6 +419,35 @@ export default function MapPage() {
             'circle-stroke-width': 2,
           },
         })
+
+        setMapReady(true)
+
+        try {
+          if (!map.hasImage('user-heading-fan')) {
+            const img = createUserHeadingFanImage()
+            map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+          }
+
+          map.addLayer({
+            id: 'user-location-heading',
+            type: 'symbol',
+            source: 'user-location',
+            layout: {
+              'icon-image': 'user-heading-fan',
+              'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
+              'icon-rotate': ['get', 'heading'],
+              'icon-rotation-alignment': 'map',
+              'icon-anchor': 'center',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+            },
+            paint: {
+              'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
+            },
+          })
+        } catch (assetError) {
+          console.error('User heading asset setup failed:', assetError)
+        }
 
         // Click on store marker -> open dialog
         map.on('click', 'store-marker', (e) => {
@@ -548,9 +492,15 @@ export default function MapPage() {
           map.getCanvas().style.cursor = ''
           popup.remove()
         })
+      }
 
-        setMapReady(true)
-      })
+      map.on('load', initializeMapOverlays)
+      map.on('styledata', initializeMapOverlays)
+      detachMapSetupListeners = () => {
+        map.off('load', initializeMapOverlays)
+        map.off('styledata', initializeMapOverlays)
+      }
+      initializeMapOverlays()
 
       mapRef.current = map
       activeMap = map
@@ -566,6 +516,8 @@ export default function MapPage() {
       if (popupRef.current) popupRef.current.remove()
       if (activeMap) removeMarkerImages(activeMap, activeMarkerImageIdsRef.current)
       activeMarkerImageIdsRef.current = new Set()
+      markerImageSetupFailedRef.current = false
+      detachMapSetupListeners?.()
       if (activeMap) activeMap.remove()
       mapRef.current = null
       setMapReady(false)
@@ -723,10 +675,22 @@ export default function MapPage() {
     const flushImageBatch = () => {
       if (cancelled) return
 
+      if (markerImageSetupFailedRef.current) {
+        removeStaleImages()
+        return
+      }
+
       const batchEnd = Math.min(index + 18, pendingImages.length)
       for (; index < batchEnd; index += 1) {
         const item = pendingImages[index]
-        ensureStoreMarkerImage(map, item)
+        try {
+          ensureStoreMarkerImage(map, item)
+        } catch (assetError) {
+          markerImageSetupFailedRef.current = true
+          console.error('Store marker image setup failed:', assetError)
+          removeStaleImages()
+          return
+        }
       }
 
       if (index < pendingImages.length) {
@@ -777,213 +741,6 @@ export default function MapPage() {
     if (routeSource) routeSource.setData(routeGeojson)
   }, [mapReady, routeGeojson])
 
-  const cancelPendingRouteDrag = useCallback(() => {
-    if (!pendingRouteDragRef.current) return
-    window.clearTimeout(pendingRouteDragRef.current.timerId)
-    pendingRouteDragRef.current = null
-  }, [])
-
-  const finishRouteDrag = useCallback((cancelled = false) => {
-    const dragState = routeDragStateRef.current
-    routeDragStateRef.current = null
-    cancelPendingRouteDrag()
-    if (routeAutoScrollRef.current) {
-      window.cancelAnimationFrame(routeAutoScrollRef.current)
-      routeAutoScrollRef.current = null
-    }
-
-    const fromIndex = dragState?.fromIndex ?? -1
-    const toIndex = dragState?.targetIndex ?? -1
-
-    if (!cancelled && fromIndex >= 0 && toIndex >= 0 && fromIndex !== toIndex) {
-      setRouteStops((prev) => moveItem(prev, fromIndex, toIndex))
-      resetRouteProgress()
-    }
-
-    setArmedRouteIndex(-1)
-    setDraggedRouteIndex(-1)
-    setDragOverRouteIndex(-1)
-    setDragRouteOffset({ x: 0, y: 0 })
-    setDragRouteBox(null)
-  }, [cancelPendingRouteDrag, resetRouteProgress, setRouteStops])
-
-  const updateRouteDragTarget = useCallback((clientY) => {
-    const entries = Array.from(routeItemRefs.current.entries())
-    if (entries.length === 0) return
-
-    let nextTarget = entries[entries.length - 1][0]
-    for (const [index, element] of entries) {
-      if (!element) continue
-      const rect = element.getBoundingClientRect()
-      if (clientY < rect.top + rect.height / 2) {
-        nextTarget = index
-        break
-      }
-    }
-
-    if (routeDragStateRef.current) {
-      routeDragStateRef.current.targetIndex = nextTarget
-    }
-    setDragOverRouteIndex(nextTarget)
-  }, [])
-
-  const tickRouteAutoScroll = useCallback(() => {
-    routeAutoScrollRef.current = null
-    const dragState = routeDragStateRef.current
-    const container = routeListScrollRef.current
-    if (!dragState || !container) return
-
-    const rect = container.getBoundingClientRect()
-    const threshold = 56
-    let delta = 0
-
-    if (dragState.lastClientY < rect.top + threshold) {
-      delta = Math.max(-14, -((rect.top + threshold - dragState.lastClientY) / 6))
-    } else if (dragState.lastClientY > rect.bottom - threshold) {
-      delta = Math.min(14, (dragState.lastClientY - (rect.bottom - threshold)) / 6)
-    }
-
-    if (delta !== 0) {
-      container.scrollTop += delta
-      updateRouteDragTarget(dragState.lastClientY)
-      routeAutoScrollRef.current = window.requestAnimationFrame(tickRouteAutoScroll)
-    }
-  }, [updateRouteDragTarget])
-
-  const activateRouteDrag = useCallback((dragState) => {
-    if (!dragState?.element) return
-
-    const elementRect = dragState.element.getBoundingClientRect()
-    routeDragStateRef.current = {
-      ...dragState,
-      status: 'dragging',
-      lastClientY: dragState.latestClientY,
-    }
-    dragState.element.setPointerCapture?.(dragState.pointerId)
-    setArmedRouteIndex(-1)
-    setDraggedRouteIndex(dragState.fromIndex)
-    setDragOverRouteIndex(dragState.fromIndex)
-    setDragRouteOffset({
-      x: dragState.latestClientX - dragState.startX,
-      y: dragState.latestClientY - dragState.startY,
-    })
-    setDragRouteBox({
-      left: elementRect.left,
-      top: elementRect.top,
-      width: elementRect.width,
-      height: elementRect.height,
-    })
-    updateRouteDragTarget(dragState.latestClientY)
-  }, [updateRouteDragTarget])
-
-  useEffect(() => {
-    const handlePointerMove = (event) => {
-      if (routeDragStateRef.current?.status === 'dragging') {
-        if (event.cancelable) event.preventDefault()
-        routeDragStateRef.current.lastClientY = event.clientY
-        routeDragStateRef.current.latestClientX = event.clientX
-        routeDragStateRef.current.latestClientY = event.clientY
-        setDragRouteOffset({
-          x: event.clientX - routeDragStateRef.current.startX,
-          y: event.clientY - routeDragStateRef.current.startY,
-        })
-        updateRouteDragTarget(event.clientY)
-        if (!routeAutoScrollRef.current) {
-          routeAutoScrollRef.current = window.requestAnimationFrame(tickRouteAutoScroll)
-        }
-        return
-      }
-
-      if (routeDragStateRef.current?.status === 'armed') {
-        if (event.cancelable) event.preventDefault()
-        routeDragStateRef.current.latestClientX = event.clientX
-        routeDragStateRef.current.latestClientY = event.clientY
-        routeDragStateRef.current.lastClientY = event.clientY
-
-        const movedX = Math.abs(event.clientX - routeDragStateRef.current.startX)
-        const movedY = Math.abs(event.clientY - routeDragStateRef.current.startY)
-        if (movedX > 3 || movedY > 3) {
-          activateRouteDrag(routeDragStateRef.current)
-        }
-        return
-      }
-
-      const pending = pendingRouteDragRef.current
-      if (!pending) return
-
-      const movedX = Math.abs(event.clientX - pending.startX)
-      const movedY = Math.abs(event.clientY - pending.startY)
-      if (movedX > ROUTE_DRAG_CANCEL_PX || movedY > ROUTE_DRAG_CANCEL_PX) {
-        cancelPendingRouteDrag()
-        return
-      }
-      pending.latestClientX = event.clientX
-      pending.latestClientY = event.clientY
-    }
-
-    const handlePointerUp = () => {
-      if (routeDragStateRef.current) {
-        finishRouteDrag(false)
-        return
-      }
-      cancelPendingRouteDrag()
-      setArmedRouteIndex(-1)
-    }
-
-    const handlePointerCancel = () => {
-      if (routeDragStateRef.current) {
-        finishRouteDrag(true)
-        return
-      }
-      cancelPendingRouteDrag()
-      setArmedRouteIndex(-1)
-    }
-
-    const handleTouchMove = (event) => {
-      if (!routeDragStateRef.current) return
-      if (event.cancelable) event.preventDefault()
-    }
-
-    window.addEventListener('pointermove', handlePointerMove, { passive: false })
-    window.addEventListener('pointerup', handlePointerUp)
-    window.addEventListener('pointercancel', handlePointerCancel)
-    window.addEventListener('touchmove', handleTouchMove, { passive: false })
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-      window.removeEventListener('pointercancel', handlePointerCancel)
-      window.removeEventListener('touchmove', handleTouchMove)
-    }
-  }, [activateRouteDrag, cancelPendingRouteDrag, finishRouteDrag, tickRouteAutoScroll, updateRouteDragTarget])
-
-  const startRouteDrag = useCallback((index, event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return
-
-    cancelPendingRouteDrag()
-    pendingRouteDragRef.current = {
-      fromIndex: index,
-      startX: event.clientX,
-      startY: event.clientY,
-      latestClientX: event.clientX,
-      latestClientY: event.clientY,
-      pointerId: event.pointerId,
-      element: event.currentTarget,
-      timerId: window.setTimeout(() => {
-        const pending = pendingRouteDragRef.current
-        if (!pending) return
-        routeDragStateRef.current = {
-          ...pending,
-          status: 'armed',
-          targetIndex: pending.fromIndex,
-          lastClientY: pending.latestClientY,
-        }
-        pendingRouteDragRef.current = null
-        setArmedRouteIndex(pending.fromIndex)
-      }, ROUTE_DRAG_HOLD_MS),
-    }
-  }, [cancelPendingRouteDrag])
-
   const flyToStore = useCallback((store) => {
     if (!store?.coords) return
     const map = mapRef.current
@@ -992,21 +749,16 @@ export default function MapPage() {
     setHighlightedStoreId(String(store.id))
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
 
-    setShowSuggestions(false)
+    closeSuggestions()
     setSearchTerm(store.name || '')
     inputRef.current?.blur()
-  }, [])
+  }, [closeSuggestions, setSearchTerm])
 
   const handleSearch = useCallback(() => {
-    const queryMeta = createSearchQueryMeta(searchTerm)
-    if (!queryMeta.term) return
-
-    const matchedEntry = indexedMapStores.find((entry) => matchesSearchQuery(entry, queryMeta))
-    const matched = matchedEntry?.store || null
-
+    const matched = suggestions[0] || null
     if (matched) flyToStore(matched)
-    setShowSuggestions(false)
-  }, [flyToStore, indexedMapStores, searchTerm])
+    closeSuggestions()
+  }, [closeSuggestions, flyToStore, suggestions])
 
   const showNavigationInfoPanel = followUserHeading && Boolean(navigationInfo)
 
@@ -1040,22 +792,17 @@ export default function MapPage() {
   useEffect(() => {
     function onPointerDown(e) {
       if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
-        setShowSuggestions(false)
+        closeSuggestions()
       }
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [])
+  }, [closeSuggestions])
 
   // Recalculate scroll indicator when suggestions change
   useEffect(() => {
-    const el = suggestionsRef.current
-    if (el) {
-      setCanScrollDown(el.scrollHeight > el.clientHeight + 2)
-    } else {
-      setCanScrollDown(false)
-    }
-  }, [suggestions])
+    syncSuggestionScrollHint(suggestionsRef.current)
+  }, [suggestions, syncSuggestionScrollHint])
 
   return (
     <div className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-slate-950 text-slate-100 flex">
@@ -1067,7 +814,10 @@ export default function MapPage() {
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950 transition-opacity duration-500"
-          style={{ opacity: mapReady ? 0 : 1 }}
+          style={{
+            opacity: mapReady ? 0 : 1,
+            visibility: mapReady ? 'hidden' : 'visible',
+          }}
         >
           <svg className="h-8 w-8 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
@@ -1084,19 +834,15 @@ export default function MapPage() {
                   ref={inputRef}
                   placeholder="Tìm cửa hàng..."
                   value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value)
-                    setShowSuggestions(true)
-                    setActiveSuggestion(-1)
-                  }}
-                  onFocus={() => { if (searchTerm.trim()) setShowSuggestions(true) }}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
+                  onFocus={handleSearchFocus}
                   onKeyDown={(e) => {
                     if (e.key === 'ArrowDown') {
                       e.preventDefault()
-                      setActiveSuggestion((i) => Math.min(i + 1, suggestions.length - 1))
+                      moveActiveSuggestion('down', suggestions.length)
                     } else if (e.key === 'ArrowUp') {
                       e.preventDefault()
-                      setActiveSuggestion((i) => Math.max(i - 1, -1))
+                      moveActiveSuggestion('up', suggestions.length)
                     } else if (e.key === 'Enter') {
                       e.preventDefault()
                       if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
@@ -1105,7 +851,7 @@ export default function MapPage() {
                         handleSearch()
                       }
                     } else if (e.key === 'Escape') {
-                      setShowSuggestions(false)
+                      closeSuggestions()
                       inputRef.current?.blur()
                     }
                   }}
@@ -1119,10 +865,7 @@ export default function MapPage() {
                 <div
                   ref={suggestionsRef}
                   className="max-h-64 overflow-y-auto"
-                  onScroll={(e) => {
-                    const el = e.currentTarget
-                    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 2)
-                  }}
+                  onScroll={(e) => handleSuggestionsScroll(e.currentTarget)}
                 >
                   {suggestions.map((store, idx) => (
                     <div
@@ -1297,8 +1040,7 @@ export default function MapPage() {
                       <div
                         key={store.id}
                         ref={(element) => {
-                          if (element) routeItemRefs.current.set(displayIndex, element)
-                          else routeItemRefs.current.delete(displayIndex)
+                          setRouteItemRef(displayIndex, element)
                         }}
                         onPointerDown={(event) => startRouteDrag(originalIndex, event)}
                         onContextMenu={(event) => event.preventDefault()}
@@ -1523,8 +1265,8 @@ export default function MapPage() {
           {/* Sidebar header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/60">
             <h2 className="text-base font-semibold text-slate-100">Bộ lọc khu vực</h2>
-            <div className="flex items-center gap-2">
-              {(selectedDistricts.length > 0 || selectedWards.length > 0 || selectedStoreTypes.length > 0) && (
+              <div className="flex items-center gap-2">
+              {filtersActive && (
                 <button
                   type="button"
                   onClick={clearFilters}

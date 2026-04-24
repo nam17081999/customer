@@ -1,6 +1,5 @@
-import { haversineKm } from '@/helper/distance'
 import { parseCoordinate } from '@/helper/coordinate'
-import { createSearchQueryMeta, getSearchScore } from '@/helper/storeSearch'
+import { rankStoreSearchResults } from '@/helper/storeSearch'
 
 export const FILTER_FLAG_HAS_PHONE = 'has_phone'
 export const FILTER_FLAG_HAS_IMAGE = 'has_image'
@@ -101,14 +100,6 @@ export function countActiveFilters({
     + selectedDetailFlags.length
 }
 
-function computeDistance(store, refLoc) {
-  if (!refLoc) return null
-  const lat = parseCoordinate(store?.latitude)
-  const lng = parseCoordinate(store?.longitude)
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-  return haversineKm(refLoc.latitude, refLoc.longitude, lat, lng)
-}
-
 export function filterAndSortSearchResults({
   indexedStores,
   searchTerm,
@@ -119,8 +110,6 @@ export function filterAndSortSearchResults({
   currentLocation,
 }) {
   let results = Array.isArray(indexedStores) ? indexedStores : []
-  const queryMeta = createSearchQueryMeta(searchTerm)
-  const hasTextSearch = Boolean(queryMeta.term)
 
   if (selectedDistrict) {
     results = results.filter(({ store }) => store.district === selectedDistrict)
@@ -144,40 +133,9 @@ export function filterAndSortSearchResults({
     results = results.filter(({ store }) => Boolean(store.is_potential))
   }
 
-  if (hasTextSearch) {
-    results = results
-      .map((entry) => {
-        const score = getSearchScore(entry, queryMeta)
-        if (score == null) return null
-        return { entry, score }
-      })
-      .filter(Boolean)
-  } else {
-    results = results.map((entry) => ({ entry, score: 2 }))
-  }
-
-  results = results.map(({ entry, score }) => ({
-    ...entry.store,
-    _score: score,
-    distance: computeDistance(entry.store, currentLocation),
-  }))
-
-  return results.slice().sort((a, b) => {
-    if (hasTextSearch) {
-      const sa = a._score ?? 2
-      const sb = b._score ?? 2
-      if (sb !== sa) return sb - sa
-    }
-
-    const aHasDistance = a.distance != null
-    const bHasDistance = b.distance != null
-    if (aHasDistance && bHasDistance && a.distance !== b.distance) {
-      return a.distance - b.distance
-    }
-    if (aHasDistance !== bHasDistance) return aHasDistance ? -1 : 1
-    if (a.active !== b.active) return a.active ? -1 : 1
-    const da = a.created_at || ''
-    const db = b.created_at || ''
-    return db.localeCompare(da)
+  return rankStoreSearchResults({
+    indexedStores: results,
+    searchTerm,
+    currentLocation,
   })
 }

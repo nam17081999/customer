@@ -169,7 +169,7 @@ export function removeMarkerImages(map, imageIds) {
 
 export function createUserHeadingFanImage() {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 2
-  const size = 132 * dpr
+  const size = Math.max(1, Math.round(132 * dpr))
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -206,9 +206,9 @@ export function createUserHeadingFanImage() {
   ctx.fill()
 
   return {
-    width: size,
-    height: size,
-    data: ctx.getImageData(0, 0, size, size).data,
+    width: canvas.width,
+    height: canvas.height,
+    data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
     dpr,
   }
 }
