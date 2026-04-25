@@ -1,13 +1,12 @@
-import dynamic from 'next/dynamic'
+﻿import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  DEFAULT_STORE_TYPE,
-  DISTRICT_SUGGESTIONS,
-  REPORT_REASON_OPTIONS,
-  STORE_TYPE_OPTIONS,
-} from '@/lib/constants'
+import { Msg } from '@/components/ui/msg'
+import { REPORT_REASON_OPTIONS } from '@/lib/constants'
+import StoreDistrictWardPicker from '@/components/store/store-district-ward-picker'
+import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
+import StoreTypePicker from '@/components/store/store-type-picker'
 import { useStoreReportFormController } from '@/helper/useStoreReportFormController'
 
 const StoreLocationPicker = dynamic(
@@ -22,15 +21,21 @@ const StoreLocationPicker = dynamic(
   }
 )
 
-export default function StoreReportForm({ store, user, onSubmitted }) {
-  const controller = useStoreReportFormController({ store, user, onSubmitted })
+export default function StoreReportForm({
+  store,
+  user,
+  onSubmitted,
+  onCancel,
+  initialMode = '',
+  hideModeChooser = false,
+}) {
+  const controller = useStoreReportFormController({ store, user, onSubmitted, initialMode })
   const {
     mode,
     setMode,
     reasons,
     submitting,
-    error,
-    success,
+    msgState,
     reportName,
     setReportName,
     reportStoreType,
@@ -52,31 +57,80 @@ export default function StoreReportForm({ store, user, onSubmitted }) {
     mapEditable,
     setMapEditable,
     resolving,
-    wardSuggestions,
+    currentStep,
+    setCurrentStep,
+    mapKey,
     toggleReason,
     resetFeedback,
     handleGetLocation,
+    validateEditStep,
     handleSubmit,
   } = controller
 
+  const editSteps = [
+    { num: 1, label: 'Tên' },
+    { num: 2, label: 'Thông tin' },
+    { num: 3, label: 'Vị trí' },
+  ]
+  const standaloneEdit = hideModeChooser && initialMode === 'edit'
+
+  const goBack = () => {
+    if (mode === 'edit' && currentStep > 1) {
+      setCurrentStep((step) => step - 1)
+      resetFeedback()
+      return
+    }
+
+    if (standaloneEdit && typeof onCancel === 'function') {
+      resetFeedback()
+      onCancel()
+      return
+    }
+
+    if (!hideModeChooser) {
+      setMode('')
+    }
+    setCurrentStep(1)
+    resetFeedback()
+  }
+
+  const primaryActionLabel = mode === 'edit' && currentStep < 3
+    ? 'Tiếp theo →'
+    : submitting ? 'Đang gửi...' : 'Gửi báo cáo'
+
+  const handlePrimaryAction = () => {
+    if (mode === 'edit' && currentStep < 3) {
+      const canAdvance = validateEditStep(currentStep)
+      if (!canAdvance) return
+      setCurrentStep((step) => step + 1)
+      resetFeedback()
+      return
+    }
+
+    handleSubmit()
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
-        <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
-        <p className="mt-1 text-sm text-gray-400">
-          Tách riêng khỏi modal để dễ nhập liệu hơn trên điện thoại.
-        </p>
-        {!mode && (
-          <div className="mt-4 grid gap-2">
-            <Button type="button" className="w-full" onClick={() => setMode('edit')}>
-              Sửa thông tin
-            </Button>
-            <Button type="button" variant="outline" className="w-full" onClick={() => setMode('reason')}>
-              Chỉ báo cáo vấn đề
-            </Button>
-          </div>
-        )}
-      </div>
+      <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
+      {!hideModeChooser && (
+        <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
+          <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
+          <p className="mt-1 text-sm text-gray-400">
+            Tách riêng khỏi modal để dễ nhập liệu hơn trên điện thoại.
+          </p>
+          {!mode && (
+            <div className="mt-4 grid gap-2">
+              <Button type="button" className="w-full" onClick={() => setMode('edit')}>
+                Sửa thông tin
+              </Button>
+              <Button type="button" variant="outline" className="w-full" onClick={() => setMode('reason')}>
+                Chỉ báo cáo vấn đề
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {mode === 'reason' && (
         <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-3">
@@ -111,183 +165,149 @@ export default function StoreReportForm({ store, user, onSubmitted }) {
       )}
 
       {mode === 'edit' && (
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-4">
-            <div>
-              <p className="text-base font-semibold text-gray-100">Thông tin đề xuất</p>
-              <p className="mt-1 text-sm text-gray-400">Nhập lại các trường cần chỉnh sửa.</p>
-            </div>
+        <div className="space-y-3">
+          <div className={standaloneEdit ? 'space-y-4' : 'rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-4'}>
+            <StoreFormStepIndicator steps={editSteps} currentStep={currentStep} />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="report-store-type" className="text-sm text-gray-300">Loại cửa hàng</Label>
-              <select
-                id="report-store-type"
-                value={reportStoreType}
-                onChange={(event) => setReportStoreType(event.target.value || DEFAULT_STORE_TYPE)}
-                className="h-11 w-full rounded-xl border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-              >
-                {STORE_TYPE_OPTIONS.map((type) => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
+            {currentStep === 1 && (
+              <div className="space-y-5">
+                <StoreTypePicker
+                  id="report-store-type"
+                  value={reportStoreType}
+                  onChange={setReportStoreType}
+                />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="report-name" className="text-sm text-gray-300">Tên cửa hàng</Label>
-              <Input
-                id="report-name"
-                value={reportName}
-                onChange={(event) => setReportName(event.target.value)}
-                placeholder="VD: Tạp hóa Minh Anh"
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="report-name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Tên cửa hàng
+                  </Label>
+                  <Input
+                    id="report-name"
+                    value={reportName}
+                    onChange={(event) => setReportName(event.target.value)}
+                    placeholder="VD: Minh Anh"
+                    className="h-11 w-full text-base sm:text-base"
+                  />
+                </div>
+              </div>
+            )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="report-district" className="text-sm text-gray-300">Quận / Huyện</Label>
-                <select
-                  id="report-district"
-                  value={reportDistrict}
-                  onChange={(event) => {
-                    setReportDistrict(event.target.value)
+            {currentStep === 2 && (
+              <div className="space-y-4">
+                <StoreDistrictWardPicker
+                  district={reportDistrict}
+                  ward={reportWard}
+                  districtContainerId="report-district-section"
+                  wardContainerId="report-ward-section"
+                  onDistrictChange={(item) => {
+                    setReportDistrict(item)
                     setReportWard('')
                   }}
-                  className="h-11 w-full rounded-xl border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-                >
-                  <option value="">Chọn quận / huyện</option>
-                  {DISTRICT_SUGGESTIONS.map((district) => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-              </div>
+                  onWardChange={setReportWard}
+                />
 
-              <div className="space-y-1.5">
-                <Label htmlFor="report-ward" className="text-sm text-gray-300">Xã / Phường</Label>
-                {wardSuggestions.length > 0 ? (
-                  <select
-                    id="report-ward"
-                    value={reportWard}
-                    onChange={(event) => setReportWard(event.target.value)}
-                    className="h-11 w-full rounded-xl border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-                  >
-                    <option value="">Chọn xã / phường</option>
-                    {wardSuggestions.map((ward) => (
-                      <option key={ward} value={ward}>{ward}</option>
-                    ))}
-                  </select>
-                ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="report-address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span>
+                  </Label>
                   <Input
-                    id="report-ward"
-                    value={reportWard}
-                    onChange={(event) => setReportWard(event.target.value)}
-                    placeholder="VD: Minh Khai"
+                    id="report-address"
+                    value={reportAddressDetail}
+                    onChange={(event) => setReportAddressDetail(event.target.value)}
+                    placeholder="Số nhà, đường, thôn/xóm/đội..."
+                    className="text-base sm:text-base"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="report-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span>
+                  </Label>
+                  <Input
+                    id="report-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9+ ]*"
+                    value={reportPhone}
+                    onChange={(event) => setReportPhone(event.target.value)}
+                    placeholder="0901 234 567"
+                    className="text-base sm:text-base"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="report-note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                    Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span>
+                  </Label>
+                  <Input
+                    id="report-note"
+                    value={reportNote}
+                    onChange={(event) => setReportNote(event.target.value)}
+                    placeholder="VD: Bán từ 6:00 - 22:00"
+                    className="text-base sm:text-base"
+                  />
+                </div>
+              </div>
+            )}
+
+            {currentStep === 3 && (
+              <div className="space-y-3">
+                {resolving ? (
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
+                    <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
+                  </div>
+                ) : null}
+
+                {!resolving && reportLat != null && reportLng != null ? (
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      📍 Tọa độ đề xuất: <strong>{reportLat.toFixed(6)}, {reportLng.toFixed(6)}</strong>. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/20">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Cửa hàng chưa có vị trí hoặc bạn chưa chọn vị trí mới. Có thể lấy GPS, mở khóa bản đồ, hoặc dán link Google Maps.
+                    </p>
+                  </div>
                 )}
+
+                <div id="report-location-section">
+                  <StoreLocationPicker
+                    mapKey={`report-${mapKey}`}
+                    initialLat={reportLat}
+                    initialLng={reportLng}
+                    editable={mapEditable}
+                    onToggleEditable={() => setMapEditable((prev) => !prev)}
+                    onChange={(lat, lng) => {
+                      setReportLat(lat)
+                      setReportLng(lng)
+                    }}
+                    onGetLocation={handleGetLocation}
+                    resolvingAddr={resolving}
+                    height="65vh"
+                    dark={false}
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="report-address" className="text-sm text-gray-300">Địa chỉ chi tiết</Label>
-              <Input
-                id="report-address"
-                value={reportAddressDetail}
-                onChange={(event) => setReportAddressDetail(event.target.value)}
-                placeholder="Số nhà, đường, thôn/xóm/đội..."
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="report-phone" className="text-sm text-gray-300">Số điện thoại</Label>
-              <Input
-                id="report-phone"
-                type="tel"
-                value={reportPhone}
-                onChange={(event) => setReportPhone(event.target.value)}
-                placeholder="0901 234 567"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="report-note" className="text-sm text-gray-300">Ghi chú</Label>
-              <Input
-                id="report-note"
-                value={reportNote}
-                onChange={(event) => setReportNote(event.target.value)}
-                placeholder="VD: Mở cửa từ 6:00 - 22:00"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-3">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-base font-semibold text-gray-100">Vị trí trên bản đồ</p>
-                <p className="text-sm text-gray-400">
-                  {reportLat != null && reportLng != null
-                    ? `Tọa độ: ${reportLat.toFixed(6)}, ${reportLng.toFixed(6)}`
-                    : 'Cửa hàng chưa có vị trí hoặc bạn chưa chọn vị trí mới.'}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  disabled={resolving}
-                  onClick={handleGetLocation}
-                >
-                  {resolving ? 'Đang lấy...' : 'Lấy GPS'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => setMapEditable((prev) => !prev)}
-                >
-                  {mapEditable ? 'Khóa bản đồ' : 'Mở khóa'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="h-[36vh] min-h-[280px] overflow-hidden rounded-2xl border border-gray-800 sm:h-[42vh]">
-              <StoreLocationPicker
-                initialLat={reportLat}
-                initialLng={reportLng}
-                editable={mapEditable}
-                onToggleEditable={() => setMapEditable((prev) => !prev)}
-                onChange={(lat, lng) => {
-                  setReportLat(lat)
-                  setReportLng(lng)
-                }}
-                onGetLocation={handleGetLocation}
-                resolvingAddr={resolving}
-                dark={false}
-              />
-            </div>
+            )}
           </div>
         </div>
       )}
-
-      {(error || success) && (
-        <div className={`rounded-xl border px-3 py-3 text-sm ${
-          error
-            ? 'border-red-900 bg-red-950/20 text-red-300'
-            : 'border-emerald-900 bg-emerald-950/20 text-emerald-300'
-        }`}>
-          {error || success}
-        </div>
-      )}
-
       {mode && (
-        <div className="sticky bottom-0 z-10 -mx-3 border-t border-gray-800 bg-black/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+        <div className={`${standaloneEdit ? 'fixed inset-x-0 z-[55] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent' : 'sticky bottom-0 z-10 -mx-3 border-t border-gray-800 bg-black/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0'}`} style={standaloneEdit ? { bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' } : undefined}>
+          <div className={standaloneEdit ? 'mx-auto max-w-screen-md px-3 py-2 sm:px-0 sm:py-0' : ''}>
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
               variant="outline"
               className="w-full"
               onClick={() => {
-                setMode('')
-                resetFeedback()
+                goBack()
               }}
             >
               Quay lại
@@ -296,13 +316,15 @@ export default function StoreReportForm({ store, user, onSubmitted }) {
               type="button"
               className="w-full"
               disabled={submitting}
-              onClick={handleSubmit}
+              onClick={handlePrimaryAction}
             >
-              {submitting ? 'Đang gửi...' : 'Gửi báo cáo'}
+              {primaryActionLabel}
             </Button>
+          </div>
           </div>
         </div>
       )}
     </div>
   )
 }
+

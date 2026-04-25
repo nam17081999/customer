@@ -3,18 +3,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toTitleCaseVI } from '@/lib/utils'
-import {
-  DISTRICT_WARD_SUGGESTIONS,
-  DISTRICT_SUGGESTIONS,
-  STORE_TYPE_OPTIONS,
-  DEFAULT_STORE_TYPE,
-} from '@/lib/constants'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import SearchStoreCard from '@/components/search-store-card'
+import StoreDistrictWardPicker from '@/components/store/store-district-ward-picker'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import StoreStepFormLayout from '@/components/store/store-step-form-layout'
-import { getStoreTypeMeta } from '@/components/store/store-type-icon'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import StoreTypePicker from '@/components/store/store-type-picker'
 import { buildCreateSteps, shouldShowCreateMobileActionBar } from '@/helper/storeCreateFlow'
 import { useStoreCreateController } from '@/helper/useStoreCreateController'
 
@@ -215,48 +209,8 @@ export default function AddStore() {
         {currentStep === 1 && (
           <>
             <div className="space-y-5">
+              <StoreTypePicker value={storeType} onChange={setStoreType} />
               <div className="space-y-2">
-                <Label htmlFor="store_type" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Loại cửa hàng</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {STORE_TYPE_OPTIONS.map((type) => {
-                    const selected = storeType === type.value
-                    const typeMeta = getStoreTypeMeta(type.value)
-                    return (
-                      <button
-                        key={`top-type-${type.value}`}
-                        type="button"
-                        onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
-                        aria-pressed={selected}
-                        className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
-                          selected
-                            ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                            : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 items-center justify-center">
-                            {typeMeta.icon}
-                          </span>
-                          <span>{type.label}</span>
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <select
-                  hidden
-                  id="store_type"
-                  value={storeType}
-                  onChange={(e) => setStoreType(e.target.value || DEFAULT_STORE_TYPE)}
-                  aria-label="Loại cửa hàng"
-                  className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-                >
-                  {STORE_TYPE_OPTIONS.map((type) => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
                 <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng</Label>
                 <Input
                   ref={nameInputRef}
@@ -269,32 +223,6 @@ export default function AddStore() {
                   placeholder="VD: Minh Anh"
                   className="h-11 w-full text-base sm:text-base"
                 />
-              </div>
-              <div hidden className="grid grid-cols-2 gap-2">
-                {STORE_TYPE_OPTIONS.map((type) => {
-                  const selected = storeType === type.value
-                  const typeMeta = getStoreTypeMeta(type.value)
-                  return (
-                    <button
-                      key={`quick-type-${type.value}`}
-                      type="button"
-                      onClick={() => setStoreType(type.value || DEFAULT_STORE_TYPE)}
-                      aria-pressed={selected}
-                      className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
-                        selected
-                          ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                          : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center">
-                          {typeMeta.icon}
-                        </span>
-                        <span>{type.label}</span>
-                      </span>
-                    </button>
-                  )
-                })}
               </div>
               {fieldErrors.name ? (
                 <div className="text-xs text-red-600">{fieldErrors.name}</div>
@@ -323,56 +251,23 @@ export default function AddStore() {
 
         {currentStep === 2 && (
           <>
-            <div className="space-y-1.5">
-              <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Quận / Huyện</Label>
-              <div className="flex flex-wrap gap-2">
-                {DISTRICT_SUGGESTIONS.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      removeVietnameseTones(district || '').toLowerCase() === removeVietnameseTones(item).toLowerCase()
-                        ? 'border border-blue-600 bg-blue-600 text-white'
-                        : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                    }`}
-                    onClick={() => {
-                      setDistrict(item)
-                      setWard('')
-                      if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
-                    }}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              {fieldErrors.district ? <div className="text-xs text-red-600">{fieldErrors.district}</div> : null}
-            </div>
-
-            {district && (DISTRICT_WARD_SUGGESTIONS[district] || []).length > 0 ? (
-              <div className="space-y-1.5">
-                <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
-                <div className="flex flex-wrap gap-2">
-                  {(DISTRICT_WARD_SUGGESTIONS[district] || []).map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                        removeVietnameseTones(ward || '').toLowerCase() === removeVietnameseTones(item).toLowerCase()
-                          ? 'border border-blue-600 bg-blue-600 text-white'
-                          : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                      }`}
-                      onClick={() => {
-                        setWard(item)
-                        if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
-                      }}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-                {fieldErrors.ward ? <div className="text-xs text-red-600">{fieldErrors.ward}</div> : null}
-              </div>
-            ) : null}
+            <StoreDistrictWardPicker
+              district={district}
+              ward={ward}
+              districtContainerId="create-district-section"
+              wardContainerId="create-ward-section"
+              districtError={fieldErrors.district}
+              wardError={fieldErrors.ward}
+              onDistrictChange={(item) => {
+                setDistrict(item)
+                setWard('')
+                if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
+              }}
+              onWardChange={(item) => {
+                setWard(item)
+                if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
+              }}
+            />
 
             <div className="space-y-1.5">
               <Label htmlFor="address_detail" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -497,7 +392,7 @@ export default function AddStore() {
               </div>
             ) : null}
 
-            <div>
+            <div id="create-location-section">
               <StoreLocationPicker
                 mapKey={`step2-${step2Key}`}
                 initialLat={pickedLat}

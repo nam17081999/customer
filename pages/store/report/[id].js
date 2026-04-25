@@ -36,6 +36,18 @@ export default function StoreReportPage() {
     return Number.isFinite(parsed) ? parsed : null
   }, [router.query.distance])
 
+  const pushSearchWithNotice = async (text, type = 'success') => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
+        type,
+        text,
+        createdAt: Date.now(),
+      }))
+      window.dispatchEvent(new CustomEvent('storevis:flash-message'))
+    }
+    await router.push('/')
+  }
+
   useEffect(() => {
     if (!router.isReady || !storeId) return
 
@@ -194,12 +206,31 @@ export default function StoreReportPage() {
                   </div>
                 </section>
               ) : (
-                <StoreReportForm
-                  key={store.id}
-                  store={store}
-                  user={user}
-                  onSubmitted={(message) => setSubmitted(message)}
-                />
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
+                    <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
+                    <p className="mt-1 text-sm text-gray-400">Sửa thông tin sẽ sang màn riêng để nhập liệu giống tạo / sửa / bổ sung.</p>
+                    <div className="mt-4 grid gap-2">
+                      <Button asChild className="w-full">
+                        <Link href={{ pathname: `/store/report/${store.id}/edit`, query: { from: `/store/report/${store.id}`, distance: reportDistance ?? undefined } }}>
+                          Sửa thông tin
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+
+                  <StoreReportForm
+                    key={`${store.id}-reason`}
+                    store={store}
+                    user={user}
+                    initialMode="reason"
+                    hideModeChooser
+                    onSubmitted={(message) => {
+                      setSubmitted(message)
+                      void pushSearchWithNotice(message)
+                    }}
+                  />
+                </div>
               )}
             </>
           )}

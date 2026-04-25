@@ -24,6 +24,37 @@ export function extractCoordsFromMapsUrl(url) {
   return null
 }
 
+export async function resolveMapsLinkCoordinates(link, fetcher = fetch) {
+  const trimmed = String(link || '').trim()
+  if (!trimmed) return { coords: null, error: '' }
+
+  const directCoords = extractCoordsFromMapsUrl(trimmed)
+  if (directCoords) return { coords: directCoords, error: '' }
+
+  const isShortLink = /goo\.gl|maps\.app\.goo\.gl/i.test(trimmed)
+  if (!isShortLink) {
+    return { coords: null, error: 'Không tìm thấy tọa độ trong link' }
+  }
+
+  try {
+    const res = await fetcher('/api/expand-maps-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: trimmed }),
+    })
+    const data = await res.json()
+    if (!data.success || !data.finalUrl) {
+      return { coords: null, error: 'Không mở được link' }
+    }
+
+    const expandedCoords = extractCoordsFromMapsUrl(data.finalUrl)
+    if (expandedCoords) return { coords: expandedCoords, error: '' }
+    return { coords: null, error: 'Không tìm thấy tọa độ từ link' }
+  } catch {
+    return { coords: null, error: 'Lỗi khi xử lý link' }
+  }
+}
+
 export function getStoreFormFinalCoordinates({
   userHasEditedMap,
   pickedLat,

@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { resolveUserRole, isAdminRole, USER_ROLES } from '@/lib/authz'
+import { USER_ROLES, resolveUserRole } from '@/lib/authz'
+import { requireAdminApiUser } from '@/lib/admin-api-auth'
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {
@@ -22,34 +22,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization header' })
-    }
-    const token = authHeader.split(' ')[1]
-
-    // Verify the caller's role
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-    if (!supabaseUrl) {
-      return res.status(500).json({ error: 'Hệ thống thiếu biến môi trường NEXT_PUBLIC_SUPABASE_URL. Vui lòng bổ sung vào .env.' })
-    }
-
-    if (!supabaseAnonKey) {
-      return res.status(500).json({ error: 'Hệ thống thiếu biến môi trường NEXT_PUBLIC_SUPABASE_ANON_KEY. Vui lòng bổ sung vào .env.' })
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !currentUser) {
-      return res.status(401).json({ error: 'Invalid token' })
-    }
-
-    const currentRoleString = resolveUserRole(currentUser)
-    if (!isAdminRole(currentRoleString)) {
-      return res.status(403).json({ error: 'Forbidden: Admin access required' })
+    const adminCheck = await requireAdminApiUser(req)
+    if (adminCheck.error) {
+      return res.status(adminCheck.status).json({ error: adminCheck.error })
     }
 
     // Initialize Admin Supabase

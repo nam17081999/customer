@@ -7,9 +7,10 @@ import {
   buildDuplicatePhoneMessage,
   extractCoordsFromMapsUrl,
   getStoreFormFinalCoordinates,
+  resolveMapsLinkCoordinates,
 } from '@/helper/storeFormShared'
 
-export { extractCoordsFromMapsUrl }
+export { extractCoordsFromMapsUrl, resolveMapsLinkCoordinates }
 
 export function findNearestDistrictWard(stores, originLat, originLng) {
   if (originLat == null || originLng == null) return null
