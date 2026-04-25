@@ -3,7 +3,7 @@
   "short_name": "NPP Hà Công",
   "description": "Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#ffffff",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
