@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
@@ -13,12 +13,13 @@ import {
 } from '@/helper/duplicateCheck'
 import {
   buildCreateInsertPayload,
-  extractCoordsFromMapsUrl,
   findNearestDistrictWard,
   getCreateFinalCoordinates,
+  resolveMapsLinkCoordinates,
   validateStoreCreateStep2,
 } from '@/helper/storeCreateFlow'
 import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
+import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 
 export function useStoreCreateController() {
   const router = useRouter()
@@ -142,38 +143,14 @@ export function useStoreCreateController() {
     setMapsLinkError('')
     if (!trimmed) return
 
-    let coords = extractCoordsFromMapsUrl(trimmed)
-    if (coords) {
-      applyMapsLinkCoords(coords.lat, coords.lng)
-      return
-    }
-
-    const isShortLink = /goo\.gl|maps\.app\.goo\.gl/i.test(trimmed)
-    if (!isShortLink) {
-      setMapsLinkError('Không tìm thấy tọa độ trong link')
-      return
-    }
-
     try {
       setMapsLinkLoading(true)
-      const res = await fetch('/api/expand-maps-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmed }),
-      })
-      const data = await res.json()
-      if (!data.success || !data.finalUrl) {
-        setMapsLinkError('Không mở được link')
-        return
-      }
-      coords = extractCoordsFromMapsUrl(data.finalUrl)
+      const { coords, error } = await resolveMapsLinkCoordinates(trimmed)
       if (coords) {
         applyMapsLinkCoords(coords.lat, coords.lng)
       } else {
-        setMapsLinkError('Không tìm thấy tọa độ từ link')
+        setMapsLinkError(error)
       }
-    } catch {
-      setMapsLinkError('Lỗi khi xử lý link')
     } finally {
       setMapsLinkLoading(false)
     }
@@ -438,6 +415,7 @@ export function useStoreCreateController() {
     const trimmed = name.trim()
     if (!trimmed) {
       setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
+      scrollToFirstMatchingTarget(['#name'])
       return
     }
 
@@ -535,6 +513,16 @@ export function useStoreCreateController() {
     return result
   }, [district, ward, phone, phoneSecondary])
 
+  const scrollCreateStep2Error = useCallback((fieldErrors = {}) => {
+    const selectors = []
+
+    if (fieldErrors.phone) selectors.push('#phone')
+    if (fieldErrors.phone_secondary) selectors.push('#phone-secondary')
+    if (fieldErrors.district) selectors.push('#create-district-section')
+    if (fieldErrors.ward) selectors.push('#create-ward-section')
+
+    scrollToFirstMatchingTarget(selectors)
+  }, [])
   const validateStep2AndGoNext = useCallback(async () => {
     const { fieldErrors: nextFieldErrors } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
     if (Object.keys(nextFieldErrors).length > 0) {
@@ -544,6 +532,7 @@ export function useStoreCreateController() {
           ? 'Vui lòng kiểm tra lại số điện thoại'
           : 'Vui lòng nhập đủ quận/huyện và xã/phường'
       )
+      scrollCreateStep2Error(nextFieldErrors)
       return false
     }
 
@@ -564,7 +553,7 @@ export function useStoreCreateController() {
     void refreshCompassHeading({ requestPermission: true })
     setCurrentStep(3)
     return true
-  }, [validateStep2Fields, telesaleNoStep3, showMessage, refreshCompassHeading])
+  }, [validateStep2Fields, telesaleNoStep3, showMessage, refreshCompassHeading, scrollCreateStep2Error])
 
   const persistStore = useCallback(async ({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) => {
     const normalizedName = toTitleCaseVI(name.trim())
@@ -605,6 +594,7 @@ export function useStoreCreateController() {
           || validationResult.fieldErrors.ward
           || 'Vui lòng kiểm tra lại thông tin'
         showMessage('error', firstError)
+        scrollCreateStep2Error(validationResult.fieldErrors)
         setLoading(false)
         return false
       }
@@ -697,6 +687,7 @@ export function useStoreCreateController() {
     isTelesale,
     pushSearchWithNotice,
     showMessage,
+    scrollCreateStep2Error,
   ])
 
   const handleConfirmCreate = useCallback(async () => {
@@ -726,6 +717,11 @@ export function useStoreCreateController() {
     }
     if (!name || !district || !ward) {
       showMessage('error', 'Tên, quận/huyện và xã/phường là bắt buộc')
+      scrollToFirstMatchingTarget([
+        !name ? '#name' : null,
+        !district ? '#create-district-section' : null,
+        !ward ? '#create-ward-section' : null,
+      ])
       return
     }
 
@@ -743,6 +739,7 @@ export function useStoreCreateController() {
         if (!coords) {
           setGeoBlocked(true)
           showMessage('error', getGeoErrorMessage(error))
+          scrollToFirstMatchingTarget(['#create-location-section'])
           return
         }
         setGeoBlocked(false)
@@ -845,3 +842,6 @@ export function useStoreCreateController() {
     resetCreateForm,
   }
 }
+
+
+

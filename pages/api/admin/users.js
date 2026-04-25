@@ -1,79 +1,77 @@
-import { createClient } from '@supabase/supabase-js'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
-import { resolveUserRole, isAdminRole } from '@/lib/authz'
+import { requireAdminApiUser } from '@/lib/admin-api-auth'
+import {
+  mapSupabaseAdminUser,
+  validateCreateAdminUserInput,
+} from '@/helper/adminUserManagement'
+
+async function listUsers(adminSupabase) {
+  const users = []
+  const perPage = 100
+  let page = 1
+  const maxPages = 200
+
+  while (page <= maxPages) {
+    const { data, error } = await adminSupabase.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const pageUsers = data?.users ?? []
+    users.push(...pageUsers)
+
+    if (pageUsers.length < perPage) break
+    page += 1
+  }
+
+  return users.map(mapSupabaseAdminUser)
+}
+
+async function createUser(req, res, adminSupabase) {
+  const validation = validateCreateAdminUserInput(req.body)
+  if (validation.error) {
+    return res.status(400).json({ error: validation.error })
+  }
+
+  const { email, password, role } = validation.values
+  const { data, error } = await adminSupabase.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: { role },
+  })
+
+  if (error) throw error
+
+  return res.status(201).json({ user: mapSupabaseAdminUser(data.user) })
+}
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET')
+  if (!['GET', 'POST'].includes(req.method)) {
+    res.setHeader('Allow', 'GET, POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
   try {
-    const authHeader = req.headers.authorization
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing authorization header' })
-    }
-    const token = authHeader.split(' ')[1]
-
-    // Verify user role
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return res.status(500).json({ error: 'Server configuration error' })
+    const adminCheck = await requireAdminApiUser(req)
+    if (adminCheck.error) {
+      return res.status(adminCheck.status).json({ error: adminCheck.error })
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey)
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !user) {
-      return res.status(401).json({ error: 'Invalid token' })
-    }
-
-    const role = resolveUserRole(user)
-    if (!isAdminRole(role)) {
-      return res.status(403).json({ error: 'Forbidden: Admin access required' })
-    }
-
-    // Initialize Admin Supabase
     const adminSupabase = getSupabaseAdmin()
 
-    // Get users (paginate to retrieve all)
-    const users = []
-    const perPage = 100
-    let page = 1
-    const maxPages = 200 // safety cap: 20,000 users
-
-    while (page <= maxPages) {
-      const { data, error: usersError } = await adminSupabase.auth.admin.listUsers({ page, perPage })
-
-      if (usersError) {
-        throw usersError
-      }
-
-      const pageUsers = data?.users ?? []
-      users.push(...pageUsers)
-
-      if (pageUsers.length < perPage) {
-        break
-      }
-
-      page += 1
+    if (req.method === 'POST') {
+      return createUser(req, res, adminSupabase)
     }
 
-    const mappedUsers = users.map(u => ({
-      id: u.id,
-      email: u.email,
-      created_at: u.created_at,
-      last_sign_in_at: u.last_sign_in_at,
-      role: resolveUserRole(u)
-    }))
-
-    return res.status(200).json({ users: mappedUsers })
+    const users = await listUsers(adminSupabase)
+    return res.status(200).json({ users })
   } catch (error) {
-    console.error('List users failed:', error)
+    console.error('Admin users API failed:', error)
     if (error.message && error.message.includes('SUPABASE_SERVICE_ROLE_KEY')) {
       return res.status(500).json({ error: 'Hệ thống thiếu biến môi trường SUPABASE_SERVICE_ROLE_KEY. Vui lòng bổ sung vào .env.' })
     }
-    return res.status(500).json({ error: 'Có lỗi xảy ra khi lấy danh sách người dùng.' })
+    if (error.message && error.message.includes('already registered')) {
+      return res.status(409).json({ error: 'Email này đã có tài khoản.' })
+    }
+    return res.status(500).json({ error: 'Có lỗi xảy ra khi xử lý tài khoản.' })
   }
 }

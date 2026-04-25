@@ -45,14 +45,17 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
 
   const totalWidth = Math.max(iconSize + iconPad * 2 + hlPad * 2, labelWidth)
   const iconBottom = iconSize + hlPad * 2
-  const totalHeight = iconBottom + gap + labelHeight
+  const iconCenterToTop = hlPad + iconPad + iconSize / 2
+  const iconCenterToBottom = iconSize / 2 + hlPad + gap + labelHeight
+  const topPadding = Math.max(0, Math.ceil(iconCenterToBottom - iconCenterToTop))
+  const totalHeight = topPadding + iconBottom + gap + labelHeight
   const canvas = document.createElement('canvas')
   canvas.width = totalWidth
   canvas.height = totalHeight
   const ctx = canvas.getContext('2d')
 
   const iconCenterX = totalWidth / 2
-  const iconCenterY = hlPad + iconPad + iconSize / 2
+  const iconCenterY = topPadding + hlPad + iconPad + iconSize / 2
   const radiusOuter = iconSize / 2 - iconPad
 
   if (highlighted) {
@@ -96,7 +99,7 @@ function createStoreMarker(text, fontSize = 13, maxWidthEm = 9, highlighted = fa
   }
 
   const labelX = (totalWidth - labelWidth) / 2
-  const labelY = iconBottom + gap
+  const labelY = topPadding + iconBottom + gap
   ctx.beginPath()
   ctx.roundRect(labelX, labelY, labelWidth, labelHeight, radius)
   ctx.fillStyle = 'rgba(15, 23, 42, 0.94)'

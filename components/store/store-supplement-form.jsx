@@ -266,7 +266,7 @@ export default function StoreSupplementForm({
       {currentStep === 2 ? (
         <>
           <div className="space-y-5">
-            <div className="space-y-1.5">
+            <div id="supplement-district-section" className="space-y-1.5">
               <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Quận / Huyện</Label>
               <div className="flex flex-wrap gap-2">
                 {visibleDistricts.map((item) => (
@@ -293,7 +293,7 @@ export default function StoreSupplementForm({
             </div>
 
             {district && wardSuggestions.length > 0 ? (
-              <div className="space-y-1.5">
+              <div id="supplement-ward-section" className="space-y-1.5">
                 <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
                 <div className="flex flex-wrap gap-2">
                   {visibleWards.map((item) => (
@@ -449,7 +449,7 @@ export default function StoreSupplementForm({
             </div>
           ) : null}
 
-          <div>
+          <div id="supplement-location-section">
             <StoreLocationPicker
               mapKey={`step2-${mapKey}`}
               initialLat={pickedLat}

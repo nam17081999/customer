@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+﻿import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
@@ -19,6 +19,7 @@ import {
   validateStoreEditPhones,
 } from '@/helper/storeEditFlow'
 import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
+import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 
 function getCoordinateValue(value) {
   return Number.isFinite(value) ? value : null
@@ -388,9 +389,25 @@ export function useStoreEditController() {
     showMessage,
   ])
 
+
+
+
+
+  const scrollEditStepError = useCallback((fieldErrors = {}) => {
+    const selectors = []
+
+    if (fieldErrors.name) selectors.push('#supplement-name')
+    if (fieldErrors.phone) selectors.push('#supplement-phone')
+    if (fieldErrors.phone_secondary) selectors.push('#supplement-phone-secondary')
+    if (fieldErrors.district) selectors.push('#supplement-district-section')
+    if (fieldErrors.ward) selectors.push('#supplement-ward-section')
+
+    scrollToFirstMatchingTarget(selectors)
+  }, [])
   const handleSaveSupplement = useCallback(async () => {
     if (!hasEditableFields) {
       showMessage('error', 'Cửa hàng này không còn dữ liệu nào để bổ sung')
+      scrollToFirstMatchingTarget(['#supplement-name'])
       return
     }
 
@@ -401,6 +418,7 @@ export function useStoreEditController() {
     } = await validateCurrentPhones({ skipWhenLocked: true })
     if (supplementPhoneError) {
       showMessage('error', supplementPhoneError)
+      scrollEditStepError({ [(supplementPhoneError.includes('2') ? 'phone_secondary' : 'phone')]: supplementPhoneError })
       return
     }
 
@@ -409,7 +427,7 @@ export function useStoreEditController() {
       type: 'supplement',
       payload: { validatedSupplementPhone, validatedSupplementPhoneSecondary },
     })
-  }, [hasEditableFields, showMessage, validateCurrentPhones])
+  }, [hasEditableFields, showMessage, validateCurrentPhones, scrollEditStepError])
 
   const executeEditSave = useCallback(async (validatedPhone, validatedPhoneSecondary) => {
     setSaving(true)
@@ -506,11 +524,13 @@ export function useStoreEditController() {
     }))
   }, [])
 
+
   const handleEditStepChange = useCallback(async ({ currentStep: step }) => {
     if (step === 1) {
       if (!name.trim()) {
         clearEditFieldErrors({ name: 'Vui lòng nhập tên cửa hàng' })
         showMessage('error', 'Tên cửa hàng không được để trống')
+        scrollEditStepError({ name: true })
         return false
       }
       clearEditFieldErrors()
@@ -525,6 +545,7 @@ export function useStoreEditController() {
       if (Object.keys(nextErrors).length > 0) {
         clearEditFieldErrors(nextErrors)
         showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+        scrollEditStepError(nextErrors)
         return false
       }
 
@@ -533,6 +554,7 @@ export function useStoreEditController() {
         const fieldKey = phoneError.includes('2') ? 'phone_secondary' : 'phone'
         clearEditFieldErrors({ [fieldKey]: phoneError })
         showMessage('error', phoneError)
+        scrollEditStepError({ [fieldKey]: phoneError })
         return false
       }
 
@@ -541,12 +563,13 @@ export function useStoreEditController() {
     }
 
     return true
-  }, [name, district, ward, clearEditFieldErrors, showMessage, validateCurrentPhones])
+  }, [name, district, ward, clearEditFieldErrors, showMessage, validateCurrentPhones, scrollEditStepError])
 
   const handleSaveEdit = useCallback(async () => {
     if (!name.trim()) {
       clearEditFieldErrors({ name: 'Vui lòng nhập tên cửa hàng' })
       showMessage('error', 'Tên cửa hàng không được để trống')
+      scrollEditStepError({ name: true })
       return
     }
     if (!district.trim() || !ward.trim()) {
@@ -555,6 +578,10 @@ export function useStoreEditController() {
         ward: ward.trim() ? '' : 'Vui lòng nhập xã/phường',
       })
       showMessage('error', 'Vui lòng nhập đủ quận/huyện và xã/phường')
+      scrollEditStepError({
+        district: !district.trim(),
+        ward: !ward.trim(),
+      })
       return
     }
 
@@ -567,6 +594,7 @@ export function useStoreEditController() {
       const fieldKey = phoneError.includes('2') ? 'phone_secondary' : 'phone'
       clearEditFieldErrors({ [fieldKey]: phoneError })
       showMessage('error', phoneError)
+      scrollEditStepError({ [fieldKey]: phoneError })
       return
     }
 
@@ -576,7 +604,7 @@ export function useStoreEditController() {
       type: 'edit',
       payload: { validatedPhone, validatedPhoneSecondary },
     })
-  }, [name, district, ward, clearEditFieldErrors, showMessage, validateCurrentPhones])
+  }, [name, district, ward, clearEditFieldErrors, showMessage, validateCurrentPhones, scrollEditStepError])
 
   return {
     router,
@@ -643,3 +671,8 @@ export function useStoreEditController() {
     handleSaveEdit,
   }
 }
+
+
+
+
+
