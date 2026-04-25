@@ -1,61 +1,70 @@
-﻿# Current Work
+# Current Work
 
 ## Goal
-- Bổ sung test đầy đủ hơn cho phần report, bao phủ các hành vi mới đã chốt gần đây.
+- Sửa sai lệch vị trí marker cửa hàng trên màn `/map` khi zoom out để marker bám tọa độ ổn định và chính xác nhất có thể ở mọi mức zoom.
 
 ## Task Type
-- Feature
+- Bug Fix
 
 ## Why
-- Flow report đã thay đổi nhiều: route riêng cho edit, quay lại về màn report, reason-only submit quay về tìm kiếm, dùng flash message/Msg, và đổi thứ tự lý do báo cáo.
-- Cần khóa các hành vi này bằng test để tránh regression.
+- Hiện tại khi zoom lớn thì marker nhìn đúng, nhưng khi zoom nhỏ marker bị lệch nhẹ xuống dưới so với vị trí thực tế.
+- Đây là lỗi hiển thị bản đồ, làm giảm độ tin cậy của tọa độ và trải nghiệm định vị.
 
 ## In Scope
 - `docs/current-work.md`
-- `e2e/store-report.spec.js`
-- Có thể chỉnh helper/setup test trong cùng file nếu cần.
+- `pages/map.js`
+- `helper/mapMarkerImages.js`
+- Có thể thêm/cập nhật test gần vùng map marker nếu repo đã có chỗ phù hợp.
 
 ## Out of Scope
-- Không đổi logic sản phẩm nếu test không phát hiện bug mới.
-- Không thêm framework test mới.
-- Không mở rộng sang test create/edit/supplement ngoài phạm vi report.
+- Không đổi flow tìm kiếm, route, geolocation, cache, hay dữ liệu store.
+- Không redesign UI marker ngoài phần cần thiết để sửa lệch tọa độ.
+- Không mở rộng sang `components/map/location-picker.jsx` nếu không chứng minh được cùng root cause trong task này.
 
 ## Must Preserve
-- Các test report hiện có vẫn pass.
-- Tên tiếng Việt trong UI và assertion phải khớp hành vi thật.
-- Không làm thay đổi logic app chỉ để tiện test, trừ khi phát hiện bug thực sự.
+- `/map` vẫn nhận đúng query `storeId`, `lat`, `lng`.
+- Validate tọa độ và logic tự sửa lat/lng đảo chiều vẫn giữ nguyên.
+- Chỉ store có tọa độ hợp lệ mới được render marker.
+- UI marker hiện tại vẫn giữ phong cách icon + label, highlight và route order.
+- Không làm hỏng blue dot, route line, popup hover, click mở chi tiết.
+
+## Inputs / Repro / Expected
+- Repro: vào màn `/map`, quan sát marker cửa hàng khi zoom tối đa thì đúng; khi zoom nhỏ dần thì marker nhìn trôi nhẹ xuống dưới vị trí thật.
+- Current: marker không bám cùng một anchor hình học theo các mức zoom.
+- Expected: marker giữ đúng điểm neo với tọa độ ở mọi mức zoom, sai lệch thị giác tối thiểu và nhất quán.
+
+## Constraints
+- Giữ cấu trúc hiện tại, sửa tối thiểu và đúng root cause.
+- Ưu tiên sửa ở lớp render marker/image thay vì vá bằng offset cảm tính theo zoom.
 
 ## Required Verification
-- Chạy lint cho file test đổi.
-- Chạy `npm run text:check`.
-- Chạy toàn bộ `e2e/store-report.spec.js`.
-- Đối chiếu checklist: `Edit / Supplement / Report`, `Tiếng Việt / UI Safety`.
+- Chạy `npm.cmd run lint -- pages/map.js helper/mapMarkerImages.js`.
+- Tự rà logic theo checklist: `Map Flow`, `Tiếng Việt / UI Safety`.
+- Nếu có test phù hợp, chạy focused check liên quan map marker.
+- Smoke review code để xác nhận anchor marker không còn phụ thuộc sai vào kích thước label khi zoom.
+
+## Definition of Done
+- Root cause được xác định rõ.
+- Marker store trên `/map` dùng điểm neo đúng về hình học, không còn lệch xuống do cách dựng ảnh/layer.
+- Các hành vi map liên quan vẫn giữ nguyên.
 
 ## Plan
-- Rà coverage report hiện có và chốt gap.
-- Thêm test cho redirect reason-only, back button report edit, và thứ tự/lý do báo cáo.
-- Chạy lint, text check, và full report e2e.
-- Ghi kết quả vào current-work.
-
-## Progress
-- Đã rà các test hiện có và xác định 3 gap chính cần bổ sung.
-- Đã cập nhật test `reason-only` theo hành vi mới và thêm coverage cho UI/điều hướng gần đây.
+- Xác nhận root cause trong layer marker và ảnh marker.
+- Chỉnh cách dựng ảnh/anchor để marker bám đúng tọa độ.
+- Rà lại side effects cho hover, click, route order, highlight.
+- Chạy lint và ghi kết quả vào current-work.
 
 ## Done
-- `e2e/store-report.spec.js`: cập nhật test `reason-only` để assert redirect về tìm kiếm + flash message.
-- `e2e/store-report.spec.js`: thêm test xác nhận thứ tự lý do báo cáo mới là `Sai tên`, `Sai địa chỉ`, `Sai số điện thoại`, `Sai vị trí`.
-- `e2e/store-report.spec.js`: thêm test nút `Quay lại` trong màn `report edit` standalone quay về đúng màn report chi tiết.
-- Toàn bộ `store-report.spec.js` hiện bao phủ 10 case report chính và đều pass.
+- Xác định root cause ở `pages/map.js`: layer `store-marker` đang dùng `icon-anchor: 'top'` cho một image marker có label nằm bên dưới icon.
+- Xác định root cause ở `helper/mapMarkerImages.js`: canvas marker không cân đối phần trên/dưới quanh tâm icon, nên điểm neo của cả image không trùng tâm hình học của icon.
+- Đã thêm `topPadding` cân đối canvas để tâm image trùng tâm icon.
+- Đã đổi `store-marker` sang `icon-anchor: 'center'` để marker bám đúng tọa độ, không phụ thuộc chiều cao label khi zoom.
 
 ## Verification
-- `npm.cmd run lint -- e2e/store-report.spec.js` passed.
-- `npm.cmd run text:check` passed.
-- `npx.cmd playwright test e2e/store-report.spec.js` passed: 10 tests.
-- Checklist đã đối chiếu: `Edit / Supplement / Report`, `Tiếng Việt / UI Safety`.
-
-## Open Questions
-- Không có blocker.
+- `npm.cmd run lint -- pages/map.js helper/mapMarkerImages.js` passed.
+- Đã đối chiếu checklist: `Map Flow`, `Tiếng Việt / UI Safety`.
+- Đã smoke review logic: query `/map`, validate tọa độ, sửa lat/lng đảo chiều, hover popup, click marker, route order/highlight không bị đổi logic.
 
 ## Risks / Next
-- Bộ test hiện tập trung vào report user/admin flow chính; chưa có visual assertion riêng cho animation `Msg`.
-- Nếu cần mở rộng tiếp, bước sau hợp lý là thêm test cho mobile viewport của report edit để khóa UX sticky action bar.
+- Chưa có visual/e2e test tự động để đo sai lệch marker theo zoom; phần verify hiện là code-level + lint.
+- `components/map/location-picker.jsx` cũng đang có `icon-anchor: 'top'`, nhưng chưa sửa trong task này vì chưa xác nhận cùng kiểu marker/image và chưa có bug report ở flow đó.

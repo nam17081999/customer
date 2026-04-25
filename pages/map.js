@@ -357,7 +357,7 @@ export default function MapPage() {
               ['concat', 'sm-', ['get', 'storeId']]
             ],
             'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
-            'icon-anchor': 'top',
+            'icon-anchor': 'center',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
             'symbol-sort-key': ['case', ['==', ['get', 'highlighted'], 'yes'], 999, 0],
