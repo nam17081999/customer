@@ -1,70 +1,67 @@
-# Current Work
+# Task Request
 
 ## Goal
-- Sửa sai lệch vị trí marker cửa hàng trên màn `/map` khi zoom out để marker bám tọa độ ổn định và chính xác nhất có thể ở mọi mức zoom.
+- Làm cho website khi được thêm ra màn hình chính trên iPhone hiển thị theo kiểu giống Safari thay vì giao diện full-screen standalone khác biệt.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- Hiện tại khi zoom lớn thì marker nhìn đúng, nhưng khi zoom nhỏ marker bị lệch nhẹ xuống dưới so với vị trí thực tế.
-- Đây là lỗi hiển thị bản đồ, làm giảm độ tin cậy của tọa độ và trải nghiệm định vị.
+- Hiện tại cùng một trang `/map` nhưng khi mở bằng biểu tượng trên màn hình chính iPhone thì giao diện khác Safari.
+- Root cause cần xử lý ở cấu hình PWA/display mode để 2 môi trường hiển thị nhất quán như yêu cầu.
 
 ## In Scope
 - `docs/current-work.md`
-- `pages/map.js`
-- `helper/mapMarkerImages.js`
-- Có thể thêm/cập nhật test gần vùng map marker nếu repo đã có chỗ phù hợp.
+- `public/manifest.json`
+- `pages/_app.js`
+- Có thể chạm rất nhỏ tới meta PWA liên quan iPhone nếu cần để bỏ standalone mode.
 
 ## Out of Scope
-- Không đổi flow tìm kiếm, route, geolocation, cache, hay dữ liệu store.
-- Không redesign UI marker ngoài phần cần thiết để sửa lệch tọa độ.
-- Không mở rộng sang `components/map/location-picker.jsx` nếu không chứng minh được cùng root cause trong task này.
+- Không sửa logic map, route, search, geolocation, cache.
+- Không redesign component hay thay đổi layout Safari hiện tại.
+- Không thêm dependency hoặc refactor cấu trúc app.
 
 ## Must Preserve
-- `/map` vẫn nhận đúng query `storeId`, `lat`, `lng`.
-- Validate tọa độ và logic tự sửa lat/lng đảo chiều vẫn giữ nguyên.
-- Chỉ store có tọa độ hợp lệ mới được render marker.
-- UI marker hiện tại vẫn giữ phong cách icon + label, highlight và route order.
-- Không làm hỏng blue dot, route line, popup hover, click mở chi tiết.
+- Ứng dụng vẫn mở bình thường trên iPhone, Safari và các môi trường khác.
+- Các route hiện tại, navbar, map flow, accessibility và tiếng Việt phải giữ nguyên.
+- Không làm hỏng manifest/icon hiện có ngoài phần display mode cần đổi.
 
 ## Inputs / Repro / Expected
-- Repro: vào màn `/map`, quan sát marker cửa hàng khi zoom tối đa thì đúng; khi zoom nhỏ dần thì marker nhìn trôi nhẹ xuống dưới vị trí thật.
-- Current: marker không bám cùng một anchor hình học theo các mức zoom.
-- Expected: marker giữ đúng điểm neo với tọa độ ở mọi mức zoom, sai lệch thị giác tối thiểu và nhất quán.
+- Repro: trên iPhone, thêm web vào màn hình chính rồi mở từ icon; giao diện nhận được giống ảnh 1. Mở cùng trang bằng Safari thì giống ảnh 2.
+- Current: bản mở từ màn hình chính đang chạy ở chế độ app standalone nên khác layout/browser chrome so với Safari.
+- Expected: bản mở từ màn hình chính cũng hiển thị như Safari, càng đồng nhất càng tốt với ảnh 2.
 
 ## Constraints
-- Giữ cấu trúc hiện tại, sửa tối thiểu và đúng root cause.
-- Ưu tiên sửa ở lớp render marker/image thay vì vá bằng offset cảm tính theo zoom.
+- Sửa tối thiểu, ưu tiên đúng root cause.
+- Không vá CSS riêng cho từng màn hình nếu nguyên nhân là cấu hình PWA/display mode.
 
 ## Required Verification
-- Chạy `npm.cmd run lint -- pages/map.js helper/mapMarkerImages.js`.
-- Tự rà logic theo checklist: `Map Flow`, `Tiếng Việt / UI Safety`.
-- Nếu có test phù hợp, chạy focused check liên quan map marker.
-- Smoke review code để xác nhận anchor marker không còn phụ thuộc sai vào kích thước label khi zoom.
+- Kiểm tra lại `public/manifest.json` và `pages/_app.js` để xác nhận không còn ép iPhone vào standalone mode.
+- Chạy `npm.cmd exec eslint pages/_app.js`.
+- Parse lại `public/manifest.json` để xác nhận JSON hợp lệ.
+- Đối chiếu checklist các mục liên quan `Map Flow`, `Navigation / layout mobile`, `Tiếng Việt / UI Safety`.
 
 ## Definition of Done
-- Root cause được xác định rõ.
-- Marker store trên `/map` dùng điểm neo đúng về hình học, không còn lệch xuống do cách dựng ảnh/layer.
-- Các hành vi map liên quan vẫn giữ nguyên.
+- Root cause được xác định rõ là chế độ standalone PWA.
+- Cấu hình app không còn ép iPhone home-screen chạy giao diện standalone khác Safari.
+- Không có thay đổi ngoài scope.
 
 ## Plan
-- Xác nhận root cause trong layer marker và ảnh marker.
-- Chỉnh cách dựng ảnh/anchor để marker bám đúng tọa độ.
-- Rà lại side effects cho hover, click, route order, highlight.
-- Chạy lint và ghi kết quả vào current-work.
+- Ghi lại task bugfix hiện tại vào working memory.
+- Bỏ cấu hình standalone khiến iPhone mở như app riêng.
+- Kiểm tra nhanh manifest/meta và cập nhật kết quả verify.
 
 ## Done
-- Xác định root cause ở `pages/map.js`: layer `store-marker` đang dùng `icon-anchor: 'top'` cho một image marker có label nằm bên dưới icon.
-- Xác định root cause ở `helper/mapMarkerImages.js`: canvas marker không cân đối phần trên/dưới quanh tâm icon, nên điểm neo của cả image không trùng tâm hình học của icon.
-- Đã thêm `topPadding` cân đối canvas để tâm image trùng tâm icon.
-- Đã đổi `store-marker` sang `icon-anchor: 'center'` để marker bám đúng tọa độ, không phụ thuộc chiều cao label khi zoom.
+- Xác định root cause là cấu hình PWA đang ép home-screen app chạy ở chế độ standalone qua `public/manifest.json` và iPhone web-app meta trong `pages/_app.js`.
+- Đã đổi `display` trong `public/manifest.json` từ `standalone` sang `browser` để khi mở từ màn hình chính ưu tiên hành vi giống Safari.
+- Đã bỏ các meta `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style` trong `pages/_app.js` để không tiếp tục ép iPhone vào app shell riêng.
 
 ## Verification
-- `npm.cmd run lint -- pages/map.js helper/mapMarkerImages.js` passed.
-- Đã đối chiếu checklist: `Map Flow`, `Tiếng Việt / UI Safety`.
-- Đã smoke review logic: query `/map`, validate tọa độ, sửa lat/lng đảo chiều, hover popup, click marker, route order/highlight không bị đổi logic.
+- `npm.cmd exec eslint pages/_app.js` passed.
+- `node -e "JSON.parse(require('fs').readFileSync('public/manifest.json','utf8')); console.log('manifest ok')"` passed.
+- Đã smoke review scope thay đổi: không đụng logic map, route, navbar, cache; chỉ đổi cấu hình display/meta.
+- Đã đối chiếu checklist: `Map Flow`, `Navigation / layout mobile`, `Tiếng Việt / UI Safety` ở mức scope code thay đổi.
 
 ## Risks / Next
-- Chưa có visual/e2e test tự động để đo sai lệch marker theo zoom; phần verify hiện là code-level + lint.
-- `components/map/location-picker.jsx` cũng đang có `icon-anchor: 'top'`, nhưng chưa sửa trong task này vì chưa xác nhận cùng kiểu marker/image và chưa có bug report ở flow đó.
+- Sau khi deploy, iPhone có thể cần xóa biểu tượng cũ khỏi màn hình chính rồi thêm lại để nhận manifest/meta mới.
+- Nếu Safari hoặc iOS còn cache manifest cũ, có thể cần reload mạnh hoặc chờ cache cập nhật trước khi retest.
