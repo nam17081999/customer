@@ -417,6 +417,7 @@ export default function AddStore() {
                 loading={mapsLinkLoading}
                 error={mapsLinkError}
                 mobile
+                showDirectionIcon
                 onChange={setMapsLink}
                 onSubmit={() => handleMapsLink(mapsLink)}
               />
@@ -427,6 +428,7 @@ export default function AddStore() {
                 value={mapsLink}
                 loading={mapsLinkLoading}
                 error={mapsLinkError}
+                showDirectionIcon
                 onChange={setMapsLink}
                 onSubmit={() => handleMapsLink(mapsLink)}
               />

@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
 
 const DEFAULT_PLACEHOLDER = 'https://maps.app.goo.gl/... ho\u1eb7c link Google Maps'
 const LABEL = 'D\u00e1n \u0111\u01b0\u1eddng d\u1eabn Google Maps'
@@ -12,6 +13,7 @@ export default function StoreMapsLinkFields({
   loading = false,
   error = '',
   mobile = false,
+  showDirectionIcon = false,
   placeholder = DEFAULT_PLACEHOLDER,
   onChange,
   onSubmit,
@@ -42,7 +44,7 @@ export default function StoreMapsLinkFields({
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-          ) : undefined}
+          ) : showDirectionIcon ? <DirectionTurnIcon className="h-4 w-4" /> : undefined}
           onClick={() => onSubmit?.()}
           className={mobile ? 'w-full' : 'shrink-0'}
         >

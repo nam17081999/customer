@@ -10,6 +10,7 @@ import StoreDetailModal from '@/components/store-detail-modal'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import TelesaleCallDialog from '@/components/store/telesale-call-dialog'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
+import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
 
 function CircleIconButton({ href, label, children, onClick, onPointerDown }) {
   const className = 'flex h-10 w-10 items-center justify-center rounded-full border border-gray-800 bg-gray-800 text-gray-400 transition'
@@ -173,9 +174,7 @@ export default function SearchStoreCard({
               <div className="flex shrink-0 flex-col justify-center gap-2">
                 {hasCoordinates && (
                   <CircleIconButton href={directionHref} label="Chỉ đường">
-                    <svg className="h-4.5 w-4.5 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 128" aria-hidden="true">
-                      <path d="M96 48c0 34.912-40.615 75.928-42.342 77.657a8.002 8.002 0 0 1-11.314 0C40.615 123.927 0 82.912 0 48a48 48 0 0 1 96 0zM48 72a24 24 0 1 0-24-24 23.999 23.999 0 0 0 24 24z"></path>
-                    </svg>
+                    <DirectionTurnIcon className="h-6 w-6" />
                   </CircleIconButton>
                 )}
                 {hasAnyPhone && (
@@ -276,9 +275,7 @@ export default function SearchStoreCard({
             <div className="flex shrink-0 items-start gap-2">
               {hasCoordinates && (
                 <CircleIconButton href={directionHref} label="Chỉ đường">
-                  <svg className="h-4.5 w-4.5 fill-current" viewBox="0 0 100 100" aria-hidden="true">
-                    <path d="m86.3 11.2-74 30.7c-1.7.7-1.6 3.3.3 3.8l34.1 7.7 7.7 34.1c.4 1.9 3 2.1 3.7.3l30.8-74c.6-1.7-1-3.3-2.6-2.6zm-66.8 32 59.1-24.6-30.9 30.9-28.2-6.3zm37.3 37.3-6.4-28.2 30.9-30.9-24.5 59.1z"></path>
-                  </svg>
+                  <DirectionTurnIcon className="h-6 w-6" />
                 </CircleIconButton>
               )}
               {hasAnyPhone && (
