@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
+import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
@@ -80,6 +81,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
   const storeTypeMeta = getStoreTypeMeta(store.store_type)
   const storeTypeLabel = storeTypeMeta.label
   const phoneNumbers = getStorePhoneNumbers(store)
+  const isMapPage = router.pathname === '/map'
   const hasRouteAction = hasCoords && (
     (isInRoute && typeof onRemoveFromRoute === 'function') ||
     (!isInRoute && typeof onAddToRoute === 'function')
@@ -204,9 +206,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
                         aria-label="Mở địa chỉ trên Google Maps"
                         className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-800 bg-gray-800 text-gray-400 transition"
                       >
-                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                        </svg>
+                        <DirectionTurnIcon className="h-5 w-5" />
                       </a>
                     )}
                   </div>
@@ -214,8 +214,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
 
                 {phoneNumbers.map((phoneValue, phoneIndex) => (
                   <div key={`detail-phone-${phoneValue}-${phoneIndex}`} className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5">
-                    <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    <svg className="h-5 w-5 shrink-0 text-gray-500" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z" />
                     </svg>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm leading-tight text-gray-500">Số điện thoại {phoneIndex + 1}</p>
@@ -226,8 +226,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
                       aria-label={`Gọi số điện thoại ${phoneIndex + 1}`}
                       className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-800 bg-gray-800 text-gray-400 transition"
                     >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z" />
                       </svg>
                     </a>
                   </div>
@@ -250,13 +250,13 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
           <section className="space-y-2 border-t border-gray-800/70 pt-3">
             <p className="px-0.5 text-sm font-semibold text-gray-300">Thao tác</p>
             <div className="grid grid-cols-2 gap-2">
-              {hasCoords && (
+              {hasCoords && !isMapPage && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full px-3"
                   leftIcon={
-                    <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    <DirectionTurnIcon className="h-4 w-4 shrink-0" />
                   }
                   onClick={(e) => {
                     e.stopPropagation()
