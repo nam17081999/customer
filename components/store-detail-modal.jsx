@@ -1,4 +1,5 @@
 ﻿import { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -13,6 +14,10 @@ import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { supabase } from '@/lib/supabaseClient'
 import { removeStoreFromCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
+
+const StoreDetailMiniMap = dynamic(() => import('@/components/map/store-detail-mini-map'), {
+  ssr: false,
+})
 
 function buildTelHref(phone) {
   return `tel:${String(phone || '').replace(/[^0-9+]/g, '')}`
@@ -187,6 +192,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
             ) : null}
           </div>
 
+        <div>
           {hasStoreInfo && (
               <div className="space-y-2 mt-4">
                 {addressText && (
@@ -246,6 +252,8 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
                 )}
             </div>
           )}
+
+          {hasCoords && <StoreDetailMiniMap store={store} open={resolvedOpen} />}
 
           <section className="space-y-2 border-t border-gray-800/70 pt-3">
             <p className="px-0.5 text-sm font-semibold text-gray-300">Thao tác</p>
@@ -370,6 +378,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
               )}
             </div>
           </section>
+        </div>
         </div>
       </div>
     </DialogContent>
