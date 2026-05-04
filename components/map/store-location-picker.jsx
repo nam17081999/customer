@@ -47,7 +47,7 @@ export default function StoreLocationPicker({
     return (
       <div className={`relative ${className}`}>
         {showControls && (
-          <div className="absolute top-3 right-2 z-[100] flex flex-col gap-1.5 items-end">
+          <div className="absolute top-3 right-2 z-20 flex flex-col gap-1.5 items-end">
             {onGetLocation && (
               <button
                 type="button"
@@ -63,7 +63,7 @@ export default function StoreLocationPicker({
         )}
 
         {showControls && onToggleEditable && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[100]">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
             <button
               type="button"
               onClick={onToggleEditable}
@@ -109,7 +109,7 @@ export default function StoreLocationPicker({
     <div className={`relative ${className}`}>
       {/* Control buttons - top right inside map */}
       {showControls && (
-        <div className="absolute top-3 right-2 z-[100] flex flex-col gap-1.5 items-end">
+        <div className="absolute top-3 right-2 z-20 flex flex-col gap-1.5 items-end">
           {/* Get location button */}
           {onGetLocation && (
             <button
@@ -136,7 +136,7 @@ export default function StoreLocationPicker({
 
       {/* Lock/Unlock button - top center inside map */}
       {showControls && onToggleEditable && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[100]">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
           <button
             type="button"
             onClick={onToggleEditable}
@@ -169,14 +169,14 @@ export default function StoreLocationPicker({
       {/* Lock status badge - top right (only show if no controls) */}
       {!showControls && (
         editable ? (
-          <div className="absolute top-2 right-2 z-[1000] bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+          <div className="absolute top-2 right-2 z-20 bg-orange-600 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
             </svg>
             Đang mở khóa
           </div>
         ) : (
-          <div className="absolute top-2 right-2 z-[1000] bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
+          <div className="absolute top-2 right-2 z-20 bg-gray-700 text-white px-2 py-1 rounded-md shadow-lg flex items-center gap-1 text-xs font-medium pointer-events-none">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -202,14 +202,14 @@ export default function StoreLocationPicker({
 
         {/* Compass error - bottom right to avoid control buttons */}
         {compassError && (
-          <div className="absolute bottom-3 right-2 z-[1000] max-w-[200px] rounded-md border border-orange-900 bg-orange-950/30 px-2 py-1.5 text-[10px] text-orange-400">
+          <div className="absolute bottom-3 right-2 z-20 max-w-[200px] rounded-md border border-orange-900 bg-orange-950/30 px-2 py-1.5 text-[10px] text-orange-400">
             {compassError}
           </div>
         )}
 
         {/* Geo blocked overlay */}
         {geoBlocked && (
-          <div className="absolute inset-0 z-[1200] flex items-center justify-center px-4">
+          <div className="absolute inset-0 z-30 flex items-center justify-center px-4">
             <div className="w-full max-w-md rounded-md border border-red-900 bg-gray-900/95 p-5 text-center shadow-lg backdrop-blur-md">
               <div className="text-base font-semibold text-red-500">
                 Không thể lấy vị trí của bạn
@@ -237,7 +237,7 @@ export default function StoreLocationPicker({
 
         {/* Resolving address overlay */}
         {resolvingAddr && (
-          <div className="absolute inset-0 z-[1100] flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-md">
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-md">
             <div className="flex items-center gap-2 text-sm text-gray-200">
               <span className="inline-block h-2 w-2 rounded-full bg-gray-600 animate-pulse" />
               Đang lấy vị trí…
