@@ -114,6 +114,32 @@ test('admin edit dùng layout step và lưu thành công', async ({ page }) => {
   })
 })
 
+test('admin edit store chưa có vị trí sẽ tự lấy GPS ở bước 3', async ({ page }) => {
+  await setupEditFlow(page, {
+    stores: [
+      buildStore({
+        id: 'admin-no-location-1',
+        name: 'Tạp hóa Chưa Có Vị Trí',
+        latitude: null,
+        longitude: null,
+      }),
+    ],
+  })
+
+  await page.goto('/store/edit/admin-no-location-1')
+
+  await expect(page.getByText('Sửa cửa hàng')).toBeVisible()
+  await page.getByRole('button', { name: 'Tiếp theo' }).click()
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+
+  await resetGeoCallCount(page)
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expectGeoCallCount(page, 1)
+  await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.02851, 105.80482')
+})
+
 test('guest supplement giữ flow step và gửi store report', async ({ page }) => {
   await setupEditFlow(page, {
     auth: { role: 'guest' },

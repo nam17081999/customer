@@ -224,6 +224,25 @@ export function useStoreEditController() {
     bootstrapSupplementLocationStep
   )
 
+  const bootstrapEditLocationStep = useCallback(async () => {
+    if (originalHasCoordinates) return
+    setGeoBlocked(false)
+    setMapEditable(false)
+    setUserHasEditedMap(false)
+    setPickedLat(null)
+    setPickedLng(null)
+    setInitialGPSLat(null)
+    setInitialGPSLng(null)
+    setHeading(null)
+    setStep2Key((value) => value + 1)
+    await handleGetLocation()
+  }, [handleGetLocation, originalHasCoordinates])
+
+  useStepEntryEffect(
+    !isSupplementMode && !originalHasCoordinates && currentStep === 3,
+    bootstrapEditLocationStep
+  )
+
   const applyMapsLinkCoords = useCallback((lat, lng) => {
     setInitialGPSLat(lat)
     setInitialGPSLng(lng)

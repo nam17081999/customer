@@ -4,9 +4,12 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { parseCoordinate } from '@/helper/coordinate'
 import { haversineKm } from '@/helper/distance'
+import { createUserHeadingFanImage } from '@/helper/mapMarkerImages'
 
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const NEARBY_STORES_LIMIT = 30
+const HEADING_SOURCE_ID = 'picker-user-heading'
+const HEADING_LAYER_ID = 'picker-user-heading-layer'
 
 function getMarkerLabelText(name = '') {
   const cleaned = String(name || '').trim()
@@ -144,6 +147,7 @@ export default function LocationPicker({
 }) {
   const defaultLat = 21.0768617
   const defaultLng = 105.6955684
+  const hasInitialCoordinates = typeof initialLat === 'number' && typeof initialLng === 'number'
   const mapRef = useRef(null)
   const lastBearingRef = useRef(0)
   const mapContainerRef = useRef(null)
@@ -155,9 +159,47 @@ export default function LocationPicker({
   const allStoresRef = useRef([])
   const nearbyImageIdsRef = useRef(new Set())
 
+  const updateHeadingFan = useCallback((lat, lng, nextHeading = heading) => {
+    const map = mapRef.current
+    if (!map) return
+    const source = map.getSource(HEADING_SOURCE_ID)
+    if (!source) return
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      source.setData(EMPTY_FEATURE_COLLECTION)
+      return
+    }
+
+    const safeHeading = Number.isFinite(nextHeading) ? Number(nextHeading) : 0
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat],
+          },
+          properties: {
+            heading: safeHeading,
+            hasHeading: Number.isFinite(nextHeading) ? 'yes' : 'no',
+          },
+        },
+      ],
+    })
+  }, [heading])
+
   const ensureNearbyStoresLayers = useCallback((map) => {
     if (!map.getSource('nearby-stores')) {
       map.addSource('nearby-stores', {
+        type: 'geojson',
+        data: EMPTY_FEATURE_COLLECTION,
+      })
+    }
+
+    if (!map.getSource(HEADING_SOURCE_ID)) {
+      map.addSource(HEADING_SOURCE_ID, {
         type: 'geojson',
         data: EMPTY_FEATURE_COLLECTION,
       })
@@ -177,6 +219,35 @@ export default function LocationPicker({
           'symbol-sort-key': ['*', -1, ['get', 'distanceRank']],
         },
       })
+    }
+
+    try {
+      if (!map.hasImage('user-heading-fan')) {
+        const img = createUserHeadingFanImage()
+        map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+      }
+
+      if (!map.getLayer(HEADING_LAYER_ID)) {
+        map.addLayer({
+          id: HEADING_LAYER_ID,
+          type: 'symbol',
+          source: HEADING_SOURCE_ID,
+          layout: {
+            'icon-image': 'user-heading-fan',
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
+            'icon-rotate': ['get', 'heading'],
+            'icon-rotation-alignment': 'map',
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
+          },
+        })
+      }
+    } catch (error) {
+      console.error('LocationPicker heading asset setup failed:', error)
     }
   }, [])
 
@@ -318,10 +389,12 @@ export default function LocationPicker({
       })
     }
 
-    const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
-      .setLngLat(centerRef.current)
-      .addTo(map)
-    markerRef.current = marker
+    if (hasInitialCoordinates) {
+      const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+        .setLngLat(centerRef.current)
+        .addTo(map)
+      markerRef.current = marker
+    }
 
     setControlsOnTop()
 
@@ -333,6 +406,7 @@ export default function LocationPicker({
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat])
       }
+      updateHeadingFan(lat, lng)
     }
 
     map.on('move', updateCenter)
@@ -355,9 +429,16 @@ export default function LocationPicker({
       const lng = Number(e.lngLat.lng.toFixed(7))
       centerRef.current = [lng, lat]
       map.easeTo({ center: [lng, lat], duration: 250 })
-      if (markerRef.current) markerRef.current.setLngLat([lng, lat])
+      if (!markerRef.current) {
+        markerRef.current = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+          .setLngLat([lng, lat])
+          .addTo(map)
+      } else {
+        markerRef.current.setLngLat([lng, lat])
+      }
       if (onChangeRef.current) onChangeRef.current(lat, lng)
       updateNearbyStores(lat, lng)
+      updateHeadingFan(lat, lng)
     })
 
     loadNearbyStores()
@@ -366,7 +447,7 @@ export default function LocationPicker({
       map.remove()
       mapRef.current = null
     }
-  }, [ensureNearbyStoresLayers, loadNearbyStores, updateNearbyStores])
+  }, [ensureNearbyStoresLayers, hasInitialCoordinates, loadNearbyStores, updateHeadingFan, updateNearbyStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -374,10 +455,24 @@ export default function LocationPicker({
     if (typeof initialLat === 'number' && typeof initialLng === 'number') {
       map.setCenter([initialLng, initialLat])
       centerRef.current = [initialLng, initialLat]
-      if (markerRef.current) markerRef.current.setLngLat([initialLng, initialLat])
+      if (!markerRef.current) {
+        markerRef.current = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+          .setLngLat([initialLng, initialLat])
+          .addTo(map)
+      } else {
+        markerRef.current.setLngLat([initialLng, initialLat])
+      }
       updateNearbyStores(initialLat, initialLng)
+      updateHeadingFan(initialLat, initialLng)
+      return
     }
-  }, [initialLat, initialLng, updateNearbyStores])
+
+    if (markerRef.current) {
+      markerRef.current.remove()
+      markerRef.current = null
+    }
+    updateHeadingFan(null, null)
+  }, [initialLat, initialLng, updateHeadingFan, updateNearbyStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -413,7 +508,9 @@ export default function LocationPicker({
       lastBearingRef.current = heading
       map.setBearing(heading)
     }
-  }, [heading])
+    const [lng, lat] = centerRef.current
+    updateHeadingFan(lat, lng, heading)
+  }, [heading, updateHeadingFan])
 
   return (
     <div className={className} style={{ position: 'relative' }}>
