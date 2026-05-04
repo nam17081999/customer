@@ -1,66 +1,66 @@
 ﻿# Task Request
 
 ## Goal
-- Thêm phần màu xanh hiển thị hướng trong bản đồ dùng cho create/edit/supplement/report, giống hành vi ở màn `/map`.
+- Ẩn phần bản đồ trong `StoreDetailModal` theo mặc định; chỉ hiện khi người dùng bấm mở và có thể bấm lại để ẩn đi.
 
 ## Task Type
 - Feature
 
 ## Why
-- Giúp người dùng dễ đối chiếu hướng thực tế khi chọn vị trí trong form.
-- Đồng bộ trải nghiệm giữa `/map` và các map picker trong form.
+- Giảm chiều cao modal, giúp phần thông tin chính dễ đọc hơn.
+- Tránh tải quá nhiều nội dung bản đồ ngay khi mở chi tiết cửa hàng.
+- Giữ trải nghiệm gọn, chủ động, hợp lý hơn trên mobile.
 
 ## In Scope
-- `LocationPicker` dùng chung cho create/edit/supplement/report edit.
-- Hiển thị lớp hướng màu xanh theo `heading` hiện có.
-- Giữ tương thích với `StoreLocationPicker` và các form đang dùng chung.
-- Verify nhanh các flow liên quan bằng test/lint gần nhất.
+- UI/UX phần mini map trong `components/store-detail-modal.jsx`.
+- Trạng thái mở/đóng của mini map trong modal detail.
+- Cách render `StoreDetailMiniMap` khi người dùng bật phần bản đồ.
 
 ## Out of Scope
-- Không đổi logic route/navigation đầy đủ của `/map`.
-- Không refactor lớn các component form.
-- Không thay đổi business rule lưu vị trí.
+- Không đổi logic bản đồ đầy đủ ở trang `/map`.
+- Không đổi dữ liệu cửa hàng hay logic route.
+- Không refactor lớn modal detail ngoài phần map block.
 
 ## Must Preserve
-- Marker/pin vị trí hiện tại vẫn hoạt động như cũ.
-- Nearby stores layer vẫn hiển thị như hiện tại.
-- Nếu không có `heading`, map vẫn dùng bình thường và không lỗi.
-- Các flow create/edit/supplement/report không đổi submit/validation.
+- Nếu cửa hàng không có tọa độ thì không hiện block mở bản đồ vô nghĩa.
+- Nút `Bản đồ`/`Chỉ đường` hiện có vẫn hoạt động như cũ.
+- Mini map khi được mở vẫn hiển thị đúng như hiện tại.
+- UI dark theme, dễ bấm, rõ trạng thái mở/đóng.
 
 ## Inputs / Repro / Expected
-- Input: mở bản đồ trong create/edit/supplement/report khi đã có `heading`.
-- Expected: trên map có thêm phần màu xanh hiển thị hướng, tương tự `/map`.
+- Input: mở `StoreDetailModal` với cửa hàng có tọa độ.
+- Expected: mini map mặc định đang ẩn; có nút/card để bấm `Xem bản đồ`; bấm lần nữa thì thu gọn lại.
 
 ## Constraints
-- Ưu tiên tái sử dụng asset/helper đang có từ `/map`.
-- Sửa tối thiểu trong component map dùng chung.
+- Ưu tiên sửa tối thiểu trong modal detail.
+- UI/UX phải rõ ràng trên mobile trước.
 
 ## Required Verification
-- `npm.cmd run test:e2e -- e2e/store-edit.spec.js`
 - `npm.cmd run lint`
-- Đối chiếu checklist: `Map / Geolocation`, `Store Edit Flow`, `Tiếng Việt / UI Safety`.
+- Smoke review code cho `StoreDetailModal`.
+- Đối chiếu checklist: `Store Detail / Actions`, `Map / Geolocation`, `Tiếng Việt / UI Safety`.
 
 ## Definition of Done
-- Map picker trong create/edit/supplement/report có phần hướng màu xanh khi có `heading`.
-- Không làm hỏng marker vị trí, overlay, hay interaction hiện có.
-- Có bằng chứng verify mới.
+- Modal detail không tự hiện mini map nữa.
+- Người dùng có thể chủ động mở/đóng mini map dễ hiểu.
+- Không ảnh hưởng các action khác trong modal.
 
 ## Plan
-- Đọc logic hướng đang dùng ở `/map`.
-- Tái dùng vào `LocationPicker` chung.
-- Soát các màn form đang dùng component này.
-- Chạy verify gần nhất và cập nhật kết quả.
+- Xác định chỗ render mini map trong modal.
+- Thiết kế block toggle mở/đóng hợp lý.
+- Patch modal detail với trạng thái collapse.
+- Chạy lint và cập nhật kết quả.
 
 ## Done
-- Tái sử dụng asset `createUserHeadingFanImage()` từ `/map` để hiển thị lớp hướng màu xanh trong `LocationPicker` dùng chung.
-- Thêm source/layer riêng cho heading fan và đồng bộ vị trí + heading theo tâm pin/map hiện tại.
-- Giữ tương thích cho các flow create/edit/supplement/report vì tất cả đang dùng chung `LocationPicker` qua `StoreLocationPicker`.
+- Đổi mini map trong `StoreDetailModal` sang dạng thu gọn mặc định.
+- Thêm card toggle full-width với mô tả ngắn, icon mũi tên và trạng thái mở/đóng rõ ràng.
+- Reset trạng thái mở bản đồ khi đóng modal hoặc khi đổi sang store khác để tránh giữ state cũ.
 
 ## Verification
 - `npm.cmd run lint` passed.
-- `npm.cmd run test:e2e -- e2e/store-edit.spec.js` passed: 5/5 tests.
-- Đối chiếu checklist trong phạm vi liên quan: `Map / Geolocation`, `Store Edit Flow`, `Tiếng Việt / UI Safety`.
+- Smoke review code: block bản đồ chỉ render khi store có tọa độ; action khác trong modal giữ nguyên.
+- Đối chiếu checklist trong phạm vi liên quan: `Store Detail / Actions`, `Map / Geolocation`, `Tiếng Việt / UI Safety`.
 
 ## Risks / Next
-- Chưa có e2e riêng để assert trực tiếp layer hướng màu xanh; hiện mới verify bằng lint + các flow form còn hoạt động bình thường.
-- Nếu muốn, bước tiếp theo có thể thêm e2e visual/assert nhẹ cho trạng thái có `heading` ở map picker test double hoặc browser thật.
+- Chưa có e2e riêng cho toggle mini map trong modal detail.
+- Nếu muốn, bước tiếp theo có thể thêm animation mở/đóng nhẹ hoặc lưu trạng thái mở tạm thời theo session, nhưng hiện tại mình giữ bản tối giản để tránh phức tạp UI.
