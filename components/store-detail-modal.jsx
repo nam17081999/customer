@@ -27,6 +27,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
   const router = useRouter()
   const { user, isAdmin } = useAuth() || {}
   const [internalOpen, setInternalOpen] = useState(false)
+  const [mapExpanded, setMapExpanded] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const suppressNextOpenRef = useRef(false)
@@ -76,6 +77,16 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     if (!canPrefetchMap) return
     router.prefetch('/map')
   }, [canPrefetchMap, router])
+
+  useEffect(() => {
+    if (!resolvedOpen) {
+      setMapExpanded(false)
+    }
+  }, [resolvedOpen])
+
+  useEffect(() => {
+    setMapExpanded(false)
+  }, [store?.id])
 
   if (!store) return trigger || null
 
@@ -152,9 +163,9 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
   }
 
   const detailContent = (
-    <DialogContent className="max-w-md w-[calc(100%-2rem)] rounded-md p-0 overflow-hidden max-h-[90vh] z-[310]">
-      <div className="flex flex-col max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur pt-5 pb-4 px-3">
+    <DialogContent className="w-[calc(100%-1.5rem)] max-w-md rounded-md p-0 overflow-hidden max-h-[calc(100dvh-2rem)] sm:w-[calc(100%-2rem)] sm:max-h-[90vh]">
+      <div className="flex flex-col max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-h-[90vh]">
+        <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur pt-5 pb-4 px-3 sm:pt-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-sky-500/40 bg-sky-500/10 text-sky-300">
@@ -253,7 +264,35 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
             </div>
           )}
 
-          {hasCoords && <StoreDetailMiniMap store={store} open={resolvedOpen} />}
+          {hasCoords && !isMapPage && (
+            <section className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => setMapExpanded((value) => !value)}
+                aria-expanded={mapExpanded}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950/50 px-3 py-3 text-left transition hover:border-gray-700 hover:bg-gray-900/70"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-200">Bản đồ khu vực</p>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    {mapExpanded ? 'Thu gọn bản đồ để xem thông tin khác' : 'Bấm để xem vị trí cửa hàng và khu vực lân cận'}
+                  </p>
+                </div>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-700 bg-gray-900 text-gray-300">
+                  <svg
+                    className={`h-4 w-4 transition-transform ${mapExpanded ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {mapExpanded ? <StoreDetailMiniMap store={store} open={resolvedOpen} /> : null}
+            </section>
+          )}
 
           <section className="space-y-2 border-t border-gray-800/70 pt-3">
             <p className="px-0.5 text-sm font-semibold text-gray-300">Thao tác</p>

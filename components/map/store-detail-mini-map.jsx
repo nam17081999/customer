@@ -298,11 +298,7 @@ export default function StoreDetailMiniMap({ store, open }) {
   if (!hasCoords) return null
 
   return (
-    <section className="space-y-2 border-t border-gray-800/70 pt-3">
-      <div className="flex items-center justify-between gap-3 px-0.5">
-        <p className="text-sm font-semibold text-gray-300">Bản đồ cửa hàng</p>
-      </div>
-
+    <section className="space-y-2">
       <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950/40">
         <div ref={containerRef} className="aspect-square w-full bg-slate-950" />
       </div>
