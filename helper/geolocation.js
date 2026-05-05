@@ -6,26 +6,52 @@
 import { getE2EGeolocationOverride, incrementE2EGeolocationCallCount } from '@/lib/e2e-test-mode'
 
 /**
+ * In-memory position cache (TTL = 10 s).
+ * Lets successive calls within the same session reuse a recent GPS fix
+ * without waiting for the hardware to settle again.
+ * skipCache: true bypasses this (used by "Lấy lại vị trí" button).
+ */
+const _posCache = {
+  coords: null,
+  ts: 0,
+  TTL: 10_000,
+  set(coords) {
+    this.coords = coords
+    this.ts = Date.now()
+  },
+  get(maxAge = this.TTL) {
+    if (!this.coords) return null
+    if (Date.now() - this.ts > maxAge) return null
+    return this.coords
+  },
+  clear() {
+    this.coords = null
+    this.ts = 0
+  },
+}
+
+/**
  * Get the best GPS position using watchPosition for progressive accuracy.
  * Returns the first position that meets desiredAccuracy, or the best one
  * collected within maxWaitTime.
  *
  * Strategy:
- * 1. Start watchPosition immediately (gets coarse → fine updates)
- * 2. If a cached position (<60s) with acceptable accuracy exists, return it fast
- * 3. As watch updates arrive, keep the best sample
- * 4. Early-exit as soon as desiredAccuracy is met
- * 5. After maxWaitTime, return the best sample collected
+ * 1. Check in-memory cache — if fresh enough and accurate enough, return instantly
+ * 2. Start watchPosition immediately (gets coarse → fine updates)
+ * 3. In parallel, try a quick browser-cached position (maximumAge 30 s)
+ * 4. As watch updates arrive, keep the best sample and update in-memory cache
+ * 5. Early-exit as soon as desiredAccuracy is met
+ * 6. After maxWaitTime, return the best sample collected
  *
  * @param {Object} options
- * @param {number} options.maxWaitTime    — total budget in ms (default 2000)
- * @param {number} options.desiredAccuracy — early-exit threshold in metres (default 20)
- * @param {boolean} options.skipCache     — skip cached position shortcut (default false)
+ * @param {number}  options.maxWaitTime     — total budget in ms (default 2000)
+ * @param {number}  options.desiredAccuracy — early-exit threshold in metres (default 30)
+ * @param {boolean} options.skipCache       — bypass in-memory cache (default false)
  * @returns {Promise<{coords: GeolocationCoordinates|null, error: Error|null}>}
  */
 export async function getBestPosition({
   maxWaitTime = 2000,
-  desiredAccuracy = 20,
+  desiredAccuracy = 30,
   skipCache = false,
   // Legacy params — ignored but accepted to avoid breaking callers
   attempts,
@@ -51,11 +77,18 @@ export async function getBestPosition({
     return { coords: null, error: new Error('Geolocation not supported') }
   }
 
+  // ── 1. In-memory cache fast-path ──────────────────────────────────────────
+  if (!skipCache) {
+    const cached = _posCache.get()
+    if (cached && (cached.accuracy || Infinity) <= desiredAccuracy) {
+      return { coords: cached, error: null }
+    }
+  }
+
   return new Promise((resolve) => {
     let best = null
     let watchId = null
     let resolved = false
-    const startTime = Date.now()
 
     function finish() {
       if (resolved) return
@@ -65,6 +98,7 @@ export async function getBestPosition({
         watchId = null
       }
       if (best) {
+        _posCache.set(best)
         resolve({ coords: best, error: null })
       } else {
         resolve({ coords: null, error: new Error('Không lấy được vị trí') })
@@ -93,38 +127,45 @@ export async function getBestPosition({
       // Don't resolve yet — wait for timeout, watchPosition may recover
     }
 
-    // Start continuous watch immediately
+    // ── 2. Start continuous watch immediately ─────────────────────────────
     watchId = navigator.geolocation.watchPosition(onPosition, onError, {
       enableHighAccuracy: true,
       timeout: maxWaitTime,
       maximumAge: 0,
     })
 
-    // Also try a quick cached position in parallel
+    // ── 3. Also try a quick browser-cached position in parallel ───────────
     if (!skipCache) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           if (resolved) return
           const coords = pos?.coords
-          if (coords?.accuracy && coords.accuracy <= desiredAccuracy * 1.5) {
-            const bestAcc = best?.accuracy || Infinity
-            if (coords.accuracy < bestAcc) {
-              best = coords
-            }
-            // If cache is excellent, finish early
-            if (coords.accuracy <= desiredAccuracy) {
-              finish()
-            }
+          if (!coords?.accuracy) return
+          const acc = coords.accuracy
+          const bestAcc = best?.accuracy || Infinity
+          if (acc < bestAcc) {
+            best = coords
+          }
+          // Finish early if the cached position is accurate enough
+          if (acc <= desiredAccuracy) {
+            finish()
           }
         },
         () => { /* ignore cache error */ },
-        { enableHighAccuracy: true, timeout: 500, maximumAge: 60000 },
+        { enableHighAccuracy: true, timeout: 500, maximumAge: 30_000 },
       )
     }
 
-    // Hard deadline
+    // ── 4. Hard deadline ──────────────────────────────────────────────────
     setTimeout(finish, maxWaitTime)
   })
+}
+
+/**
+ * Exposed for testing / "Lấy lại vị trí" to force a fresh read.
+ */
+export function clearPositionCache() {
+  _posCache.clear()
 }
 
 /**

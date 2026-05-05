@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import { DEFAULT_STORE_TYPE, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
-import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import { extractCoordsFromMapsUrl } from '@/helper/storeFormShared'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import {
@@ -170,10 +170,11 @@ export function useStoreEditController() {
     try {
       compassOnceRef.current = false
       void refreshCompassHeading({ requestPermission: true })
+      clearPositionCache()
       setResolvingAddr(true)
       const { coords, error } = await getBestPosition({
         maxWaitTime: 2000,
-        desiredAccuracy: 15,
+        desiredAccuracy: 30,
         skipCache: true,
       })
       if (!coords) {

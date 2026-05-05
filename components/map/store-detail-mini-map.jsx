@@ -302,21 +302,6 @@ export default function StoreDetailMiniMap({ store, open }) {
       <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950/40">
         <div ref={containerRef} className="aspect-square w-full bg-slate-950" />
       </div>
-
-      <style jsx global>{`
-        .detail-mini-map-popup .maplibregl-popup-content {
-          background: rgba(15, 23, 42, 0.96);
-          color: #f8fafc;
-          padding: 6px 10px;
-          border-radius: 8px;
-          border: 1px solid rgba(148, 163, 184, 0.24);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
-        }
-
-        .detail-mini-map-popup .maplibregl-popup-tip {
-          border-top-color: rgba(15, 23, 42, 0.96);
-        }
-      `}</style>
     </section>
   )
 }

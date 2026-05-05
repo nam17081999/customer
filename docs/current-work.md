@@ -1,66 +1,47 @@
-﻿# Task Request
+# Task Request
 
 ## Goal
-- Ẩn phần bản đồ trong `StoreDetailModal` theo mặc định; chỉ hiện khi người dùng bấm mở và có thể bấm lại để ẩn đi.
+- Sửa sạch lỗi tiếng Việt/mã hóa trong các file changed hiện tại, đồng thời giữ nguyên logic boundary lookup mới.
 
 ## Task Type
-- Feature
+- Bug Fix
 
 ## Why
-- Giảm chiều cao modal, giúp phần thông tin chính dễ đọc hơn.
-- Tránh tải quá nhiều nội dung bản đồ ngay khi mở chi tiết cửa hàng.
-- Giữ trải nghiệm gọn, chủ động, hợp lý hơn trên mobile.
+- User phát hiện các file changed còn lỗi tiếng Việt (mojibake / ký tự vỡ dấu).
+- Các file đã đi qua nhiều phase thử nghiệm nên có một số chuỗi bị hỏng encoding, đặc biệt ở create controller.
 
 ## In Scope
-- UI/UX phần mini map trong `components/store-detail-modal.jsx`.
-- Trạng thái mở/đóng của mini map trong modal detail.
-- Cách render `StoreDetailMiniMap` khi người dùng bật phần bản đồ.
+- `helper/useStoreCreateController.js`
+- các file changed còn lại liên quan đến phase boundary lookup
+- `docs/current-work.md`
 
 ## Out of Scope
-- Không đổi logic bản đồ đầy đủ ở trang `/map`.
-- Không đổi dữ liệu cửa hàng hay logic route.
-- Không refactor lớn modal detail ngoài phần map block.
+- Không đổi business logic boundary lookup vừa hoàn thành.
+- Không refactor thêm ngoài phạm vi fix text/mã hóa.
 
 ## Must Preserve
-- Nếu cửa hàng không có tọa độ thì không hiện block mở bản đồ vô nghĩa.
-- Nút `Bản đồ`/`Chỉ đường` hiện có vẫn hoạt động như cũ.
-- Mini map khi được mở vẫn hiển thị đúng như hiện tại.
-- UI dark theme, dễ bấm, rõ trạng thái mở/đóng.
-
-## Inputs / Repro / Expected
-- Input: mở `StoreDetailModal` với cửa hàng có tọa độ.
-- Expected: mini map mặc định đang ẩn; có nút/card để bấm `Xem bản đồ`; bấm lần nữa thì thu gọn lại.
-
-## Constraints
-- Ưu tiên sửa tối thiểu trong modal detail.
-- UI/UX phải rõ ràng trên mobile trước.
+- Logic `point-in-polygon` từ boundary local vẫn hoạt động.
+- Test hiện có vẫn pass.
+- Không còn chuỗi tiếng Việt bị lỗi trong các file changed.
 
 ## Required Verification
+- `node scripts/check-mojibake.js --files ...`
+- `.\node_modules\.bin\vitest.cmd run __tests__/helper/storeAreaResolver.test.js __tests__/pages/api/reverse-geocode-area.test.js`
 - `npm.cmd run lint`
-- Smoke review code cho `StoreDetailModal`.
-- Đối chiếu checklist: `Store Detail / Actions`, `Map / Geolocation`, `Tiếng Việt / UI Safety`.
-
-## Definition of Done
-- Modal detail không tự hiện mini map nữa.
-- Người dùng có thể chủ động mở/đóng mini map dễ hiểu.
-- Không ảnh hưởng các action khác trong modal.
-
-## Plan
-- Xác định chỗ render mini map trong modal.
-- Thiết kế block toggle mở/đóng hợp lý.
-- Patch modal detail với trạng thái collapse.
-- Chạy lint và cập nhật kết quả.
 
 ## Done
-- Đổi mini map trong `StoreDetailModal` sang dạng thu gọn mặc định.
-- Thêm card toggle full-width với mô tả ngắn, icon mũi tên và trạng thái mở/đóng rõ ràng.
-- Reset trạng thái mở bản đồ khi đóng modal hoặc khi đổi sang store khác để tránh giữ state cũ.
+- Sửa toàn bộ chuỗi tiếng Việt bị mojibake trong `helper/useStoreCreateController.js`.
+- Rà lại toàn bộ các file changed bằng `scripts/check-mojibake.js`.
+- Dọn 2 file data tạm không còn dùng từ phase cũ:
+  - `data/gadm41_VNM_3.json`
+  - `data/oldAdminAreaSeeds.js`
+- Giữ nguyên logic boundary lookup mới.
 
 ## Verification
+- `node scripts/check-mojibake.js --files ...` passed, không còn phát hiện lỗi mã hóa trong các file changed.
+- `.\node_modules\.bin\vitest.cmd run __tests__/helper/storeAreaResolver.test.js __tests__/pages/api/reverse-geocode-area.test.js` passed (`19/19`).
 - `npm.cmd run lint` passed.
-- Smoke review code: block bản đồ chỉ render khi store có tọa độ; action khác trong modal giữ nguyên.
-- Đối chiếu checklist trong phạm vi liên quan: `Store Detail / Actions`, `Map / Geolocation`, `Tiếng Việt / UI Safety`.
 
 ## Risks / Next
-- Chưa có e2e riêng cho toggle mini map trong modal detail.
-- Nếu muốn, bước tiếp theo có thể thêm animation mở/đóng nhẹ hoặc lưu trạng thái mở tạm thời theo session, nhưng hiện tại mình giữ bản tối giản để tránh phức tạp UI.
+- Không còn lỗi mã hóa trong các file changed đã rà.
+- Nếu muốn sạch hẳn phase cũ, bước tiếp theo có thể dọn tiếp các file thử nghiệm không còn dùng như route reverse geocode cũ.
