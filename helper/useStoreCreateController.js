@@ -1,11 +1,11 @@
-﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_WARD_SUGGESTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
-import { getBestPosition, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   findNearbySimilarStores,
   findGlobalExactNameMatches,
@@ -13,11 +13,11 @@ import {
 } from '@/helper/duplicateCheck'
 import {
   buildCreateInsertPayload,
-  findNearestDistrictWard,
   getCreateFinalCoordinates,
   resolveMapsLinkCoordinates,
   validateStoreCreateStep2,
 } from '@/helper/storeCreateFlow'
+import { resolveDistrictWardFromCoordinates } from '@/helper/storeAreaResolver'
 import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 
@@ -53,8 +53,10 @@ export function useStoreCreateController() {
   const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
   const duplicateCheckSeqRef = useRef(0)
   const duplicateGeoRequestedRef = useRef(false)
-  const nearestLocationPrefilledRef = useRef(false)
-  const nearestLocationPrefillRunningRef = useRef(false)
+  const areaPrefilledRef = useRef(false)
+  const areaPrefillRunningRef = useRef(false)
+  const [areaAutoFillStatus, setAreaAutoFillStatus] = useState('idle')
+  const [areaAutoFillMessage, setAreaAutoFillMessage] = useState('')
 
   const [pickedLat, setPickedLat] = useState(null)
   const [pickedLng, setPickedLng] = useState(null)
@@ -134,9 +136,63 @@ export function useStoreCreateController() {
     setGeoBlocked(false)
     setStep2Key((value) => value + 1)
     setMapsLinkError('')
-    showMessage('success', `Đã lấy vị trí: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+    showMessage('success', "Đã lấy vị trí: , ")
   }, [showMessage])
 
+
+  const handleLocationChange = useCallback((lat, lng) => {
+    setPickedLat(lat)
+    setPickedLng(lng)
+    if (mapEditable) {
+      setUserHasEditedMap(true)
+    }
+  }, [mapEditable])
+
+  const autoFillDistrictWardFromCoordinates = useCallback(async (originLat, originLng) => {
+    if (telesaleNoStep3) return
+    if (areaPrefilledRef.current || areaPrefillRunningRef.current) return
+    if (districtRef.current.trim() || wardRef.current.trim()) return
+    if (originLat == null || originLng == null) return
+
+    areaPrefillRunningRef.current = true
+    try {
+      const resolved = await resolveDistrictWardFromCoordinates(originLat, originLng)
+      if (districtRef.current.trim() || wardRef.current.trim()) return
+
+      const nextDistrict = String(resolved?.district || '').trim()
+      const nextWard = String(resolved?.ward || '').trim()
+      if (!nextDistrict && !nextWard) {
+        setAreaAutoFillStatus('unresolved')
+        setAreaAutoFillMessage('Chưa tự xác định được quận/huyện và xã/phường từ vị trí này. Vui lòng chọn tay.')
+        return
+      }
+
+      if (nextDistrict) setDistrict(nextDistrict)
+      if (nextWard) setWard(nextWard)
+      setFieldErrors((prev) => ({
+        ...prev,
+        district: nextDistrict ? '' : prev.district,
+        ward: nextWard ? '' : prev.ward,
+      }))
+      areaPrefilledRef.current = Boolean(nextDistrict || nextWard)
+
+      if (nextDistrict && nextWard) {
+        setAreaAutoFillStatus('resolved_full')
+        setAreaAutoFillMessage('Đã tự chọn quận/huyện và xã/phường từ vị trí.')
+        showMessage('success', 'Đã tự chọn quận/huyện và xã/phường từ vị trí')
+      } else if (nextDistrict) {
+        setAreaAutoFillStatus('resolved_district_only')
+        setAreaAutoFillMessage('Đã tự chọn quận/huyện từ vị trí, vui lòng chọn thêm xã/phường.')
+        showMessage('info', 'Đã tự chọn quận/huyện từ vị trí, vui lòng chọn thêm xã/phường')
+      }
+    } catch (err) {
+      setAreaAutoFillStatus('error')
+      setAreaAutoFillMessage('Không tự xác định được khu vực từ vị trí. Bạn vẫn có thể chọn tay.')
+      console.error('Auto fill district/ward from coordinates error:', err)
+    } finally {
+      areaPrefillRunningRef.current = false
+    }
+  }, [showMessage, telesaleNoStep3])
   const handleMapsLink = useCallback(async (link) => {
     const trimmed = String(link || '').trim()
     setMapsLink(trimmed)
@@ -148,56 +204,14 @@ export function useStoreCreateController() {
       const { coords, error } = await resolveMapsLinkCoordinates(trimmed)
       if (coords) {
         applyMapsLinkCoords(coords.lat, coords.lng)
+        void autoFillDistrictWardFromCoordinates(coords.lat, coords.lng)
       } else {
         setMapsLinkError(error)
       }
     } finally {
       setMapsLinkLoading(false)
     }
-  }, [applyMapsLinkCoords])
-
-  const handleLocationChange = useCallback((lat, lng) => {
-    setPickedLat(lat)
-    setPickedLng(lng)
-    if (mapEditable) {
-      setUserHasEditedMap(true)
-    }
-  }, [mapEditable])
-
-  const autoFillNearestDistrictWard = useCallback(async (originLat, originLng) => {
-    if (telesaleNoStep3) return
-    if (nearestLocationPrefilledRef.current || nearestLocationPrefillRunningRef.current) return
-    if (district.trim() || ward.trim()) return
-    if (originLat == null || originLng == null) return
-
-    nearestLocationPrefillRunningRef.current = true
-    try {
-      const stores = await getOrRefreshStores()
-      const nearestStore = findNearestDistrictWard(stores, originLat, originLng)
-      if (!nearestStore) return
-      if (districtRef.current.trim() || wardRef.current.trim()) return
-      const nextDistrict = nearestStore.district
-      const nextWard = nearestStore.ward
-
-      if (nearestLocationPrefilledRef.current || district.trim() || ward.trim()) {
-        return
-      }
-
-      setDistrict(nextDistrict)
-      setWard(nextWard)
-      setFieldErrors((prev) => ({
-        ...prev,
-        district: '',
-        ward: '',
-      }))
-      nearestLocationPrefilledRef.current = true
-      showMessage('success', 'Đã tự chọn quận/huyện và xã/phường gần nhất')
-    } catch (err) {
-      console.error('Auto fill nearest district/ward error:', err)
-    } finally {
-      nearestLocationPrefillRunningRef.current = false
-    }
-  }, [district, ward, telesaleNoStep3, showMessage])
+  }, [applyMapsLinkCoords, autoFillDistrictWardFromCoordinates])
 
   const refreshCompassHeading = useCallback(async ({ requestPermission = false } = {}) => {
     if (compassOnceRef.current) return
@@ -218,10 +232,11 @@ export function useStoreCreateController() {
     try {
       compassOnceRef.current = false
       void refreshCompassHeading({ requestPermission: true })
+      clearPositionCache()
       setResolvingAddr(true)
       const { coords, error } = await getBestPosition({
         maxWaitTime: 2000,
-        desiredAccuracy: 15,
+        desiredAccuracy: 30,
         skipCache: true,
       })
       if (!coords) {
@@ -235,6 +250,10 @@ export function useStoreCreateController() {
       setPickedLat(coords.latitude)
       setPickedLng(coords.longitude)
       setUserHasEditedMap(false)
+      setStep2Key((value) => value + 1)
+      setAreaAutoFillStatus('idle')
+      setAreaAutoFillMessage('')
+      void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
       showMessage('success', 'Đã cập nhật vị trí GPS mới')
     } catch (err) {
       console.error('Get location error:', err)
@@ -243,7 +262,7 @@ export function useStoreCreateController() {
     } finally {
       setResolvingAddr(false)
     }
-  }, [refreshCompassHeading, showMessage])
+  }, [autoFillDistrictWardFromCoordinates, refreshCompassHeading, showMessage])
 
   useEffect(() => {
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
@@ -279,7 +298,7 @@ export function useStoreCreateController() {
     const onRouteChangeStart = (nextUrl) => {
       if (!hasUnsavedChanges) return
       if (nextUrl === router.asPath) return
-      const ok = window.confirm('Bạn có dữ liệu chưa lưu. Bạn có chắc muốn rời trang?')
+      const ok = window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')
       if (ok) return
       router.events.emit('routeChangeError')
       const err = new Error('Route change aborted by user')
@@ -323,8 +342,10 @@ export function useStoreCreateController() {
     setMapsLink('')
     setMapsLinkError('')
     setFieldErrors({})
-    nearestLocationPrefilledRef.current = false
-    nearestLocationPrefillRunningRef.current = false
+    setAreaAutoFillStatus('idle')
+    setAreaAutoFillMessage('')
+    areaPrefilledRef.current = false
+    areaPrefillRunningRef.current = false
 
     if (router.query?.name) {
       const { name: _discard, ...rest } = router.query
@@ -344,8 +365,8 @@ export function useStoreCreateController() {
     try {
       setResolvingAddr(true)
       const { coords, error } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 15,
+        maxWaitTime: 1500,
+        desiredAccuracy: 30,
       })
       if (!coords) {
         setGeoBlocked(true)
@@ -448,7 +469,7 @@ export function useStoreCreateController() {
       }
     }
 
-    void autoFillNearestDistrictWard(checkLat, checkLng)
+    void autoFillDistrictWardFromCoordinates(checkLat, checkLng)
 
     const seq = ++duplicateCheckSeqRef.current
     setDuplicateCheckLoading(true)
@@ -476,7 +497,7 @@ export function useStoreCreateController() {
     } finally {
       if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
     }
-  }, [name, duplicateCheckLat, duplicateCheckLng, autoFillNearestDistrictWard])
+  }, [name, duplicateCheckLat, duplicateCheckLng, autoFillDistrictWardFromCoordinates])
 
   const handleStep1Next = useCallback(() => {
     if (!duplicateCheckDone) {
@@ -735,7 +756,7 @@ export function useStoreCreateController() {
 
     if (latitude == null || longitude == null) {
       try {
-        const { coords, error } = await getBestPosition({ maxWaitTime: 3000, desiredAccuracy: 15 })
+        const { coords, error } = await getBestPosition({ maxWaitTime: 2000, desiredAccuracy: 30 })
         if (!coords) {
           setGeoBlocked(true)
           showMessage('error', getGeoErrorMessage(error))
@@ -829,6 +850,8 @@ export function useStoreCreateController() {
     setMapsLink,
     mapsLinkLoading,
     mapsLinkError,
+    areaAutoFillStatus,
+    areaAutoFillMessage,
     confirmCreate,
     dismissConfirmCreate,
     handleMapsLink,

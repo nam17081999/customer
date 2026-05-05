@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b)",
+      "Bash(xargs grep -l \"LocationPicker\" --include=\"*.js\" --include=\"*.jsx\")"
+    ]
+  }
+}

@@ -36,11 +36,7 @@ html {
 @media (min-width: 640px) {
   html {
     font-size: 21px;
-    /* Custom utility for dark map appearance with standard tiles */
-  .dark-map-filter {
-    filter: invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%);
   }
-}
 }
 
 body {

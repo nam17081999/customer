@@ -329,6 +329,7 @@ export default function LocationPicker({
       container: mapContainerRef.current,
       style: {
         version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
         sources: {
           osm: {
             type: 'raster',
@@ -390,7 +391,7 @@ export default function LocationPicker({
     }
 
     if (hasInitialCoordinates) {
-      const marker = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+      const marker = new maplibregl.Marker({ scale: 1.1 })
         .setLngLat(centerRef.current)
         .addTo(map)
       markerRef.current = marker
@@ -430,7 +431,7 @@ export default function LocationPicker({
       centerRef.current = [lng, lat]
       map.easeTo({ center: [lng, lat], duration: 250 })
       if (!markerRef.current) {
-        markerRef.current = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+        markerRef.current = new maplibregl.Marker({ scale: 1.1 })
           .setLngLat([lng, lat])
           .addTo(map)
       } else {
@@ -456,7 +457,7 @@ export default function LocationPicker({
       map.setCenter([initialLng, initialLat])
       centerRef.current = [initialLng, initialLat]
       if (!markerRef.current) {
-        markerRef.current = new maplibregl.Marker({ color: '#ef4444', scale: 1.1 })
+        markerRef.current = new maplibregl.Marker({ scale: 1.1 })
           .setLngLat([initialLng, initialLat])
           .addTo(map)
       } else {
@@ -516,7 +517,6 @@ export default function LocationPicker({
     <div className={className} style={{ position: 'relative' }}>
       <div
         ref={mapContainerRef}
-        className={dark ? "dark-map-filter" : ""}
         style={{ height, width: '100%', touchAction: editable ? 'none' : 'manipulation', cursor: editable ? 'grab' : 'default' }}
       />
       {!editable && (
