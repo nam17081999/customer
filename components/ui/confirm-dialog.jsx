@@ -16,7 +16,7 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1.5rem)] z-[310] max-w-sm rounded-xl border border-gray-800 bg-gray-950 p-0 sm:w-full">
+      <DialogContent className="w-[calc(100%-1.5rem)] z-[1210] max-w-sm rounded-xl border border-gray-800 bg-gray-950 p-0 sm:w-full">
         <div className="space-y-2 px-4 pt-4">
           <DialogTitle className="text-base font-semibold text-gray-100">{title}</DialogTitle>
           {description ? (
