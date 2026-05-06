@@ -18,8 +18,8 @@ import {
   hasEditableSupplementFields,
   validateStoreEditPhones,
 } from '@/helper/storeEditFlow'
-import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
+import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
 
 function getCoordinateValue(value) {
   return Number.isFinite(value) ? value : null
@@ -198,6 +198,44 @@ export function useStoreEditController() {
     }
   }, [refreshCompassHeading, showMessage])
 
+  const handleStartLocationSetup = useCallback(async () => {
+    setStep2Key((value) => {
+      const patch = buildLocationStepResetPatch(value)
+      setGeoBlocked(patch.geoBlocked)
+      setMapEditable(patch.mapEditable)
+      setUserHasEditedMap(patch.userHasEditedMap)
+      setPickedLat(patch.pickedLat)
+      setPickedLng(patch.pickedLng)
+      setInitialGPSLat(patch.initialGPSLat)
+      setInitialGPSLng(patch.initialGPSLng)
+      setHeading(patch.heading)
+      return patch.nextStep2Key
+    })
+
+    try {
+      setResolvingAddr(true)
+      const { coords, error } = await getBestPosition({
+        maxWaitTime: 1500,
+        desiredAccuracy: 30,
+      })
+      if (!coords) {
+        setGeoBlocked(true)
+        showMessage('error', getGeoErrorMessage(error))
+        return
+      }
+      setGeoBlocked(false)
+      setInitialGPSLat(coords.latitude)
+      setInitialGPSLng(coords.longitude)
+      setPickedLat(coords.latitude)
+      setPickedLng(coords.longitude)
+    } catch (err) {
+      console.error('Get location error:', err)
+      showMessage('error', getGeoErrorMessage(err))
+    } finally {
+      setResolvingAddr(false)
+    }
+  }, [showMessage])
+
   const resolvedWardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
 
   const originalHasCoordinates = hasStoreCoordinates(store)
@@ -206,43 +244,6 @@ export function useStoreEditController() {
   const supplementSteps = useMemo(() => buildSupplementSteps(canSupplementLocation), [canSupplementLocation])
   const editSteps = useMemo(() => buildEditSteps(), [])
   const hasEditableFields = useMemo(() => hasEditableSupplementFields(supplementLocks), [supplementLocks])
-
-  const bootstrapSupplementLocationStep = useCallback(async () => {
-    setGeoBlocked(false)
-    setMapEditable(false)
-    setUserHasEditedMap(false)
-    setPickedLat(null)
-    setPickedLng(null)
-    setInitialGPSLat(null)
-    setInitialGPSLng(null)
-    setHeading(null)
-    setStep2Key((value) => value + 1)
-    await handleGetLocation()
-  }, [handleGetLocation])
-
-  useStepEntryEffect(
-    isSupplementMode && canSupplementLocation && currentStep === 3,
-    bootstrapSupplementLocationStep
-  )
-
-  const bootstrapEditLocationStep = useCallback(async () => {
-    if (originalHasCoordinates) return
-    setGeoBlocked(false)
-    setMapEditable(false)
-    setUserHasEditedMap(false)
-    setPickedLat(null)
-    setPickedLng(null)
-    setInitialGPSLat(null)
-    setInitialGPSLng(null)
-    setHeading(null)
-    setStep2Key((value) => value + 1)
-    await handleGetLocation()
-  }, [handleGetLocation, originalHasCoordinates])
-
-  useStepEntryEffect(
-    !isSupplementMode && !originalHasCoordinates && currentStep === 3,
-    bootstrapEditLocationStep
-  )
 
   const applyMapsLinkCoords = useCallback((lat, lng) => {
     setInitialGPSLat(lat)
@@ -682,6 +683,7 @@ export function useStoreEditController() {
     editSteps,
     hasEditableFields,
     handleLocationChange,
+    handleStartLocationSetup,
     handleGetLocation,
     handleMapsLink,
     handleSaveSupplement,
@@ -691,8 +693,6 @@ export function useStoreEditController() {
     handleSaveEdit,
   }
 }
-
-
 
 
 

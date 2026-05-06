@@ -855,13 +855,13 @@ export default function MapPage() {
                       inputRef.current?.blur()
                     }
                   }}
-                  className="h-11 rounded-lg border-slate-700 bg-slate-950/90 px-3 text-base text-slate-100 placeholder:text-slate-400"
+                  className="h-11 rounded-lg border-slate-700 bg-slate-950 px-3 text-base text-slate-100 placeholder:text-slate-400"
                 />
             </div>
 
             {/* Suggestions dropdown */}
             {showSuggestions && suggestions.length > 0 && (
-              <div className="relative mt-1 rounded-xl bg-slate-900/95 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
+              <div className="relative mt-1 rounded-xl bg-slate-900 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
                 <div
                   ref={suggestionsRef}
                   className="max-h-64 overflow-y-auto"
@@ -885,7 +885,7 @@ export default function MapPage() {
                         type="button"
                         className={`shrink-0 rounded-md border px-2 py-1 text-sm transition ${routeStopIds.has(String(store.id))
                           ? 'border-red-500/40 bg-red-500/15 text-red-200 hover:border-red-400 hover:text-red-100'
-                          : 'border-slate-600/70 bg-slate-950/80 text-slate-200 hover:border-sky-400 hover:text-sky-200'
+                          : 'border-slate-600/70 bg-slate-950 text-slate-200 hover:border-sky-400 hover:text-sky-200'
                           }`}
                         onPointerDown={(e) => e.preventDefault()}
                         onClick={() => {
@@ -902,7 +902,7 @@ export default function MapPage() {
                   ))}
                 </div>
                 {canScrollDown && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-slate-900/90 to-transparent pb-1 pt-4">
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-slate-900 to-transparent pb-1 pt-4">
                     <svg width="14" height="8" viewBox="0 0 14 8" className="text-slate-400">
                       <path d="M1 1l6 6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -1417,4 +1417,3 @@ export default function MapPage() {
     </div>
   )
 }
-
