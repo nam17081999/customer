@@ -1,9 +1,11 @@
 import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import StoreStepFormLayout from '@/components/store/store-step-form-layout'
+import { hasLocationCoordinates } from '@/helper/storeLocationStep'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import {
   DISTRICT_SUGGESTIONS,
@@ -83,6 +85,7 @@ export default function StoreSupplementForm({
   geoBlocked,
   resolvingAddr,
   handleGetLocation,
+  handleStartLocationSetup,
   onReload,
   mapsLink,
   mapsLinkLoading,
@@ -109,6 +112,14 @@ export default function StoreSupplementForm({
     && (!showActiveToggle || setActive == null)
 
   const finalSubmitLabel = submitLabel || (isSupplementMode ? 'Hoàn thành bổ sung' : 'Lưu thay đổi')
+  const hasCoordinates = hasLocationCoordinates(pickedLat, pickedLng)
+  const [showLocationEditor, setShowLocationEditor] = useState(hasCoordinates)
+
+  useEffect(() => {
+    if (hasCoordinates) {
+      setShowLocationEditor(true)
+    }
+  }, [hasCoordinates])
 
   async function handlePrimaryAction() {
     if (currentStep < stepCount) {
@@ -423,6 +434,27 @@ export default function StoreSupplementForm({
 
       {currentStep === 3 ? (
         <>
+          {!showLocationEditor ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-slate-300">
+                Cửa hàng hiện chưa có vị trí. Nếu bạn muốn bổ sung hoặc chỉnh sửa vị trí, hãy bấm <strong>Thêm vị trí</strong>.
+              </div>
+
+              <Button
+                type="button"
+                className="w-full"
+                onClick={async () => {
+                  setShowLocationEditor(true)
+                  await handleStartLocationSetup?.()
+                }}
+              >
+                Thêm vị trí
+              </Button>
+            </div>
+          ) : null}
+
+          {showLocationEditor ? (
+            <>
           {resolvingAddr ? (
             <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
               <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
@@ -500,6 +532,8 @@ export default function StoreSupplementForm({
               {renderPrimaryLabel()}
             </Button>
           </div>
+            </>
+          ) : null}
         </>
       ) : null}
     </StoreStepFormLayout>

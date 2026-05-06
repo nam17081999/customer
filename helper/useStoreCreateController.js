@@ -20,6 +20,7 @@ import {
 import { resolveDistrictWardFromCoordinates } from '@/helper/storeAreaResolver'
 import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
+import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
 
 export function useStoreCreateController() {
   const router = useRouter()
@@ -387,15 +388,18 @@ export function useStoreCreateController() {
   }, [showMessage])
 
   const bootstrapCreateLocationStep = useCallback(async () => {
-    setGeoBlocked(false)
-    setMapEditable(false)
-    setUserHasEditedMap(false)
-    setPickedLat(null)
-    setPickedLng(null)
-    setInitialGPSLat(null)
-    setInitialGPSLng(null)
-    setHeading(null)
-    setStep2Key((value) => value + 1)
+    setStep2Key((value) => {
+      const patch = buildLocationStepResetPatch(value)
+      setGeoBlocked(patch.geoBlocked)
+      setMapEditable(patch.mapEditable)
+      setUserHasEditedMap(patch.userHasEditedMap)
+      setPickedLat(patch.pickedLat)
+      setPickedLng(patch.pickedLng)
+      setInitialGPSLat(patch.initialGPSLat)
+      setInitialGPSLng(patch.initialGPSLng)
+      setHeading(patch.heading)
+      return patch.nextStep2Key
+    })
     await handleFillAddress()
   }, [handleFillAddress])
 
@@ -865,6 +869,5 @@ export function useStoreCreateController() {
     resetCreateForm,
   }
 }
-
 
 

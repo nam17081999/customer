@@ -57,6 +57,7 @@ export default function EditStore() {
     supplementSteps,
     editSteps,
     handleLocationChange,
+    handleStartLocationSetup,
     handleGetLocation,
     handleMapsLink,
     handleSaveSupplement,
@@ -107,12 +108,6 @@ export default function EditStore() {
         <p className="text-xs font-medium uppercase tracking-[0.12em] text-gray-500">Bổ sung cửa hàng</p>
         <OverflowMarquee text={store.name} className="mt-1" textClassName="text-sm text-gray-200" />
       </div>
-
-      {!isAuthenticated ? (
-        <div className="rounded-xl border border-amber-900/70 bg-amber-950/30 px-3 py-2.5 text-sm text-amber-200">
-          Bạn chưa đăng nhập. Dữ liệu bổ sung sẽ được gửi vào danh sách duyệt thay vì cập nhật trực tiếp.
-        </div>
-      ) : null}
     </div>
   )
 
@@ -178,6 +173,7 @@ export default function EditStore() {
           geoBlocked={geoBlocked}
           resolvingAddr={resolvingAddr}
           handleGetLocation={handleGetLocation}
+          handleStartLocationSetup={handleStartLocationSetup}
           onReload={() => window.location.reload()}
           mapsLink={mapsLink}
           mapsLinkLoading={mapsLinkLoading}
@@ -239,6 +235,7 @@ export default function EditStore() {
         geoBlocked={geoBlocked}
         resolvingAddr={resolvingAddr}
         handleGetLocation={handleGetLocation}
+        handleStartLocationSetup={handleStartLocationSetup}
         onReload={() => window.location.reload()}
         mapsLink={mapsLink}
         mapsLinkLoading={mapsLinkLoading}

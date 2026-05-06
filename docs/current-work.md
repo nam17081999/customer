@@ -1,47 +1,49 @@
 # Task Request
 
 ## Goal
-- Sửa sạch lỗi tiếng Việt/mã hóa trong các file changed hiện tại, đồng thời giữ nguyên logic boundary lookup mới.
+- Khi bấm `Thêm vị trí` ở màn bổ sung và màn sửa, logic phải hoạt động tương tự khi tới bước 3 của màn tạo cửa hàng; đồng thời kiểm tra đầy đủ bằng toàn bộ test suite và lint của repo.
 
 ## Task Type
-- Bug Fix
+- Feature
 
 ## Why
-- User phát hiện các file changed còn lỗi tiếng Việt (mojibake / ký tự vỡ dấu).
-- Các file đã đi qua nhiều phase thử nghiệm nên có một số chuỗi bị hỏng encoding, đặc biệt ở create controller.
+- User muốn trải nghiệm `Thêm vị trí` ở sửa/bổ sung nhất quán với create step 3.
+- User cũng muốn xác nhận toàn diện để giảm rủi ro regression.
 
 ## In Scope
 - `helper/useStoreCreateController.js`
-- các file changed còn lại liên quan đến phase boundary lookup
+- `helper/useStoreEditController.js`
+- `components/store/store-supplement-form.jsx`
+- `pages/store/edit/[id].js`
+- `helper/storeLocationStep.js`
+- `__tests__/helper/storeLocationStep.test.js`
 - `docs/current-work.md`
 
 ## Out of Scope
-- Không đổi business logic boundary lookup vừa hoàn thành.
-- Không refactor thêm ngoài phạm vi fix text/mã hóa.
+- Không đổi logic report.
+- Không đổi flow create ngoài việc dùng làm chuẩn tham chiếu.
+- Không chạy e2e nếu không có yêu cầu riêng.
 
 ## Must Preserve
-- Logic `point-in-polygon` từ boundary local vẫn hoạt động.
-- Test hiện có vẫn pass.
-- Không còn chuỗi tiếng Việt bị lỗi trong các file changed.
+- Create step 3 tiếp tục hoạt động như hiện tại.
+- Edit/supplement chỉ khởi tạo logic vị trí khi user bấm `Thêm vị trí` nếu trước đó chưa có tọa độ.
+- Các logic GPS, maps link, khóa/mở khóa, submit, validation và cache vẫn giữ nguyên hành vi hiện có.
 
 ## Required Verification
-- `node scripts/check-mojibake.js --files ...`
-- `.\node_modules\.bin\vitest.cmd run __tests__/helper/storeAreaResolver.test.js __tests__/pages/api/reverse-geocode-area.test.js`
-- `npm.cmd run lint`
+- `npm test`
+- `npm run lint`
+- Rà checklist liên quan: `Edit / Supplement / Report`, `Create Flow`, `Map Flow`, `Tiếng Việt / UI Safety`.
 
 ## Done
-- Sửa toàn bộ chuỗi tiếng Việt bị mojibake trong `helper/useStoreCreateController.js`.
-- Rà lại toàn bộ các file changed bằng `scripts/check-mojibake.js`.
-- Dọn 2 file data tạm không còn dùng từ phase cũ:
-  - `data/gadm41_VNM_3.json`
-  - `data/oldAdminAreaSeeds.js`
-- Giữ nguyên logic boundary lookup mới.
+- Trích phần reset state vị trí dùng chung thành helper riêng.
+- Đồng bộ flow `Thêm vị trí` ở sửa/bổ sung với bootstrap của create step 3.
+- Thêm test cho helper reset state/tọa độ.
+- Chạy toàn bộ unit test suite và lint toàn repo.
 
 ## Verification
-- `node scripts/check-mojibake.js --files ...` passed, không còn phát hiện lỗi mã hóa trong các file changed.
-- `.\node_modules\.bin\vitest.cmd run __tests__/helper/storeAreaResolver.test.js __tests__/pages/api/reverse-geocode-area.test.js` passed (`19/19`).
-- `npm.cmd run lint` passed.
+- `npm test` passed: `24` test files, `286` tests.
+- `npm run lint` passed.
+- Đối chiếu checklist liên quan: `Edit / Supplement / Report`, `Create Flow`, `Map Flow`, `Tiếng Việt / UI Safety`.
 
 ## Risks / Next
-- Không còn lỗi mã hóa trong các file changed đã rà.
-- Nếu muốn sạch hẳn phase cũ, bước tiếp theo có thể dọn tiếp các file thử nghiệm không còn dùng như route reverse geocode cũ.
+- Chưa chạy `playwright` e2e, nên phần xác nhận trực quan trên UI mobile/desktop vẫn là bước tiếp theo nếu muốn kiểm tra mức cao hơn.

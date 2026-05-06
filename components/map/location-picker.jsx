@@ -4,12 +4,9 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { parseCoordinate } from '@/helper/coordinate'
 import { haversineKm } from '@/helper/distance'
-import { createUserHeadingFanImage } from '@/helper/mapMarkerImages'
 
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const NEARBY_STORES_LIMIT = 30
-const HEADING_SOURCE_ID = 'picker-user-heading'
-const HEADING_LAYER_ID = 'picker-user-heading-layer'
 
 function getMarkerLabelText(name = '') {
   const cleaned = String(name || '').trim()
@@ -118,6 +115,26 @@ function createStoreMarker(text, fontSize = 12) {
   return { width: totalW, height: totalH, data: ctx.getImageData(0, 0, totalW, totalH).data, dpr }
 }
 
+function createSelectedLocationMarkerElement() {
+  const wrapper = document.createElement('div')
+  wrapper.style.width = '28px'
+  wrapper.style.height = '28px'
+  wrapper.style.display = 'flex'
+  wrapper.style.alignItems = 'center'
+  wrapper.style.justifyContent = 'center'
+
+  wrapper.innerHTML = `
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="14" cy="14" r="10.5" fill="#EF4444" fill-opacity="0.2" />
+      <path d="M14 2.75C9.44365 2.75 5.75 6.44365 5.75 11C5.75 17.1875 14 25.25 14 25.25C14 25.25 22.25 17.1875 22.25 11C22.25 6.44365 18.5563 2.75 14 2.75Z" fill="#DC2626"/>
+      <path d="M14 6.5C11.5147 6.5 9.5 8.51472 9.5 11C9.5 13.4853 11.5147 15.5 14 15.5C16.4853 15.5 18.5 13.4853 18.5 11C18.5 8.51472 16.4853 6.5 14 6.5Z" fill="#F8FAFC"/>
+      <path d="M14 8.55C12.6472 8.55 11.55 9.6472 11.55 11C11.55 12.3528 12.6472 13.45 14 13.45C15.3528 13.45 16.45 12.3528 16.45 11C16.45 9.6472 15.3528 8.55 14 8.55Z" fill="#DC2626"/>
+    </svg>
+  `
+
+  return wrapper
+}
+
 function toLatLng(store) {
   let lat = parseCoordinate(store?.latitude)
   let lng = parseCoordinate(store?.longitude)
@@ -159,47 +176,9 @@ export default function LocationPicker({
   const allStoresRef = useRef([])
   const nearbyImageIdsRef = useRef(new Set())
 
-  const updateHeadingFan = useCallback((lat, lng, nextHeading = heading) => {
-    const map = mapRef.current
-    if (!map) return
-    const source = map.getSource(HEADING_SOURCE_ID)
-    if (!source) return
-
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      source.setData(EMPTY_FEATURE_COLLECTION)
-      return
-    }
-
-    const safeHeading = Number.isFinite(nextHeading) ? Number(nextHeading) : 0
-
-    source.setData({
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          geometry: {
-            type: 'Point',
-            coordinates: [lng, lat],
-          },
-          properties: {
-            heading: safeHeading,
-            hasHeading: Number.isFinite(nextHeading) ? 'yes' : 'no',
-          },
-        },
-      ],
-    })
-  }, [heading])
-
   const ensureNearbyStoresLayers = useCallback((map) => {
     if (!map.getSource('nearby-stores')) {
       map.addSource('nearby-stores', {
-        type: 'geojson',
-        data: EMPTY_FEATURE_COLLECTION,
-      })
-    }
-
-    if (!map.getSource(HEADING_SOURCE_ID)) {
-      map.addSource(HEADING_SOURCE_ID, {
         type: 'geojson',
         data: EMPTY_FEATURE_COLLECTION,
       })
@@ -219,35 +198,6 @@ export default function LocationPicker({
           'symbol-sort-key': ['*', -1, ['get', 'distanceRank']],
         },
       })
-    }
-
-    try {
-      if (!map.hasImage('user-heading-fan')) {
-        const img = createUserHeadingFanImage()
-        map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
-      }
-
-      if (!map.getLayer(HEADING_LAYER_ID)) {
-        map.addLayer({
-          id: HEADING_LAYER_ID,
-          type: 'symbol',
-          source: HEADING_SOURCE_ID,
-          layout: {
-            'icon-image': 'user-heading-fan',
-            'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
-            'icon-rotate': ['get', 'heading'],
-            'icon-rotation-alignment': 'map',
-            'icon-anchor': 'center',
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
-          },
-          paint: {
-            'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
-          },
-        })
-      }
-    } catch (error) {
-      console.error('LocationPicker heading asset setup failed:', error)
     }
   }, [])
 
@@ -391,7 +341,7 @@ export default function LocationPicker({
     }
 
     if (hasInitialCoordinates) {
-      const marker = new maplibregl.Marker({ scale: 1.1 })
+      const marker = new maplibregl.Marker({ element: createSelectedLocationMarkerElement(), anchor: 'bottom' })
         .setLngLat(centerRef.current)
         .addTo(map)
       markerRef.current = marker
@@ -407,7 +357,6 @@ export default function LocationPicker({
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat])
       }
-      updateHeadingFan(lat, lng)
     }
 
     map.on('move', updateCenter)
@@ -431,7 +380,7 @@ export default function LocationPicker({
       centerRef.current = [lng, lat]
       map.easeTo({ center: [lng, lat], duration: 250 })
       if (!markerRef.current) {
-        markerRef.current = new maplibregl.Marker({ scale: 1.1 })
+        markerRef.current = new maplibregl.Marker({ element: createSelectedLocationMarkerElement(), anchor: 'bottom' })
           .setLngLat([lng, lat])
           .addTo(map)
       } else {
@@ -439,7 +388,6 @@ export default function LocationPicker({
       }
       if (onChangeRef.current) onChangeRef.current(lat, lng)
       updateNearbyStores(lat, lng)
-      updateHeadingFan(lat, lng)
     })
 
     loadNearbyStores()
@@ -448,7 +396,7 @@ export default function LocationPicker({
       map.remove()
       mapRef.current = null
     }
-  }, [ensureNearbyStoresLayers, hasInitialCoordinates, loadNearbyStores, updateHeadingFan, updateNearbyStores])
+  }, [ensureNearbyStoresLayers, hasInitialCoordinates, loadNearbyStores, updateNearbyStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -457,14 +405,13 @@ export default function LocationPicker({
       map.setCenter([initialLng, initialLat])
       centerRef.current = [initialLng, initialLat]
       if (!markerRef.current) {
-        markerRef.current = new maplibregl.Marker({ scale: 1.1 })
+        markerRef.current = new maplibregl.Marker({ element: createSelectedLocationMarkerElement(), anchor: 'bottom' })
           .setLngLat([initialLng, initialLat])
           .addTo(map)
       } else {
         markerRef.current.setLngLat([initialLng, initialLat])
       }
       updateNearbyStores(initialLat, initialLng)
-      updateHeadingFan(initialLat, initialLng)
       return
     }
 
@@ -472,8 +419,7 @@ export default function LocationPicker({
       markerRef.current.remove()
       markerRef.current = null
     }
-    updateHeadingFan(null, null)
-  }, [initialLat, initialLng, updateHeadingFan, updateNearbyStores])
+  }, [initialLat, initialLng, updateNearbyStores])
 
   useEffect(() => {
     const map = mapRef.current
@@ -509,9 +455,7 @@ export default function LocationPicker({
       lastBearingRef.current = heading
       map.setBearing(heading)
     }
-    const [lng, lat] = centerRef.current
-    updateHeadingFan(lat, lng, heading)
-  }, [heading, updateHeadingFan])
+  }, [heading])
 
   return (
     <div className={className} style={{ position: 'relative' }}>
