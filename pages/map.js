@@ -8,13 +8,20 @@ import { getOrRefreshStores } from '@/lib/storeCache'
 import { IGNORED_NAME_TERMS } from '@/helper/duplicateCheck'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { parseCoordinate } from '@/helper/coordinate'
-import { formatAddressParts } from '@/lib/utils'
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
   formatRouteDistance,
   formatRouteDuration,
   formatShortAddress,
 } from '@/helper/mapRoute'
+import {
+  buildMapMarkerImagePlan,
+  buildMapStoreFeatures,
+  buildMarkerSourceCollections,
+  buildStoreLookupMap,
+  buildVisibleMapStores,
+  createMapFeatureBaseCache,
+} from '@/helper/mapDerivedData'
 import { useMapSearchPanelController } from '@/helper/useMapSearchPanelController'
 import { useMapRouteDragController } from '@/helper/useMapRouteDragController'
 import { useMapNavigationController } from '@/helper/useMapNavigationController'
@@ -22,8 +29,6 @@ import { useMapRouteController } from '@/helper/useMapRouteController'
 import {
   createUserHeadingFanImage,
   ensureStoreMarkerImage,
-  getBaseMarkerImageId,
-  getHighlightedMarkerImageId,
   removeMarkerImages,
 } from '@/helper/mapMarkerImages'
 
@@ -31,34 +36,6 @@ const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 
 const MAP_INTERACTION_SUPPRESS_MS = 500
-
-/**
- * Get the first meaningful word of a store name,
- * skipping leading words that match IGNORED_NAME_TERMS.
- * Example: "Cua Hang Anh Dung" -> "Anh"
- */
-function getFirstWord(name = '') {
-  let remaining = String(name).trim().toLowerCase()
-  // Sort ignored terms by length (longest first) so multi-word terms
-  // like "cua hang" are stripped before single-word "cua".
-  const sorted = [...IGNORED_NAME_TERMS].sort((a, b) => b.length - a.length)
-  let stripped = true
-  while (stripped) {
-    stripped = false
-    for (const term of sorted) {
-      if (remaining.startsWith(term)) {
-        remaining = remaining.slice(term.length).trimStart()
-        stripped = true
-        break
-      }
-    }
-  }
-  // Restore original casing by matching position in original string
-  const offset = String(name).trim().length - remaining.length
-  const meaningful = String(name).trim().slice(offset).trimStart()
-  const first = meaningful.split(/\s+/)[0] || String(name).trim().split(/\s+/)[0] || '?'
-  return first.slice(0, 12)
-}
 
 function toLatLng(store) {
   let lat = parseCoordinate(store.latitude)
@@ -86,6 +63,7 @@ export default function MapPage() {
   const popupRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
   const markerImageSetupFailedRef = useRef(false)
+  const featureBaseCacheRef = useRef(createMapFeatureBaseCache())
 
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
@@ -242,37 +220,19 @@ export default function MapPage() {
     currentLocation: userLocation,
   })
 
-  const visibleMapStores = useMemo(() => {
-    if (!hideUnselectedStores || routeStopIds.size === 0) return filteredStores
-    return filteredStores.filter((store) => routeStopIds.has(String(store.id)))
-  }, [filteredStores, hideUnselectedStores, routeStopIds])
+  const visibleMapStores = useMemo(() => buildVisibleMapStores({
+    filteredStores,
+    hideUnselectedStores,
+    routeStopIds,
+  }), [filteredStores, hideUnselectedStores, routeStopIds])
 
-  const storeFeatures = useMemo(() => {
-    const highlightedId = highlightedStoreId ? String(highlightedStoreId) : ''
-    const features = visibleMapStores.map((store) => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [store.coords.lng, store.coords.lat] },
-      properties: {
-        storeId: String(store.id),
-        name: store.name || 'Cửa hàng',
-        shortName: getFirstWord(store.name),
-        address: formatAddressParts(store),
-        routeOrder: routeStopOrderById.get(String(store.id)) || '',
-        passed: completedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
-        highlighted: String(store.id) === highlightedId ? 'yes' : 'no',
-      },
-    }))
-
-    if (!highlightedId) return features
-
-    const highlightedIndex = features.findIndex((feature) => feature.properties.storeId === highlightedId)
-    if (highlightedIndex < 0) return features
-
-    const nextFeatures = features.slice()
-    const [highlightedFeature] = nextFeatures.splice(highlightedIndex, 1)
-    nextFeatures.push(highlightedFeature)
-    return nextFeatures
-  }, [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
+  const storeFeatures = useMemo(() => buildMapStoreFeatures({
+    visibleMapStores,
+    highlightedStoreId,
+    completedRouteStopIdSet,
+    routeStopOrderById,
+    featureBaseCache: featureBaseCacheRef.current,
+  }), [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
 
   const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
 
@@ -334,6 +294,11 @@ export default function MapPage() {
           data: EMPTY_FEATURE_COLLECTION,
         })
 
+        map.addSource('stores-highlighted', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
         map.addSource('user-location', {
           type: 'geojson',
           data: EMPTY_FEATURE_COLLECTION,
@@ -344,15 +309,13 @@ export default function MapPage() {
           data: EMPTY_FEATURE_COLLECTION,
         })
 
-        // Combined marker: house icon + name label in one image per store
+        // Base markers
         map.addLayer({
-          id: 'store-marker',
+          id: 'store-marker-base',
           type: 'symbol',
           source: 'stores',
           layout: {
             'icon-image': ['case',
-              ['all', ['==', ['get', 'highlighted'], 'yes'], ['!=', ['get', 'routeOrder'], '']], ['concat', 'smrh-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
-              ['==', ['get', 'highlighted'], 'yes'], ['concat', 'smh-', ['get', 'storeId']],
               ['!=', ['get', 'routeOrder'], ''], ['concat', 'smr-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
               ['concat', 'sm-', ['get', 'storeId']]
             ],
@@ -360,7 +323,26 @@ export default function MapPage() {
             'icon-anchor': 'center',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
-            'symbol-sort-key': ['case', ['==', ['get', 'highlighted'], 'yes'], 999, 0],
+            'symbol-z-order': 'auto',
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
+          },
+        })
+
+        map.addLayer({
+          id: 'store-marker-highlighted',
+          type: 'symbol',
+          source: 'stores-highlighted',
+          layout: {
+            'icon-image': ['case',
+              ['!=', ['get', 'routeOrder'], ''], ['concat', 'smrh-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
+              ['concat', 'smh-', ['get', 'storeId']]
+            ],
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
             'symbol-z-order': 'auto',
           },
           paint: {
@@ -381,7 +363,7 @@ export default function MapPage() {
             'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 9, 16, 12],
             'line-opacity': 0.95,
           },
-        }, 'store-marker')
+        }, 'store-marker-base')
 
         map.addLayer({
           id: 'route-line',
@@ -396,7 +378,7 @@ export default function MapPage() {
             'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 5.5, 16, 7],
             'line-opacity': 0.95,
           },
-        }, 'store-marker')
+        }, 'store-marker-base')
 
         map.addLayer({
           id: 'user-location-halo',
@@ -449,8 +431,9 @@ export default function MapPage() {
           console.error('User heading asset setup failed:', assetError)
         }
 
-        // Click on store marker -> open dialog
-        map.on('click', 'store-marker', (e) => {
+        const markerLayerIds = ['store-marker-base', 'store-marker-highlighted']
+
+        const handleMarkerInteraction = (e) => {
           if (Date.now() < suppressMapInteractionUntilRef.current) return
           const f = e.features?.[0]
           if (!f) return
@@ -462,6 +445,10 @@ export default function MapPage() {
             setHighlightedStoreId(String(storeId))
             setSelectedStore(store)
           }
+        }
+
+        markerLayerIds.forEach((layerId) => {
+          map.on('click', layerId, handleMarkerInteraction)
         })
 
         // Hover tooltip (desktop only) using Popup
@@ -474,7 +461,8 @@ export default function MapPage() {
         })
         popupRef.current = popup
 
-        map.on('mousemove', 'store-marker', (e) => {
+        markerLayerIds.forEach((layerId) => {
+          map.on('mousemove', layerId, (e) => {
           if (!e.features?.length) return
           map.getCanvas().style.cursor = 'pointer'
           const f = e.features[0]
@@ -486,11 +474,14 @@ export default function MapPage() {
               (addr ? `<div style="font-size:11px;color:#94a3b8;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr.replace(/</g, '&lt;')}</div>` : '')
             )
             .addTo(map)
+          })
         })
 
-        map.on('mouseleave', 'store-marker', () => {
+        markerLayerIds.forEach((layerId) => {
+          map.on('mouseleave', layerId, () => {
           map.getCanvas().style.cursor = ''
           popup.remove()
+          })
         })
       }
 
@@ -622,38 +613,20 @@ export default function MapPage() {
     const map = mapRef.current
     if (!map || !mapReady) return
 
-    // Build lookup map for click handler
-    const lookup = new Map()
-    visibleMapStores.forEach((store) => { lookup.set(String(store.id), store) })
-    storeMapRef.current = lookup
+    storeMapRef.current = buildStoreLookupMap(visibleMapStores)
 
     const source = map.getSource('stores')
-    if (!source) return
+    const highlightedSource = map.getSource('stores-highlighted')
+    if (!source || !highlightedSource) return
 
-    source.setData({ type: 'FeatureCollection', features: storeFeatures })
+    const { baseCollection, highlightedCollection } = buildMarkerSourceCollections(storeFeatures)
+    source.setData(baseCollection)
+    highlightedSource.setData(highlightedCollection)
 
-    const desiredImageIds = new Set()
-    const pendingImages = []
-    for (const feature of storeFeatures) {
-      const storeId = feature.properties.storeId
-      const routeOrder = feature.properties.routeOrder || ''
-      const name = feature.properties.name || 'Cửa hàng'
-      const highlighted = feature.properties.highlighted === 'yes'
-      const baseImageId = getBaseMarkerImageId(storeId, routeOrder)
-
-      desiredImageIds.add(baseImageId)
-      if (!map.hasImage(baseImageId)) {
-        pendingImages.push({ storeId, text: name, routeOrder, highlighted: false })
-      }
-
-      if (highlighted) {
-        const highlightedImageId = getHighlightedMarkerImageId(storeId, routeOrder)
-        desiredImageIds.add(highlightedImageId)
-        if (!map.hasImage(highlightedImageId)) {
-          pendingImages.push({ storeId, text: name, routeOrder, highlighted: true })
-        }
-      }
-    }
+    const { desiredImageIds, pendingImages } = buildMapMarkerImagePlan({
+      storeFeatures,
+      hasImage: (imageId) => map.hasImage(imageId),
+    })
 
     let frameId = 0
     let cancelled = false

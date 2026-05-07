@@ -1,5 +1,5 @@
 import { parseCoordinate } from '@/helper/coordinate'
-import { rankStoreSearchResults } from '@/helper/storeSearch'
+import { filterAndRankIndexedStores } from '@/helper/storeSearch'
 
 export const FILTER_FLAG_HAS_PHONE = 'has_phone'
 export const FILTER_FLAG_HAS_IMAGE = 'has_image'
@@ -88,6 +88,10 @@ export function hasActiveSearchCriteria({
   )
 }
 
+function parseCoordinateSelectedText(value) {
+  return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+}
+
 export function countActiveFilters({
   selectedDistrict,
   selectedWard,
@@ -109,33 +113,22 @@ export function filterAndSortSearchResults({
   selectedDetailFlags,
   currentLocation,
 }) {
-  let results = Array.isArray(indexedStores) ? indexedStores : []
-
-  if (selectedDistrict) {
-    results = results.filter(({ store }) => store.district === selectedDistrict)
-  }
-  if (selectedWard) {
-    results = results.filter(({ store }) => store.ward === selectedWard)
-  }
-  if (selectedStoreTypes.length > 0) {
-    results = results.filter(({ store }) => selectedStoreTypes.includes(store.store_type || ''))
-  }
-  if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)) {
-    results = results.filter((entry) => entry.hasPhone)
-  }
-  if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE)) {
-    results = results.filter((entry) => entry.hasImage)
-  }
-  if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION)) {
-    results = results.filter((entry) => !entry.hasCoords)
-  }
-  if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)) {
-    results = results.filter(({ store }) => Boolean(store.is_potential))
-  }
-
-  return rankStoreSearchResults({
-    indexedStores: results,
+  return filterAndRankIndexedStores({
+    indexedStores,
     searchTerm,
     currentLocation,
+    predicate: (entry) => {
+      const { store, hasPhone, hasImage, hasCoords, normalizedDistrict, normalizedWard, normalizedStoreType } = entry
+
+      if (selectedDistrict && normalizedDistrict !== parseCoordinateSelectedText(selectedDistrict)) return false
+      if (selectedWard && normalizedWard !== parseCoordinateSelectedText(selectedWard)) return false
+      if (selectedStoreTypes.length > 0 && !selectedStoreTypes.some((value) => normalizedStoreType === parseCoordinateSelectedText(value))) return false
+      if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE) && !hasPhone) return false
+      if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE) && !hasImage) return false
+      if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION) && hasCoords) return false
+      if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL) && !Boolean(store.is_potential)) return false
+
+      return true
+    },
   })
 }

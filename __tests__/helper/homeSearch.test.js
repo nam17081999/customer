@@ -168,6 +168,27 @@ describe('filterAndSortSearchResults', () => {
     expect(results[0]._score).toBeGreaterThanOrEqual(results[1]?._score ?? -1)
   })
 
+
+
+  it('giữ nguyên output filter theo district/ward/type sau khi dùng derived fields chuẩn hóa sẵn', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, district: 'Hoài Đức', ward: 'An Khánh', store_type: 'Tạp hóa' }),
+      makeStore({ id: 2, district: 'Quốc Oai', ward: 'Yên Sơn', store_type: 'Quán ăn' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = filterAndSortSearchResults({
+      indexedStores,
+      searchTerm: '',
+      selectedDistrict: 'Hoài Đức',
+      selectedWard: 'An Khánh',
+      selectedStoreTypes: ['Tạp hóa'],
+      selectedDetailFlags: [],
+      currentLocation: null,
+    })
+
+    expect(results.map((store) => store.id)).toEqual([1])
+  })
+
   it('hỗ trợ match qua phonetic search', () => {
     const results = filterAndSortSearchResults({
       indexedStores,
@@ -180,5 +201,27 @@ describe('filterAndSortSearchResults', () => {
     })
 
     expect(results.map((store) => store.id)).toContain(3)
+  })
+})
+
+
+describe('filterAndSortSearchResults regression', () => {
+  it('home search vẫn ưu tiên exact match trước near-match mới', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Shopii Mart', store_type: 'tap_hoa', phone: '', image_url: '' }),
+      makeStore({ id: 2, name: 'Shoppii Mart', store_type: 'tap_hoa', phone: '', image_url: '' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = filterAndSortSearchResults({
+      indexedStores,
+      searchTerm: 'shopii',
+      selectedDistrict: '',
+      selectedWard: '',
+      selectedStoreTypes: [],
+      selectedDetailFlags: [],
+      currentLocation: null,
+    })
+
+    expect(results.map((store) => store.id)).toEqual([1, 2])
   })
 })

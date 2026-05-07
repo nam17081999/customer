@@ -4,15 +4,19 @@ import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
-  buildSearchRouteQuery,
   buildSearchStateFromRouteQuery,
   countActiveFilters,
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
-  parseQueryList,
-  serializeRouteQuery,
 } from '@/helper/homeSearch'
+import {
+  buildCurrentSearchRouteQuery,
+  buildNextSearchRouteQuery,
+  buildPersistedSearchHref,
+  scheduleSearchRouteSync,
+  shouldSyncSearchRoute,
+} from '@/helper/homeSearchRouteSync'
 
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
 const ALL_WARDS = Array.from(
@@ -24,8 +28,7 @@ const FLASH_MESSAGE_DURATION_MS = 3800
 
 function persistSearchRoute(query) {
   if (typeof window === 'undefined') return
-  const search = new URLSearchParams(query).toString()
-  const href = search ? `/?${search}` : '/'
+  const href = buildPersistedSearchHref(query)
   window.sessionStorage.setItem('storevis:last-search-route', href)
   window.dispatchEvent(new CustomEvent('storevis:search-route-changed', { detail: { href } }))
 }
@@ -121,41 +124,25 @@ export function useHomeSearchController() {
   useEffect(() => {
     if (!initializedFromQuery.current || !router.isReady) return
 
-    const nextQuery = buildSearchRouteQuery({
+    const nextQuery = buildNextSearchRouteQuery({
       searchTerm,
       selectedDistrict,
       selectedWard,
       selectedStoreTypes,
       selectedDetailFlags,
     })
-    const currentQuery = buildSearchRouteQuery({
-      searchTerm: String(router.query.q || ''),
-      selectedDistrict: parseQueryList(router.query.districts || router.query.district)[0] || '',
-      selectedWard: parseQueryList(router.query.wards || router.query.ward)[0] || '',
-      selectedStoreTypes: parseQueryList(router.query.types),
-      selectedDetailFlags: parseQueryList(router.query.flags),
+    const currentQuery = buildCurrentSearchRouteQuery(router.query)
+
+    if (!shouldSyncSearchRoute(nextQuery, currentQuery)) return
+
+    return scheduleSearchRouteSync({
+      nextQuery,
+      pathname: router.pathname,
+      replace: router.replace.bind(router),
+      persist: persistSearchRoute,
+      setTimer: window.setTimeout.bind(window),
     })
-
-    if (serializeRouteQuery(nextQuery) === serializeRouteQuery(currentQuery)) return
-
-    const syncTimer = window.setTimeout(() => {
-      router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
-      persistSearchRoute(nextQuery)
-    }, 250)
-
-    return () => window.clearTimeout(syncTimer)
   }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router, router.isReady, router.pathname, router.query])
-
-  useEffect(() => {
-    if (!initializedFromQuery.current || !router.isReady) return
-    persistSearchRoute(buildSearchRouteQuery({
-      searchTerm,
-      selectedDistrict,
-      selectedWard,
-      selectedStoreTypes,
-      selectedDetailFlags,
-    }))
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router.isReady])
 
   const wardOptions = useMemo(() => (
     selectedDistrict

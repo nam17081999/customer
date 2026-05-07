@@ -168,6 +168,118 @@ describe('storeCache mutation helpers', () => {
     expect(cached.lastSyncedAt).toBe('2026-04-01T00:00:00.000Z')
   })
 
+
+
+  it('getOrRefreshStores không gọi Supabase khi cache vừa được ghi và chưa cần reconcile', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-07T10:00:00.000Z'))
+
+    await setCachedStores(
+      [{ id: 1, name: 'Tạp hóa A', updated_at: '2026-05-07T09:59:00.000Z' }],
+      1,
+      { cacheVersion: 30, lastSyncedAt: '2026-05-07T09:59:00.000Z' }
+    )
+
+    const stores = await getOrRefreshStores()
+
+    expect(stores.map((store) => store.id)).toEqual([1])
+    expect(supabase.from).not.toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+
+  it('getOrRefreshStores không gọi lại version check trong cooldown sau khi cache đã match version', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-07T10:00:00.000Z'))
+
+    await setCachedStores(
+      [{ id: 1, name: 'Tạp hóa A', updated_at: '2026-05-07T09:00:00.000Z' }],
+      1,
+      {
+        cacheVersion: 41,
+        lastSyncedAt: '2026-05-07T09:00:00.000Z',
+        cacheSavedAt: 0,
+      }
+    )
+
+    vi.setSystemTime(new Date('2026-05-07T10:02:00.000Z'))
+
+    const versionSingle = vi.fn(async () => ({ data: { version: 41 }, error: null }))
+    supabase.from.mockImplementation((table) => {
+      if (table === 'store_cache_versions') {
+        return {
+          select: () => ({
+            eq: () => ({ single: versionSingle }),
+          }),
+        }
+      }
+      throw new Error(`Unexpected table ${table}`)
+    })
+
+    const first = await getOrRefreshStores()
+    const second = await getOrRefreshStores()
+
+    expect(first.map((store) => store.id)).toEqual([1])
+    expect(second.map((store) => store.id)).toEqual([1])
+    expect(versionSingle).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
+  it('getOrRefreshStores không gọi lại fallback count/max trong cooldown khi cache vẫn fresh', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-07T10:00:00.000Z'))
+
+    await setCachedStores(
+      [{ id: 1, name: 'Tạp hóa A', updated_at: '2026-05-07T09:00:00.000Z' }],
+      1,
+      {
+        cacheVersion: null,
+        lastSyncedAt: '2026-05-07T09:00:00.000Z',
+      }
+    )
+
+    vi.setSystemTime(new Date('2026-05-07T10:02:00.000Z'))
+
+    const countQuery = vi.fn(async () => ({
+      data: [{ updated_at: '2026-05-07T09:00:00.000Z' }],
+      count: 1,
+      error: null,
+    }))
+    const versionSingle = vi.fn(async () => ({ data: null, error: new Error('missing version table') }))
+
+    supabase.from.mockImplementation((table) => {
+      if (table === 'store_cache_versions') {
+        return {
+          select: () => ({
+            eq: () => ({ single: versionSingle }),
+          }),
+        }
+      }
+      if (table === 'stores') {
+        return {
+          select: () => ({
+            is: () => ({
+              order: () => ({
+                limit: countQuery,
+              }),
+            }),
+          }),
+        }
+      }
+      throw new Error(`Unexpected table ${table}`)
+    })
+
+    const first = await getOrRefreshStores()
+    const second = await getOrRefreshStores()
+
+    expect(first.map((store) => store.id)).toEqual([1])
+    expect(second.map((store) => store.id)).toEqual([1])
+    expect(countQuery).toHaveBeenCalledTimes(1)
+
+    vi.useRealTimers()
+  })
+
   it('getOrRefreshStores reconcile các row server đổi sau mốc sync cũ sau local patch', async () => {
     await setCachedStores(
       [

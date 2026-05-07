@@ -1,11 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 
-import { filterMapStoresByAreaSelection } from '@/helper/mapFilter'
 import {
   buildMapAvailableWards,
-  buildMapSearchSuggestions,
+  buildMapPanelDerivedData,
   buildMapStoreCounts,
-  buildMapStoreTypeCounts,
   hasActiveMapFilters,
   toggleMapDistrictSelection,
   toggleMapMultiSelect,
@@ -34,28 +32,20 @@ export function useMapSearchPanelController({
     [storesWithCoords]
   )
 
-  const storesAfterAreaFilters = useMemo(
-    () => filterMapStoresByAreaSelection(storesWithCoords, selectedDistricts, selectedWards),
-    [selectedDistricts, selectedWards, storesWithCoords]
-  )
-
-  const filteredStores = useMemo(() => {
-    return storesAfterAreaFilters.filter((store) => {
-      return selectedStoreTypes.length === 0 || selectedStoreTypes.includes(store.store_type || '')
-    })
-  }, [selectedStoreTypes, storesAfterAreaFilters])
-
-  const storeTypeCounts = useMemo(
-    () => buildMapStoreTypeCounts(storesAfterAreaFilters),
-    [storesAfterAreaFilters]
-  )
-
-  const suggestions = useMemo(() => buildMapSearchSuggestions({
+  const {
+    storesAfterAreaFilters,
+    filteredStores,
+    storeTypeCounts,
+    suggestions,
+  } = useMemo(() => buildMapPanelDerivedData({
     indexedStores: indexedMapStores,
     searchTerm,
     currentLocation,
-    limit: 25,
-  }), [currentLocation, indexedMapStores, searchTerm])
+    selectedDistricts,
+    selectedWards,
+    selectedStoreTypes,
+    suggestionLimit: 25,
+  }), [currentLocation, indexedMapStores, searchTerm, selectedDistricts, selectedStoreTypes, selectedWards])
 
   const filtersActive = hasActiveMapFilters({
     selectedDistricts,

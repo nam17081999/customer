@@ -2,17 +2,32 @@ import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/re
 import { haversineKm } from '@/helper/distance'
 import { parseCoordinate } from '@/helper/coordinate'
 
+
+function normalizeLooseText(value) {
+  return removeVietnameseTones(String(value || '').trim())
+}
+
+function collapseRepeatedCharacters(value) {
+  return String(value || '').replace(/([a-z0-9])\1+/g, '$1')
+}
+
 export function createSearchQueryMeta(rawValue) {
   const term = String(rawValue || '').trim().toLowerCase()
   const normalizedTerm = removeVietnameseTones(term)
   const phoneticTerm = normalizeVietnamesePhonetics(term)
+  const relaxedNormalizedTerm = collapseRepeatedCharacters(normalizedTerm)
+  const relaxedPhoneticTerm = collapseRepeatedCharacters(phoneticTerm)
 
   return {
     term,
     normalizedTerm,
     phoneticTerm,
+    relaxedNormalizedTerm,
+    relaxedPhoneticTerm,
     words: normalizedTerm.split(/\s+/).filter(Boolean),
     phoneticWords: phoneticTerm.split(/\s+/).filter(Boolean),
+    relaxedWords: relaxedNormalizedTerm.split(/\s+/).filter(Boolean),
+    relaxedPhoneticWords: relaxedPhoneticTerm.split(/\s+/).filter(Boolean),
   }
 }
 
@@ -21,12 +36,19 @@ export function buildStoreSearchIndex(stores, options = {}) {
 
   return (Array.isArray(stores) ? stores : []).map((store) => {
     const nameLower = String(store?.name || '').toLowerCase()
+    const normalizedName = removeVietnameseTones(nameLower)
+    const phoneticName = normalizeVietnamesePhonetics(nameLower)
 
     return {
       store,
       nameLower,
-      normalizedName: removeVietnameseTones(nameLower),
-      phoneticName: normalizeVietnamesePhonetics(nameLower),
+      normalizedName,
+      phoneticName,
+      relaxedNormalizedName: collapseRepeatedCharacters(normalizedName),
+      relaxedPhoneticName: collapseRepeatedCharacters(phoneticName),
+      normalizedDistrict: normalizeLooseText(store?.district),
+      normalizedWard: normalizeLooseText(store?.ward),
+      normalizedStoreType: normalizeLooseText(store?.store_type),
       hasPhone: Boolean(String(store?.phone || '').trim()),
       hasImage: Boolean(String(store?.image_url || '').trim()),
       hasCoords: getHasCoords ? Boolean(getHasCoords(store)) : null,
@@ -41,8 +63,12 @@ export function getSearchScore(entry, queryMeta) {
     term,
     normalizedTerm,
     phoneticTerm,
+    relaxedNormalizedTerm,
+    relaxedPhoneticTerm,
     words,
     phoneticWords,
+    relaxedWords,
+    relaxedPhoneticWords,
   } = queryMeta
 
   const hasExactLike = (
@@ -64,6 +90,21 @@ export function getSearchScore(entry, queryMeta) {
   })
   if (anyWordMatch) return 0
 
+  const hasRelaxedExactLike = (
+    relaxedNormalizedTerm
+    && (
+      entry.relaxedNormalizedName.includes(relaxedNormalizedTerm)
+      || entry.relaxedPhoneticName.includes(relaxedPhoneticTerm)
+    )
+  )
+  if (hasRelaxedExactLike) return -1
+
+  const relaxedAnyWordMatch = relaxedWords.some((word, index) => {
+    const relaxedPhoneticWord = relaxedPhoneticWords[index] || collapseRepeatedCharacters(normalizeVietnamesePhonetics(word))
+    return entry.relaxedNormalizedName.includes(word) || entry.relaxedPhoneticName.includes(relaxedPhoneticWord)
+  })
+  if (relaxedAnyWordMatch) return -2
+
   return null
 }
 
@@ -81,7 +122,7 @@ function computeDistance(store, currentLocation) {
   return haversineKm(currentLocation.latitude, currentLocation.longitude, lat, lng)
 }
 
-function compareRankedStores(a, b, hasTextSearch) {
+export function compareRankedStores(a, b, hasTextSearch) {
   if (hasTextSearch) {
     const scoreA = a._score ?? 2
     const scoreB = b._score ?? 2
@@ -101,34 +142,49 @@ function compareRankedStores(a, b, hasTextSearch) {
   return createdAtB.localeCompare(createdAtA)
 }
 
+export function filterAndRankIndexedStores({
+  indexedStores,
+  searchTerm,
+  currentLocation,
+  limit,
+  predicate,
+}) {
+  const safeIndexedStores = Array.isArray(indexedStores) ? indexedStores : []
+  const entryPredicate = typeof predicate === 'function' ? predicate : null
+  const queryMeta = createSearchQueryMeta(searchTerm)
+  const hasTextSearch = Boolean(queryMeta.term)
+  const rankedResults = []
+
+  safeIndexedStores.forEach((entry) => {
+    if (entryPredicate && !entryPredicate(entry)) return
+
+    const score = hasTextSearch ? getSearchScore(entry, queryMeta) : 2
+    if (score == null) return
+
+    rankedResults.push({
+      ...entry.store,
+      _score: score,
+      distance: computeDistance(entry.store, currentLocation),
+    })
+  })
+
+  rankedResults.sort((a, b) => compareRankedStores(a, b, hasTextSearch))
+
+  return Number.isInteger(limit) && limit >= 0
+    ? rankedResults.slice(0, limit)
+    : rankedResults
+}
+
 export function rankStoreSearchResults({
   indexedStores,
   searchTerm,
   currentLocation,
   limit,
 }) {
-  const safeIndexedStores = Array.isArray(indexedStores) ? indexedStores : []
-  const queryMeta = createSearchQueryMeta(searchTerm)
-  const hasTextSearch = Boolean(queryMeta.term)
-
-  const rankedResults = (hasTextSearch
-    ? safeIndexedStores
-      .map((entry) => {
-        const score = getSearchScore(entry, queryMeta)
-        if (score == null) return null
-        return { entry, score }
-      })
-      .filter(Boolean)
-    : safeIndexedStores.map((entry) => ({ entry, score: 2 }))
-  )
-    .map(({ entry, score }) => ({
-      ...entry.store,
-      _score: score,
-      distance: computeDistance(entry.store, currentLocation),
-    }))
-    .sort((a, b) => compareRankedStores(a, b, hasTextSearch))
-
-  return Number.isInteger(limit) && limit >= 0
-    ? rankedResults.slice(0, limit)
-    : rankedResults
+  return filterAndRankIndexedStores({
+    indexedStores,
+    searchTerm,
+    currentLocation,
+    limit,
+  })
 }

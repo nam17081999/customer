@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildStoreSearchIndex,
   createSearchQueryMeta,
+  filterAndRankIndexedStores,
   getSearchScore,
   matchesSearchQuery,
   rankStoreSearchResults,
@@ -88,9 +89,42 @@ describe('buildStoreSearchIndex', () => {
     expect(entry).toHaveProperty('nameLower')
     expect(entry).toHaveProperty('normalizedName')
     expect(entry).toHaveProperty('phoneticName')
+    expect(entry).toHaveProperty('relaxedNormalizedName')
+    expect(entry).toHaveProperty('relaxedPhoneticName')
+    expect(entry).toHaveProperty('normalizedDistrict')
+    expect(entry).toHaveProperty('normalizedWard')
+    expect(entry).toHaveProperty('normalizedStoreType')
     expect(entry).toHaveProperty('hasPhone')
     expect(entry).toHaveProperty('hasImage')
     expect(entry).toHaveProperty('hasCoords')
+  })
+
+
+
+  it('chuẩn hóa sẵn district, ward và store_type một lần trong index', () => {
+    const store = makeStore({
+      district: 'Hoài Đức',
+      ward: 'An Khánh',
+      store_type: 'Tạp hóa',
+    })
+    const [entry] = buildStoreSearchIndex([store])
+
+    expect(entry.normalizedDistrict).toBe('hoai duc')
+    expect(entry.normalizedWard).toBe('an khanh')
+    expect(entry.normalizedStoreType).toBe('tap hoa')
+  })
+
+  it('trim + normalize các field phụ ngay khi build index', () => {
+    const store = makeStore({
+      district: '  Hoài Đức  ',
+      ward: '  An Khánh  ',
+      store_type: '  Tạp hóa  ',
+    })
+    const [entry] = buildStoreSearchIndex([store])
+
+    expect(entry.normalizedDistrict).toBe('hoai duc')
+    expect(entry.normalizedWard).toBe('an khanh')
+    expect(entry.normalizedStoreType).toBe('tap hoa')
   })
 
   it('nameLower là lowercase của store.name', () => {
@@ -224,6 +258,61 @@ describe('getSearchScore', () => {
     expect(getSearchScore(entry, meta)).toBeNull()
   })
 
+
+  it('trả về score yếu hơn cho near-match do lặp ký tự', () => {
+    const entry = makeEntry('Shoppii Mart')
+    const meta = createSearchQueryMeta('shopii')
+    expect(getSearchScore(entry, meta)).toBe(-1)
+  })
+
+  it('near-match vẫn đứng dưới exact match', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Shopii Mart', created_at: '2026-04-01T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Shoppii Mart', created_at: '2026-04-02T00:00:00.000Z' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = rankStoreSearchResults({
+      indexedStores,
+      searchTerm: 'shopii',
+      currentLocation: null,
+    })
+
+    expect(results.map((store) => store.id)).toEqual([1, 2])
+    expect(results[0]._score).toBeGreaterThan(results[1]._score)
+  })
+
+
+  it('phonetic match cũ vẫn đứng trên near-match mới', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Siêu Thị Mini', created_at: '2026-04-01T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Siiêu Thị Mini', created_at: '2026-04-02T00:00:00.000Z' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = rankStoreSearchResults({
+      indexedStores,
+      searchTerm: 'xieu thi',
+      currentLocation: null,
+    })
+
+    expect(results.map((store) => store.id)).toEqual([1, 2])
+    expect(results[0]._score).toBeGreaterThan(results[1]._score)
+  })
+
+  it('không trả near-match khi không đủ giống', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Shoppii Mart' }),
+      makeStore({ id: 2, name: 'Alpha Beta' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = rankStoreSearchResults({
+      indexedStores,
+      searchTerm: 'zalo',
+      currentLocation: null,
+    })
+
+    expect(results).toEqual([])
+  })
+
   it('trả về null khi query rỗng', () => {
     const entry = makeEntry('Tạp Hóa Minh Anh')
     const meta = createSearchQueryMeta('')
@@ -289,6 +378,27 @@ describe('matchesSearchQuery', () => {
     const entry = makeEntry('Cửa Hàng Giang')
     const meta = createSearchQueryMeta('dang')
     expect(matchesSearchQuery(entry, meta)).toBe(true)
+  })
+})
+
+
+
+describe('filterAndRankIndexedStores', () => {
+  it('áp dụng predicate trước khi rank nhưng giữ nguyên rule sort dùng chung', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp Hóa Minh', district: 'Hoài Đức', created_at: '2026-04-01T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Tạp Hóa Minh Anh', district: 'Hoài Đức', created_at: '2026-04-02T00:00:00.000Z' }),
+      makeStore({ id: 3, name: 'Minh Anh Quốc Oai', district: 'Quốc Oai', created_at: '2026-04-03T00:00:00.000Z' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    const results = filterAndRankIndexedStores({
+      indexedStores,
+      searchTerm: 'minh anh',
+      currentLocation: null,
+      predicate: (entry) => entry.store.district === 'Hoài Đức',
+    })
+
+    expect(results.map((store) => store.id)).toEqual([2, 1])
   })
 })
 
