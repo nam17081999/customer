@@ -244,7 +244,7 @@ export function useStoreCreateController() {
       void refreshCompassHeading({ requestPermission: true })
       clearPositionCache()
       setResolvingAddr(true)
-      const { coords, error } = await getBestPosition(getLocationRefreshOptions())
+      const { coords, error } = await getBestPosition({ ...getLocationRefreshOptions(), anchorCoords: pickedLat != null && pickedLng != null ? { latitude: pickedLat, longitude: pickedLng } : null })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
@@ -269,7 +269,7 @@ export function useStoreCreateController() {
     } finally {
       setResolvingAddr(false)
     }
-  }, [autoFillDistrictWardFromCoordinates, refreshCompassHeading, showMessage])
+  }, [autoFillDistrictWardFromCoordinates, pickedLat, pickedLng, refreshCompassHeading, showMessage])
 
   useEffect(() => {
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''

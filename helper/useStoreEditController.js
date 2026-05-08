@@ -175,7 +175,7 @@ export function useStoreEditController() {
       void refreshCompassHeading({ requestPermission: true })
       clearPositionCache()
       setResolvingAddr(true)
-      const { coords, error } = await getBestPosition(getLocationRefreshOptions())
+      const { coords, error } = await getBestPosition({ ...getLocationRefreshOptions(), anchorCoords: pickedLat != null && pickedLng != null ? { latitude: pickedLat, longitude: pickedLng } : null })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
@@ -198,7 +198,7 @@ export function useStoreEditController() {
     } finally {
       setResolvingAddr(false)
     }
-  }, [refreshCompassHeading, showMessage])
+  }, [pickedLat, pickedLng, refreshCompassHeading, showMessage])
 
   const handleStartLocationSetup = useCallback(async () => {
     setStep2Key((value) => {

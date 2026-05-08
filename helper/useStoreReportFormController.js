@@ -151,7 +151,7 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
       clearPositionCache()
       setResolving(true)
       resetFeedback()
-      const { coords, error: geoError } = await getBestPosition(getLocationRefreshOptions({ profile: 'report' }))
+      const { coords, error: geoError } = await getBestPosition({ ...getLocationRefreshOptions({ profile: 'report' }), anchorCoords: reportLat != null && reportLng != null ? { latitude: reportLat, longitude: reportLng } : null })
 
       if (!coords) {
         showErrorWithScroll(getGeoErrorMessage(geoError))

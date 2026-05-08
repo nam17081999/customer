@@ -1,58 +1,64 @@
 # Task Request
 
 ## Goal
-- Đồng nhất modal `Xác nhận cập nhật cửa hàng` ở màn chi tiết báo cáo với các modal xác nhận chuẩn khác trong app.
+- Giảm trường hợp `Lấy lại vị trí` nhảy rất xa vị trí thật bằng cách cải thiện thuật toán chọn mẫu GPS trong `getBestPosition()`, theo hướng:
+  - không chốt quá sớm ở mẫu đầu tiên
+  - lọc trường hợp nhảy xa bất thường
+  - ưu tiên chất lượng cao hơn cho refresh path
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- Modal xác nhận ở `pages/store/reports/[id].js` đang có style/structure khác pattern chung, gây lệch UI và trải nghiệm không nhất quán.
+- Hiện tại refresh GPS đôi lúc trả về vị trí rất xa vị trí thật dù user đang đứng yên.
+- Nguyên nhân nghi ngờ lớn nhất nằm ở cách `getBestPosition()` chọn mẫu dựa quá nhiều vào `accuracy` và early-exit quá sớm.
 
 ## In Scope
-- `pages/store/reports/[id].js`
-- `components/ui/confirm-dialog.jsx` nếu cần dùng lại API hiện có
+- `helper/geolocation.js`
+- helper geolocation phụ nếu cần
+- test helper geolocation liên quan
+- `helper/locationPolicy.js` nếu cần chỉnh refresh policy nhẹ
 - `docs/current-work.md`
 
 ## Out of Scope
-- Không redesign toàn bộ hệ thống dialog.
-- Không đổi business logic approve/reject report.
-- Không chỉnh các modal khác ngoài phạm vi cần để đồng nhất pattern.
+- Không đổi business rule create/edit/report submit.
+- Không đổi base map component.
+- Không refactor controller flow lớn.
 
 ## Must Preserve
-- Hành vi xác nhận approve report giữ nguyên.
-- Wording nghiệp vụ hiện có giữ nguyên nếu không cần đổi.
-- Dùng pattern modal xác nhận chung của app khi phù hợp.
+- `Lấy lại vị trí` vẫn là fresh read.
+- Bootstrap step 3 vẫn tách với refresh policy.
+- Không làm hỏng các case GPS tốt đang hoạt động bình thường.
+- Nếu không đủ dữ liệu tốt hơn, vẫn phải trả được kết quả hợp lý thay vì treo vô hạn.
 
 ## Inputs / Repro / Expected
-- Repro:
-  1. Vào màn chi tiết báo cáo cửa hàng.
-  2. Bấm duyệt/cập nhật.
-  3. Mở modal `Xác nhận cập nhật cửa hàng`.
-- Current:
-  - Modal này khác style/spacing/layout so với các modal xác nhận khác.
+- Repro: bấm `Lấy lại vị trí`, có lúc vị trí bị nhảy xa bất thường.
 - Expected:
-  - Modal dùng cùng pattern với `ConfirmDialog` và nhìn đồng nhất với create/edit/delete flows.
+  - thuật toán không chốt ngay ở mẫu đầu chỉ vì accuracy đạt ngưỡng
+  - nếu mẫu mới nhảy xa bất thường so với mẫu tốt hiện có thì cần thận trọng hơn
+  - refresh path ưu tiên đúng hơn nhanh
 
 ## Constraints
+- Test-first thật sự.
 - Không thêm dependency mới.
-- Ưu tiên thay đổi tối thiểu, tận dụng component chung.
+- Giữ thay đổi tập trung ở thuật toán geolocation.
 
 ## Required Verification
-- So khớp với pattern `components/ui/confirm-dialog.jsx`.
-- Kiểm tra lại file report detail sau khi thay đổi.
-- Chạy `npm run lint` nếu thay đổi logic/component đủ nhỏ để verify nhanh.
+- Test mới cho helper/chọn mẫu geolocation.
+- `npm test -- --run __tests__/helper/geolocation.test.js`
+- `npm test`
+- `npm run lint`
+- `npm run build`
 
 ## Definition of Done
-- Modal xác nhận ở report detail dùng cùng pattern/modal shell với các confirm modal khác.
-- Không đổi behavior approve report.
+- Có test khóa case chốt sớm sai và jump bất thường.
+- `getBestPosition()` chọn mẫu an toàn hơn cho refresh path.
+- Full test/lint/build xanh.
 
-## Done
-- Đã chuyển modal xác nhận ở trang chi tiết báo cáo sang dùng `ConfirmDialog` chung để đồng nhất style/spacing/actions với các flow create/edit/delete.
-
-## Verification
-- So khớp pattern với `components/ui/confirm-dialog.jsx`.
-- `npx eslint 'pages/store/reports/[id].js'` passed.
-
-## Risks / Next
-- Chưa chạy smoke test trên browser trong phiên này, nhưng thay đổi chỉ đổi shell modal, không đổi logic approve.
+## Output Contract
+- Báo cáo cuối phải có:
+  - Goal
+  - What changed
+  - Files touched
+  - Verification done
+  - Risks or unverified parts
