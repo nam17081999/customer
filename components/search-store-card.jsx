@@ -123,7 +123,7 @@ function SearchStoreCard({
   if (compact) {
     return (
       <>
-        <Card className="min-h-[112px] overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
+        <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
           <CardContent className="p-0">
             <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
               <button
@@ -161,7 +161,7 @@ function SearchStoreCard({
                       </span>
                     ) : null}
 
-                    <p className="line-clamp-2 min-h-[44px] text-base leading-snug text-gray-400">{addressText}</p>
+                    <p className="line-clamp-2 text-base leading-snug text-gray-400">{addressText}</p>
                   </div>
                 </div>
               </button>
