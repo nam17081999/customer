@@ -21,7 +21,7 @@ import {
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
 import { getLocationBootstrapOptions, getLocationRefreshOptions } from '@/helper/locationPolicy'
-import { buildStoreFormLocationPatch, shouldAutoAcquireLocationOnStepEnter } from '@/helper/locationOrchestration'
+import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
 import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 function getCoordinateValue(value) {
@@ -214,11 +214,16 @@ export function useStoreEditController() {
       return patch.nextStep2Key
     })
 
-    if (!shouldAutoAcquireLocationOnStepEnter({ lat: pickedLat, lng: pickedLng })) {
+    const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
+    if (!entryBehavior.shouldAutoAcquire) {
       return true
     }
 
-    return handleGetLocation()
+    if (entryBehavior.reuseRefreshFlow) {
+      return handleGetLocation()
+    }
+
+    return true
   }, [handleGetLocation, pickedLat, pickedLng])
 
   const resolvedWardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []

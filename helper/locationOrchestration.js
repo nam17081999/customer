@@ -25,3 +25,10 @@ export function buildReportLocationPatch({ lat, lng } = {}) {
 export function shouldAutoAcquireLocationOnStepEnter({ lat, lng } = {}) {
   return !hasLocationCoordinates(lat, lng)
 }
+
+export function getLocationStepEntryBehavior({ lat, lng } = {}) {
+  return {
+    shouldAutoAcquire: shouldAutoAcquireLocationOnStepEnter({ lat, lng }),
+    reuseRefreshFlow: true,
+  }
+}

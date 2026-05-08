@@ -27,7 +27,7 @@ import {
   getLocationFallbackSubmitOptions,
   getLocationRefreshOptions,
 } from '@/helper/locationPolicy'
-import { buildStoreFormLocationPatch } from '@/helper/locationOrchestration'
+import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
 import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 export function useStoreCreateController() {
@@ -368,30 +368,8 @@ export function useStoreCreateController() {
     }
   }, [router])
 
-  const handleFillAddress = useCallback(async () => {
-    try {
-      setResolvingAddr(true)
-      const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
-      if (!coords) {
-        setGeoBlocked(true)
-        showMessage('error', getGeoErrorMessage(error))
-        return
-      }
-      const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
-      setGeoBlocked(patch.geoBlocked)
-      setInitialGPSLat(patch.initialGPSLat)
-      setInitialGPSLng(patch.initialGPSLng)
-      setPickedLat(patch.pickedLat)
-      setPickedLng(patch.pickedLng)
-    } catch (err) {
-      console.error('Get location error:', err)
-      showMessage('error', getGeoErrorMessage(err))
-    } finally {
-      setResolvingAddr(false)
-    }
-  }, [showMessage])
-
   const bootstrapCreateLocationStep = useCallback(async () => {
+    const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
     setStep2Key((value) => {
       const patch = buildLocationStepResetPatch(value)
       setGeoBlocked(patch.geoBlocked)
@@ -404,8 +382,10 @@ export function useStoreCreateController() {
       setHeading(patch.heading)
       return patch.nextStep2Key
     })
-    await handleFillAddress()
-  }, [handleFillAddress])
+    if (entryBehavior.shouldAutoAcquire && entryBehavior.reuseRefreshFlow) {
+      await handleGetLocation()
+    }
+  }, [handleGetLocation, pickedLat, pickedLng])
 
   useStepEntryEffect(currentStep === 3, bootstrapCreateLocationStep)
 

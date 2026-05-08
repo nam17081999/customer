@@ -2,7 +2,7 @@
 import { DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading, clearPositionCache } from '@/helper/geolocation'
 import { getLocationRefreshOptions } from '@/helper/locationPolicy'
-import { buildReportLocationPatch, shouldAutoAcquireLocationOnStepEnter } from '@/helper/locationOrchestration'
+import { buildReportLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
 import { supabase } from '@/lib/supabaseClient'
 import {
   buildStoreReportPayload,
@@ -174,8 +174,9 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
   }
 
   useStepEntryEffect(mode === 'edit' && currentStep === 3, async () => {
-    if (!shouldAutoAcquireLocationOnStepEnter({ lat: reportLat, lng: reportLng })) return
-    await handleGetLocation()
+    const entryBehavior = getLocationStepEntryBehavior({ lat: reportLat, lng: reportLng })
+    if (!entryBehavior.shouldAutoAcquire) return
+    if (entryBehavior.reuseRefreshFlow) await handleGetLocation()
   })
 
   const handleMapsLink = async (link) => {

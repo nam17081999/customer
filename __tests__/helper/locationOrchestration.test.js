@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildReportLocationPatch,
   buildStoreFormLocationPatch,
+  getLocationStepEntryBehavior,
   shouldAutoAcquireLocationOnStepEnter,
 } from '@/helper/locationOrchestration'
 
@@ -48,5 +49,21 @@ describe('shouldAutoAcquireLocationOnStepEnter', () => {
   it('auto acquire nếu chưa có tọa độ hợp lệ', () => {
     expect(shouldAutoAcquireLocationOnStepEnter({ lat: null, lng: null })).toBe(true)
     expect(shouldAutoAcquireLocationOnStepEnter({ lat: Number.NaN, lng: 105.8 })).toBe(true)
+  })
+})
+
+describe('getLocationStepEntryBehavior', () => {
+  it('khóa rule regression: vào step 3 phải tái dùng refresh flow khi cần auto acquire', () => {
+    expect(getLocationStepEntryBehavior({ lat: null, lng: null })).toEqual({
+      shouldAutoAcquire: true,
+      reuseRefreshFlow: true,
+    })
+  })
+
+  it('không auto acquire nếu đã có tọa độ, nhưng vẫn giữ policy chung nhất quán', () => {
+    expect(getLocationStepEntryBehavior({ lat: 21.0285, lng: 105.8048 })).toEqual({
+      shouldAutoAcquire: false,
+      reuseRefreshFlow: true,
+    })
   })
 })
