@@ -46,12 +46,15 @@ export function useHomeSearchController() {
   const [selectedDetailFlags, setSelectedDetailFlags] = useState([])
   const [showDetailedFilters, setShowDetailedFilters] = useState(false)
   const [currentLocation, setCurrentLocation] = useState(null)
+  const [sortLocation, setSortLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const searchInputRef = useRef(null)
   const virtuosoRef = useRef(null)
   const initializedFromQuery = useRef(false)
   const lastLocationRequestAtRef = useRef(0)
   const lastSearchCriteriaRef = useRef('')
+  const isListAtTopRef = useRef(true)
+  const pendingSortLocationRef = useRef(null)
 
   const hasSearchCriteria = hasActiveSearchCriteria({
     searchTerm,
@@ -190,6 +193,41 @@ export function useHomeSearchController() {
     refreshCurrentLocation()
   }, [refreshCurrentLocation])
 
+  const commitSortLocation = useCallback((location) => {
+    if (!location) return
+    setSortLocation((prev) => {
+      if (
+        prev
+        && prev.latitude === location.latitude
+        && prev.longitude === location.longitude
+      ) {
+        return prev
+      }
+      return location
+    })
+  }, [])
+
+  const handleListAtTopChange = useCallback((isAtTop) => {
+    isListAtTopRef.current = isAtTop
+
+    if (isAtTop && pendingSortLocationRef.current) {
+      commitSortLocation(pendingSortLocationRef.current)
+      pendingSortLocationRef.current = null
+    }
+  }, [commitSortLocation])
+
+  useEffect(() => {
+    if (!currentLocation) return
+
+    if (!sortLocation || isListAtTopRef.current) {
+      commitSortLocation(currentLocation)
+      pendingSortLocationRef.current = null
+      return
+    }
+
+    pendingSortLocationRef.current = currentLocation
+  }, [commitSortLocation, currentLocation, sortLocation])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -308,7 +346,7 @@ export function useHomeSearchController() {
       selectedWard,
       selectedStoreTypes,
       selectedDetailFlags,
-      currentLocation,
+      currentLocation: sortLocation,
     })
   }, [
     indexedStores,
@@ -318,7 +356,7 @@ export function useHomeSearchController() {
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
-    currentLocation,
+    sortLocation,
   ])
 
   const showSkeleton = loading || !storesLoaded
@@ -354,12 +392,17 @@ export function useHomeSearchController() {
     if (lastSearchCriteriaRef.current === nextCriteria) return
     lastSearchCriteriaRef.current = nextCriteria
 
+    if (currentLocation) {
+      commitSortLocation(currentLocation)
+      pendingSortLocationRef.current = null
+    }
+
     virtuosoRef.current?.scrollToIndex({
       index: 0,
       align: 'start',
       behavior: 'auto',
     })
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags])
+  }, [commitSortLocation, currentLocation, searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags])
 
   return {
     msgState,
@@ -383,6 +426,7 @@ export function useHomeSearchController() {
     districtOptions: DISTRICTS,
     toggleFilterValue,
     clearAllFilters,
+    handleListAtTopChange,
     searchResults,
     showSkeleton,
   }

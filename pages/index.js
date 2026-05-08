@@ -45,12 +45,13 @@ export default function HomePage() {
     districtOptions,
     toggleFilterValue,
     clearAllFilters,
+    handleListAtTopChange,
     searchResults,
     showSkeleton,
   } = useHomeSearchController()
 
   return (
-    <div className="h-[calc(100dvh-3.5rem)] overflow-hidden bg-black">
+    <div className="h-[calc(100svh-3.5rem)] overflow-hidden bg-black sm:h-[calc(100dvh-3.5rem)]">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       <div className="mx-auto flex h-full max-w-screen-md flex-col gap-3 px-3 pt-4 sm:px-4 sm:pt-6">
         <div className="flex shrink-0 flex-col gap-2">
@@ -288,10 +289,12 @@ export default function HomePage() {
                 ref={virtuosoRef}
                 style={{ height: '100%' }}
                 data={searchResults}
+                atTopStateChange={handleListAtTopChange}
+                fixedItemHeight={124}
                 computeItemKey={(index, item) => String(item.id)}
-                overscan={300}
+                overscan={180}
                 itemContent={(index, store) => (
-                  <div className="mb-3" key={store.id}>
+                  <div className="h-[124px] pb-3" key={store.id}>
                     <SearchStoreCard
                       store={store}
                       distance={store.distance}
