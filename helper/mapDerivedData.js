@@ -1,34 +1,6 @@
 import { getBaseMarkerImageId, getHighlightedMarkerImageId } from '@/helper/mapMarkerImages'
+import { IGNORED_NAME_TERMS } from '@/helper/ignoredNameTerms'
 import { formatAddressParts } from '@/lib/utils'
-
-const IGNORED_NAME_TERMS = [
-  'cửa hàng',
-  'tạp hoá',
-  'quán nước',
-  'giải khát',
-  'nhà nghỉ',
-  'nhà hàng',
-  'cyber cà phê',
-  'cafe',
-  'lẩu',
-  'siêu thị',
-  'quán',
-  'gym',
-  'đại lý',
-  'cơm',
-  'phở',
-  'bún',
-  'shop',
-  'kok',
-  'karaoke',
-  'bi-a',
-  'bia',
-  'net',
-  'game',
-  'internet',
-  'beer',
-  'coffee',
-]
 
 export function getFirstMeaningfulWord(name = '') {
   let remaining = String(name).trim().toLowerCase()

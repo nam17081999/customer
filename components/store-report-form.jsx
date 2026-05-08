@@ -288,6 +288,42 @@ export default function StoreReportForm({
                     </p>
                   </div>
                 )}
+
+                <div id="report-location-section">
+                  {locationView.shouldRenderMap ? (
+                    <StoreLocationPicker
+                      mapKey={`step2-${mapKey}`}
+                      initialLat={reportLat}
+                      initialLng={reportLng}
+                      onChange={(lat, lng) => {
+                        setReportLat(lat)
+                        setReportLng(lng)
+                      }}
+                      editable={mapEditable}
+                      onToggleEditable={() => setMapEditable((value) => !value)}
+                      onGetLocation={handleGetLocation}
+                      heading={heading}
+                      height="65vh"
+                      compassError={compassError}
+                      resolvingAddr={resolving}
+                      dark={false}
+                    />
+                  ) : (
+                    <div
+                      className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
+                      style={{ height: '65vh' }}
+                    >
+                      <div className="max-w-md space-y-2">
+                        <div className="text-base font-medium text-gray-300">
+                          {getLocationPlaceholderCopy(locationView.phase).title}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          {getLocationPlaceholderCopy(locationView.phase).description}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -322,4 +358,3 @@ export default function StoreReportForm({
     </div>
   )
 }
-

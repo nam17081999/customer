@@ -7,6 +7,7 @@
 
 import { getOrRefreshStores } from '@/lib/storeCache'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import { IGNORED_NAME_TERMS } from '@/helper/ignoredNameTerms'
 
 function parseCoordinate(value) {
   if (value === null || value === undefined || value === '') return null
@@ -141,49 +142,7 @@ const ADJACENT_WARD_DRAFT = {
 };
 
 /** Common business-type words that should be ignored when comparing names. */
-export const IGNORED_NAME_TERMS = [
-  'cửa hàng',
-  'tạp hoá',
-  'quán nước',
-  'giải khát',
-  'nhà nghỉ',
-  'nhà hàng',
-  'cyber cà phê',
-  'cafe',
-  'lẩu',
-  'siêu thị',
-  'quán',
-  'gym',
-  'đại lý',
-  'cơm',
-  'phở',
-  'bún',
-  'shop',
-  'kok',
-  'karaoke',
-  'bi-a',
-  'bia',
-  'net',
-  'game',
-  'internet',
-  'beer',
-  'coffee',
-  'mart',
-  'store',
-  'minimart',
-  'thực phẩm',
-  'cơm bình dân',
-  'ăn vặt',
-  'ăn nhanh',
-  'quán nước',
-  'quán ăn',
-  'chị',
-  'anh',
-  'cô',
-  'chú',
-  'bác',
-  'em',
-]
+export { IGNORED_NAME_TERMS }
 
 // ── Internal helpers ────────────────────────────────────────────────────
 

@@ -1,87 +1,79 @@
 # Current Work
 
 ## Goal
-- Sửa hiện tượng danh sách cửa hàng ở màn tìm kiếm bị khựng, trượt giật và đôi lúc nhảy một đoạn trên điện thoại, phù hợp cho cả web mobile và app cài ra màn hình chính trên iPhone.
+- Áp dụng các chỉnh sửa theo review thread PR #70: khôi phục map picker ở report edit step 3, xử lý các lỗi lint (unused import/duplicate reset), đồng bộ dark-mode placeholder và dọn indentation JSX.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- Hành vi cuộn không mượt đang ảnh hưởng flow chính của route `/`.
-- Ứng dụng chạy trên nhiều trình duyệt điện thoại và cả iPhone standalone PWA nên fix phải ưu tiên tính ổn định viewport và tránh list reorder giữa lúc user đang lướt.
+- Review thread nêu các lỗi có thể làm fail lint và regression UX ở flow location/map/report.
+- Cần chốt bản sửa nhỏ, đúng phạm vi các comment đã được yêu cầu.
 
 ## In Scope
-- `pages/index.js`
-- `helper/useHomeSearchController.js`
-- `components/search-store-card.jsx`
-- Điều chỉnh behavior scroll/search list ở route `/`.
-- Cập nhật `docs/current-work.md`.
+- `components/store-report-form.jsx`
+- `pages/map.js`
+- `helper/mapDerivedData.js`
+- `helper/useStoreEditController.js`
+- `helper/useStoreCreateController.js`
+- `pages/store/create.js`
+- `components/store/store-supplement-form.jsx`
+- `lib/storeCache.js`
+- `docs/current-work.md`
 
 ## Out of Scope
-- Không redesign UI lớn.
-- Không đổi business rule search/filter/sort mặc định ngoài việc tránh re-sort giữa lúc user đang cuộn.
+- Không đổi business rule ngoài các điểm đã bị review.
 - Không thêm dependency mới.
+- Không refactor lớn ngoài phần cần để giải quyết comment.
 
 ## Must Preserve
-- Search tiếng Việt có dấu/không dấu và rule phonetic hiện tại.
-- Pages Router, query sync, filter behavior, cache read hiện tại.
-- Mặc định vẫn ưu tiên sort theo khoảng cách khi có location; chỉ thay đổi thời điểm áp dụng lại sort để tránh jump.
-- Accessibility và touch targets hiện tại.
+- Flow create/edit/supplement/report hiện tại và rule dữ liệu location.
+- Quy tắc dark-mode only trong design system.
+- Hành vi map derived data và duplicate check nhất quán với rule hiện có.
 
 ## Inputs / Repro / Expected
-- Repro: trên điện thoại, lướt danh sách cửa hàng ở màn tìm kiếm thì cuộn không mượt; đôi lúc danh sách bị khựng rồi nhảy/trượt đi một đoạn.
-- Current: viewport list có thể bị remeasure khi mobile browser chrome đổi trạng thái; list cũng có thể đổi thứ tự khi location update đến trong lúc user đang cuộn.
-- Expected: vùng list có chiều cao ổn định hơn trên mobile/PWA và list không tự reorder khi user đang ở giữa danh sách.
+- Input: comment mới yêu cầu áp dụng toàn bộ chỉnh sửa trong review thread đã link.
+- Current: còn các lỗi map render step 3 report edit, lint unused import, placeholder light-mode, indentation lệch, duplicated reset lines.
+- Expected: tất cả điểm review được xử lý đầy đủ, lint/test pass (trừ lỗi môi trường build ngoài scope nếu còn).
 
 ## Constraints
-- Giữ thay đổi tối thiểu, đúng phạm vi bugfix.
-- Phải phù hợp cả Safari mobile và iPhone home-screen app.
+- Thay đổi nhỏ nhất có thể.
+- Giữ UTF-8 cho file tiếng Việt.
 
 ## Required Verification
 - `npm run lint`
-- Đối chiếu section `Search Flow` trong `docs/regression-checklist.md`
-- Verify logic route `/` không phá query sync/search/filter hiện tại.
+- `npm run test`
+- Đối chiếu checklist: `Edit / Supplement / Report`, `Map Flow`, `Create Flow`, `Tiếng Việt / UI Safety`, `Stores Read / Cache`.
 
 ## Definition of Done
-- Đã loại bỏ nguồn gây jump chính từ viewport height, location-driven reorder, và giảm rủi ro re-measure của virtual row.
-- Lint pass.
-- `docs/current-work.md` có `Done`, `Verification`, `Risks / Next` mới.
+- Tất cả điểm actionable trong review thread đã được sửa.
+- Không còn lint error từ các điểm được nêu.
+- `docs/current-work.md` có `Done`, `Verification`, `Risks / Next`.
 
 ## Plan
-- Dùng viewport height ổn định hơn cho mobile search page.
-- Theo dõi trạng thái list ở top để chỉ áp dụng lại sort theo location khi an toàn.
-- Ổn định hóa row height cho virtual list.
-- Chạy lint và cập nhật working memory.
+- Sửa code đúng từng comment review theo phạm vi file.
+- Chạy lại lint + test và smoke build nếu môi trường cho phép.
+- Cập nhật `docs/current-work.md` và báo cáo tiến độ.
 
 ## Done
-- Đã đổi container chính của trang search từ `100dvh` sang `100svh` trên mobile và giữ `100dvh` cho `sm+`, giúp vùng list ổn định hơn khi Safari/iPhone browser chrome ẩn/hiện trong lúc cuộn.
-- Đã nối `atTopStateChange` từ `react-virtuoso` để biết khi list đang ở đầu.
-- Đã tách `currentLocation` và `sortLocation`:
-  - `currentLocation` vẫn refresh như cũ để giữ dữ liệu vị trí mới nhất.
-  - `sortLocation` chỉ được commit khi list đang ở top hoặc khi search criteria đổi.
-  - Nếu vị trí mới đến khi user đang cuộn giữa danh sách, update sẽ được defer để tránh reorder/jump giữa chừng.
-- Đã tối ưu thêm tầng virtualization:
-  - đặt `fixedItemHeight={124}` cho `Virtuoso`
-  - giảm `overscan` từ `300` xuống `180`
-  - bọc mỗi row bằng khung cao cố định `124px`
-- Đã ổn định hóa compact row:
-  - card compact cao cố định `112px`
-  - bỏ `OverflowMarquee` ở compact row, chuyển sang `truncate` tĩnh để tránh `ResizeObserver` đo lại từng item khi cuộn
-  - cố định chiều cao vùng badge/khoảng cách và block địa chỉ
-  - bọc `SearchStoreCard` bằng `memo` để giảm rerender row visible
-- Đã giữ nguyên search/query/filter behavior hiện có.
+- Khôi phục map block cho step 3 của `StoreReportForm` (mode edit) với `StoreLocationPicker` + placeholder, đảm bảo còn dùng được `heading`/`compassError` và không còn import thừa.
+- Xóa các import không dùng ở `pages/map.js`, `helper/useStoreCreateController.js`, `helper/useStoreEditController.js`.
+- Đồng bộ nguồn `IGNORED_NAME_TERMS` sang helper dùng chung `helper/ignoredNameTerms.js`, để `duplicateCheck` và `mapDerivedData` không drift danh sách.
+- Đổi placeholder chưa có tọa độ ở create/supplement sang dark palette (`bg-gray-950`, `border-gray-800`, `text-gray-300/400`).
+- Sửa indentation các block JSX bị lệch ở create/supplement.
+- Xóa các dòng reset `lastFreshValidationAt = 0` bị lặp trong `lib/storeCache.js`.
 
 ## Verification
-- Đối chiếu `Search Flow` trong `docs/regression-checklist.md` để giữ nguyên behavior search/filter/sort/query sync.
-- Chạy `npm run lint` thành công, không còn warning/error.
-- Rà lại code path các điểm sửa:
-  - `pages/index.js`
-  - `helper/useHomeSearchController.js`
-  - `components/search-store-card.jsx`
+- `npm run lint` ✅
+- `npm run test` ✅ (29 test files, 358 tests pass)
+- `npm run build` ⚠️ fail do môi trường không truy cập được `fonts.googleapis.com` (lỗi mạng ngoài scope code change)
+- Đối chiếu checklist đã chạm:
+  - `Edit / Supplement / Report`
+  - `Map Flow`
+  - `Create Flow`
+  - `Tiếng Việt / UI Safety`
+  - `Stores Read / Cache`
 
 ## Risks / Next
-- Cần smoke test trực tiếp trên:
-  - Safari iPhone
-  - iPhone app cài ra màn hình chính
-  - Android Chrome
-- Nếu vẫn còn jump trên một nhóm máy cụ thể, bước kế tiếp cần xem liệu `StoreDetailModal`/`TelesaleCallDialog` mount trong mỗi row có còn gây cost đáng kể không; khi đó nên chuyển sang lazy-mount dialog theo item đang mở.
+- Chưa có screenshot live đầy đủ cho flow `supplement` vì môi trường local thiếu backend thật; cần QA UI thủ công thêm trên PR preview.
+- Build production vẫn phụ thuộc mạng fetch Google Fonts trong môi trường sandbox hiện tại.

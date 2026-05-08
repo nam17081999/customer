@@ -20,7 +20,7 @@ import {
 } from '@/helper/storeEditFlow'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
-import { getLocationBootstrapOptions, getLocationRefreshOptions } from '@/helper/locationPolicy'
+import { getLocationRefreshOptions } from '@/helper/locationPolicy'
 import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
 import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
@@ -660,6 +660,5 @@ export function useStoreEditController() {
     handleSaveEdit,
   }
 }
-
 
 

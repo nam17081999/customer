@@ -22,7 +22,6 @@ import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
 import {
-  getLocationBootstrapOptions,
   getLocationDuplicateCheckOptions,
   getLocationFallbackSubmitOptions,
   getLocationRefreshOptions,
@@ -850,5 +849,4 @@ export function useStoreCreateController() {
     resetCreateForm,
   }
 }
-
 

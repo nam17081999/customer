@@ -436,7 +436,7 @@ export default function AddStore() {
             {!resolvingAddr && pickedLat != null && !geoBlocked ? (
               <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
                 <p className="text-sm text-green-700 dark:text-green-300">
-                                    {getLocationReadyMessage()}
+                  {getLocationReadyMessage()}
                 </p>
               </div>
             ) : null}
@@ -444,7 +444,7 @@ export default function AddStore() {
             {geoBlocked ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-800 dark:bg-red-900/20">
                 <p className="text-sm text-red-700 dark:text-red-300">
-                                    ❌ {getLocationBlockedMessage()}
+                  ❌ {getLocationBlockedMessage()}
                 </p>
               </div>
             ) : null}
@@ -469,14 +469,14 @@ export default function AddStore() {
                 />
               ) : (
                 <div
-                  className="flex items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 text-center text-gray-600"
+                  className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
                   style={{ height: '65vh' }}
                 >
                   <div className="max-w-md space-y-2">
-                    <div className="text-base font-medium text-gray-800">
+                    <div className="text-base font-medium text-gray-300">
                       {getLocationPlaceholderCopy(createLocationView.phase).title}
                     </div>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-400">
                       {getLocationPlaceholderCopy(createLocationView.phase).description}
                     </p>
                   </div>
@@ -515,12 +515,12 @@ export default function AddStore() {
                 icon={<span>←</span>}
                 onClick={() => setCurrentStep(2)}
               />
-        <Button
-          type="submit"
-          form={createFormId}
-          disabled={loading || resolvingAddr || geoBlocked}
-          className="flex-1"
-          leftIcon={(resolvingAddr || loading) ? (
+              <Button
+                type="submit"
+                form={createFormId}
+                disabled={loading || resolvingAddr || geoBlocked}
+                className="flex-1"
+                leftIcon={(resolvingAddr || loading) ? (
                   <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
