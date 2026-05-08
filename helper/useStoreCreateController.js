@@ -21,6 +21,13 @@ import { resolveDistrictWardFromCoordinates } from '@/helper/storeAreaResolver'
 import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
+import {
+  getLocationDuplicateCheckOptions,
+  getLocationFallbackSubmitOptions,
+  getLocationRefreshOptions,
+} from '@/helper/locationPolicy'
+import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
+import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 export function useStoreCreateController() {
   const router = useRouter()
@@ -129,15 +136,16 @@ export function useStoreCreateController() {
   }, [name, storeType, addressDetail, ward, district, phone, phoneSecondary, note, pickedLat, pickedLng, currentStep, loading])
 
   const applyMapsLinkCoords = useCallback((lat, lng) => {
-    setPickedLat(lat)
-    setPickedLng(lng)
-    setInitialGPSLat(lat)
-    setInitialGPSLng(lng)
-    setUserHasEditedMap(true)
-    setGeoBlocked(false)
+    const patch = buildStoreFormLocationPatch({ lat, lng, userHasEditedMap: true })
+    setPickedLat(patch.pickedLat)
+    setPickedLng(patch.pickedLng)
+    setInitialGPSLat(patch.initialGPSLat)
+    setInitialGPSLng(patch.initialGPSLng)
+    setUserHasEditedMap(patch.userHasEditedMap)
+    setGeoBlocked(patch.geoBlocked)
     setStep2Key((value) => value + 1)
     setMapsLinkError('')
-    showMessage('success', "Đã lấy vị trí: , ")
+    showMessage('success', getLocationMapsLinkSuccessMessage(lat, lng))
   }, [showMessage])
 
 
@@ -235,27 +243,24 @@ export function useStoreCreateController() {
       void refreshCompassHeading({ requestPermission: true })
       clearPositionCache()
       setResolvingAddr(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 30,
-        skipCache: true,
-      })
+      const { coords, error } = await getBestPosition({ ...getLocationRefreshOptions(), anchorCoords: pickedLat != null && pickedLng != null ? { latitude: pickedLat, longitude: pickedLng } : null })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
         return
       }
-      setGeoBlocked(false)
-      setInitialGPSLat(coords.latitude)
-      setInitialGPSLng(coords.longitude)
-      setPickedLat(coords.latitude)
-      setPickedLng(coords.longitude)
-      setUserHasEditedMap(false)
+      const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
+      setGeoBlocked(patch.geoBlocked)
+      setInitialGPSLat(patch.initialGPSLat)
+      setInitialGPSLng(patch.initialGPSLng)
+      setPickedLat(patch.pickedLat)
+      setPickedLng(patch.pickedLng)
+      setUserHasEditedMap(patch.userHasEditedMap)
       setStep2Key((value) => value + 1)
       setAreaAutoFillStatus('idle')
       setAreaAutoFillMessage('')
       void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
-      showMessage('success', 'Đã cập nhật vị trí GPS mới')
+      showMessage('success', getLocationRefreshSuccessMessage())
     } catch (err) {
       console.error('Get location error:', err)
       setGeoBlocked(true)
@@ -263,7 +268,7 @@ export function useStoreCreateController() {
     } finally {
       setResolvingAddr(false)
     }
-  }, [autoFillDistrictWardFromCoordinates, refreshCompassHeading, showMessage])
+  }, [autoFillDistrictWardFromCoordinates, pickedLat, pickedLng, refreshCompassHeading, showMessage])
 
   useEffect(() => {
     const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
@@ -362,32 +367,8 @@ export function useStoreCreateController() {
     }
   }, [router])
 
-  const handleFillAddress = useCallback(async () => {
-    try {
-      setResolvingAddr(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 1500,
-        desiredAccuracy: 30,
-      })
-      if (!coords) {
-        setGeoBlocked(true)
-        showMessage('error', getGeoErrorMessage(error))
-        return
-      }
-      setGeoBlocked(false)
-      setInitialGPSLat(coords.latitude)
-      setInitialGPSLng(coords.longitude)
-      setPickedLat(coords.latitude)
-      setPickedLng(coords.longitude)
-    } catch (err) {
-      console.error('Get location error:', err)
-      showMessage('error', getGeoErrorMessage(err))
-    } finally {
-      setResolvingAddr(false)
-    }
-  }, [showMessage])
-
   const bootstrapCreateLocationStep = useCallback(async () => {
+    const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
     setStep2Key((value) => {
       const patch = buildLocationStepResetPatch(value)
       setGeoBlocked(patch.geoBlocked)
@@ -400,8 +381,10 @@ export function useStoreCreateController() {
       setHeading(patch.heading)
       return patch.nextStep2Key
     })
-    await handleFillAddress()
-  }, [handleFillAddress])
+    if (entryBehavior.shouldAutoAcquire && entryBehavior.reuseRefreshFlow) {
+      await handleGetLocation()
+    }
+  }, [handleGetLocation, pickedLat, pickedLng])
 
   useStepEntryEffect(currentStep === 3, bootstrapCreateLocationStep)
 
@@ -452,10 +435,7 @@ export function useStoreCreateController() {
       duplicateGeoRequestedRef.current = true
       try {
         setDuplicateCheckLoading(true)
-        const { coords, error } = await getBestPosition({
-          maxWaitTime: 2000,
-          desiredAccuracy: 50,
-        })
+        const { coords, error } = await getBestPosition(getLocationDuplicateCheckOptions())
         if (!coords) {
           setDuplicateCheckError(getGeoErrorMessage(error))
           setDuplicateCheckLoading(false)
@@ -760,7 +740,7 @@ export function useStoreCreateController() {
 
     if (latitude == null || longitude == null) {
       try {
-        const { coords, error } = await getBestPosition({ maxWaitTime: 2000, desiredAccuracy: 30 })
+        const { coords, error } = await getBestPosition(getLocationFallbackSubmitOptions())
         if (!coords) {
           setGeoBlocked(true)
           showMessage('error', getGeoErrorMessage(error))
@@ -869,5 +849,4 @@ export function useStoreCreateController() {
     resetCreateForm,
   }
 }
-
 

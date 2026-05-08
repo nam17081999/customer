@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
   buildMapAvailableWards,
+  buildMapPanelDerivedData,
+  buildMapSearchResults,
   buildMapSearchSuggestions,
   buildMapStoreCounts,
   buildMapStoreTypeCounts,
@@ -127,6 +129,78 @@ describe('hasActiveMapFilters', () => {
   })
 })
 
+
+
+
+
+describe('buildMapPanelDerivedData', () => {
+  it('trả về storesAfterAreaFilters, filteredStores, storeTypeCounts và suggestions nhất quán', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp hóa Minh Anh', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'tap_hoa', created_at: '2026-04-19T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Minh Anh Số 3', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'tap_hoa', created_at: '2026-04-21T00:00:00.000Z' }),
+      makeStore({ id: 3, name: 'Minh Anh Quán Ăn', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'quan_an', created_at: '2026-04-22T00:00:00.000Z' }),
+      makeStore({ id: 4, name: 'Quốc Oai Minh Anh', district: 'Quốc Oai', ward: 'Yên Sơn', store_type: 'tap_hoa', created_at: '2026-04-23T00:00:00.000Z' }),
+    ])
+
+    const derived = buildMapPanelDerivedData({
+      indexedStores,
+      searchTerm: 'minh anh',
+      currentLocation: null,
+      selectedDistricts: ['Hoài Đức'],
+      selectedWards: ['An Khánh'],
+      selectedStoreTypes: ['tap_hoa'],
+      suggestionLimit: 2,
+    })
+
+    expect(derived.storesAfterAreaFilters.map((store) => store.id)).toEqual([3, 2, 1])
+    expect(derived.filteredStores.map((store) => store.id)).toEqual([2, 1])
+    expect(derived.storeTypeCounts).toEqual({ tap_hoa: 2, quan_an: 1 })
+    expect(derived.suggestions.map((store) => store.id)).toEqual([2, 1])
+  })
+})
+
+describe('buildMapSearchResults', () => {
+
+
+  it('giữ nguyên output filter map theo district/ward/type khi dùng derived fields chuẩn hóa sẵn', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, district: 'Hoài Đức', ward: 'An Khánh', store_type: 'tap_hoa', name: 'A Minh' }),
+      makeStore({ id: 2, district: 'Quốc Oai', ward: 'Yên Sơn', store_type: 'quan_an', name: 'B Minh' }),
+    ])
+
+    const results = buildMapSearchResults({
+      indexedStores,
+      searchTerm: 'minh',
+      currentLocation: null,
+      selectedDistricts: ['Hoài Đức'],
+      selectedWards: ['An Khánh'],
+      selectedStoreTypes: ['tap_hoa'],
+    })
+
+    expect(results.map((store) => store.id)).toEqual([1])
+  })
+
+  it('dùng cùng rule search/ranking và áp dụng thêm filter khu vực + loại cửa hàng', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp hóa Minh Anh', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'tap_hoa', created_at: '2026-04-19T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Minh Anh Số 3', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'tap_hoa', created_at: '2026-04-21T00:00:00.000Z' }),
+      makeStore({ id: 3, name: 'Minh Anh Quốc Oai', district: 'Quốc Oai', ward: 'Yên Sơn', store_type: 'tap_hoa', created_at: '2026-04-22T00:00:00.000Z' }),
+      makeStore({ id: 4, name: 'Minh Anh Quán Ăn', district: 'Hoài Đức', ward: 'An Khánh', store_type: 'quan_an', created_at: '2026-04-23T00:00:00.000Z' }),
+    ])
+
+    const results = buildMapSearchResults({
+      indexedStores,
+      searchTerm: 'minh anh',
+      currentLocation: null,
+      selectedDistricts: ['Hoài Đức'],
+      selectedWards: ['An Khánh'],
+      selectedStoreTypes: ['tap_hoa'],
+    })
+
+    expect(results.map((store) => store.id)).toEqual([2, 1])
+  })
+})
+
 describe('buildMapSearchSuggestions', () => {
   it('trả về [] khi search term rỗng', () => {
     const indexedStores = buildStoreSearchIndex([makeStore()])
@@ -135,6 +209,24 @@ describe('buildMapSearchSuggestions', () => {
       searchTerm: '   ',
       currentLocation: null,
     })).toEqual([])
+  })
+
+
+
+  it('map suggestions vẫn ưu tiên exact match trước near-match mới', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Shopii Mart', created_at: '2026-04-01T00:00:00.000Z' }),
+      makeStore({ id: 2, name: 'Shoppii Mart', created_at: '2026-04-02T00:00:00.000Z' }),
+    ])
+
+    const suggestions = buildMapSearchSuggestions({
+      indexedStores,
+      searchTerm: 'shopii',
+      currentLocation: null,
+      limit: 2,
+    })
+
+    expect(suggestions.map((store) => store.id)).toEqual([1, 2])
   })
 
   it('giữ cùng thứ tự top-ranked với logic search dùng chung', () => {

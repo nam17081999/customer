@@ -6,7 +6,7 @@ import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import { DEFAULT_STORE_TYPE, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
-import { extractCoordsFromMapsUrl } from '@/helper/storeFormShared'
+import { resolveMapsLinkCoordinates } from '@/helper/storeFormShared'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import {
   buildEditSteps,
@@ -20,6 +20,9 @@ import {
 } from '@/helper/storeEditFlow'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
+import { getLocationRefreshOptions } from '@/helper/locationPolicy'
+import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
+import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 function getCoordinateValue(value) {
   return Number.isFinite(value) ? value : null
@@ -172,31 +175,30 @@ export function useStoreEditController() {
       void refreshCompassHeading({ requestPermission: true })
       clearPositionCache()
       setResolvingAddr(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 30,
-        skipCache: true,
-      })
+      const { coords, error } = await getBestPosition({ ...getLocationRefreshOptions(), anchorCoords: pickedLat != null && pickedLng != null ? { latitude: pickedLat, longitude: pickedLng } : null })
       if (!coords) {
         setGeoBlocked(true)
         showMessage('error', getGeoErrorMessage(error))
-        return
+        return false
       }
-      setGeoBlocked(false)
-      setInitialGPSLat(coords.latitude)
-      setInitialGPSLng(coords.longitude)
-      setPickedLat(coords.latitude)
-      setPickedLng(coords.longitude)
-      setUserHasEditedMap(false)
-      showMessage('success', 'Đã cập nhật vị trí GPS mới!')
+      const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
+      setGeoBlocked(patch.geoBlocked)
+      setInitialGPSLat(patch.initialGPSLat)
+      setInitialGPSLng(patch.initialGPSLng)
+      setPickedLat(patch.pickedLat)
+      setPickedLng(patch.pickedLng)
+      setUserHasEditedMap(patch.userHasEditedMap)
+      showMessage('success', getLocationRefreshSuccessMessage())
+      return true
     } catch (err) {
       console.error('Get location error:', err)
       setGeoBlocked(true)
       showMessage('error', getGeoErrorMessage(err))
+      return false
     } finally {
       setResolvingAddr(false)
     }
-  }, [refreshCompassHeading, showMessage])
+  }, [pickedLat, pickedLng, refreshCompassHeading, showMessage])
 
   const handleStartLocationSetup = useCallback(async () => {
     setStep2Key((value) => {
@@ -212,29 +214,17 @@ export function useStoreEditController() {
       return patch.nextStep2Key
     })
 
-    try {
-      setResolvingAddr(true)
-      const { coords, error } = await getBestPosition({
-        maxWaitTime: 1500,
-        desiredAccuracy: 30,
-      })
-      if (!coords) {
-        setGeoBlocked(true)
-        showMessage('error', getGeoErrorMessage(error))
-        return
-      }
-      setGeoBlocked(false)
-      setInitialGPSLat(coords.latitude)
-      setInitialGPSLng(coords.longitude)
-      setPickedLat(coords.latitude)
-      setPickedLng(coords.longitude)
-    } catch (err) {
-      console.error('Get location error:', err)
-      showMessage('error', getGeoErrorMessage(err))
-    } finally {
-      setResolvingAddr(false)
+    const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
+    if (!entryBehavior.shouldAutoAcquire) {
+      return true
     }
-  }, [showMessage])
+
+    if (entryBehavior.reuseRefreshFlow) {
+      return handleGetLocation()
+    }
+
+    return true
+  }, [handleGetLocation, pickedLat, pickedLng])
 
   const resolvedWardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
 
@@ -246,14 +236,15 @@ export function useStoreEditController() {
   const hasEditableFields = useMemo(() => hasEditableSupplementFields(supplementLocks), [supplementLocks])
 
   const applyMapsLinkCoords = useCallback((lat, lng) => {
-    setInitialGPSLat(lat)
-    setInitialGPSLng(lng)
-    setPickedLat(lat)
-    setPickedLng(lng)
-    setUserHasEditedMap(true)
-    setGeoBlocked(false)
+    const patch = buildStoreFormLocationPatch({ lat, lng, userHasEditedMap: true })
+    setInitialGPSLat(patch.initialGPSLat)
+    setInitialGPSLng(patch.initialGPSLng)
+    setPickedLat(patch.pickedLat)
+    setPickedLng(patch.pickedLng)
+    setUserHasEditedMap(patch.userHasEditedMap)
+    setGeoBlocked(patch.geoBlocked)
     setStep2Key((value) => value + 1)
-    showMessage('success', `Đã lấy vị trí: ${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+    showMessage('success', getLocationMapsLinkSuccessMessage(lat, lng))
   }, [showMessage])
 
   const handleMapsLink = useCallback(async (link) => {
@@ -262,38 +253,14 @@ export function useStoreEditController() {
     setMapsLinkError('')
     if (!trimmed) return
 
-    let coords = extractCoordsFromMapsUrl(trimmed)
-    if (coords) {
-      applyMapsLinkCoords(coords.lat, coords.lng)
-      return
-    }
-
-    const isShortLink = /goo\.gl|maps\.app\.goo\.gl/i.test(trimmed)
-    if (!isShortLink) {
-      setMapsLinkError('Không tìm thấy tọa độ trong link')
-      return
-    }
-
     try {
       setMapsLinkLoading(true)
-      const res = await fetch('/api/expand-maps-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmed }),
-      })
-      const data = await res.json()
-      if (!data.success || !data.finalUrl) {
-        setMapsLinkError('Không mở được link')
-        return
-      }
-      coords = extractCoordsFromMapsUrl(data.finalUrl)
+      const { coords, error } = await resolveMapsLinkCoordinates(trimmed)
       if (coords) {
         applyMapsLinkCoords(coords.lat, coords.lng)
       } else {
-        setMapsLinkError('Không tìm thấy tọa độ từ link')
+        setMapsLinkError(error)
       }
-    } catch {
-      setMapsLinkError('Lỗi khi xử lý link')
     } finally {
       setMapsLinkLoading(false)
     }
@@ -693,6 +660,5 @@ export function useStoreEditController() {
     handleSaveEdit,
   }
 }
-
 
 

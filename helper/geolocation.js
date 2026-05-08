@@ -5,12 +5,6 @@
 
 import { getE2EGeolocationOverride, incrementE2EGeolocationCallCount } from '@/lib/e2e-test-mode'
 
-/**
- * In-memory position cache (TTL = 10 s).
- * Lets successive calls within the same session reuse a recent GPS fix
- * without waiting for the hardware to settle again.
- * skipCache: true bypasses this (used by "Lấy lại vị trí" button).
- */
 const _posCache = {
   coords: null,
   ts: 0,
@@ -30,30 +24,66 @@ const _posCache = {
   },
 }
 
-/**
- * Get the best GPS position using watchPosition for progressive accuracy.
- * Returns the first position that meets desiredAccuracy, or the best one
- * collected within maxWaitTime.
- *
- * Strategy:
- * 1. Check in-memory cache — if fresh enough and accurate enough, return instantly
- * 2. Start watchPosition immediately (gets coarse → fine updates)
- * 3. In parallel, try a quick browser-cached position (maximumAge 30 s)
- * 4. As watch updates arrive, keep the best sample and update in-memory cache
- * 5. Early-exit as soon as desiredAccuracy is met
- * 6. After maxWaitTime, return the best sample collected
- *
- * @param {Object} options
- * @param {number}  options.maxWaitTime     — total budget in ms (default 2000)
- * @param {number}  options.desiredAccuracy — early-exit threshold in metres (default 30)
- * @param {boolean} options.skipCache       — bypass in-memory cache (default false)
- * @returns {Promise<{coords: GeolocationCoordinates|null, error: Error|null}>}
- */
+function toRadians(value) {
+  return (value * Math.PI) / 180
+}
+
+export function calculateGeolocationDistanceMeters(a, b) {
+  if (!a || !b) return Infinity
+  const lat1 = Number(a.latitude)
+  const lng1 = Number(a.longitude)
+  const lat2 = Number(b.latitude)
+  const lng2 = Number(b.longitude)
+  if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) return Infinity
+
+  const R = 6371e3
+  const dLat = toRadians(lat2 - lat1)
+  const dLng = toRadians(lng2 - lng1)
+  const aa = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLng / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa))
+  return R * c
+}
+
+export function classifyGeolocationSample({ anchorCoords, candidate } = {}) {
+  if (!anchorCoords || !candidate) return { isSuspicious: false, distanceMeters: 0, thresholdMeters: 0 }
+  const distanceMeters = calculateGeolocationDistanceMeters(anchorCoords, candidate)
+  const accuracy = Number(candidate?.accuracy || Infinity)
+  const thresholdMeters = Math.max(250, accuracy * 4)
+  return {
+    isSuspicious: distanceMeters > thresholdMeters,
+    distanceMeters,
+    thresholdMeters,
+  }
+}
+
+export function shouldFinishGeolocationEarly({
+  desiredAccuracy,
+  trustedFixCount,
+  suspiciousFixCount,
+  bestTrusted,
+  bestSuspicious,
+} = {}) {
+  if (bestTrusted && Number(bestTrusted.accuracy || Infinity) <= desiredAccuracy && trustedFixCount >= 1) {
+    return true
+  }
+
+  if (bestSuspicious && Number(bestSuspicious.accuracy || Infinity) <= desiredAccuracy && suspiciousFixCount >= 2) {
+    return true
+  }
+
+  return false
+}
+
+export function selectGeolocationFinishResult({ bestTrusted, bestSuspicious } = {}) {
+  return bestTrusted || bestSuspicious || null
+}
+
 export async function getBestPosition({
   maxWaitTime = 2000,
   desiredAccuracy = 30,
   skipCache = false,
-  // Legacy params — ignored but accepted to avoid breaking callers
+  anchorCoords = null,
   attempts,
   timeout,
 } = {}) {
@@ -77,7 +107,6 @@ export async function getBestPosition({
     return { coords: null, error: new Error('Geolocation not supported') }
   }
 
-  // ── 1. In-memory cache fast-path ──────────────────────────────────────────
   if (!skipCache) {
     const cached = _posCache.get()
     if (cached && (cached.accuracy || Infinity) <= desiredAccuracy) {
@@ -86,9 +115,38 @@ export async function getBestPosition({
   }
 
   return new Promise((resolve) => {
-    let best = null
+    let bestTrusted = null
+    let bestSuspicious = null
     let watchId = null
     let resolved = false
+    let trustedFixCount = 0
+    let suspiciousFixCount = 0
+
+    function considerCandidate(coords) {
+      if (!coords) return
+      const acc = coords.accuracy || Infinity
+      const { isSuspicious } = classifyGeolocationSample({ anchorCoords, candidate: coords })
+
+      if (isSuspicious) {
+        const bestAcc = bestSuspicious?.accuracy || Infinity
+        if (acc < bestAcc) bestSuspicious = coords
+        if (acc <= desiredAccuracy) suspiciousFixCount += 1
+      } else {
+        const bestAcc = bestTrusted?.accuracy || Infinity
+        if (acc < bestAcc) bestTrusted = coords
+        if (acc <= desiredAccuracy) trustedFixCount += 1
+      }
+
+      if (shouldFinishGeolocationEarly({
+        desiredAccuracy,
+        trustedFixCount,
+        suspiciousFixCount,
+        bestTrusted,
+        bestSuspicious,
+      })) {
+        finish()
+      }
+    }
 
     function finish() {
       if (resolved) return
@@ -97,9 +155,10 @@ export async function getBestPosition({
         navigator.geolocation.clearWatch(watchId)
         watchId = null
       }
-      if (best) {
-        _posCache.set(best)
-        resolve({ coords: best, error: null })
+      const result = selectGeolocationFinishResult({ bestTrusted, bestSuspicious })
+      if (result) {
+        _posCache.set(result)
+        resolve({ coords: result, error: null })
       } else {
         resolve({ coords: null, error: new Error('Không lấy được vị trí') })
       }
@@ -107,70 +166,38 @@ export async function getBestPosition({
 
     function onPosition(pos) {
       if (resolved) return
-      const coords = pos?.coords
-      if (!coords) return
-
-      const acc = coords.accuracy || Infinity
-      const bestAcc = best?.accuracy || Infinity
-
-      if (acc < bestAcc) {
-        best = coords
-      }
-
-      // Early exit if accuracy is good enough
-      if (acc <= desiredAccuracy) {
-        finish()
-      }
+      considerCandidate(pos?.coords)
     }
 
     function onError() {
-      // Don't resolve yet — wait for timeout, watchPosition may recover
+      // wait until deadline/watch recovery
     }
 
-    // ── 2. Start continuous watch immediately ─────────────────────────────
     watchId = navigator.geolocation.watchPosition(onPosition, onError, {
       enableHighAccuracy: true,
       timeout: maxWaitTime,
       maximumAge: 0,
     })
 
-    // ── 3. Also try a quick browser-cached position in parallel ───────────
     if (!skipCache) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           if (resolved) return
-          const coords = pos?.coords
-          if (!coords?.accuracy) return
-          const acc = coords.accuracy
-          const bestAcc = best?.accuracy || Infinity
-          if (acc < bestAcc) {
-            best = coords
-          }
-          // Finish early if the cached position is accurate enough
-          if (acc <= desiredAccuracy) {
-            finish()
-          }
+          considerCandidate(pos?.coords)
         },
-        () => { /* ignore cache error */ },
+        () => {},
         { enableHighAccuracy: true, timeout: 500, maximumAge: 30_000 },
       )
     }
 
-    // ── 4. Hard deadline ──────────────────────────────────────────────────
     setTimeout(finish, maxWaitTime)
   })
 }
 
-/**
- * Exposed for testing / "Lấy lại vị trí" to force a fresh read.
- */
 export function clearPositionCache() {
   _posCache.clear()
 }
 
-/**
- * Map a geolocation error to a user-friendly Vietnamese message.
- */
 export function getGeoErrorMessage(err) {
   const base =
     'Không lấy được vị trí. Vui lòng bật định vị và mở cài đặt quyền vị trí của trình duyệt để cho phép.'
@@ -194,13 +221,6 @@ export function getGeoErrorMessage(err) {
   return base
 }
 
-/**
- * Request a single compass heading sample from the device orientation API.
- * Collects up to 5 samples in 1.2 s and returns the circular mean in degrees.
- *
- * @param {{requestPermission?: boolean}} options
- * @returns {Promise<{heading: number|null, error: string}>}
- */
 export async function requestCompassHeading(options = {}) {
   const { requestPermission = false } = options
   const e2eGeolocation = getE2EGeolocationOverride()
@@ -215,8 +235,6 @@ export async function requestCompassHeading(options = {}) {
     return { heading: null, error: '' }
   }
 
-  // iOS 13+ requires explicit permission and browsers only allow prompting
-  // inside a direct user gesture (click/tap).
   if (requestPermission && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try {
       const res = await DeviceOrientationEvent.requestPermission()

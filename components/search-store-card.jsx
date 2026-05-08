@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,6 @@ import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import StoreDetailModal from '@/components/store-detail-modal'
-import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import TelesaleCallDialog from '@/components/store/telesale-call-dialog'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
@@ -60,7 +59,7 @@ function CircleIconButton({ href, label, children, onClick, onPointerDown }) {
   )
 }
 
-export default function SearchStoreCard({
+function SearchStoreCard({
   store,
   distance,
   searchTerm,
@@ -124,7 +123,7 @@ export default function SearchStoreCard({
   if (compact) {
     return (
       <>
-        <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
+        <Card className="min-h-[112px] overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
           <CardContent className="p-0">
             <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
               <button
@@ -138,18 +137,14 @@ export default function SearchStoreCard({
                   </div>
 
                   <div className="min-w-0">
-                    <OverflowMarquee
-                      className="max-w-full"
-                      textClassName="font-semibold text-gray-100 text-lg leading-snug"
-                      contentKey={`${store.id}:${store.name}:${searchTerm || ''}`}
-                    >
+                    <div className="truncate font-semibold leading-snug text-gray-100 text-lg">
                       {renderHighlightedName(store.name, searchTerm)}
-                    </OverflowMarquee>
+                    </div>
                   </div>
 
                   <div className="col-span-2 mt-1 space-y-1">
                     {distance !== null && distance !== undefined ? (
-                      <span className="inline-flex items-center gap-1 leading-none text-base text-gray-400">
+                      <span className="inline-flex h-6 items-center gap-1 leading-none text-base text-gray-400">
                         <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -157,7 +152,7 @@ export default function SearchStoreCard({
                         <span className="leading-none">{formatDistance(distance)}</span>
                       </span>
                     ) : !hasCoordinates ? (
-                      <span className="inline-flex items-center gap-1 leading-none text-base text-amber-400">
+                      <span className="inline-flex h-6 items-center gap-1 leading-none text-base text-amber-400">
                         <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" />
@@ -166,7 +161,7 @@ export default function SearchStoreCard({
                       </span>
                     ) : null}
 
-                    <p className="text-base text-gray-400 line-clamp-2 leading-snug">{addressText}</p>
+                    <p className="line-clamp-2 min-h-[44px] text-base leading-snug text-gray-400">{addressText}</p>
                   </div>
                 </div>
               </button>
@@ -299,3 +294,5 @@ export default function SearchStoreCard({
     </>
   )
 }
+
+export default memo(SearchStoreCard)

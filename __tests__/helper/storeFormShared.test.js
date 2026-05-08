@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildDuplicatePhoneMessage,
   extractCoordsFromMapsUrl,
   getStoreFormFinalCoordinates,
+  resolveMapsLinkCoordinates,
 } from '@/helper/storeFormShared'
 
 describe('extractCoordsFromMapsUrl', () => {
@@ -24,6 +25,64 @@ describe('extractCoordsFromMapsUrl', () => {
   it('trả về null khi không có tọa độ hợp lệ', () => {
     expect(extractCoordsFromMapsUrl('https://maps.google.com/?q=999,999')).toBeNull()
     expect(extractCoordsFromMapsUrl('https://example.com')).toBeNull()
+  })
+})
+
+describe('resolveMapsLinkCoordinates', () => {
+  it('trả direct coords ngay khi link đã chứa tọa độ', async () => {
+    const fetcher = vi.fn()
+    await expect(resolveMapsLinkCoordinates('https://maps.google.com/?q=21.1,105.9', fetcher)).resolves.toEqual({
+      coords: { lat: 21.1, lng: 105.9 },
+      error: '',
+    })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('expand short link qua fetcher rồi đọc tọa độ từ finalUrl', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      json: async () => ({
+        success: true,
+        finalUrl: 'https://maps.google.com/@21.02851,105.80482,17z',
+      }),
+    })
+
+    await expect(resolveMapsLinkCoordinates('https://maps.app.goo.gl/abc123', fetcher)).resolves.toEqual({
+      coords: { lat: 21.02851, lng: 105.80482 },
+      error: '',
+    })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('trả lỗi khi link không phải short-link và không có tọa độ', async () => {
+    await expect(resolveMapsLinkCoordinates('https://example.com')).resolves.toEqual({
+      coords: null,
+      error: 'Không tìm thấy tọa độ trong link',
+    })
+  })
+
+  it('trả lỗi khi expand được nhưng finalUrl vẫn không có tọa độ', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      json: async () => ({
+        success: true,
+        finalUrl: 'https://maps.google.com/place/abc',
+      }),
+    })
+
+    await expect(resolveMapsLinkCoordinates('https://maps.app.goo.gl/abc123', fetcher)).resolves.toEqual({
+      coords: null,
+      error: 'Không tìm thấy tọa độ từ link',
+    })
+  })
+
+  it('trả lỗi khi expand API báo fail', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      json: async () => ({ success: false, finalUrl: '' }),
+    })
+
+    await expect(resolveMapsLinkCoordinates('https://maps.app.goo.gl/abc123', fetcher)).resolves.toEqual({
+      coords: null,
+      error: 'Không mở được link',
+    })
   })
 })
 

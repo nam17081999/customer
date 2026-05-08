@@ -4,15 +4,19 @@ import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
-  buildSearchRouteQuery,
   buildSearchStateFromRouteQuery,
   countActiveFilters,
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
-  parseQueryList,
-  serializeRouteQuery,
 } from '@/helper/homeSearch'
+import {
+  buildCurrentSearchRouteQuery,
+  buildNextSearchRouteQuery,
+  buildPersistedSearchHref,
+  scheduleSearchRouteSync,
+  shouldSyncSearchRoute,
+} from '@/helper/homeSearchRouteSync'
 
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
 const ALL_WARDS = Array.from(
@@ -24,8 +28,7 @@ const FLASH_MESSAGE_DURATION_MS = 3800
 
 function persistSearchRoute(query) {
   if (typeof window === 'undefined') return
-  const search = new URLSearchParams(query).toString()
-  const href = search ? `/?${search}` : '/'
+  const href = buildPersistedSearchHref(query)
   window.sessionStorage.setItem('storevis:last-search-route', href)
   window.dispatchEvent(new CustomEvent('storevis:search-route-changed', { detail: { href } }))
 }
@@ -43,12 +46,15 @@ export function useHomeSearchController() {
   const [selectedDetailFlags, setSelectedDetailFlags] = useState([])
   const [showDetailedFilters, setShowDetailedFilters] = useState(false)
   const [currentLocation, setCurrentLocation] = useState(null)
+  const [sortLocation, setSortLocation] = useState(null)
   const [loading, setLoading] = useState(false)
   const searchInputRef = useRef(null)
   const virtuosoRef = useRef(null)
   const initializedFromQuery = useRef(false)
   const lastLocationRequestAtRef = useRef(0)
   const lastSearchCriteriaRef = useRef('')
+  const isListAtTopRef = useRef(true)
+  const pendingSortLocationRef = useRef(null)
 
   const hasSearchCriteria = hasActiveSearchCriteria({
     searchTerm,
@@ -121,41 +127,25 @@ export function useHomeSearchController() {
   useEffect(() => {
     if (!initializedFromQuery.current || !router.isReady) return
 
-    const nextQuery = buildSearchRouteQuery({
+    const nextQuery = buildNextSearchRouteQuery({
       searchTerm,
       selectedDistrict,
       selectedWard,
       selectedStoreTypes,
       selectedDetailFlags,
     })
-    const currentQuery = buildSearchRouteQuery({
-      searchTerm: String(router.query.q || ''),
-      selectedDistrict: parseQueryList(router.query.districts || router.query.district)[0] || '',
-      selectedWard: parseQueryList(router.query.wards || router.query.ward)[0] || '',
-      selectedStoreTypes: parseQueryList(router.query.types),
-      selectedDetailFlags: parseQueryList(router.query.flags),
+    const currentQuery = buildCurrentSearchRouteQuery(router.query)
+
+    if (!shouldSyncSearchRoute(nextQuery, currentQuery)) return
+
+    return scheduleSearchRouteSync({
+      nextQuery,
+      pathname: router.pathname,
+      replace: router.replace.bind(router),
+      persist: persistSearchRoute,
+      setTimer: window.setTimeout.bind(window),
     })
-
-    if (serializeRouteQuery(nextQuery) === serializeRouteQuery(currentQuery)) return
-
-    const syncTimer = window.setTimeout(() => {
-      router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
-      persistSearchRoute(nextQuery)
-    }, 250)
-
-    return () => window.clearTimeout(syncTimer)
   }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router, router.isReady, router.pathname, router.query])
-
-  useEffect(() => {
-    if (!initializedFromQuery.current || !router.isReady) return
-    persistSearchRoute(buildSearchRouteQuery({
-      searchTerm,
-      selectedDistrict,
-      selectedWard,
-      selectedStoreTypes,
-      selectedDetailFlags,
-    }))
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router.isReady])
 
   const wardOptions = useMemo(() => (
     selectedDistrict
@@ -202,6 +192,41 @@ export function useHomeSearchController() {
   useEffect(() => {
     refreshCurrentLocation()
   }, [refreshCurrentLocation])
+
+  const commitSortLocation = useCallback((location) => {
+    if (!location) return
+    setSortLocation((prev) => {
+      if (
+        prev
+        && prev.latitude === location.latitude
+        && prev.longitude === location.longitude
+      ) {
+        return prev
+      }
+      return location
+    })
+  }, [])
+
+  const handleListAtTopChange = useCallback((isAtTop) => {
+    isListAtTopRef.current = isAtTop
+
+    if (isAtTop && pendingSortLocationRef.current) {
+      commitSortLocation(pendingSortLocationRef.current)
+      pendingSortLocationRef.current = null
+    }
+  }, [commitSortLocation])
+
+  useEffect(() => {
+    if (!currentLocation) return
+
+    if (!sortLocation || isListAtTopRef.current) {
+      commitSortLocation(currentLocation)
+      pendingSortLocationRef.current = null
+      return
+    }
+
+    pendingSortLocationRef.current = currentLocation
+  }, [commitSortLocation, currentLocation, sortLocation])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -321,7 +346,7 @@ export function useHomeSearchController() {
       selectedWard,
       selectedStoreTypes,
       selectedDetailFlags,
-      currentLocation,
+      currentLocation: sortLocation,
     })
   }, [
     indexedStores,
@@ -331,7 +356,7 @@ export function useHomeSearchController() {
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
-    currentLocation,
+    sortLocation,
   ])
 
   const showSkeleton = loading || !storesLoaded
@@ -367,12 +392,17 @@ export function useHomeSearchController() {
     if (lastSearchCriteriaRef.current === nextCriteria) return
     lastSearchCriteriaRef.current = nextCriteria
 
+    if (currentLocation) {
+      commitSortLocation(currentLocation)
+      pendingSortLocationRef.current = null
+    }
+
     virtuosoRef.current?.scrollToIndex({
       index: 0,
       align: 'start',
       behavior: 'auto',
     })
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags])
+  }, [commitSortLocation, currentLocation, searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags])
 
   return {
     msgState,
@@ -396,6 +426,7 @@ export function useHomeSearchController() {
     districtOptions: DISTRICTS,
     toggleFilterValue,
     clearAllFilters,
+    handleListAtTopChange,
     searchResults,
     showSkeleton,
   }

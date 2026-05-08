@@ -1,8 +1,13 @@
 import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
-import { rankStoreSearchResults } from '@/helper/storeSearch'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
+import { filterAndRankIndexedStores } from '@/helper/storeSearch'
 
 function normalizeText(value) {
   return String(value || '').trim()
+}
+
+function normalizeFilterValue(value) {
+  return removeVietnameseTones(String(value || '').trim())
 }
 
 export function buildMapAvailableWards(selectedDistricts = []) {
@@ -90,18 +95,94 @@ export function hasActiveMapFilters({
   return selectedDistricts.length > 0 || selectedWards.length > 0 || selectedStoreTypes.length > 0
 }
 
+export function buildMapSearchResults({
+  indexedStores,
+  searchTerm,
+  currentLocation,
+  selectedDistricts = [],
+  selectedWards = [],
+  selectedStoreTypes = [],
+}) {
+  const districtSet = new Set(selectedDistricts.map(normalizeFilterValue).filter(Boolean))
+  const wardSet = new Set(selectedWards.map(normalizeFilterValue).filter(Boolean))
+  const typeSet = new Set(selectedStoreTypes.map(normalizeFilterValue).filter(Boolean))
+
+  return filterAndRankIndexedStores({
+    indexedStores,
+    searchTerm,
+    currentLocation,
+    predicate: (entry) => {
+      const district = entry.normalizedDistrict
+      const ward = entry.normalizedWard
+      const storeType = entry.normalizedStoreType
+
+      if (districtSet.size > 0 && !districtSet.has(district)) return false
+      if (wardSet.size > 0 && !wardSet.has(ward)) return false
+      if (typeSet.size > 0 && !typeSet.has(storeType)) return false
+
+      return true
+    },
+  })
+}
+
+
+export function buildMapPanelDerivedData({
+  indexedStores,
+  searchTerm,
+  currentLocation,
+  selectedDistricts = [],
+  selectedWards = [],
+  selectedStoreTypes = [],
+  suggestionLimit = 25,
+}) {
+  const storesAfterAreaFilters = buildMapSearchResults({
+    indexedStores,
+    searchTerm: '',
+    currentLocation,
+    selectedDistricts,
+    selectedWards,
+    selectedStoreTypes: [],
+  })
+
+  const filteredStores = selectedStoreTypes.length > 0 || String(searchTerm || '').trim()
+    ? buildMapSearchResults({
+      indexedStores,
+      searchTerm,
+      currentLocation,
+      selectedDistricts,
+      selectedWards,
+      selectedStoreTypes,
+    })
+    : storesAfterAreaFilters
+
+  return {
+    storesAfterAreaFilters,
+    filteredStores,
+    storeTypeCounts: buildMapStoreTypeCounts(storesAfterAreaFilters),
+    suggestions: String(searchTerm || '').trim()
+      ? filteredStores.slice(0, suggestionLimit)
+      : [],
+  }
+}
+
 export function buildMapSearchSuggestions({
   indexedStores,
   searchTerm,
   currentLocation,
+  selectedDistricts = [],
+  selectedWards = [],
+  selectedStoreTypes = [],
   limit = 25,
 }) {
   if (!String(searchTerm || '').trim()) return []
 
-  return rankStoreSearchResults({
+  return buildMapPanelDerivedData({
     indexedStores,
     searchTerm,
     currentLocation,
-    limit,
-  })
+    selectedDistricts,
+    selectedWards,
+    selectedStoreTypes,
+    suggestionLimit: limit,
+  }).suggestions
 }
