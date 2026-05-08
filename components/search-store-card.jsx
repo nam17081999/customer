@@ -123,9 +123,9 @@ function SearchStoreCard({
   if (compact) {
     return (
       <>
-        <Card className="h-[112px] overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
+        <Card className="min-h-[112px] overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
           <CardContent className="p-0">
-            <div className="grid h-[112px] grid-cols-[1fr_auto] gap-2 p-3">
+            <div className="grid min-h-[112px] grid-cols-[1fr_auto] gap-2 p-3">
               <button
                 type="button"
                 className="min-w-0 text-left"

@@ -294,7 +294,7 @@ export default function HomePage() {
                 computeItemKey={(index, item) => String(item.id)}
                 overscan={180}
                 itemContent={(index, store) => (
-                  <div className="h-[124px] pb-3" key={store.id}>
+                  <div className="pb-3" key={store.id}>
                     <SearchStoreCard
                       store={store}
                       distance={store.distance}
