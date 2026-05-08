@@ -199,7 +199,7 @@ export default function HomePage() {
           )}
 
           {showSkeleton ? (
-            <div className="h-5 w-56 animate-pulse rounded bg-gray-800" aria-hidden="true" />
+            <div className="h-5 w-56 animate-pulse rounded bg-gray-800 " aria-hidden="true" />
           ) : hasSearchCriteria ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <p className="min-w-0 text-sm text-gray-400">
@@ -226,14 +226,14 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           {showSkeleton && (
             <div
               className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1"
               aria-label="Đang tải kết quả"
             >
-              {[...Array(5)].map((_, i) => (
-                <Card key={i} className="overflow-hidden rounded-md border border-gray-800 bg-gray-950">
+              {[...Array(10)].map((_, i) => (
+                <Card key={i} className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 min-h-[135px]">
                   <CardContent className="p-0">
                     <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
                       <div className="min-w-0">
