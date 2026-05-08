@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildLocationStepResetPatch, hasLocationCoordinates } from '@/helper/storeLocationStep'
+import {
+  buildLocationStepResetPatch,
+  getCreateLocationStepView,
+  getLocationStepView,
+  hasLocationCoordinates,
+} from '@/helper/storeLocationStep'
 
 describe('hasLocationCoordinates', () => {
   it('trả về true khi cả lat/lng đều hợp lệ', () => {
@@ -31,5 +36,108 @@ describe('buildLocationStepResetPatch', () => {
 
   it('mặc định tăng từ 0 khi không truyền step2Key', () => {
     expect(buildLocationStepResetPatch().nextStep2Key).toBe(1)
+  })
+})
+
+describe('getLocationStepView', () => {
+  it('ẩn map mặc định khi đang bootstrap GPS nhưng chưa có tọa độ', () => {
+    expect(getLocationStepView({
+      resolving: true,
+      lat: null,
+      lng: null,
+      blocked: false,
+    })).toEqual({
+      hasCoordinates: false,
+      phase: 'bootstrapping',
+      shouldRenderMap: false,
+      shouldShowPlaceholder: true,
+    })
+  })
+
+  it('render map khi đã có tọa độ thật dù resolving vừa kết thúc hoặc còn state phụ', () => {
+    expect(getLocationStepView({
+      resolving: false,
+      lat: 21.028511,
+      lng: 105.804817,
+      blocked: false,
+    })).toEqual({
+      hasCoordinates: true,
+      phase: 'ready',
+      shouldRenderMap: true,
+      shouldShowPlaceholder: false,
+    })
+
+    expect(getLocationStepView({
+      resolving: true,
+      lat: 21.028511,
+      lng: 105.804817,
+      blocked: false,
+    }).shouldRenderMap).toBe(true)
+  })
+
+  it('vẫn render map khi flow bị chặn quyền để giữ overlay/các nút fallback hiện có', () => {
+    expect(getLocationStepView({
+      resolving: false,
+      lat: null,
+      lng: null,
+      blocked: true,
+    })).toEqual({
+      hasCoordinates: false,
+      phase: 'blocked',
+      shouldRenderMap: true,
+      shouldShowPlaceholder: false,
+    })
+  })
+
+  it('không render map default sau bootstrap nếu vẫn chưa có tọa độ và chưa blocked', () => {
+    expect(getLocationStepView({
+      resolving: false,
+      lat: null,
+      lng: null,
+      blocked: false,
+    })).toEqual({
+      hasCoordinates: false,
+      phase: 'awaiting_input',
+      shouldRenderMap: false,
+      shouldShowPlaceholder: true,
+    })
+  })
+
+  it('coi tọa độ không hợp lệ như chưa có tọa độ để chặn default center', () => {
+    expect(getLocationStepView({
+      resolving: true,
+      lat: Number.NaN,
+      lng: 105.804817,
+      blocked: false,
+    }).phase).toBe('bootstrapping')
+  })
+
+  it('hỗ trợ report flow khi chưa blocked state riêng nhưng vẫn cần placeholder', () => {
+    expect(getLocationStepView({
+      resolving: false,
+      lat: null,
+      lng: null,
+    })).toEqual({
+      hasCoordinates: false,
+      phase: 'awaiting_input',
+      shouldRenderMap: false,
+      shouldShowPlaceholder: true,
+    })
+  })
+})
+
+describe('getCreateLocationStepView', () => {
+  it('giữ compatibility bằng cách map state create sang helper chung', () => {
+    expect(getCreateLocationStepView({
+      resolvingAddr: true,
+      pickedLat: null,
+      pickedLng: null,
+      geoBlocked: false,
+    })).toEqual(getLocationStepView({
+      resolving: true,
+      lat: null,
+      lng: null,
+      blocked: false,
+    }))
   })
 })

@@ -3,7 +3,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import StoreReportAdminDetail from '@/components/store/store-report-admin-detail'
 import { summarizeStoreReport } from '@/helper/storeReportFlow'
 import { useStoreReportsController } from '@/helper/useStoreReportsController'
@@ -94,22 +94,19 @@ export default function StoreReportDetailPage() {
         </div>
       </div>
 
-      <Dialog open={confirmAction.open} onOpenChange={(open) => { if (!open) closeConfirmAction() }}>
-        <DialogContent className="rounded-2xl border border-gray-800 bg-gray-950 text-gray-100 sm:max-w-md">
-          <DialogTitle>
-            {confirmAction.type === 'edit' ? 'Xác nhận cập nhật cửa hàng' : 'Xác nhận đánh dấu báo cáo'}
-          </DialogTitle>
-          <DialogDescription className="text-sm text-gray-400">
-            {confirmAction.type === 'edit'
-              ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
-              : 'Đánh dấu báo cáo này là đã xử lý?'}
-          </DialogDescription>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={closeConfirmAction}>Hủy</Button>
-            <Button type="button" onClick={handleConfirmAction}>Xác nhận</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={confirmAction.open}
+        onOpenChange={(open) => {
+          if (!open) closeConfirmAction()
+        }}
+        title={confirmAction.type === 'edit' ? 'Xác nhận cập nhật cửa hàng' : 'Xác nhận đánh dấu báo cáo'}
+        description={
+          confirmAction.type === 'edit'
+            ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
+            : 'Đánh dấu báo cáo này là đã xử lý?'
+        }
+        onConfirm={handleConfirmAction}
+      />
     </>
   )
 }

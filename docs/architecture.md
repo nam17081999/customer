@@ -226,6 +226,7 @@ customer/
 
 ## Bản Đồ Trong Form Create/Edit/Supplement
 
+- Tài liệu tổng hợp 4 flow location hiện tại: `docs/location-flow-matrix.md`
 - Các màn `create`, `edit`, `supplement` (và report kiểu edit) dùng chung map picker trong `components/map/location-picker.jsx`.
 - Map picker đọc dữ liệu qua `getOrRefreshStores()` và render thêm lớp cửa hàng lân cận để hỗ trợ chốt vị trí.
 - Marker lân cận dùng kiểu hiển thị tương tự `/map` (icon + nhãn ngắn), không chỉ chấm tròn.

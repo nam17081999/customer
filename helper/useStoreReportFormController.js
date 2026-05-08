@@ -1,6 +1,8 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_STORE_TYPE } from '@/lib/constants'
-import { getBestPosition, getGeoErrorMessage } from '@/helper/geolocation'
+import { getBestPosition, getGeoErrorMessage, requestCompassHeading, clearPositionCache } from '@/helper/geolocation'
+import { getLocationRefreshOptions } from '@/helper/locationPolicy'
+import { buildReportLocationPatch, shouldAutoAcquireLocationOnStepEnter } from '@/helper/locationOrchestration'
 import { supabase } from '@/lib/supabaseClient'
 import {
   buildStoreReportPayload,
@@ -10,6 +12,8 @@ import {
 } from '@/helper/storeReportFlow'
 import { resolveMapsLinkCoordinates } from '@/helper/storeFormShared'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
+import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
+import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 function getReportErrorSelectors(message) {
   const errorText = String(message || '')
@@ -45,11 +49,14 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
   const [reportLng, setReportLng] = useState(normalizeStoreReportCoordinate(store?.longitude))
   const [mapEditable, setMapEditable] = useState(false)
   const [resolving, setResolving] = useState(false)
+  const [heading, setHeading] = useState(null)
+  const [compassError, setCompassError] = useState('')
   const [currentStep, setCurrentStep] = useState(1)
   const [mapsLink, setMapsLink] = useState('')
   const [mapsLinkLoading, setMapsLinkLoading] = useState(false)
   const [mapsLinkError, setMapsLinkError] = useState('')
   const [mapKey, setMapKey] = useState(0)
+  const compassOnceRef = useRef(false)
 
   const resetFeedback = useCallback(() => {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
@@ -75,6 +82,21 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
         : [...prev, code]
     ))
   }
+
+  const refreshCompassHeading = useCallback(async ({ requestPermission = false } = {}) => {
+    if (compassOnceRef.current) return
+    compassOnceRef.current = true
+    setCompassError('')
+    try {
+      const { heading: nextHeading, error } = await requestCompassHeading({ requestPermission })
+      if (error) setCompassError(error)
+      if (nextHeading != null) {
+        setHeading((prev) => (prev === nextHeading ? nextHeading + 0.000001 : nextHeading))
+      }
+    } catch {
+      // keep map usable even when heading permission is denied
+    }
+  }, [])
 
   const showErrorWithScroll = (message) => {
     showMessage('error', message)
@@ -124,30 +146,37 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
   }
   const handleGetLocation = async () => {
     try {
+      compassOnceRef.current = false
+      void refreshCompassHeading({ requestPermission: true })
+      clearPositionCache()
       setResolving(true)
       resetFeedback()
-      const { coords, error: geoError } = await getBestPosition({
-        maxWaitTime: 2000,
-        desiredAccuracy: 15,
-        skipCache: true,
-      })
+      const { coords, error: geoError } = await getBestPosition(getLocationRefreshOptions({ profile: 'report' }))
 
       if (!coords) {
         showErrorWithScroll(getGeoErrorMessage(geoError))
-        return
+        return false
       }
 
-      setReportLat(coords.latitude)
-      setReportLng(coords.longitude)
+      const patch = buildReportLocationPatch({ lat: coords.latitude, lng: coords.longitude })
+      setReportLat(patch.reportLat)
+      setReportLng(patch.reportLng)
       setMapKey((value) => value + 1)
-      showMessage('success', 'Đã cập nhật vị trí GPS mới.')
+      showMessage('success', getLocationRefreshSuccessMessage())
+      return true
     } catch (err) {
       console.error('Get location error:', err)
       showErrorWithScroll(getGeoErrorMessage(err))
+      return false
     } finally {
       setResolving(false)
     }
   }
+
+  useStepEntryEffect(mode === 'edit' && currentStep === 3, async () => {
+    if (!shouldAutoAcquireLocationOnStepEnter({ lat: reportLat, lng: reportLng })) return
+    await handleGetLocation()
+  })
 
   const handleMapsLink = async (link) => {
     const trimmed = String(link || '').trim()
@@ -158,11 +187,12 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
     setMapsLinkLoading(true)
     const { coords, error: linkError } = await resolveMapsLinkCoordinates(trimmed)
     if (coords) {
-      setReportLat(coords.lat)
-      setReportLng(coords.lng)
+      const patch = buildReportLocationPatch({ lat: coords.lat, lng: coords.lng })
+      setReportLat(patch.reportLat)
+      setReportLng(patch.reportLng)
       setMapEditable(false)
       setMapKey((value) => value + 1)
-      showMessage('success', `Đã lấy vị trí: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`)
+      showMessage('success', getLocationMapsLinkSuccessMessage(coords.lat, coords.lng))
     } else {
       setMapsLinkError(linkError)
     }

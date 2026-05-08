@@ -7,6 +7,8 @@ import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import StoreDistrictWardPicker from '@/components/store/store-district-ward-picker'
 import StoreFormStepIndicator from '@/components/store/store-form-step-indicator'
 import StoreTypePicker from '@/components/store/store-type-picker'
+import { getLocationStepView } from '@/helper/storeLocationStep'
+import { getLocationLoadingMessage, getLocationNoCoordinatesMessage, getLocationPlaceholderCopy, getLocationReadyMessage } from '@/helper/locationUi'
 import { useStoreReportFormController } from '@/helper/useStoreReportFormController'
 
 const StoreLocationPicker = dynamic(
@@ -56,6 +58,8 @@ export default function StoreReportForm({
     setReportLng,
     mapEditable,
     setMapEditable,
+    heading,
+    compassError,
     resolving,
     currentStep,
     setCurrentStep,
@@ -93,6 +97,13 @@ export default function StoreReportForm({
     setCurrentStep(1)
     resetFeedback()
   }
+
+  const locationView = getLocationStepView({
+    resolving,
+    lat: reportLat,
+    lng: reportLng,
+    blocked: false,
+  })
 
   const primaryActionLabel = mode === 'edit' && currentStep < 3
     ? 'Tiếp theo →'
@@ -258,41 +269,25 @@ export default function StoreReportForm({
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
+                    <span className="text-sm text-blue-700 dark:text-blue-300">{getLocationLoadingMessage()}</span>
                   </div>
                 ) : null}
 
-                {!resolving && reportLat != null && reportLng != null ? (
+                {locationView.hasCoordinates ? (
                   <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
                     <p className="text-sm text-green-700 dark:text-green-300">
-                      📍 Tọa độ đề xuất: <strong>{reportLat.toFixed(6)}, {reportLng.toFixed(6)}</strong>. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.
+                      {getLocationReadyMessage()}
                     </p>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/20">
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Cửa hàng chưa có vị trí hoặc bạn chưa chọn vị trí mới. Có thể lấy GPS, mở khóa bản đồ, hoặc dán link Google Maps.
+                      {locationView.phase === 'bootstrapping'
+                        ? getLocationPlaceholderCopy(locationView.phase).description
+                        : getLocationNoCoordinatesMessage()}
                     </p>
                   </div>
                 )}
-
-                <div id="report-location-section">
-                  <StoreLocationPicker
-                    mapKey={`report-${mapKey}`}
-                    initialLat={reportLat}
-                    initialLng={reportLng}
-                    editable={mapEditable}
-                    onToggleEditable={() => setMapEditable((prev) => !prev)}
-                    onChange={(lat, lng) => {
-                      setReportLat(lat)
-                      setReportLng(lng)
-                    }}
-                    onGetLocation={handleGetLocation}
-                    resolvingAddr={resolving}
-                    height="65vh"
-                    dark={false}
-                  />
-                </div>
               </div>
             )}
           </div>

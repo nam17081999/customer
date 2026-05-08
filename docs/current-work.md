@@ -1,75 +1,58 @@
 # Task Request
 
 ## Goal
-- Chuẩn hóa thêm derived fields một lần trong search index, nhưng phải viết test sâu đầy đủ trước rồi mới implement.
+- Đồng nhất modal `Xác nhận cập nhật cửa hàng` ở màn chi tiết báo cáo với các modal xác nhận chuẩn khác trong app.
 
 ## Task Type
-- Refactor With Tests First
+- Bug Fix
 
 ## Why
-- Search/map/home hiện đã có một phần derived fields cho `name`, nhưng chưa khóa test sâu cho việc mở rộng các field chuẩn hóa khác.
-- User muốn đi tiếp theo hướng này và ưu tiên test-first để chắc không đổi logic hiện có.
+- Modal xác nhận ở `pages/store/reports/[id].js` đang có style/structure khác pattern chung, gây lệch UI và trải nghiệm không nhất quán.
 
 ## In Scope
-- `helper/storeSearch.js`
-- `helper/homeSearch.js`
-- `helper/mapSearchPanel.js`
-- test search/home/map liên quan
+- `pages/store/reports/[id].js`
+- `components/ui/confirm-dialog.jsx` nếu cần dùng lại API hiện có
 - `docs/current-work.md`
 
 ## Out of Scope
-- Không đổi business rule search ranking hiện có.
-- Không đổi flow URL sync.
-- Không đổi duplicate detection business rules.
+- Không redesign toàn bộ hệ thống dialog.
+- Không đổi business logic approve/reject report.
+- Không chỉnh các modal khác ngoài phạm vi cần để đồng nhất pattern.
 
 ## Must Preserve
-- Search tiếng Việt có dấu / không dấu / phonetic / near-match vẫn giữ nguyên ưu tiên.
-- Home và map tiếp tục dùng cùng logic search shared.
-- Filter district/ward/type/flags giữ nguyên output hiện có.
-- Không giảm độ đúng của case existing tests đang bảo vệ.
+- Hành vi xác nhận approve report giữ nguyên.
+- Wording nghiệp vụ hiện có giữ nguyên nếu không cần đổi.
+- Dùng pattern modal xác nhận chung của app khi phù hợp.
 
 ## Inputs / Repro / Expected
-- Input: build index rồi search/filter ở home/map.
-- Expected: index có thêm derived fields chuẩn hóa để dùng lại, giảm work lặp; output search/filter không đổi.
+- Repro:
+  1. Vào màn chi tiết báo cáo cửa hàng.
+  2. Bấm duyệt/cập nhật.
+  3. Mở modal `Xác nhận cập nhật cửa hàng`.
+- Current:
+  - Modal này khác style/spacing/layout so với các modal xác nhận khác.
+- Expected:
+  - Modal dùng cùng pattern với `ConfirmDialog` và nhìn đồng nhất với create/edit/delete flows.
 
 ## Constraints
-- Viết test sâu trước khi refactor.
 - Không thêm dependency mới.
-- Giữ UTF-8 an toàn.
+- Ưu tiên thay đổi tối thiểu, tận dụng component chung.
 
 ## Required Verification
-- Test mới cho derived fields + search/filter regression.
-- `npm test -- --run __tests__/helper/storeSearch.test.js __tests__/helper/homeSearch.test.js __tests__/helper/mapSearchPanel.test.js`
-- `npm test`
-- `npm run lint`
-- Rà checklist liên quan: `Search Flow`, `Map Flow`, `Tiếng Việt / UI Safety`.
+- So khớp với pattern `components/ui/confirm-dialog.jsx`.
+- Kiểm tra lại file report detail sau khi thay đổi.
+- Chạy `npm run lint` nếu thay đổi logic/component đủ nhỏ để verify nhanh.
 
 ## Definition of Done
-- Có test sâu khóa derived fields mới và output cũ.
-- Implementation chuẩn hóa thêm derived fields một lần.
-- Full regression và lint xanh.
-
-## Output Contract
-- Báo cáo cuối phải có:
-  - Goal
-  - What changed
-  - Files touched
-  - Verification done
-  - Risks or unverified parts
+- Modal xác nhận ở report detail dùng cùng pattern/modal shell với các confirm modal khác.
+- Không đổi behavior approve report.
 
 ## Done
-- Viết test sâu trước cho derived fields mới trong search index (`normalizedDistrict`, `normalizedWard`, `normalizedStoreType`).
-- Viết regression test cho home/map để khóa output filter không đổi khi dùng derived fields chuẩn hóa sẵn.
-- Implement chuẩn hóa thêm các field phụ ngay trong `buildStoreSearchIndex()`.
-- Cho home/map dùng lại derived fields chuẩn hóa này thay vì tiếp tục dựa hoàn toàn vào raw field ở predicate/filter path.
-- Chạy lại focused tests, full suite, và lint.
+- Đã chuyển modal xác nhận ở trang chi tiết báo cáo sang dùng `ConfirmDialog` chung để đồng nhất style/spacing/actions với các flow create/edit/delete.
 
 ## Verification
-- `npm test -- --run __tests__/helper/storeSearch.test.js __tests__/helper/homeSearch.test.js __tests__/helper/mapSearchPanel.test.js` passed: `3` files, `77` tests.
-- `npm test` passed: `26` files, `320` tests.
-- `npm run lint` passed.
-- Đối chiếu checklist liên quan: `Search Flow`, `Map Flow`, `Tiếng Việt / UI Safety`.
+- So khớp pattern với `components/ui/confirm-dialog.jsx`.
+- `npx eslint 'pages/store/reports/[id].js'` passed.
 
 ## Risks / Next
-- Tối ưu này giảm work lặp và thống nhất normalization hơn, nhưng lợi ích perf chủ yếu nằm ở filter/search path; nó không thay đổi lớn runtime map render như các tối ưu source/layer trước.
-- Nếu muốn đi tiếp, bước hợp lý là rà xem còn field nào trong search/filter path vẫn đang normalize lặp lại mỗi lần query để đưa nốt vào index hoặc query meta.
+- Chưa chạy smoke test trên browser trong phiên này, nhưng thay đổi chỉ đổi shell modal, không đổi logic approve.

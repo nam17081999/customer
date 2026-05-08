@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import StoreStepFormLayout from '@/components/store/store-step-form-layout'
-import { hasLocationCoordinates } from '@/helper/storeLocationStep'
+import { getLocationStepView, hasLocationCoordinates } from '@/helper/storeLocationStep'
+import { getLocationBlockedMessage, getLocationLoadingMessage, getLocationPlaceholderCopy, getLocationReadyMessage } from '@/helper/locationUi'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import {
   DISTRICT_SUGGESTIONS,
@@ -114,6 +115,12 @@ export default function StoreSupplementForm({
   const finalSubmitLabel = submitLabel || (isSupplementMode ? 'Hoàn thành bổ sung' : 'Lưu thay đổi')
   const hasCoordinates = hasLocationCoordinates(pickedLat, pickedLng)
   const [showLocationEditor, setShowLocationEditor] = useState(hasCoordinates)
+  const locationView = getLocationStepView({
+    resolving: resolvingAddr,
+    lat: pickedLat,
+    lng: pickedLng,
+    blocked: geoBlocked,
+  })
 
   useEffect(() => {
     if (hasCoordinates) {
@@ -461,14 +468,14 @@ export default function StoreSupplementForm({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <span className="text-sm text-blue-700 dark:text-blue-300">Đang xác định vị trí của bạn...</span>
+              <span className="text-sm text-blue-700 dark:text-blue-300">{getLocationLoadingMessage()}</span>
             </div>
           ) : null}
 
           {!resolvingAddr && pickedLat != null && pickedLng != null && !geoBlocked ? (
             <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
               <p className="text-sm text-green-700 dark:text-green-300">
-                Đã xác định vị trí. Nếu chưa đúng, bấm <strong>Mở khóa</strong> trên bản đồ để điều chỉnh.
+                                {getLocationReadyMessage()}
               </p>
             </div>
           ) : null}
@@ -476,28 +483,44 @@ export default function StoreSupplementForm({
           {geoBlocked ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-800 dark:bg-red-900/20">
               <p className="text-sm text-red-700 dark:text-red-300">
-                Không lấy được vị trí GPS. Hãy bấm <strong>Lấy lại vị trí</strong> hoặc dán link Google Maps bên dưới.
+                                {getLocationBlockedMessage()}
               </p>
             </div>
           ) : null}
 
           <div id="supplement-location-section">
-            <StoreLocationPicker
-              mapKey={`step2-${mapKey}`}
-              initialLat={pickedLat}
-              initialLng={pickedLng}
-              onChange={onLocationChange}
-              editable={mapEditable}
-              onToggleEditable={() => setMapEditable((value) => !value)}
-              onGetLocation={handleGetLocation}
-              heading={heading}
-              height="65vh"
-              compassError={compassError}
-              geoBlocked={geoBlocked}
-              onReload={onReload}
-              resolvingAddr={resolvingAddr}
-              dark={false}
-            />
+            {locationView.shouldRenderMap ? (
+              <StoreLocationPicker
+                mapKey={`step2-${mapKey}`}
+                initialLat={pickedLat}
+                initialLng={pickedLng}
+                onChange={onLocationChange}
+                editable={mapEditable}
+                onToggleEditable={() => setMapEditable((value) => !value)}
+                onGetLocation={handleGetLocation}
+                heading={heading}
+                height="65vh"
+                compassError={compassError}
+                geoBlocked={geoBlocked}
+                onReload={onReload}
+                resolvingAddr={resolvingAddr}
+                dark={false}
+              />
+            ) : (
+              <div
+                className="flex items-center justify-center rounded-md border border-dashed border-gray-300 bg-gray-50 px-4 text-center text-gray-600"
+                style={{ height: '65vh' }}
+              >
+                <div className="max-w-md space-y-2">
+                  <div className="text-base font-medium text-gray-800">
+                    {getLocationPlaceholderCopy(locationView.phase).title}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {getLocationPlaceholderCopy(locationView.phase).description}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2 pt-2 md:hidden">
