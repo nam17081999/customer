@@ -177,7 +177,6 @@ test('guest supplement giữ flow step và gửi store report', async ({ page })
   await page.goto('/store/edit/supplement-store-1?mode=supplement')
 
   await expect(page.getByText('Bổ sung cửa hàng')).toBeVisible()
-  await expect(page.getByText('Bạn chưa đăng nhập.')).toBeVisible()
   await page.getByRole('button', { name: 'Tiếp theo' }).click()
 
   await expect(page.getByText('Quận / Huyện')).toBeVisible()

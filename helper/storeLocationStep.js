@@ -2,15 +2,24 @@ export function hasLocationCoordinates(lat, lng) {
   return Number.isFinite(lat) && Number.isFinite(lng)
 }
 
-export function buildLocationStepResetPatch(step2Key = 0) {
+export function buildLocationStepResetPatch(step2Key = 0, currentLocation = {}) {
+  const hasCurrentCoordinates = hasLocationCoordinates(
+    currentLocation.pickedLat,
+    currentLocation.pickedLng
+  )
+
   return {
     geoBlocked: false,
     mapEditable: false,
-    userHasEditedMap: false,
-    pickedLat: null,
-    pickedLng: null,
-    initialGPSLat: null,
-    initialGPSLng: null,
+    userHasEditedMap: hasCurrentCoordinates ? Boolean(currentLocation.userHasEditedMap) : false,
+    pickedLat: hasCurrentCoordinates ? currentLocation.pickedLat : null,
+    pickedLng: hasCurrentCoordinates ? currentLocation.pickedLng : null,
+    initialGPSLat: hasLocationCoordinates(currentLocation.initialGPSLat, currentLocation.initialGPSLng)
+      ? currentLocation.initialGPSLat
+      : null,
+    initialGPSLng: hasLocationCoordinates(currentLocation.initialGPSLat, currentLocation.initialGPSLng)
+      ? currentLocation.initialGPSLng
+      : null,
     heading: null,
     nextStep2Key: step2Key + 1,
   }

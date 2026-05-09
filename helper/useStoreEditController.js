@@ -202,7 +202,13 @@ export function useStoreEditController() {
 
   const handleStartLocationSetup = useCallback(async () => {
     setStep2Key((value) => {
-      const patch = buildLocationStepResetPatch(value)
+      const patch = buildLocationStepResetPatch(value, {
+        pickedLat,
+        pickedLng,
+        initialGPSLat,
+        initialGPSLng,
+        userHasEditedMap,
+      })
       setGeoBlocked(patch.geoBlocked)
       setMapEditable(patch.mapEditable)
       setUserHasEditedMap(patch.userHasEditedMap)
@@ -224,7 +230,7 @@ export function useStoreEditController() {
     }
 
     return true
-  }, [handleGetLocation, pickedLat, pickedLng])
+  }, [handleGetLocation, initialGPSLat, initialGPSLng, pickedLat, pickedLng, userHasEditedMap])
 
   const resolvedWardSuggestions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
 
@@ -660,5 +666,4 @@ export function useStoreEditController() {
     handleSaveEdit,
   }
 }
-
 

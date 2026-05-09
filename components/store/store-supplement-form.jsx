@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -115,6 +115,7 @@ export default function StoreSupplementForm({
   const finalSubmitLabel = submitLabel || (isSupplementMode ? 'Hoàn thành bổ sung' : 'Lưu thay đổi')
   const hasCoordinates = hasLocationCoordinates(pickedLat, pickedLng)
   const [showLocationEditor, setShowLocationEditor] = useState(hasCoordinates)
+  const locationSetupStartedRef = useRef(false)
   const locationView = getLocationStepView({
     resolving: resolvingAddr,
     lat: pickedLat,
@@ -128,14 +129,32 @@ export default function StoreSupplementForm({
     }
   }, [hasCoordinates])
 
+  useEffect(() => {
+    if (currentStep !== 3) {
+      locationSetupStartedRef.current = false
+      return
+    }
+    if (stepCount < 3 || showLocationEditor || hasCoordinates || locationSetupStartedRef.current) return
+
+    locationSetupStartedRef.current = true
+    setShowLocationEditor(true)
+    void handleStartLocationSetup?.()
+  }, [currentStep, handleStartLocationSetup, hasCoordinates, showLocationEditor, stepCount])
+
   async function handlePrimaryAction() {
     if (currentStep < stepCount) {
+      const nextStep = Math.min(stepCount, currentStep + 1)
       const shouldContinue = await onBeforeStepChange?.({
         currentStep,
-        nextStep: Math.min(stepCount, currentStep + 1),
+        nextStep,
       })
       if (shouldContinue === false) return
-      setCurrentStep((prev) => Math.min(stepCount, prev + 1))
+      if (nextStep === 3 && !hasCoordinates && !locationSetupStartedRef.current) {
+        locationSetupStartedRef.current = true
+        setShowLocationEditor(true)
+        void handleStartLocationSetup?.()
+      }
+      setCurrentStep(nextStep)
       return
     }
     await onFinalSubmit?.()
