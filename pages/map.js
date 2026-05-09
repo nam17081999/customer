@@ -743,7 +743,6 @@ export default function MapPage() {
     const matched = storesWithCoords.find((store) => String(store.id) === initialStoreId)
     if (!matched) return
 
-    setHighlightedStoreId(initialStoreId)
     flyToStore(matched, { updateSearchTerm: false })
   }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
 
