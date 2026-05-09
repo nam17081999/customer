@@ -55,6 +55,7 @@ async function setupMapPage(page, overrides = {}) {
   const state = createE2EState(overrides)
   const routePlan = overrides.routePlan || { routeStopIds: [], hideUnselectedStores: false }
   const routeApi = overrides.routeApi || {}
+  const path = overrides.path || '/map'
 
   if (overrides.forceCanvas2dFailure) {
     await page.addInitScript(() => {
@@ -128,7 +129,7 @@ async function setupMapPage(page, overrides = {}) {
     })
   })
 
-  await page.goto('/map')
+  await page.goto(path)
   await expect(page.getByPlaceholder('Tìm cửa hàng...')).toBeVisible()
   await expect(page.getByText('Đang tải bản đồ…')).toBeHidden()
 }
@@ -317,6 +318,20 @@ test('search suggestion trên map chỉ hiện store có tọa độ hợp lệ 
   await page.getByRole('button', { name: 'Thêm' }).click()
   await openRoutePanel(page)
   await expect(page.getByRole('button', { name: 'Loại bỏ cửa hàng Tạp hóa Hợp Lệ khỏi tuyến' })).toBeVisible()
+})
+
+test('vào map bằng storeId chỉ highlight store, không tự điền search và không lọc marker theo tên', async ({ page }) => {
+  await setupMapPage(page, {
+    path: '/map?storeId=focus-store&lat=21.02911&lng=105.80511',
+    stores: [
+      buildStore({ id: 'focus-store', name: 'Tạp hóa Cần Highlight', latitude: 21.02911, longitude: 105.80511 }),
+      buildStore({ id: 'other-store', name: 'Quán nước Khác Tên', latitude: 21.03011, longitude: 105.80611 }),
+    ],
+  })
+
+  const searchInput = page.getByPlaceholder('Tìm cửa hàng...')
+  await expect(searchInput).toHaveValue('')
+  await expect(page.getByText('Hiển thị 2 / 2 cửa hàng')).toBeVisible()
 })
 
 test('search trên map dùng cùng thứ tự ưu tiên với màn tìm kiếm khi bấm Enter', async ({ page }) => {
