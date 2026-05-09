@@ -1,79 +1,80 @@
 # Current Work
 
 ## Goal
-- Áp dụng các chỉnh sửa theo review thread PR #70: khôi phục map picker ở report edit step 3, xử lý các lỗi lint (unused import/duplicate reset), đồng bộ dark-mode placeholder và dọn indentation JSX.
+- Rà hiệu năng việc vẽ cửa hàng lân cận trong map picker của create/edit/supplement/report và tối ưu phần chọn/render marker mà không đổi logic nghiệp vụ.
 
 ## Task Type
-- Bug Fix
+- Refactor With Tests First
 
 ## Why
-- Review thread nêu các lỗi có thể làm fail lint và regression UX ở flow location/map/report.
-- Cần chốt bản sửa nhỏ, đúng phạm vi các comment đã được yêu cầu.
+- Map picker đang tính khoảng cách toàn bộ store rồi sort toàn bộ danh sách mỗi lần map `moveend`.
+- Tài liệu yêu cầu tối đa 50 cửa hàng gần nhất, nhưng code hiện đang giới hạn 30.
+- Cần trả lời rõ việc vẽ full có tốt hơn không và áp dụng tối ưu ít rủi ro nếu có.
 
 ## In Scope
-- `components/store-report-form.jsx`
-- `pages/map.js`
-- `helper/mapDerivedData.js`
-- `helper/useStoreEditController.js`
-- `helper/useStoreCreateController.js`
-- `pages/store/create.js`
-- `components/store/store-supplement-form.jsx`
-- `lib/storeCache.js`
-- `docs/current-work.md`
+- `components/map/location-picker.jsx`
+- Helper/test thuần nếu cần để khóa logic chọn 50 store gần nhất.
+- Không chạm create/edit/supplement/report submit/validation/cache.
 
 ## Out of Scope
-- Không đổi business rule ngoài các điểm đã bị review.
-- Không thêm dependency mới.
-- Không refactor lớn ngoài phần cần để giải quyết comment.
+- Không đổi UI marker.
+- Không đổi dữ liệu đọc stores; vẫn qua `getOrRefreshStores()`.
+- Không thêm dependency hoặc spatial index lớn.
+- Không đổi `/map` public.
 
 ## Must Preserve
-- Flow create/edit/supplement/report hiện tại và rule dữ liệu location.
-- Quy tắc dark-mode only trong design system.
-- Hành vi map derived data và duplicate check nhất quán với rule hiện có.
+- Map picker vẫn hiển thị store lân cận quanh tâm pin/map.
+- Chỉ store có tọa độ hợp lệ mới được đưa vào layer.
+- Giới hạn tối đa 50 cửa hàng gần nhất.
+- Marker style và nhãn vẫn như hiện tại.
+- Không ảnh hưởng create/edit/supplement/report logic.
 
 ## Inputs / Repro / Expected
-- Input: comment mới yêu cầu áp dụng toàn bộ chỉnh sửa trong review thread đã link.
-- Current: còn các lỗi map render step 3 report edit, lint unused import, placeholder light-mode, indentation lệch, duplicated reset lines.
-- Expected: tất cả điểm review được xử lý đầy đủ, lint/test pass (trừ lỗi môi trường build ngoài scope nếu còn).
+- User hỏi: vẽ 50 cửa hàng gần nhất có vấn đề hiệu năng không, move vị trí có phải vẽ lại gây chậm không, vẽ full có tốt hơn không, tối ưu gì được.
+- Expected: giải thích được tradeoff và áp dụng tối ưu an toàn nếu có.
 
 ## Constraints
-- Thay đổi nhỏ nhất có thể.
-- Giữ UTF-8 cho file tiếng Việt.
+- Sửa nhỏ, test được phần lựa chọn nearest.
+- Giữ UTF-8.
 
 ## Required Verification
 - `npm run lint`
 - `npm run test`
-- Đối chiếu checklist: `Edit / Supplement / Report`, `Map Flow`, `Create Flow`, `Tiếng Việt / UI Safety`, `Stores Read / Cache`.
+- E2E map picker create/edit/report nếu thay đổi render path.
+- Checklist: `Map Flow`, `Create Flow`, `Edit / Supplement / Report`, `Stores Read / Cache`.
 
 ## Definition of Done
-- Tất cả điểm actionable trong review thread đã được sửa.
-- Không còn lint error từ các điểm được nêu.
-- `docs/current-work.md` có `Done`, `Verification`, `Risks / Next`.
+- Có câu trả lời rõ về 50 nearest vs full render.
+- Code chọn 50 nearest nhất quán docs và giảm allocation/sort không cần thiết.
+- Verification pass.
 
 ## Plan
-- Sửa code đúng từng comment review theo phạm vi file.
-- Chạy lại lint + test và smoke build nếu môi trường cho phép.
-- Cập nhật `docs/current-work.md` và báo cáo tiến độ.
+- Tách logic chọn store gần nhất thành helper thuần có test.
+- Đổi limit về 50 theo docs.
+- Dùng helper trong `LocationPicker` và tránh `setData` nếu danh sách marker không đổi.
+- Chạy lint/test/e2e liên quan và cập nhật kết quả.
 
 ## Done
-- Khôi phục map block cho step 3 của `StoreReportForm` (mode edit) với `StoreLocationPicker` + placeholder, đảm bảo còn dùng được `heading`/`compassError` và không còn import thừa.
-- Xóa các import không dùng ở `pages/map.js`, `helper/useStoreCreateController.js`, `helper/useStoreEditController.js`.
-- Đồng bộ nguồn `IGNORED_NAME_TERMS` sang helper dùng chung `helper/ignoredNameTerms.js`, để `duplicateCheck` và `mapDerivedData` không drift danh sách.
-- Đổi placeholder chưa có tọa độ ở create/supplement sang dark palette (`bg-gray-950`, `border-gray-800`, `text-gray-300/400`).
-- Sửa indentation các block JSX bị lệch ở create/supplement.
-- Xóa các dòng reset `lastFreshValidationAt = 0` bị lặp trong `lib/storeCache.js`.
+- Đã kiểm tra `LocationPicker`: mỗi lần `moveend` đang tính khoảng cách toàn bộ stores, sort toàn bộ rồi slice. Việc này không vẽ lại liên tục theo từng pixel kéo vì đang chạy ở `moveend`, nhưng vẫn tạo allocation/sort không cần thiết khi data lớn.
+- Đã xác định vẽ full không tốt hơn cho form picker: full render làm rối màn chọn vị trí, tăng số marker/image MapLibre phải quản lý, và trái rule docs chỉ hiển thị tối đa 50 store gần nhất.
+- Đã tách helper `selectNearestStores()` để chọn N store gần nhất mà không map/sort toàn bộ danh sách store; chỉ giữ tập ứng viên tối đa theo limit.
+- Đã đổi limit shared của form picker về đúng **50** theo docs.
+- Đã thêm `buildNearbyStoresSignature()` và dùng trong `LocationPicker` để bỏ qua `source.setData()` khi top 50 marker không đổi, giảm redraw khi người dùng kéo/zoom nhẹ.
+- Giữ nguyên `getOrRefreshStores()`, tọa độ hợp lệ, marker style, map picker create/edit/supplement/report và các logic submit/validate/cache.
 
 ## Verification
+- `npm run test -- __tests__/helper/nearbyStores.test.js` ✅
 - `npm run lint` ✅
-- `npm run test` ✅ (29 test files, 358 tests pass)
-- `npm run build` ⚠️ fail do môi trường không truy cập được `fonts.googleapis.com` (lỗi mạng ngoài scope code change)
-- Đối chiếu checklist đã chạm:
-  - `Edit / Supplement / Report`
-  - `Map Flow`
-  - `Create Flow`
-  - `Tiếng Việt / UI Safety`
-  - `Stores Read / Cache`
+- `npm run test` ✅ (30 test files, 364 tests pass)
+- `npx playwright test e2e/store-create.spec.js -g "quay lại bước 2|tạo cửa hàng đầy đủ"` ✅
+- `npx playwright test e2e/store-report.spec.js -g "user gửi edit report"` ✅
+- `npm run text:check` ✅
+- `git diff --check` ✅
+- Checklist:
+  - `Map Flow`: map picker vẫn chọn/render store lân cận, limit 50, marker style/path cũ.
+  - `Create Flow`: happy path và back/next map picker pass e2e.
+  - `Edit / Supplement / Report`: report edit map picker pass e2e; edit/supplement logic không đổi trong task này.
+  - `Stores Read / Cache`: vẫn đọc public stores qua `getOrRefreshStores()`.
 
 ## Risks / Next
-- Chưa có screenshot live đầy đủ cho flow `supplement` vì môi trường local thiếu backend thật; cần QA UI thủ công thêm trên PR preview.
-- Build production vẫn phụ thuộc mạng fetch Google Fonts trong môi trường sandbox hiện tại.
+- Chưa benchmark số lượng lớn bằng dữ liệu production thật. Tối ưu hiện tại giảm allocation/sort/redraw ở client nhưng vẫn phải tính khoảng cách qua các store có tọa độ để biết top 50 chính xác.

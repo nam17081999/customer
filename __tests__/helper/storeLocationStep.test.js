@@ -37,6 +37,26 @@ describe('buildLocationStepResetPatch', () => {
   it('mặc định tăng từ 0 khi không truyền step2Key', () => {
     expect(buildLocationStepResetPatch().nextStep2Key).toBe(1)
   })
+
+  it('giữ tọa độ hợp lệ khi quay lại bước vị trí để map không bị ẩn', () => {
+    expect(buildLocationStepResetPatch(2, {
+      pickedLat: 21.028511,
+      pickedLng: 105.804817,
+      initialGPSLat: 21.0285,
+      initialGPSLng: 105.8048,
+      userHasEditedMap: true,
+    })).toEqual({
+      geoBlocked: false,
+      mapEditable: false,
+      userHasEditedMap: true,
+      pickedLat: 21.028511,
+      pickedLng: 105.804817,
+      initialGPSLat: 21.0285,
+      initialGPSLng: 105.8048,
+      heading: null,
+      nextStep2Key: 3,
+    })
+  })
 })
 
 describe('getLocationStepView', () => {

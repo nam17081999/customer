@@ -3,10 +3,9 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { parseCoordinate } from '@/helper/coordinate'
-import { haversineKm } from '@/helper/distance'
+import { buildNearbyStoresSignature, NEARBY_STORES_LIMIT, selectNearestStores } from '@/helper/nearbyStores'
 
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
-const NEARBY_STORES_LIMIT = 30
 
 function getMarkerLabelText(name = '') {
   const cleaned = String(name || '').trim()
@@ -175,6 +174,44 @@ export default function LocationPicker({
   const debugRef = useRef(debug)
   const allStoresRef = useRef([])
   const nearbyImageIdsRef = useRef(new Set())
+  const nearbyFeatureSignatureRef = useRef('')
+  const resizeFrameRef = useRef(null)
+  const resizeTimersRef = useRef([])
+
+  const clearScheduledMapResize = useCallback(() => {
+    if (resizeFrameRef.current != null && typeof window !== 'undefined') {
+      window.cancelAnimationFrame(resizeFrameRef.current)
+      resizeFrameRef.current = null
+    }
+    resizeTimersRef.current.forEach((timerId) => clearTimeout(timerId))
+    resizeTimersRef.current = []
+  }, [])
+
+  const scheduleMapResize = useCallback(() => {
+    const map = mapRef.current
+    const container = mapContainerRef.current
+    if (!map || !container || typeof window === 'undefined') return
+
+    const resize = () => {
+      if (!mapRef.current) return
+      try {
+        mapRef.current.resize()
+      } catch {
+        // MapLibre can throw while the instance is being torn down.
+      }
+    }
+
+    clearScheduledMapResize()
+    if (typeof window.requestAnimationFrame === 'function') {
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = null
+        resize()
+      })
+    } else {
+      resize()
+    }
+    resizeTimersRef.current = [80, 250].map((delay) => window.setTimeout(resize, delay))
+  }, [clearScheduledMapResize])
 
   const ensureNearbyStoresLayers = useCallback((map) => {
     if (!map.getSource('nearby-stores')) {
@@ -207,17 +244,15 @@ export default function LocationPicker({
     const source = map.getSource('nearby-stores')
     if (!source) return
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      nearbyFeatureSignatureRef.current = ''
       source.setData(EMPTY_FEATURE_COLLECTION)
       return
     }
 
-    const features = allStoresRef.current
-      .map((item) => ({
-        ...item,
-        distance: haversineKm(lat, lng, item.coords.lat, item.coords.lng),
-      }))
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, NEARBY_STORES_LIMIT)
+    const features = selectNearestStores(allStoresRef.current, lat, lng, NEARBY_STORES_LIMIT)
+    const nextSignature = buildNearbyStoresSignature(features)
+    if (nextSignature === nearbyFeatureSignatureRef.current) return
+    nearbyFeatureSignatureRef.current = nextSignature
 
     const featureList = []
     features.forEach((item, index) => {
@@ -305,6 +340,7 @@ export default function LocationPicker({
       ensureNearbyStoresLayers(map)
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
+      scheduleMapResize()
     })
 
     if (map.isStyleLoaded()) {
@@ -348,6 +384,7 @@ export default function LocationPicker({
     }
 
     setControlsOnTop()
+    scheduleMapResize()
 
     const updateCenter = () => {
       const c = map.getCenter()
@@ -393,10 +430,24 @@ export default function LocationPicker({
     loadNearbyStores()
 
     return () => {
+      clearScheduledMapResize()
       map.remove()
       mapRef.current = null
     }
-  }, [ensureNearbyStoresLayers, hasInitialCoordinates, loadNearbyStores, updateNearbyStores])
+  }, [clearScheduledMapResize, ensureNearbyStoresLayers, hasInitialCoordinates, loadNearbyStores, scheduleMapResize, updateNearbyStores])
+
+  useEffect(() => {
+    const container = mapContainerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(() => {
+      scheduleMapResize()
+    })
+    observer.observe(container)
+    scheduleMapResize()
+
+    return () => observer.disconnect()
+  }, [height, scheduleMapResize])
 
   useEffect(() => {
     const map = mapRef.current

@@ -307,9 +307,10 @@ export function useStoreCreateController() {
       const ok = window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')
       if (ok) return
       router.events.emit('routeChangeError')
-      const err = new Error('Route change aborted by user')
-      err.cancelled = true
-      throw err
+      // Next.js treats a thrown value as the route-cancel signal here.
+      // Throwing an Error object shows a Turbopack runtime overlay, so use a
+      // non-Error sentinel for an intentional user cancel.
+      throw 'storevis-route-change-aborted'
     }
 
     router.events.on('routeChangeStart', onRouteChangeStart)
@@ -370,7 +371,13 @@ export function useStoreCreateController() {
   const bootstrapCreateLocationStep = useCallback(async () => {
     const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
     setStep2Key((value) => {
-      const patch = buildLocationStepResetPatch(value)
+      const patch = buildLocationStepResetPatch(value, {
+        pickedLat,
+        pickedLng,
+        initialGPSLat,
+        initialGPSLng,
+        userHasEditedMap,
+      })
       setGeoBlocked(patch.geoBlocked)
       setMapEditable(patch.mapEditable)
       setUserHasEditedMap(patch.userHasEditedMap)
@@ -384,7 +391,7 @@ export function useStoreCreateController() {
     if (entryBehavior.shouldAutoAcquire && entryBehavior.reuseRefreshFlow) {
       await handleGetLocation()
     }
-  }, [handleGetLocation, pickedLat, pickedLng])
+  }, [handleGetLocation, initialGPSLat, initialGPSLng, pickedLat, pickedLng, userHasEditedMap])
 
   useStepEntryEffect(currentStep === 3, bootstrapCreateLocationStep)
 
@@ -849,4 +856,3 @@ export function useStoreCreateController() {
     resetCreateForm,
   }
 }
-

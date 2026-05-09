@@ -149,6 +149,45 @@ test('tạo cửa hàng đầy đủ qua browser flow và redirect về trang ch
   await expect(page.getByText('Tạo cửa hàng thành công!')).toBeVisible()
 })
 
+test('hủy rời trang khi có thay đổi chưa lưu không hiện runtime error', async ({ page }) => {
+  const pageErrors = []
+  page.on('pageerror', (error) => {
+    pageErrors.push(error.message)
+  })
+  await setupCreateFlow(page)
+
+  await page.getByLabel('Tên cửa hàng').fill('Cửa hàng Chưa Lưu')
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Bạn có thay đổi chưa lưu')
+    await dialog.dismiss()
+  })
+
+  await page.getByRole('link', { name: 'Tìm kiếm' }).click()
+  await expect(page).toHaveURL(/\/store\/create$/)
+  expect(pageErrors).toEqual([])
+})
+
+test('quay lại bước 2 rồi sang lại bước vị trí vẫn giữ bản đồ đã lấy GPS', async ({ page }) => {
+  await setupCreateFlow(page)
+
+  await completeStep1(page, 'Cửa hàng Back Next Map')
+  await fillStep2(page)
+  await resetGeoCallCount(page)
+
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.02851, 105.80482')
+  await expectGeoCallCount(page, 1)
+
+  await page.getByRole('button', { name: '←' }).click()
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.02851, 105.80482')
+  await expectGeoCallCount(page, 1)
+})
+
 test('hiện cảnh báo nghi trùng ở bước 1 và vẫn cho phép tạo tiếp', async ({ page }) => {
   await setupCreateFlow(page, {
     stores: [
