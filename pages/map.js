@@ -713,16 +713,18 @@ export default function MapPage() {
     if (routeSource) routeSource.setData(routeGeojson)
   }, [mapReady, routeGeojson])
 
-  const flyToStore = useCallback((store) => {
+  const flyToStore = useCallback((store, options = {}) => {
     if (!store?.coords) return
     const map = mapRef.current
     if (!map) return
+
+    const { updateSearchTerm = true } = options
 
     setHighlightedStoreId(String(store.id))
     map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
 
     closeSuggestions()
-    setSearchTerm(store.name || '')
+    if (updateSearchTerm) setSearchTerm(store.name || '')
     inputRef.current?.blur()
   }, [closeSuggestions, setSearchTerm])
 
@@ -741,8 +743,7 @@ export default function MapPage() {
     const matched = storesWithCoords.find((store) => String(store.id) === initialStoreId)
     if (!matched) return
 
-    setHighlightedStoreId(initialStoreId)
-    flyToStore(matched)
+    flyToStore(matched, { updateSearchTerm: false })
   }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
 
   useEffect(() => {

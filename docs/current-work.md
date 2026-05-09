@@ -1,80 +1,71 @@
 # Current Work
 
 ## Goal
-- Rà hiệu năng việc vẽ cửa hàng lân cận trong map picker của create/edit/supplement/report và tối ưu phần chọn/render marker mà không đổi logic nghiệp vụ.
+- Áp dụng feedback review cho PR hiện tại: chỉnh lại phạm vi task document cho đúng với bugfix `/map?storeId=...` và loại bỏ state update dư thừa gây render churn.
 
 ## Task Type
-- Refactor With Tests First
+- Bug Fix
 
 ## Why
-- Map picker đang tính khoảng cách toàn bộ store rồi sort toàn bộ danh sách mỗi lần map `moveend`.
-- Tài liệu yêu cầu tối đa 50 cửa hàng gần nhất, nhưng code hiện đang giới hạn 30.
-- Cần trả lời rõ việc vẽ full có tốt hơn không và áp dụng tối ưu ít rủi ro nếu có.
+- Reviewer chỉ ra 2 điểm chưa nhất quán:
+  - `docs/current-work.md` mô tả `Out of Scope` sai vì thực tế PR có thay đổi behavior `/map`.
+  - `pages/map.js` có `setHighlightedStoreId` bị gọi dư trong effect khi `flyToStore()` đã xử lý.
 
 ## In Scope
-- `components/map/location-picker.jsx`
-- Helper/test thuần nếu cần để khóa logic chọn 50 store gần nhất.
-- Không chạm create/edit/supplement/report submit/validation/cache.
+- `docs/current-work.md` (cập nhật scope đúng với map bugfix).
+- `pages/map.js` (loại bỏ state update dư trong effect focus theo `storeId`).
+- Verify lint/test liên quan map sau chỉnh sửa.
 
 ## Out of Scope
-- Không đổi UI marker.
-- Không đổi dữ liệu đọc stores; vẫn qua `getOrRefreshStores()`.
-- Không thêm dependency hoặc spatial index lớn.
-- Không đổi `/map` public.
+- Không thay đổi business rule khác ngoài bugfix `/map?storeId` đã có trong PR.
+- Không mở rộng dependency/package hygiene.
+- Không refactor map flow ngoài phần state update dư thừa.
 
 ## Must Preserve
-- Map picker vẫn hiển thị store lân cận quanh tâm pin/map.
-- Chỉ store có tọa độ hợp lệ mới được đưa vào layer.
-- Giới hạn tối đa 50 cửa hàng gần nhất.
-- Marker style và nhãn vẫn như hiện tại.
-- Không ảnh hưởng create/edit/supplement/report logic.
+- `/map` vẫn nhận query `storeId`, `lat`, `lng` như hiện tại.
+- Luồng vào `/map?storeId=...` chỉ focus/highlight store, không auto-fill search gây lọc marker.
+- Không thay đổi rule render marker/suggestion (chỉ store có tọa độ hợp lệ).
+- Không phá lint/test hiện có.
 
 ## Inputs / Repro / Expected
-- User hỏi: vẽ 50 cửa hàng gần nhất có vấn đề hiệu năng không, move vị trí có phải vẽ lại gây chậm không, vẽ full có tốt hơn không, tối ưu gì được.
-- Expected: giải thích được tradeoff và áp dụng tối ưu an toàn nếu có.
+- Repro: vào `/map?storeId=<id-hợp-lệ>` khi dữ liệu map đã tải.
+- Current: effect set highlight 2 lần (`effect` + `flyToStore`), và task doc ghi sai phạm vi.
+- Expected:
+  - Highlight chỉ set 1 lần qua `flyToStore`.
+  - `docs/current-work.md` phản ánh đúng là có map behavior bugfix trong phạm vi.
 
 ## Constraints
-- Sửa nhỏ, test được phần lựa chọn nearest.
-- Giữ UTF-8.
+- Sửa nhỏ, đúng trọng tâm feedback.
+- Giữ UTF-8 cho file docs có tiếng Việt.
 
 ## Required Verification
 - `npm run lint`
 - `npm run test`
-- E2E map picker create/edit/report nếu thay đổi render path.
-- Checklist: `Map Flow`, `Create Flow`, `Edit / Supplement / Report`, `Stores Read / Cache`.
+- Focus smoke test map (test đã có cho case `storeId chỉ highlight`).
+- Checklist áp dụng: `Checklist chung`, `Map Flow`, `Tiếng Việt / UI Safety`.
 
 ## Definition of Done
-- Có câu trả lời rõ về 50 nearest vs full render.
-- Code chọn 50 nearest nhất quán docs và giảm allocation/sort không cần thiết.
-- Verification pass.
+- Cả 2 feedback trong thread đã được xử lý bằng thay đổi code/docs tối thiểu.
+- Có bằng chứng verify mới cho thay đổi.
 
 ## Plan
-- Tách logic chọn store gần nhất thành helper thuần có test.
-- Đổi limit về 50 theo docs.
-- Dùng helper trong `LocationPicker` và tránh `setData` nếu danh sách marker không đổi.
-- Chạy lint/test/e2e liên quan và cập nhật kết quả.
+- Cập nhật `docs/current-work.md` để scope đúng với map bugfix.
+- Xóa `setHighlightedStoreId(initialStoreId)` dư trong effect ở `pages/map.js`.
+- Chạy lint + test liên quan map.
+- Cập nhật `Done`, `Verification`, `Risks / Next`.
 
 ## Done
-- Đã kiểm tra `LocationPicker`: mỗi lần `moveend` đang tính khoảng cách toàn bộ stores, sort toàn bộ rồi slice. Việc này không vẽ lại liên tục theo từng pixel kéo vì đang chạy ở `moveend`, nhưng vẫn tạo allocation/sort không cần thiết khi data lớn.
-- Đã xác định vẽ full không tốt hơn cho form picker: full render làm rối màn chọn vị trí, tăng số marker/image MapLibre phải quản lý, và trái rule docs chỉ hiển thị tối đa 50 store gần nhất.
-- Đã tách helper `selectNearestStores()` để chọn N store gần nhất mà không map/sort toàn bộ danh sách store; chỉ giữ tập ứng viên tối đa theo limit.
-- Đã đổi limit shared của form picker về đúng **50** theo docs.
-- Đã thêm `buildNearbyStoresSignature()` và dùng trong `LocationPicker` để bỏ qua `source.setData()` khi top 50 marker không đổi, giảm redraw khi người dùng kéo/zoom nhẹ.
-- Giữ nguyên `getOrRefreshStores()`, tọa độ hợp lệ, marker style, map picker create/edit/supplement/report và các logic submit/validate/cache.
+- Đã cập nhật phạm vi task trong `current-work` để phản ánh đúng bugfix map theo `storeId`.
+- Đã bỏ gọi dư `setHighlightedStoreId(initialStoreId)` trong effect của `/map`; highlight giờ chỉ set qua `flyToStore()`.
 
 ## Verification
-- `npm run test -- __tests__/helper/nearbyStores.test.js` ✅
 - `npm run lint` ✅
-- `npm run test` ✅ (30 test files, 364 tests pass)
-- `npx playwright test e2e/store-create.spec.js -g "quay lại bước 2|tạo cửa hàng đầy đủ"` ✅
-- `npx playwright test e2e/store-report.spec.js -g "user gửi edit report"` ✅
-- `npm run text:check` ✅
-- `git diff --check` ✅
+- `npm run test` ✅ (30 files, 364 tests)
+- `NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=test-key npx playwright test e2e/store-map.spec.js -g "storeId chỉ highlight"` ✅
 - Checklist:
-  - `Map Flow`: map picker vẫn chọn/render store lân cận, limit 50, marker style/path cũ.
-  - `Create Flow`: happy path và back/next map picker pass e2e.
-  - `Edit / Supplement / Report`: report edit map picker pass e2e; edit/supplement logic không đổi trong task này.
-  - `Stores Read / Cache`: vẫn đọc public stores qua `getOrRefreshStores()`.
+  - `Checklist chung`: đã cập nhật scope, không mở rộng refactor, có verify mới.
+  - `Map Flow`: đã verify case `/map?storeId=...` vẫn chỉ highlight/focus, không auto-fill search.
+  - `Tiếng Việt / UI Safety`: file docs tiếng Việt giữ UTF-8, sửa cục bộ.
 
 ## Risks / Next
-- Chưa benchmark số lượng lớn bằng dữ liệu production thật. Tối ưu hiện tại giảm allocation/sort/redraw ở client nhưng vẫn phải tính khoảng cách qua các store có tọa độ để biết top 50 chính xác.
+- `npm run build` vẫn lỗi trong sandbox vì không resolve được `fonts.googleapis.com` (hạn chế môi trường mạng), không phải regression từ thay đổi hiện tại.
