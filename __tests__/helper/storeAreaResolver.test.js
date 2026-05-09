@@ -7,6 +7,7 @@ import {
   resolveDistrictWardFromCoordinates,
   resolveDistrictWardFromPayload,
 } from '@/helper/storeAreaResolver'
+import { DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 
 describe('storeAreaResolver', () => {
   it('extracts old ward/district from Goong-style components', () => {
@@ -64,6 +65,40 @@ describe('storeAreaResolver', () => {
       ward: 'Đức Thượng',
       source: 'boundary_lookup',
     })
+  })
+
+  it('supports Cầu Giấy district and ward suggestions', () => {
+    expect(DISTRICT_WARD_SUGGESTIONS['Cầu Giấy']).toEqual([
+      'Dịch Vọng',
+      'Dịch Vọng Hậu',
+      'Mai Dịch',
+      'Nghĩa Đô',
+      'Nghĩa Tân',
+      'Quan Hoa',
+      'Trung Hòa',
+      'Yên Hòa',
+    ])
+  })
+
+  it('resolves Cầu Giấy wards from internal boundary data', async () => {
+    const wardSamples = [
+      ['Dịch Vọng', 21.0329958, 105.7928552],
+      ['Dịch Vọng Hậu', 21.0347452, 105.784706],
+      ['Mai Dịch', 21.0408258, 105.7745513],
+      ['Nghĩa Đô', 21.0489004, 105.8030437],
+      ['Nghĩa Tân', 21.0455417, 105.7919938],
+      ['Quan Hoa', 21.0341687, 105.8006138],
+      ['Trung Hòa', 21.0090152, 105.801675],
+      ['Yên Hòa', 21.0210607, 105.7916653],
+    ]
+
+    for (const [ward, lat, lng] of wardSamples) {
+      await expect(resolveDistrictWardFromCoordinates(lat, lng)).resolves.toMatchObject({
+        district: 'Cầu Giấy',
+        ward,
+        source: 'boundary_lookup',
+      })
+    }
   })
 
   it('returns unresolved when coordinates are outside supported seed areas', async () => {
@@ -154,4 +189,3 @@ describe('storeAreaResolver', () => {
     expect(findBestWard(['An Khanh'], 'Hoài Đức')).toBe('An Khánh')
   })
 })
-
