@@ -169,7 +169,7 @@ function getWardMatches(candidates, districts = DISTRICT_SUGGESTIONS) {
       for (const normalizedCandidate of normalizedCandidates) {
         if (normalizedCandidate === normalizedWard) {
           bestScore = Math.max(bestScore, 3)
-        } else if (normalizedCandidate.includes(normalizedWard)) {
+        } else if (normalizedWard.length >= 5 && normalizedCandidate.includes(normalizedWard)) {
           bestScore = Math.max(bestScore, 2)
         } else if (
           normalizedCandidate.length >= 5
