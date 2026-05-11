@@ -9,6 +9,7 @@ import {
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
+  shouldShowSearchCreateCta,
 } from '@/helper/homeSearch'
 import {
   buildCurrentSearchRouteQuery,
@@ -359,6 +360,41 @@ export function useHomeSearchController() {
     sortLocation,
   ])
 
+  const showCreateStoreCta = useMemo(() => {
+    if (!storesLoaded) return false
+    return shouldShowSearchCreateCta({ indexedStores, searchTerm })
+  }, [indexedStores, searchTerm, storesLoaded])
+
+  const createStoreHref = useMemo(() => ({
+    pathname: '/store/create',
+    query: {
+      name: searchTerm.trim(),
+      step: '2',
+    },
+  }), [searchTerm])
+
+  const handleCreateStoreClick = useCallback(async () => {
+    const nextQuery = buildNextSearchRouteQuery({
+      searchTerm,
+      selectedDistrict,
+      selectedWard,
+      selectedStoreTypes,
+      selectedDetailFlags,
+    })
+
+    persistSearchRoute(nextQuery)
+    await router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
+    await router.push(createStoreHref)
+  }, [
+    createStoreHref,
+    router,
+    searchTerm,
+    selectedDistrict,
+    selectedWard,
+    selectedStoreTypes,
+    selectedDetailFlags,
+  ])
+
   const showSkeleton = loading || !storesLoaded
 
   useEffect(() => {
@@ -428,6 +464,9 @@ export function useHomeSearchController() {
     clearAllFilters,
     handleListAtTopChange,
     searchResults,
+    showCreateStoreCta,
+    createStoreHref,
+    handleCreateStoreClick,
     showSkeleton,
   }
 }
