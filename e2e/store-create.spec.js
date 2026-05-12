@@ -188,6 +188,33 @@ test('quay lại bước 2 rồi sang lại bước vị trí vẫn giữ bản 
   await expectGeoCallCount(page, 1)
 })
 
+test('dán Google Maps share link không có tọa độ trong URL vẫn cập nhật vị trí', async ({ page }) => {
+  await setupCreateFlow(page)
+  await page.route('**/api/expand-maps-link', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        finalUrl: 'https://www.google.com/maps/place/Cua+Hang+Share',
+        coords: { lat: 21.05555, lng: 105.79999 },
+      }),
+    })
+  })
+
+  await completeStep1(page, 'Cửa hàng Share Maps')
+  await fillStep2(page)
+  await page.getByRole('button', { name: 'Tiếp theo →' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
+  await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.02851, 105.80482')
+
+  await page.locator('input[placeholder*="maps.app.goo.gl"]:visible').fill('https://maps.app.goo.gl/share123')
+  await page.locator('button:visible').filter({ hasText: 'Lấy vị trí' }).click()
+
+  await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.05555, 105.79999')
+})
+
 test('deeplink từ search vào bước 2 vẫn back/next trong form đúng trạng thái', async ({ page }) => {
   await setupCreateFlow(page, {
     geolocation: {
