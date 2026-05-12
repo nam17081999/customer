@@ -13,6 +13,7 @@ import {
 } from '@/helper/duplicateCheck'
 import {
   buildCreateInsertPayload,
+  buildCreatePrefillFromRouteQuery,
   getCreateFinalCoordinates,
   resolveMapsLinkCoordinates,
   validateStoreCreateStep2,
@@ -61,6 +62,8 @@ export function useStoreCreateController() {
   const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
   const duplicateCheckSeqRef = useRef(0)
   const duplicateGeoRequestedRef = useRef(false)
+  const createQueryStepAppliedRef = useRef(false)
+  const createQueryAreaPrefillRequestedRef = useRef(false)
   const areaPrefilledRef = useRef(false)
   const areaPrefillRunningRef = useRef(false)
   const [areaAutoFillStatus, setAreaAutoFillStatus] = useState('idle')
@@ -271,9 +274,39 @@ export function useStoreCreateController() {
   }, [autoFillDistrictWardFromCoordinates, pickedLat, pickedLng, refreshCompassHeading, showMessage])
 
   useEffect(() => {
-    const qName = typeof router.query.name === 'string' ? router.query.name.trim() : ''
-    if (qName) setName(toTitleCaseVI(qName))
-  }, [router.query.name])
+    if (!router.isReady) return
+    const { name: qName, shouldStartAtStep2 } = buildCreatePrefillFromRouteQuery(router.query)
+
+    if (qName) {
+      setName(toTitleCaseVI(qName))
+      setFieldErrors((prev) => ({ ...prev, name: '' }))
+    }
+
+    if (shouldStartAtStep2 && !createQueryStepAppliedRef.current) {
+      createQueryStepAppliedRef.current = true
+      setDuplicateCandidates([])
+      setDuplicateCheckError('')
+      setDuplicateCheckDone(true)
+      setNameValid(true)
+      setAllowDuplicate(false)
+      setCurrentStep(2)
+    }
+
+    if (shouldStartAtStep2 && !createQueryAreaPrefillRequestedRef.current) {
+      createQueryAreaPrefillRequestedRef.current = true
+      void (async () => {
+        try {
+          const { coords } = await getBestPosition(getLocationDuplicateCheckOptions())
+          if (!coords) return
+          setDuplicateCheckLat(coords.latitude)
+          setDuplicateCheckLng(coords.longitude)
+          void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
+        } catch (err) {
+          console.error('Step 2 area prefill from current location failed:', err)
+        }
+      })()
+    }
+  }, [autoFillDistrictWardFromCoordinates, router.isReady, router.query])
 
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { /* noop */ }
@@ -354,8 +387,8 @@ export function useStoreCreateController() {
     areaPrefilledRef.current = false
     areaPrefillRunningRef.current = false
 
-    if (router.query?.name) {
-      const { name: _discard, ...rest } = router.query
+    if (router.query?.name || router.query?.step) {
+      const { name: _discardName, step: _discardStep, ...rest } = router.query
       void router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true }).catch((err) => {
         if (err?.cancelled) return
         console.error('Failed to clean create query params:', err)

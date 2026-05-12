@@ -12,8 +12,10 @@ import {
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
+  normalizeCreateStoreName,
   parseQueryList,
   serializeRouteQuery,
+  shouldShowSearchCreateCta,
 } from '@/helper/homeSearch'
 
 function makeStore(overrides = {}) {
@@ -223,5 +225,64 @@ describe('filterAndSortSearchResults regression', () => {
     })
 
     expect(results.map((store) => store.id)).toEqual([1, 2])
+  })
+})
+
+describe('shouldShowSearchCreateCta', () => {
+  it('hiện CTA khi query có ít nhất 2 từ và không trùng chính xác tên store', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp Hóa Minh Anh' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    expect(shouldShowSearchCreateCta({
+      indexedStores,
+      searchTerm: 'Minh Anh',
+    })).toBe(true)
+  })
+
+  it('ẩn CTA khi query chỉ có 1 từ', () => {
+    const indexedStores = buildStoreSearchIndex([], { getHasCoords: hasStoreCoordinates })
+
+    expect(shouldShowSearchCreateCta({
+      indexedStores,
+      searchTerm: 'Minh',
+    })).toBe(false)
+  })
+
+  it('ẩn CTA khi tên query trùng 100% với store hiện có theo lowercase và bỏ dấu', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp Hóa Minh Anh' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    expect(shouldShowSearchCreateCta({
+      indexedStores,
+      searchTerm: 'tap hoa minh anh',
+    })).toBe(false)
+  })
+
+  it('ẩn CTA khi exact-name chỉ khác khoảng trắng thừa', () => {
+    const indexedStores = buildStoreSearchIndex([
+      makeStore({ id: 1, name: 'Tạp Hóa Minh Anh' }),
+    ], { getHasCoords: hasStoreCoordinates })
+
+    expect(shouldShowSearchCreateCta({
+      indexedStores,
+      searchTerm: 'tap hoa   minh anh',
+    })).toBe(false)
+  })
+})
+
+describe('normalizeCreateStoreName', () => {
+  it('trim và gom khoảng trắng về 1 dấu cách', () => {
+    expect(normalizeCreateStoreName('  Minh   Anh  ')).toBe('Minh Anh')
+  })
+
+  it('trả về chuỗi rỗng khi input rỗng hoặc toàn khoảng trắng', () => {
+    expect(normalizeCreateStoreName('')).toBe('')
+    expect(normalizeCreateStoreName('   ')).toBe('')
+  })
+
+  it('gom cả tab/newline về 1 dấu cách', () => {
+    expect(normalizeCreateStoreName('Minh\t\nAnh')).toBe('Minh Anh')
   })
 })

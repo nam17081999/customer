@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildCreateDuplicatePhoneMessage,
   buildCreateInsertPayload,
+  buildCreatePrefillFromRouteQuery,
   buildCreateSteps,
   extractCoordsFromMapsUrl,
   findNearestDistrictWard,
@@ -227,6 +228,39 @@ describe('buildCreateSteps', () => {
       { num: 2, label: 'Thông tin' },
       { num: 3, label: 'Vị trí' },
     ])
+  })
+})
+
+describe('buildCreatePrefillFromRouteQuery', () => {
+  it('nhận name + step=2 để mở thẳng bước 2', () => {
+    expect(buildCreatePrefillFromRouteQuery({
+      name: '  Minh Anh  ',
+      step: '2',
+    })).toEqual({
+      name: 'Minh Anh',
+      shouldStartAtStep2: true,
+    })
+  })
+
+  it('không mở bước 2 nếu thiếu name hoặc step khác 2', () => {
+    expect(buildCreatePrefillFromRouteQuery({ name: 'Minh Anh' })).toEqual({
+      name: 'Minh Anh',
+      shouldStartAtStep2: false,
+    })
+    expect(buildCreatePrefillFromRouteQuery({ step: '2' })).toEqual({
+      name: '',
+      shouldStartAtStep2: false,
+    })
+  })
+
+  it('hỗ trợ query array từ Next router', () => {
+    expect(buildCreatePrefillFromRouteQuery({
+      name: ['Minh Anh', 'Bỏ Qua'],
+      step: ['2'],
+    })).toEqual({
+      name: 'Minh Anh',
+      shouldStartAtStep2: true,
+    })
   })
 })
 

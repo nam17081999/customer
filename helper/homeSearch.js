@@ -1,5 +1,5 @@
 import { parseCoordinate } from '@/helper/coordinate'
-import { filterAndRankIndexedStores } from '@/helper/storeSearch'
+import { createSearchQueryMeta, filterAndRankIndexedStores } from '@/helper/storeSearch'
 
 export const FILTER_FLAG_HAS_PHONE = 'has_phone'
 export const FILTER_FLAG_HAS_IMAGE = 'has_image'
@@ -131,4 +131,18 @@ export function filterAndSortSearchResults({
       return true
     },
   })
+}
+
+export function shouldShowSearchCreateCta({ indexedStores, searchTerm }) {
+  const queryMeta = createSearchQueryMeta(searchTerm)
+  if (queryMeta.words.length < 2) return false
+
+  const exactName = queryMeta.words.join(' ')
+  return !(Array.isArray(indexedStores) ? indexedStores : []).some((entry) => (
+    String(entry?.normalizedName || '').split(/\s+/).filter(Boolean).join(' ') === exactName
+  ))
+}
+
+export function normalizeCreateStoreName(searchTerm) {
+  return String(searchTerm || '').trim().split(/\s+/).filter(Boolean).join(' ')
 }

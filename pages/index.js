@@ -1,5 +1,4 @@
 import { Virtuoso } from 'react-virtuoso'
-import Link from 'next/link'
 
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -47,6 +46,8 @@ export default function HomePage() {
     clearAllFilters,
     handleListAtTopChange,
     searchResults,
+    showCreateStoreCta,
+    handleCreateStoreClick,
     showSkeleton,
   } = useHomeSearchController()
 
@@ -218,6 +219,11 @@ export default function HomePage() {
                 </svg>
                 Xóa lọc
               </button>
+              {showCreateStoreCta && (
+                <Button type="button" variant="outline" className="h-9 shrink-0 px-3 text-sm" onClick={handleCreateStoreClick}>
+                  + Tạo cửa hàng
+                </Button>
+              )}
             </div>
           ) : (
             <p className="text-sm text-gray-400">
@@ -277,9 +283,11 @@ export default function HomePage() {
               </div>
               <p className="mb-1 font-medium text-gray-300">Không tìm thấy cửa hàng</p>
               <p className="mb-4 text-sm text-gray-500">Thử tìm với từ khác hoặc bớt bộ lọc</p>
-              <Button asChild>
-                <Link href="/store/create">+ Tạo cửa hàng mới</Link>
-              </Button>
+              {showCreateStoreCta && (
+                <Button type="button" onClick={handleCreateStoreClick}>
+                  + Tạo cửa hàng mới
+                </Button>
+              )}
             </div>
           )}
 

@@ -45,7 +45,7 @@ function createE2EState(overrides = {}) {
   }
 }
 
-async function setupCreateFlow(page, overrides = {}) {
+async function setupCreateFlow(page, overrides = {}, options = {}) {
   const state = createE2EState(overrides)
 
   await page.addInitScript((value) => {
@@ -94,7 +94,7 @@ async function setupCreateFlow(page, overrides = {}) {
     })
   })
 
-  await page.goto('/store/create')
+  await page.goto(options.path || '/store/create')
 }
 
 async function completeStep1(page, name) {
@@ -186,6 +186,60 @@ test('quay lại bước 2 rồi sang lại bước vị trí vẫn giữ bản 
   await expect(page.getByTestId('e2e-store-location-picker')).toBeVisible()
   await expect(page.getByTestId('e2e-store-location-coords')).toHaveText('21.02851, 105.80482')
   await expectGeoCallCount(page, 1)
+})
+
+test('deeplink từ search vào bước 2 vẫn back/next trong form đúng trạng thái', async ({ page }) => {
+  await setupCreateFlow(page, {
+    geolocation: {
+      coords: {
+        latitude: 21.07744026184082,
+        longitude: 105.69537353515625,
+        accuracy: 5,
+      },
+      heading: 42,
+    },
+    stores: [],
+  }, {
+    path: '/store/create?name=Minh%20Anh&step=2',
+  })
+
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await expect(page.getByLabel('Tên cửa hàng')).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hoài Đức', exact: true })).toHaveClass(/bg-blue-600/)
+  await expect(page.getByRole('button', { name: 'Đức Thượng', exact: true })).toHaveClass(/bg-blue-600/)
+
+  await page.getByRole('button', { name: '←' }).click()
+  await expect(page.getByLabel('Tên cửa hàng')).toBeVisible()
+  await expect(page.getByLabel('Tên cửa hàng')).toHaveValue('Minh Anh')
+
+  await page.getByRole('button', { name: 'Tiếp theo' }).click()
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await expect(page.getByLabel('Tên cửa hàng')).not.toBeVisible()
+  await expect(page.getByRole('button', { name: 'Hoài Đức', exact: true })).toHaveClass(/bg-blue-600/)
+  await expect(page.getByRole('button', { name: 'Đức Thượng', exact: true })).toHaveClass(/bg-blue-600/)
+})
+
+test('deeplink bước 2 quay lại đổi tên thì next chạy lại duplicate check', async ({ page }) => {
+  await setupCreateFlow(page, {
+    stores: [
+      buildStore({
+        id: 'changed-name-duplicate',
+        name: 'Tạp Hóa Trùng Tên',
+        latitude: 21.02852,
+        longitude: 105.80483,
+      }),
+    ],
+  }, {
+    path: '/store/create?name=Minh%20Anh&step=2',
+  })
+
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await page.getByRole('button', { name: '←' }).click()
+  await page.getByLabel('Tên cửa hàng').fill('Trùng Tên')
+  await page.getByRole('button', { name: 'Tiếp theo' }).click()
+
+  await expect(page.getByText('Phát hiện cửa hàng có thể đã được tạo')).toBeVisible()
+  await expect(page.getByText('Tạp Hóa Trùng Tên')).toBeVisible()
 })
 
 test('hiện cảnh báo nghi trùng ở bước 1 và vẫn cho phép tạo tiếp', async ({ page }) => {

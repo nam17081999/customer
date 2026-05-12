@@ -177,6 +177,17 @@ export function buildCreateSteps(telesaleNoStep3) {
   ]
 }
 
+export function buildCreatePrefillFromRouteQuery(query = {}) {
+  const rawName = Array.isArray(query.name) ? query.name[0] : query.name
+  const rawStep = Array.isArray(query.step) ? query.step[0] : query.step
+  const name = typeof rawName === 'string' ? rawName.trim() : ''
+
+  return {
+    name,
+    shouldStartAtStep2: Boolean(name && rawStep === '2'),
+  }
+}
+
 export function shouldShowCreateMobileActionBar({
   currentStep,
   allowDuplicate,

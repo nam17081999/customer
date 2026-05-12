@@ -89,6 +89,10 @@ async function setupSearchFlow(page, overrides = {}) {
   }, state)
 }
 
+async function waitSearchReady(page, expectedCount = '1') {
+  await expect(page.getByText('Đang hiển thị')).toContainText(expectedCount)
+}
+
 test('trang chủ load store public từ cache override và hiển thị danh sách', async ({ page }) => {
   await setupSearchFlow(page, {
     stores: [
@@ -118,6 +122,78 @@ test('tìm kiếm tiếng Việt không dấu vẫn khớp tên có dấu', asyn
   await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
   await expect(page.getByText('Quán Ăn Lan Chi')).not.toBeVisible()
   await expect(page.getByText('Tìm thấy')).toContainText('1')
+})
+
+test('CTA tạo cửa hàng hiện khi query có 2 từ và không trùng tên 100%', async ({ page }) => {
+  await setupSearchFlow(page, {
+    stores: [
+      buildStore({ id: 'cta-near-1', name: 'Tạp Hóa Minh Anh' }),
+    ],
+  })
+
+  await page.goto('/')
+  await waitSearchReady(page)
+  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh Anh')
+
+  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toBeVisible()
+})
+
+test('CTA tạo cửa hàng ẩn khi query 1 từ hoặc trùng tên 100%', async ({ page }) => {
+  await setupSearchFlow(page, {
+    stores: [
+      buildStore({ id: 'cta-exact-1', name: 'Tạp Hóa Minh Anh' }),
+    ],
+  })
+
+  await page.goto('/')
+  await waitSearchReady(page)
+  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh')
+  await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toHaveCount(0)
+
+  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('tap hoa   minh anh')
+  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toHaveCount(0)
+})
+
+test('click CTA tạo cửa hàng sang thẳng bước 2 và browser back-forward giữ đúng màn', async ({ page }) => {
+  await setupSearchFlow(page, {
+    stores: [
+      buildStore({ id: 'cta-click-1', name: 'Tạp Hóa Minh Anh' }),
+    ],
+  })
+
+  await page.goto('/')
+  await waitSearchReady(page)
+  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh Anh')
+  await page.getByRole('button', { name: /Tạo cửa hàng/ }).click()
+
+  await expect.poll(() => {
+    const currentUrl = new URL(page.url())
+    return {
+      pathname: currentUrl.pathname,
+      name: currentUrl.searchParams.get('name'),
+      step: currentUrl.searchParams.get('step'),
+    }
+  }).toEqual({
+    pathname: '/store/create',
+    name: 'Minh Anh',
+    step: '2',
+  })
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
+  await expect(page.getByLabel('Tên cửa hàng')).not.toBeVisible()
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Bạn có thay đổi chưa lưu')
+    await dialog.accept()
+  })
+  await page.goBack()
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/')
+  await expect(page.getByPlaceholder('VD: Tạp Hóa Minh Anh')).toHaveValue('Minh Anh')
+
+  await page.goForward()
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/store/create')
+  await expect(page.getByText('Quận / Huyện')).toBeVisible()
 })
 
 test('search và filter sync lên URL rồi khôi phục lại state từ route', async ({ page }) => {
@@ -173,7 +249,7 @@ test('mở detail modal từ search result vẫn hiển thị đúng thông tin 
   await page.getByRole('button', { name: /Tạp Hóa Mở Modal/i }).click()
 
   const detailModal = page.getByRole('dialog')
-  await expect(detailModal.getByText('Thông tin cửa hàng')).toBeVisible()
+  await expect(detailModal.getByText('Tạp Hóa Mở Modal')).toBeVisible()
   await expect(detailModal.getByText('Đội 3')).toBeVisible()
   await expect(detailModal.getByText('Gần cổng trường')).toBeVisible()
 })

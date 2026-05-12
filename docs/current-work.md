@@ -1,70 +1,80 @@
 # Current Work
 
 ## Goal
-- Thêm quận `Cầu Giấy` vào danh sách địa chỉ, gồm danh sách phường và dữ liệu tọa độ/boundary liên quan để chọn địa chỉ và tự nhận diện quận/phường từ tọa độ.
+- Follow up PR review thread: normalize quick-create `name` query from search CTA so extra internal whitespace is collapsed before navigating to `/store/create`.
 
 ## Task Type
-- Feature
+- Bug Fix
 
 ## Why
-- User cần mở rộng phạm vi địa lý sang Cầu Giấy.
-- Repo hiện dùng `DISTRICT_WARD_SUGGESTIONS` cho dropdown/search/filter và `OLD_ADMIN_AREA_BOUNDARIES` cho reverse lookup tọa độ theo mô hình quận/phường cũ.
+- Search create CTA currently sends `name: searchTerm.trim()`, while CTA visibility logic already uses normalized words.
+- This can create inconsistent URL/form prefill (e.g. `tap hoa   minh anh`) compared with search normalization behavior.
 
 ## In Scope
-- `lib/constants.js`
-- `data/oldAdminAreaBoundaries.js`
-- Test helper liên quan đến area resolver/constants nếu cần.
-- Verify dropdown/filter/reverse lookup data path ở mức unit.
+- `helper/useHomeSearchController.js`
+- Unit tests around search CTA href generation if needed.
+- `docs/current-work.md`
 
 ## Out of Scope
-- Không đổi business flow create/edit/report/map.
-- Không đổi mô hình địa chỉ sang hệ thống hành chính mới sau 2025.
-- Không sửa dữ liệu store hiện có.
-- Không đổi thuật toán search/filter/cache.
+- Không đổi create flow step/deeplink behavior ngoài normalize query name.
+- Không đổi duplicate/search ranking rules.
+- Không đổi cache/map/auth logic.
 
 ## Must Preserve
-- `DISTRICT_SUGGESTIONS` vẫn sinh từ `DISTRICT_WARD_SUGGESTIONS`.
-- Các quận/phường hiện có giữ nguyên.
-- Reverse lookup tọa độ vẫn validate lat/lng và không trả sai khi không match boundary.
-- UTF-8 tiếng Việt phải sạch.
-- Không đè các thay đổi đang có trong working tree.
+- CTA vẫn chỉ hiện theo rule hiện tại.
+- CTA vẫn điều hướng `/store/create?step=2`.
+- Deep-link prefill name vẫn hoạt động.
+- UTF-8 tiếng Việt sạch.
 
 ## Inputs / Repro / Expected
-- Input: Cầu Giấy theo mô hình cũ gồm 8 phường: `Dịch Vọng`, `Dịch Vọng Hậu`, `Mai Dịch`, `Nghĩa Đô`, `Nghĩa Tân`, `Quan Hoa`, `Trung Hòa`, `Yên Hòa`.
-- Expected:
-  - Dropdown quận có `Cầu Giấy`.
-  - Chọn `Cầu Giấy` hiện đúng các phường trên.
-  - Reverse lookup tọa độ mẫu trong Cầu Giấy trả đúng quận/phường tương ứng.
+- Repro: nhập `tap hoa   minh anh` ở search, bấm CTA `Tạo cửa hàng`.
+- Current: query `name` có thể chứa nhiều khoảng trắng liên tiếp.
+- Expected: query `name` được normalize thành single-space words (vd `tap hoa minh anh`).
 
 ## Constraints
-- Dữ liệu địa giới hiện tại trong app là `oldAdminAreaBoundaries`; nếu thêm boundary polygon quá lớn/rủi ro, ưu tiên dữ liệu bounds/geometry đơn giản đủ cho reverse lookup theo điểm trung tâm đã kiểm.
-- Không thêm dependency.
+- Sửa tối thiểu, không thêm dependency.
+- Tận dụng helper normalize hiện có.
 
 ## Required Verification
 - `npm run lint`
-- `npm run test -- __tests__/helper/storeAreaResolver.test.js`
+- `npm run test -- __tests__/helper/homeSearch.test.js`
+- `npm run test -- __tests__/helper/storeCreateFlow.test.js`
 - `npm run text:check`
 - `git diff --check`
-- Checklist: `Map Flow`, `Search Flow`, `Create Flow`, `Edit / Supplement / Report`, `Tiếng Việt / UI Safety`.
+- Checklist: Search Flow, Create Flow, Tiếng Việt / UI Safety.
 
 ## Definition of Done
-- `Cầu Giấy` có trong constants.
-- Các phường Cầu Giấy có trong gợi ý.
-- Tọa độ mẫu của từng phường Cầu Giấy resolve được đúng quận/phường.
-- Verification pass hoặc rủi ro được ghi rõ.
+- Query `name` từ CTA được normalize nhất quán với search meta.
+- Test liên quan pass.
+- Không regression flow search/create đã thêm trước đó.
 
 ## Plan
-- Xác minh danh sách phường Cầu Giấy theo mô hình cũ.
-- Thêm `Cầu Giấy` vào `DISTRICT_WARD_SUGGESTIONS`.
-- Bổ sung dữ liệu tọa độ/boundary Cầu Giấy vào data resolver.
-- Thêm/cập nhật unit test cho constants và reverse lookup Cầu Giấy.
-- Chạy lint/test/text/diff checks.
+- Chạy baseline lint/test/build để ghi nhận trạng thái trước khi sửa.
+- Áp dụng fix nhỏ ở `createStoreHref`.
+- Bổ sung/điều chỉnh test unit cho normalize query.
+- Chạy focused verification và cập nhật kết quả.
 
 ## Done
-- Chưa thực hiện.
+- Root cause: `createStoreHref.query.name` chỉ dùng `trim()`, nên giữ nguyên khoảng trắng thừa ở giữa khi bấm CTA từ search.
+- Fix: thêm helper `normalizeCreateStoreName()` để collapse whitespace (trim + split/join 1-space) và dùng helper này khi tạo deeplink `/store/create?name=...&step=2`.
+- Test: bổ sung unit test khóa behavior normalize query name, gồm edge cases rỗng/toàn khoảng trắng/tab/newline.
 
 ## Verification
-- Chưa chạy.
+- Baseline trước khi sửa:
+  - Pass: `npm run lint`
+  - Pass: `npm run test`
+  - Fail (môi trường): `npm run build` lỗi mạng `getaddrinfo ENOTFOUND fonts.googleapis.com` khi fetch `next/font` (Geist/Geist Mono).
+- Sau khi sửa:
+  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js __tests__/helper/storeCreateFlow.test.js`
+  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js`
+  - Pass: `npm run lint`
+  - Pass: `npm run text:check`
+  - Pass: `git diff --check`
+  - Fail (môi trường): `npm run test:e2e -- e2e/store-search.spec.js` không khởi động web server vì thiếu env `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Checklist verified:
+  - Search Flow: normalize query name cho CTA deeplink, không đổi rule hiện/ẩn CTA.
+  - Create Flow: deeplink `step=2` giữ nguyên.
+  - Tiếng Việt / UI Safety: text check pass.
 
 ## Risks / Next
-- Chưa có.
+- Chưa có bằng chứng e2e mới trong sandbox do thiếu env Supabase; cần chạy lại `e2e/store-search.spec.js` trên CI hoặc môi trường có đủ env để xác nhận UI flow end-to-end.
