@@ -276,4 +276,13 @@ describe('normalizeCreateStoreName', () => {
   it('trim và gom khoảng trắng về 1 dấu cách', () => {
     expect(normalizeCreateStoreName('  Minh   Anh  ')).toBe('Minh Anh')
   })
+
+  it('trả về chuỗi rỗng khi input rỗng hoặc toàn khoảng trắng', () => {
+    expect(normalizeCreateStoreName('')).toBe('')
+    expect(normalizeCreateStoreName('   ')).toBe('')
+  })
+
+  it('gom cả tab/newline về 1 dấu cách', () => {
+    expect(normalizeCreateStoreName('Minh\t\nAnh')).toBe('Minh Anh')
+  })
 })

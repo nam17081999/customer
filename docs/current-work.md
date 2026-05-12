@@ -57,7 +57,7 @@
 ## Done
 - Root cause: `createStoreHref.query.name` chỉ dùng `trim()`, nên giữ nguyên khoảng trắng thừa ở giữa khi bấm CTA từ search.
 - Fix: thêm helper `normalizeCreateStoreName()` để collapse whitespace (trim + split/join 1-space) và dùng helper này khi tạo deeplink `/store/create?name=...&step=2`.
-- Test: bổ sung unit test khóa behavior normalize query name.
+- Test: bổ sung unit test khóa behavior normalize query name, gồm edge cases rỗng/toàn khoảng trắng/tab/newline.
 
 ## Verification
 - Baseline trước khi sửa:
@@ -66,6 +66,7 @@
   - Fail (môi trường): `npm run build` lỗi mạng `getaddrinfo ENOTFOUND fonts.googleapis.com` khi fetch `next/font` (Geist/Geist Mono).
 - Sau khi sửa:
   - Pass: `npm run test -- __tests__/helper/homeSearch.test.js __tests__/helper/storeCreateFlow.test.js`
+  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js`
   - Pass: `npm run lint`
   - Pass: `npm run text:check`
   - Pass: `git diff --check`
