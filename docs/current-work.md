@@ -1,78 +1,79 @@
 # Current Work
 
 ## Goal
-- Fix luồng từ search CTA sang `/store/create?name=...&step=2` không tự điền `Quận / Huyện` và `Xã / Phường` theo vị trí hiện tại; thêm test regression cho case này.
+- Follow up PR review thread: normalize quick-create `name` query from search CTA so extra internal whitespace is collapsed before navigating to `/store/create`.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- Deep-link vào bước 2 đang bỏ qua bước 1 duplicate/GPS path, nên không gọi auto-fill địa bàn từ tọa độ như luồng bấm `Tiếp theo` từ bước 1.
+- Search create CTA currently sends `name: searchTerm.trim()`, while CTA visibility logic already uses normalized words.
+- This can create inconsistent URL/form prefill (e.g. `tap hoa   minh anh`) compared with search normalization behavior.
 
 ## In Scope
-- `helper/useStoreCreateController.js`
-- E2E create/search tests liên quan `step=2`.
+- `helper/useHomeSearchController.js`
+- Unit tests around search CTA href generation if needed.
 - `docs/current-work.md`
 
 ## Out of Scope
-- Không đổi duplicate rule.
-- Không đổi submit/create/cache.
-- Không đổi map/location picker step 3.
-- Không đổi DB/schema.
+- Không đổi create flow step/deeplink behavior ngoài normalize query name.
+- Không đổi duplicate/search ranking rules.
+- Không đổi cache/map/auth logic.
 
 ## Must Preserve
-- Deep-link step 2 vẫn prefill tên và vào đúng bước 2.
-- User vẫn có thể sửa/chọn tay quận/xã.
-- Nếu không lấy được vị trí thì không chặn bước 2.
-- Create flow validate bước 2 như cũ.
+- CTA vẫn chỉ hiện theo rule hiện tại.
+- CTA vẫn điều hướng `/store/create?step=2`.
+- Deep-link prefill name vẫn hoạt động.
 - UTF-8 tiếng Việt sạch.
 
 ## Inputs / Repro / Expected
-- Repro: vào `/store/create?name=Minh%20Anh&step=2` với geolocation e2e có tọa độ thuộc `Hoài Đức / An Khánh`.
-- Current: bước 2 trống quận/xã.
-- Expected: bước 2 tự chọn `Hoài Đức` và `An Khánh`.
+- Repro: nhập `tap hoa   minh anh` ở search, bấm CTA `Tạo cửa hàng`.
+- Current: query `name` có thể chứa nhiều khoảng trắng liên tiếp.
+- Expected: query `name` được normalize thành single-space words (vd `tap hoa minh anh`).
 
 ## Constraints
-- Không thêm dependency.
-- Dùng helper geolocation/location policy hiện có.
+- Sửa tối thiểu, không thêm dependency.
+- Tận dụng helper normalize hiện có.
 
 ## Required Verification
-- `npm run test -- __tests__/helper/storeCreateFlow.test.js`
-- `npm run test:e2e -- e2e/store-create.spec.js e2e/store-search.spec.js`
 - `npm run lint`
+- `npm run test -- __tests__/helper/homeSearch.test.js`
+- `npm run test -- __tests__/helper/storeCreateFlow.test.js`
 - `npm run text:check`
 - `git diff --check`
-- Checklist: Create Flow, Search Flow, Map Flow, Tiếng Việt / UI Safety.
+- Checklist: Search Flow, Create Flow, Tiếng Việt / UI Safety.
 
 ## Definition of Done
-- Root cause xác định.
-- Deep-link step 2 tự fill district/ward khi lấy được vị trí.
-- Có test khóa behavior.
-- Verification pass hoặc ghi rõ rủi ro.
+- Query `name` từ CTA được normalize nhất quán với search meta.
+- Test liên quan pass.
+- Không regression flow search/create đã thêm trước đó.
 
 ## Plan
-- Thêm effect chỉ chạy 1 lần cho deep-link step 2 để lấy tọa độ hiện tại và gọi `autoFillDistrictWardFromCoordinates()`.
-- Không block UI nếu GPS fail.
-- Thêm e2e assert `Hoài Đức` + `An Khánh` được selected ở step 2.
-- Chạy focused tests/checks.
+- Chạy baseline lint/test/build để ghi nhận trạng thái trước khi sửa.
+- Áp dụng fix nhỏ ở `createStoreHref`.
+- Bổ sung/điều chỉnh test unit cho normalize query.
+- Chạy focused verification và cập nhật kết quả.
 
 ## Done
-- Root cause: deep-link `?step=2` chỉ set `currentStep=2`, bỏ qua nhánh bước 1 gọi GPS + `autoFillDistrictWardFromCoordinates()`.
-- Fix: khi route query có `name` và `step=2`, controller lấy vị trí hiện tại 1 lần bằng policy duplicate/location hiện có, lưu tọa độ check, rồi gọi auto-fill quận/xã. Nếu GPS fail thì không chặn form.
-- E2E `deeplink từ search vào bước 2...` đã assert `Hoài Đức` và `Đức Thượng` được chọn tự động theo boundary seed từ tọa độ test.
-- Giữ test back/next: quay về bước 1 vẫn giữ tên; bấm next lại về bước 2 và vẫn giữ quận/xã đã auto-fill.
+- Root cause: `createStoreHref.query.name` chỉ dùng `trim()`, nên giữ nguyên khoảng trắng thừa ở giữa khi bấm CTA từ search.
+- Fix: thêm helper `normalizeCreateStoreName()` để collapse whitespace (trim + split/join 1-space) và dùng helper này khi tạo deeplink `/store/create?name=...&step=2`.
+- Test: bổ sung unit test khóa behavior normalize query name.
 
 ## Verification
-- Pass: `npm run test -- __tests__/helper/storeCreateFlow.test.js`
-- Pass: `npm run test:e2e -- e2e/store-create.spec.js e2e/store-search.spec.js` (`16 passed`)
-- Pass: `npm run lint`
-- Pass: `npm run text:check`
-- Pass: `git diff --check`
+- Baseline trước khi sửa:
+  - Pass: `npm run lint`
+  - Pass: `npm run test`
+  - Fail (môi trường): `npm run build` lỗi mạng `getaddrinfo ENOTFOUND fonts.googleapis.com` khi fetch `next/font` (Geist/Geist Mono).
+- Sau khi sửa:
+  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js __tests__/helper/storeCreateFlow.test.js`
+  - Pass: `npm run lint`
+  - Pass: `npm run text:check`
+  - Pass: `git diff --check`
+  - Fail (môi trường): `npm run test:e2e -- e2e/store-search.spec.js` không khởi động web server vì thiếu env `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Checklist verified:
-  - Create Flow: deep-link step 2, auto-fill địa bàn, back/next, duplicate reset after name edit.
-  - Search Flow: CTA click route vẫn pass browser back/forward.
-  - Map Flow: chỉ dùng geolocation/resolver hiện có; không đổi step 3 map.
+  - Search Flow: normalize query name cho CTA deeplink, không đổi rule hiện/ẩn CTA.
+  - Create Flow: deeplink `step=2` giữ nguyên.
   - Tiếng Việt / UI Safety: text check pass.
 
 ## Risks / Next
-- Chưa chạy toàn bộ e2e suite; đã chạy focused search/create.
+- Chưa có bằng chứng e2e mới trong sandbox do thiếu env Supabase; cần chạy lại `e2e/store-search.spec.js` trên CI hoặc môi trường có đủ env để xác nhận UI flow end-to-end.

@@ -142,3 +142,7 @@ export function shouldShowSearchCreateCta({ indexedStores, searchTerm }) {
     String(entry?.normalizedName || '').split(/\s+/).filter(Boolean).join(' ') === exactName
   ))
 }
+
+export function normalizeCreateStoreName(searchTerm) {
+  return String(searchTerm || '').trim().split(/\s+/).filter(Boolean).join(' ')
+}

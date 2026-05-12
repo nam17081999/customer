@@ -9,6 +9,7 @@ import {
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
+  normalizeCreateStoreName,
   shouldShowSearchCreateCta,
 } from '@/helper/homeSearch'
 import {
@@ -368,7 +369,7 @@ export function useHomeSearchController() {
   const createStoreHref = useMemo(() => ({
     pathname: '/store/create',
     query: {
-      name: searchTerm.trim(),
+      name: normalizeCreateStoreName(searchTerm),
       step: '2',
     },
   }), [searchTerm])

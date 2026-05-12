@@ -12,6 +12,7 @@ import {
   filterAndSortSearchResults,
   hasActiveSearchCriteria,
   hasStoreCoordinates,
+  normalizeCreateStoreName,
   parseQueryList,
   serializeRouteQuery,
   shouldShowSearchCreateCta,
@@ -268,5 +269,11 @@ describe('shouldShowSearchCreateCta', () => {
       indexedStores,
       searchTerm: 'tap hoa   minh anh',
     })).toBe(false)
+  })
+})
+
+describe('normalizeCreateStoreName', () => {
+  it('trim và gom khoảng trắng về 1 dấu cách', () => {
+    expect(normalizeCreateStoreName('  Minh   Anh  ')).toBe('Minh Anh')
   })
 })
