@@ -1,68 +1,114 @@
 # Current Work
 
 ## Goal
-- Resolve merge conflict currently blocking the worktree.
+- Add product unit conversion management to the order/inventory MVP.
 
 ## Task Type
-- Bug Fix
+- Feature
 
 ## Why
-- `docs/current-work.md` contains conflict markers from two completed bugfix task logs.
-- Git cannot proceed until the unmerged file is resolved.
+- The previous phase completed product edit, but unit conversion editing remained read-only.
+- Operators need to add/edit/disable sale units like `thùng 24`, `lốc 6`, `chai/lon` prices directly from the product screen.
 
 ## In Scope
-- `docs/current-work.md`
-- Git conflict state check.
+- `helper/orderInventoryFlow.js`
+- `api/inventory/inventory-client.js`
+- `/inventory/products/[id]`
+- Unit conversion add/update/disable UI.
+- Tests before implementation.
 
 ## Out of Scope
-- Do not change app logic while resolving this conflict.
-- Do not rewrite or revert the staged/unstaged code changes from either side.
-- Do not alter search/create/map behavior beyond preserving existing changes already present in the worktree.
+- Payment/debt management.
+- Barcode support.
+- Chart-heavy analytics dashboard.
+- Reworking order/purchase flows already completed.
+- Applying Supabase migrations to the remote environment.
 
 ## Must Preserve
-- UTF-8 Vietnamese text.
-- Existing staged and unstaged code/test changes.
-- Repository conventions from `AGENTS.md` and project docs.
+- Admin-only protection for order/inventory pages.
+- Stock stored in base units.
+- Base unit must stay active with conversion `1`.
+- Purchase creation enters stock immediately.
+- Sales creation exits stock immediately.
+- No hard deletes for products or product units.
+- Vietnamese UTF-8 text.
+- 1900px workbench design with mobile readability.
 
 ## Inputs / Repro / Expected
-- Current: `git status` reports `docs/current-work.md` as unmerged.
-- Expected: no conflict markers remain and Git reports no unmerged paths.
+- Current:
+  - Product edit shows units read-only.
+  - API lacks create/update helpers for `product_units`.
+  - Helper lacks unit payload validation.
+- Expected:
+  - Admin can add a non-base unit conversion.
+  - Admin can update an existing unit conversion/prices/active flag.
+  - Base unit cannot be disabled or changed away from conversion `1`.
 
 ## Constraints
-- Minimal docs-only conflict resolution.
-- Use `apply_patch` for file edit.
+- Test-first for helper/API behavior.
+- Avoid new dependencies.
+- Keep UI pragmatic and consistent with the existing dark workbench.
 
 ## Required Verification
-- Conflict marker scan for `docs/current-work.md`
-- `git diff --check`
-- `git status --short`
-- Checklist: chung cho mọi task, Tiếng Việt / UI Safety.
+- Initial focused tests must fail before implementation.
+- Focused unit tests for unit helper/API logic.
+- Full `npm run test`.
+- `npm run lint`.
+- `npm run build`.
+- `git diff --check`.
+- `npm run text:check`.
+- Checklist:
+  - Checklist chung cho mọi task
+  - Tiếng Việt / UI Safety
 
 ## Definition of Done
-- Conflict markers removed.
-- `docs/current-work.md` is staged to mark the conflict resolved.
-- Remaining worktree changes are preserved.
+- Tests are written first and pass after implementation.
+- Product unit add/update API helpers exist.
+- Product edit page can add/update/disable units.
+- Verification passes or residual risk is recorded.
 
 ## Plan
-- Replace conflicted task-log content with this conflict-resolution task.
-- Confirm no conflict markers remain in `docs/current-work.md`.
-- Stage `docs/current-work.md` to resolve the unmerged path.
-- Run lightweight verification.
+- Add failing helper/API tests for unit payload validation and unit create/update.
+- Implement unit helper and API functions.
+- Update product edit UI to add/update/disable units.
+- Run focused tests and full verification.
 
 ## Done
-- Resolved the only unmerged path: `docs/current-work.md`.
-- Replaced stale conflict-marker task logs with the current conflict-resolution task record.
-- Preserved all existing code/test changes in the worktree.
+- Added test-first coverage for product unit payload validation and unit create/update API helpers.
+- Added `buildProductUnitPayload()`:
+  - normalizes unit names
+  - validates positive conversion
+  - validates non-negative prices
+  - keeps base unit conversion at `1`
+  - blocks disabling the base unit
+- Added API helpers:
+  - `createProductUnit()`
+  - `updateProductUnit()`
+- Updated `/inventory/products/[id]`:
+  - existing units can be edited in-place
+  - non-base units can be disabled via `active=false`
+  - base unit cannot be disabled and conversion stays locked
+  - new unit conversion can be added from the product edit screen
 
 ## Verification
-- Pass: conflict marker scan for `docs/current-work.md`.
-- Pass: conflict marker scan for repository.
+- Initial focused tests failed before implementation, as expected:
+  - missing `buildProductUnitPayload`
+  - missing `createProductUnit`
+  - missing `updateProductUnit`
+- Pass: focused `npm run test -- __tests__/helper/orderInventoryFlow.test.js __tests__/api/inventoryClient.test.js`
+  - 2 test files passed
+  - 31 tests passed
+- Pass: full `npm run test`
+  - 33 test files passed
+  - 422 tests passed
+- Pass: `npm run lint`.
+- Pass: `npm run build`.
 - Pass: `git diff --check`.
-- Pass: `git status --short` shows no `UU` or other unmerged paths.
+- Pass: `npm run text:check`.
 - Checklist verified:
-  - Chung cho mọi task: goal/scope recorded, no unrelated refactor, closest checks run.
-  - Tiếng Việt / UI Safety: UTF-8 docs edit via `apply_patch`, no conflict markers left.
+  - Checklist chung cho mọi task: tests first, scoped implementation, full verification passed.
+  - Tiếng Việt / UI Safety: mojibake scan passed; UI remains readable and dark-workbench aligned.
 
 ## Risks / Next
-- No app tests were run for this conflict-resolution-only edit because no app logic was changed in this step.
-- Existing staged/modified code changes remain for the prior maps-link work and still need their normal test gate before commit if not already trusted.
+- No authenticated browser smoke was run against a real admin session.
+- Supabase RLS must allow admin update/insert on `product_units`, already intended by the migration.

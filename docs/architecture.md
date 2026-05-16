@@ -32,7 +32,7 @@
 ```
 customer/
 ├── .editorconfig           # UTF-8 + LF guardrail cho source/docs
-├── app/                    # layout.js, globals.css (font-size 19px/21px)
+├── app/                    # layout.js, globals.css (mobile 19px, desktop 16-17px)
 ├── pages/
 │   ├── _app.js             # AuthProvider + Navbar + ErrorBoundary
 │   ├── index.js            # Tìm kiếm (/)

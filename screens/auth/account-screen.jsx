@@ -7,6 +7,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 
+function MenuSection({ title, children }) {
+  return (
+    <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
+      <h2 className="text-base font-semibold text-gray-100">{title}</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function AccountScreen() {
   const router = useRouter()
   const { user, role, isAdmin, isTelesale, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
@@ -75,27 +86,65 @@ export default function AccountScreen() {
               </div>
 
               {(isAdmin || isTelesale) && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Button asChild>
-                    <Link href="/telesale/overview">Màn telesale</Link>
-                  </Button>
+                <div className="space-y-3">
+                  <MenuSection title="Bán hàng">
+                    {isAdmin && (
+                      <>
+                        <Button asChild>
+                          <Link href="/orders/new">Lên đơn hàng</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/orders">Danh sách đơn</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/inventory/products">Hàng hóa & tồn kho</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/inventory/purchases/new">Nhập hàng</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/inventory/purchases">Phiếu nhập</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/inventory/stock">Báo cáo tồn kho</Link>
+                        </Button>
+                      </>
+                    )}
+                    {isTelesale && !isAdmin && (
+                      <Button asChild>
+                        <Link href="/telesale/overview">Màn telesale</Link>
+                      </Button>
+                    )}
+                  </MenuSection>
+
                   {isAdmin && (
                     <>
-                      <Button asChild variant="outline">
-                        <Link href="/overview">Màn tổng quan</Link>
-                      </Button>
-                      <Button asChild variant="outline">
-                        <Link href="/store/import">Màn nhập dữ liệu</Link>
-                      </Button>
-                      <Button asChild variant="outline">
-                        <Link href="/store/export">Màn xuất dữ liệu</Link>
-                      </Button>
-                      <Button asChild variant="outline">
-                        <Link href="/admin/users">Quản lý tài khoản</Link>
-                      </Button>
-                      <Button asChild variant="outline">
-                        <Link href="/store/deduplicate">Gộp cửa hàng trùng lặp</Link>
-                      </Button>
+                      <MenuSection title="Cửa hàng">
+                        <Button asChild variant="outline">
+                          <Link href="/overview">Màn tổng quan</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/store/import">Nhập dữ liệu cửa hàng</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/store/export">Xuất dữ liệu cửa hàng</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/store/deduplicate">Gộp cửa hàng trùng lặp</Link>
+                        </Button>
+                      </MenuSection>
+
+                      <MenuSection title="Quản trị">
+                        <Button asChild variant="outline">
+                          <Link href="/store/verify">Duyệt cửa hàng</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/store/reports">Duyệt báo cáo</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/admin/users">Quản lý tài khoản</Link>
+                        </Button>
+                      </MenuSection>
                     </>
                   )}
                 </div>

@@ -1,5 +1,14 @@
 # 🎨 Design System - NPP Hà Công
 
+## Ngôn Ngữ Thiết Kế Theo Thiết Bị
+
+Dự án tách 2 ngôn ngữ thiết kế:
+
+- **Mobile (<640px)**: giữ ngôn ngữ hiện tại, ưu tiên chữ lớn, nút lớn, thao tác chạm, ít mật độ.
+- **Desktop (>=640px)**: dùng ngôn ngữ riêng kiểu admin/workbench, mật độ cao hơn, nhiều cột/bảng hơn, chữ gọn hơn nhưng vẫn đủ tương phản và không dưới 16px cho nội dung quan trọng.
+
+Rule: các guideline cũ về chữ lớn và tap target là **mặc định cho mobile**. Desktop không copy nguyên layout mobile phóng to; desktop phải tận dụng chiều ngang, bảng, sidebar, toolbar, filter ngang và các khối dữ liệu dày hơn.
+
 ## Nguyên Tắc Ưu Tiên
 
 > **Ứng dụng dành cho người có thể mắt kém.** Mọi thiết kế phải ưu tiên:
@@ -8,9 +17,14 @@
 > - Nút bấm lớn (tối thiểu 44px height)
 > - Không dùng `text-xs` hay `text-[11px]` cho thông tin quan trọng
 
+Áp dụng cụ thể:
+
+- Mobile: nội dung chính ưu tiên 18-19px trở lên, nút chạm tối thiểu 44px.
+- Desktop: nội dung chính có thể dùng 16-17px, bảng/danh sách có thể dày hơn; hành động chính vẫn nên cao 40-44px.
+
 ---
 
-## Typography
+## Typography Mobile
 
 | Cấp | Class | px (mobile 19px base) |
 |---|---|---|
@@ -22,7 +36,22 @@
 | Label nhỏ | `text-sm` | ~16px (min chấp nhận được) |
 | ❌ Không dùng | `text-xs`, `text-[11px]` | <14px — vi phạm |
 
-**Base font**: `globals.css` → `font-size: 19px` (mobile), `21px` (≥640px)
+**Mobile base font**: `globals.css` → `font-size: 19px` cho `<640px`.
+
+## Typography Desktop
+
+Desktop dùng hệ thống gọn hơn để phục vụ admin, đơn hàng, tồn kho, bảng dữ liệu:
+
+| Cấp | Class gợi ý | px (desktop 16px base) |
+|---|---|---|
+| H1 trang | `text-2xl font-bold` | 24px |
+| H2 section | `text-xl font-semibold` | 20px |
+| H3 panel/card | `text-lg font-semibold` | 18px |
+| Body text | `text-base` | 16px |
+| Metadata/label | `text-sm` | 14px, chỉ dùng cho phụ trợ |
+| Table cell | `text-base` hoặc `text-sm` nếu không phải thông tin trọng yếu | 16px / 14px |
+
+Desktop không dùng `text-xs` cho dữ liệu quan trọng như giá, số lượng, tên khách hàng, tên hàng, trạng thái đơn.
 
 ---
 
@@ -55,7 +84,7 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 
 ---
 
-## Layout
+## Layout Mobile
 
 - **Max-width**: `max-w-screen-md mx-auto` (768px)
 - **Padding**: `px-3 sm:px-4` | `py-3 sm:py-4`
@@ -69,18 +98,24 @@ Dự án sử dụng **Dark Mode duy nhất**. Không có chế độ Light Mode
 ---
 
 ### Desktop (≥ 640px)
-- Sticky top: `bg-slate-950/82 backdrop-blur-xl`
-- Brand giữ nguyên bên trái, nav links giữ nguyên bên phải
-- Tab active: chỉ sáng chữ/icon + vạch mảnh phía dưới, không dùng nền nổi bật
-- Tab inactive: `text-slate-300`, hover sáng nhẹ, spacing gọn
-- Admin nav: hiển thị **badge số lượng** cho mục **Xác thực** và **Báo cáo** (pending).
+- Desktop là **workbench/admin layout**, không phải mobile layout phóng to.
+- Base font: `16px` ở `>=640px`, `17px` ở màn rất rộng (`>=1280px`).
+- Page shell admin/order/inventory ưu tiên `max-w-6xl` hoặc `max-w-7xl`, không bị bó vào `max-w-screen-md` nếu cần bảng/danh sách.
+- Sticky top nav: `bg-slate-950/82 backdrop-blur-xl`, gọn, chiều cao khoảng `48px`.
+- Nội dung desktop dùng nhiều cột, bảng, filter ngang, toolbar trên cùng.
+- Card/panel desktop nên gọn: `rounded-md`, border mảnh, padding `p-4` hoặc `p-5`.
+- Không đặt card lồng card nếu chỉ để chia section; dùng panel/border/table row.
+- Desktop có thể dùng table/list dense, nhưng giá, số lượng, trạng thái, tên khách hàng/hàng hóa vẫn phải dễ đọc.
+- Admin nav hiện ưu tiên luồng vận hành thường ngày; các màn quản trị ít dùng có thể đặt trong `/account`.
 
 ### Mobile (< 640px)
 - Fixed bottom tab bar: `bg-gray-950/95 backdrop-blur-md border-t border-gray-800`
 - Icon **w-5 h-5** + label `text-[9px]`
 - Active: `text-blue-400`
 - Create/Edit form: nút hành động chính (Tiếp theo/Lưu) dùng **mobile fixed action bar** nằm ngay **trên** bottom tab bar để luôn hiển thị; nội dung form cần `pb-32` để tránh bị che.
-- Admin tab: hiển thị **badge số lượng** (pending) trong tab **Duyệt** và **Báo cáo**.
+- Mobile nav giữ ít mục, ưu tiên thao tác thường ngày. Các màn quản trị ít dùng có thể nằm trong `/account`.
+
+Mobile tiếp tục dùng ngôn ngữ cũ: màn một cột, vùng bấm lớn, text lớn, ít thông tin mỗi hàng, ưu tiên thao tác tuần tự.
 
 ---
 
@@ -157,6 +192,20 @@ Trang map luôn dark (không theo system preference):
 - `Loại cửa hàng` hiển thị phía trên `Tên cửa hàng`
 - Dùng `text-sm` hoặc tương đương để hierarchy rõ ràng, không cạnh tranh với title
 
+### Màn Tạo/Form — Desktop Pattern
+Màn `/store/create` là mẫu chuẩn cho các màn tạo mới hoặc form tuần tự trên desktop.
+
+- Dùng layout tập trung, không kéo rộng toàn màn: ưu tiên `max-w-screen-md` hoặc gần tương đương khi form là luồng nhập tuần tự.
+- Nền trang giữ `bg-black`; nội dung nằm trong một cột chính, khoảng cách đều `space-y-3` đến `space-y-5`, không cần thêm hero/card trang trí.
+- Step indicator nằm trên form để người dùng biết đang ở bước nào; không đặt thêm heading lớn nếu step đã đủ ngữ cảnh.
+- Field quan trọng dùng `Label` rõ ràng, `Input` cao khoảng `h-11`, chữ `text-base`, label `text-sm` chỉ để phân cấp.
+- Nhóm lựa chọn như `Loại cửa hàng` dùng button grid gọn, trạng thái active có border/nền xanh nhẹ; tránh dropdown nếu số lựa chọn ít và cần quét nhanh.
+- CTA desktop nằm trong luồng form ở cuối bước, không fixed; dùng hàng ngang `sm:flex` với nút quay lại dạng icon và nút chính `flex-1`.
+- Các thông báo trạng thái trong bước dùng panel nhỏ, viền rõ, màu semantic nhẹ; không dùng modal/toast cho trạng thái tạm thời trong form.
+- Bản đồ trong form giữ chiều cao lớn (`~65vh`) để chọn vị trí chính xác; trên desktop trường dán Google Maps link hiển thị ngay dưới bản đồ.
+- Khi cần màn form desktop mới, ưu tiên tái dùng `StoreStepFormLayout` hoặc mô phỏng đúng cấu trúc của nó trước khi tạo layout mới.
+- Chỉ dùng layout desktop rộng nhiều cột khi form cần so sánh dữ liệu song song; với flow nhập tuần tự, giữ cột giữa như `/store/create` để thao tác ổn định và ít phân tán.
+
 ### Form Tạo Cửa Hàng — Loại Cửa Hàng
 - Khối `Loại cửa hàng` tách riêng khỏi `Tên cửa hàng`
 - Dùng grid `2 cột` cả trên mobile để hiển thị nhanh toàn bộ loại
@@ -181,8 +230,8 @@ Trang map luôn dark (không theo system preference):
 
 | Breakpoint | Behavior |
 |---|---|
-| `<640px` | Bottom tab bar, compact padding, no autofocus |
-| `≥640px` | Top navbar, wider padding, autofocus input (desktop only) |
+| `<640px` | Mobile language: bottom tab bar, large text, touch-first controls, no autofocus |
+| `≥640px` | Desktop workbench language: top navbar, 16px base, wider content, denser tables/forms, autofocus allowed |
 | Map sidebar | Chỉ khi `(hover: hover) and (pointer: fine)` |
 
 ---

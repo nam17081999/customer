@@ -44,7 +44,7 @@ function createFeature(store, selectedStoreId) {
   }
 }
 
-export default function StoreDetailMiniMap({ store, open }) {
+export default function StoreDetailMiniMap({ store, open, fill = false }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
@@ -298,9 +298,9 @@ export default function StoreDetailMiniMap({ store, open }) {
   if (!hasCoords) return null
 
   return (
-    <section className="space-y-2">
-      <div className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950/40">
-        <div ref={containerRef} className="aspect-square w-full bg-slate-950" />
+    <section className={fill ? 'h-full min-h-0' : 'space-y-2'}>
+      <div className={`overflow-hidden border border-gray-800 bg-gray-950/40 ${fill ? 'h-full rounded-lg' : 'rounded-2xl'}`}>
+        <div ref={containerRef} className={fill ? 'h-full min-h-[500px] w-full bg-slate-950' : 'aspect-square w-full bg-slate-950'} />
       </div>
     </section>
   )
