@@ -4,15 +4,19 @@ import {
   buildCancelSalesOrderArgs,
   buildProductUpdatePayload,
   buildProductUnitPayload,
+  buildSalesOrderInvoiceModel,
   buildPurchaseOrderRpcPayload,
   buildSalesOrderRpcPayload,
+  buildSalesOrderPaymentQrUrl,
   filterInventoryProducts,
   filterSalesOrders,
   filterStockMovements,
   formatProductStock,
+  formatVietnameseMoneyInWords,
   getInventoryProductCategories,
   getOrderInventoryWorkbenchClasses,
   getSalesOrderCreateRedirect,
+  getSalesOrderPaymentInfo,
   summarizeInventoryProducts,
   summarizePurchaseOrders,
   summarizeSalesOrders,
@@ -363,5 +367,103 @@ describe('orderInventoryFlow product unit helpers', () => {
     expect(() => buildProductUnitPayload({ unitName: '', conversionToBaseQty: '1' })).toThrow('Vui lòng nhập tên đơn vị.')
     expect(() => buildProductUnitPayload({ unitName: 'thùng', conversionToBaseQty: '0' })).toThrow('Quy đổi phải lớn hơn 0.')
     expect(() => buildProductUnitPayload({ unitName: 'thùng', conversionToBaseQty: '24', defaultSalePrice: '-1' })).toThrow('Giá bán không được âm.')
+  })
+})
+
+describe('orderInventoryFlow invoice payment helpers', () => {
+  it('formatVietnameseMoneyInWords đọc tiền nguyên đồng bằng tiếng Việt', () => {
+    expect(formatVietnameseMoneyInWords(9170000)).toBe('Chín triệu một trăm bảy mươi nghìn đồng')
+    expect(formatVietnameseMoneyInWords(0)).toBe('Không đồng')
+  })
+
+  it('trả thông tin thanh toán HDBank cố định cho mẫu in đơn', () => {
+    expect(getSalesOrderPaymentInfo()).toEqual({
+      bankCode: 'HDB',
+      bankName: 'Ngân hàng HD Bank',
+      accountNumber: '186704070009441',
+    })
+  })
+
+  it('buildSalesOrderPaymentQrUrl tạo VietQR theo tổng tiền đơn hàng', () => {
+    const url = buildSalesOrderPaymentQrUrl({
+      code: 'DH001',
+      total_amount: 411000,
+    })
+
+    expect(url).toContain('https://img.vietqr.io/image/HDB-186704070009441-compact2.png')
+    expect(url).toContain('amount=411000')
+    expect(url).toContain('addInfo=DH001')
+  })
+
+  it('buildSalesOrderPaymentQrUrl làm tròn amount về số nguyên không âm', () => {
+    expect(buildSalesOrderPaymentQrUrl({
+      code: 'DH002',
+      total_amount: -1000,
+    })).toContain('amount=0')
+
+    expect(buildSalesOrderPaymentQrUrl({
+      code: 'DH003',
+      total_amount: 1234.56,
+    })).toContain('amount=1235')
+  })
+
+  it('buildSalesOrderInvoiceModel gom dữ liệu in đơn với khách, hàng, đơn vị và QR', () => {
+    const model = buildSalesOrderInvoiceModel({
+      order: {
+        code: 'DH004',
+        created_at: '2026-05-17T06:30:00Z',
+        subtotal_amount: 500000,
+        discount_amount: 10000,
+        total_amount: 490000,
+        note: 'Giao trong ngày',
+      },
+      customer: {
+        name: 'Tạp Hóa Minh Anh',
+        phone: '0901234567',
+        address_detail: 'Số 1 Đường A',
+        ward: 'Phường B',
+        district: 'Quận C',
+      },
+      items: [
+        {
+          id: 'i1',
+          product_id: 'p1',
+          product_unit_id: 'u2',
+          quantity: 2,
+          conversion_to_base_qty: 24,
+          unit_price: 245000,
+          line_total: 490000,
+        },
+      ],
+      productsById: new Map([
+        ['p1', {
+          name: 'Nước Lavie 500ml',
+          sku: 'LAVIE500',
+          base_unit_name: 'chai',
+          units: [
+            { id: 'u1', unit_name: 'chai', conversion_to_base_qty: 1 },
+            { id: 'u2', unit_name: 'thùng 24', conversion_to_base_qty: 24 },
+          ],
+        }],
+      ]),
+    })
+
+    expect(model.customerAddress).toBe('Số 1 Đường A, Phường B, Quận C')
+    expect(model.totalAmountInWords).toBe('Bốn trăm chín mươi nghìn đồng')
+    expect(model.paymentInfo).toEqual(getSalesOrderPaymentInfo())
+    expect(model.paymentQrUrl).toContain('amount=490000')
+    expect(model.lines).toEqual([
+      {
+        id: 'i1',
+        productName: 'Nước Lavie 500ml',
+        sku: 'LAVIE500',
+        unitName: 'thùng 24',
+        quantity: 2,
+        conversionToBaseQty: 24,
+        baseUnitName: 'chai',
+        unitPrice: 245000,
+        lineTotal: 490000,
+      },
+    ])
   })
 })

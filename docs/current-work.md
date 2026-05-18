@@ -1,57 +1,49 @@
 # Current Work
 
 ## Goal
-- Add product unit conversion management to the order/inventory MVP.
+- Adjust the printable sales invoice to match the compact paper order sample provided by the user.
 
 ## Task Type
 - Feature
 
 ## Why
-- The previous phase completed product edit, but unit conversion editing remained read-only.
-- Operators need to add/edit/disable sale units like `thùng 24`, `lốc 6`, `chai/lon` prices directly from the product screen.
+- The current invoice is too modern/card-like.
+- The user wants a compact paper-style delivery invoice: dense header, bordered item table, amount in words, notes, and signature columns.
 
 ## In Scope
 - `helper/orderInventoryFlow.js`
-- `api/inventory/inventory-client.js`
-- `/inventory/products/[id]`
-- Unit conversion add/update/disable UI.
-- Tests before implementation.
+- `pages/orders/[id].js`
+- Unit tests before implementation.
+- Paper-style invoice layout and amount-in-words helper.
 
 ## Out of Scope
-- Payment/debt management.
-- Barcode support.
-- Chart-heavy analytics dashboard.
-- Reworking order/purchase flows already completed.
-- Applying Supabase migrations to the remote environment.
+- PDF generation.
+- Debt/payment tracking.
+- Changing order creation/cancel behavior.
+- Adding new dependencies.
 
 ## Must Preserve
-- Admin-only protection for order/inventory pages.
-- Stock stored in base units.
-- Base unit must stay active with conversion `1`.
-- Purchase creation enters stock immediately.
-- Sales creation exits stock immediately.
-- No hard deletes for products or product units.
+- Admin-only order detail access.
+- Existing order detail/cancel behavior.
+- No hard delete or inventory mutation changes.
 - Vietnamese UTF-8 text.
-- 1900px workbench design with mobile readability.
+- 1900px workbench and mobile readability.
 
 ## Inputs / Repro / Expected
-- Current:
-  - Product edit shows units read-only.
-  - API lacks create/update helpers for `product_units`.
-  - Helper lacks unit payload validation.
+- Current: invoice exists but does not look like the provided paper sample.
 - Expected:
-  - Admin can add a non-base unit conversion.
-  - Admin can update an existing unit conversion/prices/active flag.
-  - Base unit cannot be disabled or changed away from conversion `1`.
+  - Printable invoice has compact paper layout similar to the image.
+  - Header shows company/distributor, bank info, date, order number, customer, address, and salesperson placeholder.
+  - Bordered table has STT, item name, unit, quantity, unit price, amount.
+  - Footer has total amount, amount in Vietnamese words, payment QR/bank info, note, and signature columns.
 
 ## Constraints
-- Test-first for helper/API behavior.
-- Avoid new dependencies.
-- Keep UI pragmatic and consistent with the existing dark workbench.
+- Test-first helper coverage.
+- Use VietQR Quick Link image URL; no QR package dependency.
 
 ## Required Verification
 - Initial focused tests must fail before implementation.
-- Focused unit tests for unit helper/API logic.
+- Focused unit tests for amount-in-words and invoice helpers.
 - Full `npm run test`.
 - `npm run lint`.
 - `npm run build`.
@@ -63,52 +55,53 @@
 
 ## Definition of Done
 - Tests are written first and pass after implementation.
-- Product unit add/update API helpers exist.
-- Product edit page can add/update/disable units.
+- `/orders/[id]` print invoice matches the compact paper-style sample more closely.
 - Verification passes or residual risk is recorded.
 
 ## Plan
-- Add failing helper/API tests for unit payload validation and unit create/update.
-- Implement unit helper and API functions.
-- Update product edit UI to add/update/disable units.
-- Run focused tests and full verification.
+- Add failing tests for Vietnamese amount in words in the invoice model.
+- Implement amount-in-words helper.
+- Replace the invoice template with a compact bordered paper-style layout.
+- Run focused and full verification.
 
 ## Done
-- Added test-first coverage for product unit payload validation and unit create/update API helpers.
-- Added `buildProductUnitPayload()`:
-  - normalizes unit names
-  - validates positive conversion
-  - validates non-negative prices
-  - keeps base unit conversion at `1`
-  - blocks disabling the base unit
-- Added API helpers:
-  - `createProductUnit()`
-  - `updateProductUnit()`
-- Updated `/inventory/products/[id]`:
-  - existing units can be edited in-place
-  - non-base units can be disabled via `active=false`
-  - base unit cannot be disabled and conversion stays locked
-  - new unit conversion can be added from the product edit screen
+- Added test-first coverage for:
+  - Vietnamese amount-in-words formatting.
+  - invoice model exposing `totalAmountInWords`.
+- Added `formatVietnameseMoneyInWords()` for integer VND amounts.
+- Updated `/orders/[id]` print template to match the provided sample more closely:
+  - A5 portrait print page.
+  - compact paper-style header.
+  - customer/address/phone/salesperson lines.
+  - bordered item table with `STT`, `Tên hàng hóa`, `ĐVT`, `SL`, `Đ.Giá`, `T.Tiền`.
+  - total amount row and amount in words.
+  - short customer notes.
+  - three signature columns: `Khách hàng`, `Thủ kho`, `Kế toán`.
+  - compact HDBank transfer info and QR retained.
 
 ## Verification
-- Initial focused tests failed before implementation, as expected:
-  - missing `buildProductUnitPayload`
-  - missing `createProductUnit`
-  - missing `updateProductUnit`
-- Pass: focused `npm run test -- __tests__/helper/orderInventoryFlow.test.js __tests__/api/inventoryClient.test.js`
-  - 2 test files passed
-  - 31 tests passed
+- Initial focused test failed before implementation, as expected:
+  - missing `formatVietnameseMoneyInWords`
+  - missing `totalAmountInWords`
+- Pass: focused `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
+  - 1 test file passed
+  - 26 tests passed
 - Pass: full `npm run test`
   - 33 test files passed
-  - 422 tests passed
-- Pass: `npm run lint`.
-- Pass: `npm run build`.
+  - 427 tests passed
+- Pass: `npm run lint`
+  - 0 errors
+  - 1 warning for external QR `<img>`
+- Pass: `npm run build`
+  - compiled successfully
+  - same external QR `<img>` warning
 - Pass: `git diff --check`.
 - Pass: `npm run text:check`.
 - Checklist verified:
-  - Checklist chung cho mọi task: tests first, scoped implementation, full verification passed.
-  - Tiếng Việt / UI Safety: mojibake scan passed; UI remains readable and dark-workbench aligned.
+  - Checklist chung cho mọi task: scoped implementation, test-first, full verification passed.
+  - Tiếng Việt / UI Safety: UTF-8 scan passed; invoice remains readable and print-focused.
 
 ## Risks / Next
-- No authenticated browser smoke was run against a real admin session.
-- Supabase RLS must allow admin update/insert on `product_units`, already intended by the migration.
+- No authenticated browser print-preview smoke was run against a real admin session.
+- Company address/phone are placeholders because no official values were provided.
+- VietQR image depends on external `img.vietqr.io` availability.

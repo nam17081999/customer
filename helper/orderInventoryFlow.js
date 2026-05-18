@@ -1,5 +1,5 @@
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
-import { toTitleCaseVI } from '@/lib/utils'
+import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 
 export function toInventoryNumber(value, fallback = 0) {
   const number = Number(String(value ?? '').replaceAll(',', '.'))
@@ -131,6 +131,118 @@ export function buildCancelPurchaseOrderArgs(purchaseOrderId, userId) {
 
 export function getSalesOrderCreateRedirect() {
   return '/orders'
+}
+
+const SALES_ORDER_PAYMENT_INFO = {
+  bankCode: 'HDB',
+  bankName: 'Ngân hàng HD Bank',
+  accountNumber: '186704070009441',
+}
+
+export function getSalesOrderPaymentInfo() {
+  return { ...SALES_ORDER_PAYMENT_INFO }
+}
+
+export function buildSalesOrderPaymentQrUrl(order = {}) {
+  const amount = Math.max(0, Math.round(Number(order.total_amount || 0)))
+  const addInfo = encodeURIComponent(String(order.code || 'THANH TOAN DON HANG').trim() || 'THANH TOAN DON HANG')
+  const accountName = encodeURIComponent('NPP HA CONG')
+  const { bankCode, accountNumber } = SALES_ORDER_PAYMENT_INFO
+  return `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${amount}&addInfo=${addInfo}&accountName=${accountName}`
+}
+
+const VI_DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín']
+const VI_SCALES = ['', 'nghìn', 'triệu', 'tỷ']
+
+function readVietnameseTriplet(value, full = false) {
+  const number = Number(value || 0)
+  const hundreds = Math.floor(number / 100)
+  const tens = Math.floor((number % 100) / 10)
+  const ones = number % 10
+  const words = []
+
+  if (hundreds > 0 || full) words.push(`${VI_DIGITS[hundreds]} trăm`)
+  if (tens > 1) {
+    words.push(`${VI_DIGITS[tens]} mươi`)
+    if (ones === 1) words.push('mốt')
+    else if (ones === 5) words.push('lăm')
+    else if (ones > 0) words.push(VI_DIGITS[ones])
+  } else if (tens === 1) {
+    words.push('mười')
+    if (ones === 5) words.push('lăm')
+    else if (ones > 0) words.push(VI_DIGITS[ones])
+  } else if (ones > 0) {
+    if (hundreds > 0 || full) words.push('lẻ')
+    words.push(VI_DIGITS[ones])
+  }
+
+  return words.join(' ')
+}
+
+export function formatVietnameseMoneyInWords(value) {
+  const amount = Math.max(0, Math.round(Number(value || 0)))
+  if (amount === 0) return 'Không đồng'
+
+  const groups = []
+  let rest = amount
+  while (rest > 0) {
+    groups.push(rest % 1000)
+    rest = Math.floor(rest / 1000)
+  }
+
+  const words = []
+  for (let index = groups.length - 1; index >= 0; index -= 1) {
+    const group = groups[index]
+    if (group === 0) continue
+    const full = index < groups.length - 1 && group < 100
+    words.push([readVietnameseTriplet(group, full), VI_SCALES[index]].filter(Boolean).join(' '))
+  }
+
+  const sentence = `${words.join(' ')} đồng`
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1)
+}
+
+function findInvoiceUnit(product, item) {
+  const units = product?.units || []
+  return units.find((unit) => String(unit.id) === String(item.product_unit_id))
+    || units.find((unit) => Number(unit.conversion_to_base_qty || 0) === Number(item.conversion_to_base_qty || 0))
+    || null
+}
+
+export function buildSalesOrderInvoiceModel({
+  order = {},
+  customer = null,
+  items = [],
+  productsById = new Map(),
+} = {}) {
+  const paymentInfo = getSalesOrderPaymentInfo()
+  const customerAddress = formatAddressParts(customer) || 'Chưa có địa chỉ'
+  const lines = items.map((item) => {
+    const product = productsById.get(String(item.product_id)) || null
+    const unit = findInvoiceUnit(product, item)
+    return {
+      id: item.id,
+      productName: product?.name || item.product_id || 'Hàng hóa',
+      sku: product?.sku || 'Chưa có mã',
+      unitName: unit?.unit_name || product?.base_unit_name || 'đơn vị',
+      quantity: Number(item.quantity || 0),
+      conversionToBaseQty: Number(item.conversion_to_base_qty || 0),
+      baseUnitName: product?.base_unit_name || 'gốc',
+      unitPrice: Number(item.unit_price || 0),
+      lineTotal: Number(item.line_total || 0),
+    }
+  })
+
+  return {
+    order,
+    customerName: customer?.name || 'Khách hàng',
+    customerPhone: customer?.phone || 'Chưa có SĐT',
+    customerAddress,
+    lines,
+    paymentInfo,
+    paymentQrUrl: buildSalesOrderPaymentQrUrl(order),
+    totalAmountInWords: formatVietnameseMoneyInWords(order.total_amount),
+  }
 }
 
 export function summarizeSalesOrders(orders = []) {

@@ -2,20 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { ArrowLeft, RefreshCw, XCircle } from 'lucide-react'
+import { ArrowLeft, Printer, RefreshCw, XCircle } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { cancelSalesOrder, formatMoney, getSalesOrderDetail, listProductsWithStock } from '@/api/inventory/inventory-client'
-import { formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { buildSalesOrderInvoiceModel, formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'Chưa có dữ liệu'
   return date.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function formatDateOnly(value) {
+  if (!value) return '.../.../......'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '.../.../......'
+  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 export default function SalesOrderDetailPage() {
@@ -35,6 +42,12 @@ export default function SalesOrderDetailPage() {
   const storesById = useMemo(() => new Map(stores.map((store) => [String(store.id), store])), [stores])
   const productsById = useMemo(() => new Map(products.map((product) => [String(product.id), product])), [products])
   const customer = order ? storesById.get(String(order.customer_store_id)) : null
+  const invoice = useMemo(() => buildSalesOrderInvoiceModel({
+    order: order || {},
+    customer,
+    items,
+    productsById,
+  }), [customer, items, order, productsById])
 
   useEffect(() => {
     if (authLoading) return
@@ -90,40 +103,60 @@ export default function SalesOrderDetailPage() {
     }
   }
 
+  const handlePrint = () => {
+    if (!order) return
+    window.print()
+  }
+
   if (authLoading || !pageReady) return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
 
   return (
     <>
-      <Head><title>Chi tiết đơn hàng - NPP Hà Công</title></Head>
-      <main className="min-h-screen bg-black text-gray-100">
+      <Head>
+        <title>Chi tiết đơn hàng - NPP Hà Công</title>
+        <style>{`
+          @media print {
+            @page { size: A5 portrait; margin: 8mm; }
+            body { background: #fff !important; }
+            nav, .sales-order-screen-only { display: none !important; }
+            .sales-order-invoice-print { display: block !important; }
+          }
+        `}</style>
+      </Head>
+      <main className="min-h-screen bg-black text-gray-100 print:bg-white print:text-black">
         <div className={`${layoutClasses.shell} space-y-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <Button asChild variant="outline">
-                <Link href="/orders"><ArrowLeft className="h-4 w-4" /> Đơn hàng</Link>
-              </Button>
-              <h1 className="mt-3 text-2xl font-bold">{order?.code || 'Chi tiết đơn hàng'}</h1>
-              <p className="text-base text-gray-400">{formatDateTime(order?.created_at)}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={loadDetail} disabled={loading}>
-                <RefreshCw className="h-4 w-4" /> Làm mới
-              </Button>
-              {order && order.status !== 'cancelled' && (
-                <Button type="button" variant="outline" className="border-red-900/60 text-red-300 hover:bg-red-950/30" onClick={handleCancel} disabled={cancelling}>
-                  <XCircle className="h-4 w-4" /> {cancelling ? 'Đang hủy...' : 'Hủy đơn'}
+          <div className="sales-order-screen-only space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <Button asChild variant="outline">
+                  <Link href="/orders"><ArrowLeft className="h-4 w-4" /> Đơn hàng</Link>
                 </Button>
-              )}
+                <h1 className="mt-3 text-2xl font-bold">{order?.code || 'Chi tiết đơn hàng'}</h1>
+                <p className="text-base text-gray-400">{formatDateTime(order?.created_at)}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={loadDetail} disabled={loading}>
+                  <RefreshCw className="h-4 w-4" /> Làm mới
+                </Button>
+                <Button type="button" variant="outline" onClick={handlePrint} disabled={!order || loading}>
+                  <Printer className="h-4 w-4" /> In đơn
+                </Button>
+                {order && order.status !== 'cancelled' && (
+                  <Button type="button" variant="outline" className="border-red-900/60 text-red-300 hover:bg-red-950/30" onClick={handleCancel} disabled={cancelling}>
+                    <XCircle className="h-4 w-4" /> {cancelling ? 'Đang hủy...' : 'Hủy đơn'}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
 
-          {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
+            {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
+          </div>
 
           {loading ? (
             <Card><CardContent className="p-4 text-gray-400">Đang tải chi tiết...</CardContent></Card>
           ) : order ? (
             <>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px] min-[1900px]:grid-cols-[1fr_430px]">
+              <div className="sales-order-screen-only grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px] min-[1900px]:grid-cols-[1fr_430px]">
                 <Card>
                   <CardContent className="p-0">
                     <div className="grid grid-cols-1 gap-3 border-b border-gray-800 px-4 py-3 text-sm font-semibold text-gray-300 md:grid-cols-[1.5fr_0.8fr_0.8fr_0.9fr_0.9fr]">
@@ -161,6 +194,99 @@ export default function SalesOrderDetailPage() {
                   </CardContent></Card>
                 </div>
               </div>
+
+              <section className="sales-order-invoice-print mx-auto max-w-[148mm] rounded-sm border border-gray-800 bg-white p-5 font-serif text-sm leading-tight text-gray-950 shadow-sm print:border-0 print:p-0 print:shadow-none">
+                <div className="grid grid-cols-[1fr_auto] gap-4">
+                  <div>
+                    <p className="font-bold uppercase">Công Ty TNHH Phân Phối Hà Công</p>
+                    <p>Địa chỉ: ................................................</p>
+                    <p>Điện thoại: ..............................................</p>
+                    <p>STK: {invoice.paymentInfo.accountNumber} - {invoice.paymentInfo.bankName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p>Ngày: {formatDateOnly(order.created_at)}</p>
+                    <p>Số: <span className="font-semibold">{order.code}</span></p>
+                    <p>Loại tiền: VNĐ</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-center">
+                  <p className="text-lg font-bold uppercase">Hóa đơn bán hàng</p>
+                  <p className="text-sm">Liên giao khách hàng</p>
+                </div>
+
+                <div className="mt-4 space-y-1">
+                  <p>Tên khách hàng: <span className="font-semibold">{invoice.customerName}</span></p>
+                  <p>Địa chỉ: {invoice.customerAddress}</p>
+                  <p>Điện thoại: {invoice.customerPhone}</p>
+                  <p>NVBH: {user?.email || '................................'} </p>
+                  {order.note && <p>Ghi chú: {order.note}</p>}
+                </div>
+
+                <table className="mt-3 w-full border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th className="border border-gray-900 px-1 py-1 text-center font-semibold">STT</th>
+                      <th className="border border-gray-900 px-2 py-1 text-left font-semibold">Tên hàng hóa</th>
+                      <th className="border border-gray-900 px-1 py-1 text-center font-semibold">ĐVT</th>
+                      <th className="border border-gray-900 px-1 py-1 text-right font-semibold">SL</th>
+                      <th className="border border-gray-900 px-2 py-1 text-right font-semibold">Đ.Giá</th>
+                      <th className="border border-gray-900 px-2 py-1 text-right font-semibold">T.Tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoice.lines.map((line, index) => (
+                      <tr key={line.id}>
+                        <td className="border border-gray-900 px-1 py-1 text-center">{index + 1}</td>
+                        <td className="border border-gray-900 px-2 py-1">
+                          <p className="font-semibold">{line.productName}</p>
+                          <p className="text-gray-700">{line.sku}</p>
+                        </td>
+                        <td className="border border-gray-900 px-1 py-1 text-center">{line.unitName}</td>
+                        <td className="border border-gray-900 px-1 py-1 text-right">{formatInventoryQuantity(line.quantity)}</td>
+                        <td className="border border-gray-900 px-2 py-1 text-right">{formatMoney(line.unitPrice)}</td>
+                        <td className="border border-gray-900 px-2 py-1 text-right">{formatMoney(line.lineTotal)}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td className="border border-gray-900 px-1 py-1 text-center" colSpan={5}>Tổng tiền thanh toán</td>
+                      <td className="border border-gray-900 px-2 py-1 text-right font-bold">{formatMoney(order.total_amount)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="mt-3 space-y-1">
+                  <p>Số tiền bằng chữ: <span className="font-semibold italic">{invoice.totalAmountInWords}</span></p>
+                  <p>Quý khách kiểm tra hàng và thanh toán tiền trước khi nhận hàng ra về.</p>
+                  <p>Quý khách được đổi/trả hàng trong vòng 30 ngày nếu hàng còn nguyên vẹn.</p>
+                  <p>Cảm ơn quý khách đã mua hàng.</p>
+                </div>
+
+                <div className="mt-3 grid grid-cols-[1fr_auto] gap-4">
+                  <div>
+                    <p className="font-semibold">Thông tin chuyển khoản</p>
+                    <p>{invoice.paymentInfo.bankName}</p>
+                    <p>STK: <span className="font-bold">{invoice.paymentInfo.accountNumber}</span></p>
+                    <p>Số tiền: <span className="font-bold">{formatMoney(order.total_amount)} VNĐ</span></p>
+                  </div>
+                  <img src={invoice.paymentQrUrl} alt={`QR thanh toán ${order.code}`} className="h-24 w-24 border border-gray-900 object-contain p-1" />
+                </div>
+
+                <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="font-semibold">Khách hàng</p>
+                    <p className="mt-14">........................</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Thủ kho</p>
+                    <p className="mt-14">........................</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold">Kế toán</p>
+                    <p className="mt-14">........................</p>
+                  </div>
+                </div>
+              </section>
             </>
           ) : (
             <Card><CardContent className="p-4 text-gray-400">Không tìm thấy đơn hàng.</CardContent></Card>
