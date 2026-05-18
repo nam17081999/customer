@@ -1,103 +1,90 @@
 # Current Work
 
 ## Goal
-- Khôi phục màu header navbar và modal chi tiết store về palette cũ sau regression gần đây.
+- Follow up PR review comments for order/inventory changes and verify the remaining fixes are covered.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- User báo ngoài thẻ store, modal detail và header navbar cũng bị chỉnh màu.
-- Cần so sánh lịch sử gần đây, xác định class màu bị đổi, sửa tối thiểu.
+- PR review flagged two issues in the order/inventory follow-up area.
+- `toInventoryNumber()` must honor fallback values for blank input.
+- Store mini map popup must avoid HTML injection while keeping OSM attribution enabled.
 
 ## In Scope
-- Header/navbar đang render trên desktop/mobile.
-- Modal chi tiết store mở từ Search card.
-- So sánh 2-3 commit gần đây và dirty diff để tìm palette đổi.
-- Sửa class màu/card/modal/header liên quan trực tiếp.
+- `helper/orderInventoryFlow.js`
+- `components/map/store-detail-mini-map.jsx`
+- Direct regression coverage in `__tests__/helper/orderInventoryFlow.test.js`
+- Update this working-memory file for the current task.
 
 ## Out of Scope
-- Đổi search logic, filter, cache, store mutation.
-- Đổi layout/navbar route, permission, modal actions/report/supplement behavior.
-- Refactor lớn hoặc đổi design system.
-- Thêm dependency.
+- New order/inventory features outside the flagged review comments.
+- Refactors outside the touched helper/map popup code.
+- Unrelated UI/layout changes.
+- New dependencies.
 
 ## Must Preserve
-- Pages Router và route hiện có.
-- Store detail modal actions: gọi điện, bản đồ, bổ sung/sửa, báo cáo.
-- Search card click mở modal đúng.
-- Dark theme, contrast, font readable, touch target mobile.
+- Pages Router and current routes.
+- Existing order/inventory create/list/detail behavior.
+- Mini map rendering and nearby-store marker behavior.
+- Dark theme, contrast, and readable sizing.
 - UTF-8 tiếng Việt.
-- Không revert unrelated dirty changes.
+- OSM attribution compliance and safe popup text rendering.
 
 ## Inputs / Repro / Expected
-- Input: user báo màu modal detail và header navbar bị đổi.
-- Current: cần xác nhận qua diff/history/render.
-- Expected: navbar + modal dùng lại palette cũ theo design system/trước regression, trên desktop và mobile.
+- Input: PR review comments on `toInventoryNumber()` and mini map popup HTML handling.
+- Current: latest branch commits already contain the production-code fixes.
+- Expected: keep those fixes, add regression proof where practical, and confirm no fresh CI/local validation failures in scope.
 
 ## Constraints
 - Dùng `apply_patch`.
 - Patch nhỏ, giữ behavior.
-- Tôn trọng dirty worktree hiện có.
+- Không mở rộng scope sang feature work.
 
 ## Required Verification
 - `npm run lint`
-- `npm run text:check`
+- `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
 - `git diff --check`
-- Smoke/render `/` desktop/mobile, mở detail modal nếu có data.
 - Checklist:
   - Checklist chung cho mọi task
-  - Search Flow
-  - Edit / Supplement / Report
+  - Map Flow
   - Tiếng Việt / UI Safety
 
 ## Definition of Done
-- Root cause palette navbar/modal xác định.
-- Header navbar và modal detail được khôi phục màu.
-- Lint/text/diff pass hoặc ghi rõ blocker.
-- Có bằng chứng smoke desktop/mobile.
+- Blank-input fallback regression is covered by automated test.
+- Mini map popup remains safe and attributable.
+- Lint/test/diff pass or blockers are documented.
 
 ## Plan
-- Diff `components/layout/app-navbar.jsx`, `components/navbar.jsx`, `components/store-detail-modal.jsx` với 2-3 commit gần đây.
-- Tìm class `slate/neutral` thay cho `gray/black` hoặc màu surface cũ.
-- Patch scoped.
-- Smoke desktop/mobile + modal detail.
+- Inspect current branch state vs original comment commit for the two flagged files.
+- Add a focused regression test for blank-string fallback behavior.
+- Re-run lint and targeted unit tests.
+- Summarize CI status and local verification.
 
 ## Done
-- Checked recent history/diff for `components/layout/app-navbar.jsx` and `components/store-detail-modal.jsx`.
-- Restored navbar colors:
-  - desktop header: `bg-slate-950/82`, `text-slate-*`
-  - mobile bottom nav: `bg-gray-950/95`, `border-gray-800`, `text-gray-*`
-- Restored Store Detail Modal colors:
-  - mobile modal/header/info/actions: `gray-*`
-  - desktop modal shell/map aside: `slate-*`
-  - removed unintended `neutral-*` / `zinc-*` palette from navbar/modal.
-- Kept existing refactor/subcomponent/router/action behavior intact.
+- Verified the latest branch already includes the production-code fixes:
+  - `toInventoryNumber()` now returns `fallback` for `null`/blank input before parsing.
+  - `StoreDetailMiniMap` keeps `attributionControl: true` and uses `setDOMContent()` with text content instead of `setHTML()`.
+- Added a focused unit test that locks blank-string fallback behavior for `toInventoryNumber()`.
 
 ## Verification
 - Pass: `npm run lint`
   - 0 errors.
   - 1 existing warning remains in `pages/orders/[id].js:272` for external `<img>`.
-- Pass: `npm run text:check`
-  - No mojibake detected.
+- Pass: `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
+  - 27 tests passed.
 - Pass: `git diff --check`.
-- Pass: desktop smoke render at `http://localhost:3001/`
-  - Navbar computed with `bg-slate-950/82`.
-  - Detail modal opened from first store card and rendered `slate/gray` shell.
-  - Screenshot: `/tmp/store-search-modal-desktop.png`.
-- Pass: mobile smoke render at `http://localhost:3001/`
-  - Detail modal opened from first store card and rendered `gray` mobile shell/header/actions.
-  - Screenshot: `/tmp/store-search-modal-mobile.png`.
+- Checked GitHub Actions:
+  - `develop` recent runs found, all completed successfully.
+  - Current branch has an in-progress Copilot run (`26043263157`); no failed jobs/logs available yet.
 - Checklist verified:
-  - Checklist chung cho mọi task: scoped fix, docs reread, no dependency added, lint/text/diff checked.
-  - Search Flow: card click/open modal behavior smoke-tested; search logic unchanged.
-  - Edit / Supplement / Report: modal action buttons still render; action logic unchanged.
-  - Tiếng Việt / UI Safety: UTF-8 scan passed; contrast/surface checked visually on desktop/mobile.
+  - Checklist chung cho mọi task: scoped fix, docs reread, no dependency added, lint/test/diff checked.
+  - Map Flow: popup text handling kept safe without changing map source/marker behavior; OSM attribution preserved.
+  - Tiếng Việt / UI Safety: no Vietnamese copy changed; patch stayed small.
 
 ## Risks / Next
-- Did not run full `npm run test`; fix is CSS palette-only plus visual smoke.
-- Worktree has pre-existing unrelated modified files; intentionally touched for this request:
-  - `components/layout/app-navbar.jsx`
-  - `components/search-store-card.jsx`
-  - `components/store-detail-modal.jsx`
+- Did not add an automated test for the mini map popup because the current repo coverage in this area is unit-test focused; popup safety was verified by code inspection plus existing lint.
+- `npm ci` warned that the sandbox is on Node 20 while the repo expects Node 24, but lint and the targeted Vitest run still completed successfully.
+- Files intentionally touched for this request:
+  - `__tests__/helper/orderInventoryFlow.test.js`
   - `docs/current-work.md`

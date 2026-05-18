@@ -20,6 +20,7 @@ import {
   summarizeInventoryProducts,
   summarizePurchaseOrders,
   summarizeSalesOrders,
+  toInventoryNumber,
 } from '@/helper/orderInventoryFlow'
 
 describe('orderInventoryFlow purchase payload', () => {
@@ -324,6 +325,11 @@ describe('orderInventoryFlow completion helpers', () => {
 })
 
 describe('orderInventoryFlow product unit helpers', () => {
+  it('toInventoryNumber trả fallback cho input rỗng hoặc chỉ có khoảng trắng', () => {
+    expect(toInventoryNumber('', 120000)).toBe(120000)
+    expect(toInventoryNumber('   ', 24)).toBe(24)
+  })
+
   it('buildProductUnitPayload chuẩn hóa đơn vị quy đổi thường', () => {
     expect(buildProductUnitPayload({
       unitName: ' Thùng 24 ',
