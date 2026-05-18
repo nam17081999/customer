@@ -9,8 +9,8 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 
 function MenuSection({ title, children }) {
   return (
-    <div className="space-y-3 rounded-xl border border-gray-800 bg-gray-950 p-3">
-      <h2 className="text-base font-semibold text-gray-100">{title}</h2>
+    <div className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950 p-3">
+      <h2 className="text-base font-semibold text-neutral-100">{title}</h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {children}
       </div>
@@ -53,15 +53,15 @@ export default function AccountScreen() {
         <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-screen bg-neutral-950">
         <div className="mx-auto max-w-screen-md px-3 py-4 sm:px-4 sm:py-6">
-          <Card className="rounded-2xl border border-gray-800">
+          <Card className="rounded-2xl border border-neutral-800">
             <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-2 border-b border-gray-800 pb-3">
+              <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-3">
                 <div className="min-w-0">
-                  <p className="text-sm text-gray-400">Tài khoản đăng nhập</p>
-                  <p className="truncate text-base font-semibold text-gray-200">{user?.email}</p>
-                  <p className="text-sm text-gray-400">
+                  <p className="text-sm text-neutral-400">Tài khoản đăng nhập</p>
+                  <p className="truncate text-base font-semibold text-neutral-200">{user?.email}</p>
+                  <p className="text-sm text-neutral-400">
                     Quyền: {isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'}
                   </p>
                 </div>
@@ -78,7 +78,7 @@ export default function AccountScreen() {
               </div>
 
               <div>
-                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Menu nhanh</h1>
+                <h1 className="text-xl font-semibold text-neutral-100 sm:text-2xl">Menu nhanh</h1>
               </div>
 
               {(isAdmin || isTelesale) && (
@@ -147,7 +147,7 @@ export default function AccountScreen() {
               )}
 
               {isTelesale && !isAdmin && (
-                <div className="rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-3 text-sm text-gray-300">
+                <div className="rounded-xl border border-neutral-800 bg-neutral-900/70 p-3 text-sm text-neutral-300">
                   Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
                 </div>
               )}

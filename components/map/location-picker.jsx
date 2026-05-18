@@ -146,16 +146,14 @@ function toLatLng(store) {
   return { lat, lng }
 }
 
-export default function LocationPicker({
+function useLocationPickerController({
   initialLat,
   initialLng,
   onChange,
-  className,
   editable = true,
   debug = false,
   height = 420,
   heading = null,
-  dark = true
 }) {
   const defaultLat = 21.0768617
   const defaultLng = 105.6955684
@@ -518,6 +516,30 @@ export default function LocationPicker({
       map.setBearing(heading)
     }
   }, [heading])
+
+  return { mapContainerRef }
+}
+
+export default function LocationPicker({
+  initialLat,
+  initialLng,
+  onChange,
+  className,
+  editable = true,
+  debug = false,
+  height = 420,
+  heading = null,
+  dark = true
+}) {
+  const { mapContainerRef } = useLocationPickerController({
+    initialLat,
+    initialLng,
+    onChange,
+    editable,
+    debug,
+    height,
+    heading,
+  })
 
   return (
     <div className={className} style={{ position: 'relative' }}>

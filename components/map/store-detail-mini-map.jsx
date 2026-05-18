@@ -136,9 +136,9 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
     let onMouseLeave = null
     let markerLayerListenersAttached = false
 
-    const setupMap = async () => {
+    const setupMap = () => {
       if (cancelled || !containerRef.current) return
-      const maplibreModule = await import('maplibre-gl')
+      import('maplibre-gl').then((maplibreModule) => {
       if (cancelled || !containerRef.current) return
 
       const maplibregl = maplibreModule.default
@@ -237,6 +237,9 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         markMapReady()
       }
       map.on('load', onLoad)
+      }).catch((error) => {
+        console.error('Setup detail mini map failed:', error)
+      })
     }
 
     setupMap()
@@ -321,8 +324,8 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
 
   return (
     <section className={fill ? 'h-full min-h-0' : 'space-y-2'}>
-      <div className={`overflow-hidden border border-gray-800 bg-gray-950/40 ${fill ? 'h-full rounded-lg' : 'rounded-2xl'}`}>
-        <div ref={containerRef} className={fill ? 'h-full min-h-[500px] w-full bg-slate-950' : 'aspect-square w-full bg-slate-950'} />
+      <div className={`overflow-hidden border border-neutral-800 bg-neutral-950/40 ${fill ? 'h-full rounded-lg' : 'rounded-2xl'}`}>
+        <div ref={containerRef} className={fill ? 'h-full min-h-[500px] w-full bg-zinc-950' : 'aspect-square w-full bg-zinc-950'} />
       </div>
     </section>
   )

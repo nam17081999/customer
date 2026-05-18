@@ -1,116 +1,103 @@
 # Current Work
 
 ## Goal
-- Fix the reported React Doctor issues in state/effects, performance, correctness, Next.js routing warning, and the explicitly referenced architecture warnings without changing store business behavior.
+- Khôi phục màu header navbar và modal chi tiết store về palette cũ sau regression gần đây.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- The current report shows effect subscriptions without explicit cleanup, unnecessary rerender state, chained iterations, index keys, and style warnings.
-- These can cause leaks, unstable render behavior, avoidable rerenders, or noisy quality gates.
+- User báo ngoài thẻ store, modal detail và header navbar cũng bị chỉnh màu.
+- Cần so sánh lịch sử gần đây, xác định class màu bị đổi, sửa tối thiểu.
 
 ## In Scope
-- `components/map/store-detail-mini-map.jsx`
-- `components/map/location-picker.jsx`
-- `components/store/store-supplement-form.jsx`
-- `components/search-store-card.jsx`
-- `screens/auth/account-screen.jsx`
-- `components/layout/app-navbar.jsx`
-- `pages/map.js`
-- `pages/_app.js`
-- Minimal docs working-memory update for this task.
+- Header/navbar đang render trên desktop/mobile.
+- Modal chi tiết store mở từ Search card.
+- So sánh 2-3 commit gần đây và dirty diff để tìm palette đổi.
+- Sửa class màu/card/modal/header liên quan trực tiếp.
 
 ## Out of Scope
-- Broad Tailwind palette migration across the whole app.
-- New features or route redesign.
-- Store mutation/cache logic.
-- Search scoring, duplicate detection, DB schema, auth provider changes.
-- Adding dependencies.
+- Đổi search logic, filter, cache, store mutation.
+- Đổi layout/navbar route, permission, modal actions/report/supplement behavior.
+- Refactor lớn hoặc đổi design system.
+- Thêm dependency.
 
 ## Must Preserve
-- Pages Router route structure.
-- Public store reads through `getOrRefreshStores()`.
-- Map query/location behavior and coordinate validation assumptions.
-- Supplement flow step behavior, including auto-start location only when entering the location step.
-- Account page auth guard behavior for unauthenticated users.
-- Dark theme, readable text, and Vietnamese UTF-8.
+- Pages Router và route hiện có.
+- Store detail modal actions: gọi điện, bản đồ, bổ sung/sửa, báo cáo.
+- Search card click mở modal đúng.
+- Dark theme, contrast, font readable, touch target mobile.
+- UTF-8 tiếng Việt.
+- Không revert unrelated dirty changes.
 
 ## Inputs / Repro / Expected
-- Input: React Doctor report listing warnings in map mini map, supplement form, navbar, account screen, location picker, and search card.
-- Current: subscriptions/timers are not always cleaned explicitly, some state is only used as a rerender gate, array index is used as highlight key, and some Tailwind classes trigger project warnings.
-- Expected: referenced warnings are removed or reduced with minimal targeted changes, while the affected UI flows keep the same behavior.
+- Input: user báo màu modal detail và header navbar bị đổi.
+- Current: cần xác nhận qua diff/history/render.
+- Expected: navbar + modal dùng lại palette cũ theo design system/trước regression, trên desktop và mobile.
 
 ## Constraints
-- Use `apply_patch` for file edits.
-- Do not rewrite unrelated UI or business logic.
-- Keep the scope to the issues named in the user request.
+- Dùng `apply_patch`.
+- Patch nhỏ, giữ behavior.
+- Tôn trọng dirty worktree hiện có.
 
 ## Required Verification
 - `npm run lint`
 - `npm run text:check`
 - `git diff --check`
-- Run a focused React Doctor check if available.
+- Smoke/render `/` desktop/mobile, mở detail modal nếu có data.
 - Checklist:
   - Checklist chung cho mọi task
-  - Map Flow
-  - Edit / Supplement / Report
   - Search Flow
+  - Edit / Supplement / Report
   - Tiếng Việt / UI Safety
 
 ## Definition of Done
-- Targeted code changes compile through lint.
-- Cleanup functions remove MapLibre listeners/timers where applicable.
-- No array index key remains in the reported search highlight path.
-- Account screen avoids page-ready state rerenders and destructures router methods.
-- Working memory records final verification and residual risk.
+- Root cause palette navbar/modal xác định.
+- Header navbar và modal detail được khôi phục màu.
+- Lint/text/diff pass hoặc ghi rõ blocker.
+- Có bằng chứng smoke desktop/mobile.
 
 ## Plan
-- Patch map mini map listener cleanup and combine nearby-store iteration.
-- Patch location picker listener/timer cleanup and batch simple DOM style writes.
-- Move supplement location auto-start logic into the step transition handler where possible.
-- Patch account screen router method usage and replace render-only state.
-- Patch search highlight key stability.
-- Patch the referenced navbar Tailwind warning examples.
-- Run verification and update this file with outcome.
+- Diff `components/layout/app-navbar.jsx`, `components/navbar.jsx`, `components/store-detail-modal.jsx` với 2-3 commit gần đây.
+- Tìm class `slate/neutral` thay cho `gray/black` hoặc màu surface cũ.
+- Patch scoped.
+- Smoke desktop/mobile + modal detail.
 
 ## Done
-- Fixed explicit MapLibre listener cleanup in `components/map/store-detail-mini-map.jsx`.
-- Reworked mini map nearby-store processing to avoid chained `.filter().map()` and replaced nearby-store updates with reducer dispatch.
-- Reworked mini map readiness trigger to avoid render-only state.
-- Batched selected-location marker DOM style writes in `components/map/location-picker.jsx`.
-- Added explicit MapLibre listener cleanup in `components/map/location-picker.jsx`.
-- Combined nearby store coordinate normalization/filtering into one loop in `components/map/location-picker.jsx`.
-- Moved supplement location auto-start out of a state-setting effect and into step transition handling in `components/store/store-supplement-form.jsx`.
-- Removed account `pageReady` state, destructured router `replace`, and kept the auth guard behavior in `screens/auth/account-screen.jsx`.
-- Replaced highlighted search mark index keys with stable range keys in `components/search-store-card.jsx`.
-- Updated the referenced navbar palette/size shorthand examples in `components/layout/app-navbar.jsx`.
-- Removed mobile zoom restriction from `pages/_app.js`.
-- Added explicit map event detachers for public `/map` marker/load/style listeners in `pages/map.js`.
+- Checked recent history/diff for `components/layout/app-navbar.jsx` and `components/store-detail-modal.jsx`.
+- Restored navbar colors:
+  - desktop header: `bg-slate-950/82`, `text-slate-*`
+  - mobile bottom nav: `bg-gray-950/95`, `border-gray-800`, `text-gray-*`
+- Restored Store Detail Modal colors:
+  - mobile modal/header/info/actions: `gray-*`
+  - desktop modal shell/map aside: `slate-*`
+  - removed unintended `neutral-*` / `zinc-*` palette from navbar/modal.
+- Kept existing refactor/subcomponent/router/action behavior intact.
 
 ## Verification
 - Pass: `npm run lint`
   - 0 errors.
-  - 1 existing warning remains in `pages/orders/[id].js` for external QR `<img>`.
-- Pass: `npm run test`
-  - 33 test files passed.
-  - 427 tests passed.
+  - 1 existing warning remains in `pages/orders/[id].js:272` for external `<img>`.
 - Pass: `npm run text:check`
   - No mojibake detected.
 - Pass: `git diff --check`.
-- Pass with warnings: `npx react-doctor@latest . --verbose`
-  - Exit code 0.
-  - 0 errors.
-  - Score 63 / 100.
-  - 1598 warnings remain across 100 files, mostly pre-existing broad architecture/design/dead-code warnings outside this task.
+- Pass: desktop smoke render at `http://localhost:3001/`
+  - Navbar computed with `bg-slate-950/82`.
+  - Detail modal opened from first store card and rendered `slate/gray` shell.
+  - Screenshot: `/tmp/store-search-modal-desktop.png`.
+- Pass: mobile smoke render at `http://localhost:3001/`
+  - Detail modal opened from first store card and rendered `gray` mobile shell/header/actions.
+  - Screenshot: `/tmp/store-search-modal-mobile.png`.
 - Checklist verified:
-  - Checklist chung cho mọi task: scoped change, no dependency added, lint/test/text/diff checked.
-  - Map Flow: listener cleanup changed only; map query/store rendering behavior not changed.
-  - Edit / Supplement / Report: supplement step behavior preserved; location setup still starts when entering step 3.
-  - Search Flow: highlight key stability changed only; search scoring/filtering untouched.
-  - Tiếng Việt / UI Safety: UTF-8 scan passed.
+  - Checklist chung cho mọi task: scoped fix, docs reread, no dependency added, lint/text/diff checked.
+  - Search Flow: card click/open modal behavior smoke-tested; search logic unchanged.
+  - Edit / Supplement / Report: modal action buttons still render; action logic unchanged.
+  - Tiếng Việt / UI Safety: UTF-8 scan passed; contrast/surface checked visually on desktop/mobile.
 
 ## Risks / Next
-- No browser/manual smoke test was run for map drag/click interactions.
-- React Doctor still reports broad repo warnings outside the requested targeted fixes, especially palette migration, giant components, dead code, and unrelated array-index keys.
-- `components/map/store-detail-mini-map.jsx:141` still has a React Doctor `async-defer-await` warning because the dynamic import keeps a post-await cancellation guard to avoid creating a map after unmount.
+- Did not run full `npm run test`; fix is CSS palette-only plus visual smoke.
+- Worktree has pre-existing unrelated modified files; intentionally touched for this request:
+  - `components/layout/app-navbar.jsx`
+  - `components/search-store-card.jsx`
+  - `components/store-detail-modal.jsx`
+  - `docs/current-work.md`
