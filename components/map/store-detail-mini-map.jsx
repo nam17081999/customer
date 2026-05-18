@@ -182,10 +182,13 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         const coordinates = feature?.geometry?.coordinates
         if (!feature || !Array.isArray(coordinates)) return
 
+        const popupContent = document.createElement('div')
+        popupContent.textContent = feature.properties?.name || 'Cửa hàng'
+
         map.getCanvas().style.cursor = 'pointer'
         popupRef.current
           ?.setLngLat(coordinates)
-          .setHTML(`<div>${feature.properties?.name || 'Cửa hàng'}</div>`)
+          .setDOMContent(popupContent)
           .addTo(map)
       }
 
