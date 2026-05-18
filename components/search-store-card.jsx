@@ -107,10 +107,10 @@ function SearchStoreCard({
 
     const parts = []
     let lastEnd = 0
-    ranges.forEach(([s, e], i) => {
+    ranges.forEach(([s, e]) => {
       if (s > lastEnd) parts.push(text.slice(lastEnd, s))
       parts.push(
-        <mark key={`hl-${i}`} className="bg-yellow-200 dark:bg-yellow-700 -md px-0.5">
+        <mark key={`hl-${s}-${e}`} className="bg-yellow-200 dark:bg-yellow-700 -md px-0.5">
           {text.slice(s, e)}
         </mark>,
       )

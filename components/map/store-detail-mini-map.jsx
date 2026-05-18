@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef } from 'react'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   ensureStoreMarkerImage,
@@ -49,8 +49,8 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
   const mapRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
   const popupRef = useRef(null)
-  const [mapReady, setMapReady] = useState(false)
-  const [nearbyStores, setNearbyStores] = useState([])
+  const [mapReadyVersion, markMapReady] = useReducer((version) => version + 1, 0)
+  const [nearbyStores, dispatchNearbyStores] = useReducer((_, nextStores) => nextStores, [])
 
   const selectedStoreId = String(store?.id || '')
   const hasCoords = hasStoreCoordinates(store)
@@ -64,13 +64,15 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
       longitude: Number(store.longitude),
     }
 
-    const normalizedNearby = nearbyStores
-      .filter((item) => String(item.id) !== selectedStoreId)
-      .map((item) => ({
+    const normalizedNearby = []
+    for (const item of nearbyStores) {
+      if (String(item.id) === selectedStoreId) continue
+      normalizedNearby.push({
         ...item,
         latitude: Number(item.latitude),
         longitude: Number(item.longitude),
-      }))
+      })
+    }
 
     return [
       ...normalizedNearby.map((item) => createFeature(item, selectedStoreId)),
@@ -80,7 +82,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
 
   useEffect(() => {
     if (!open || !hasCoords || !store?.id) {
-      setNearbyStores([])
+      dispatchNearbyStores([])
       return
     }
 
@@ -94,9 +96,10 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         const currentLat = Number(store.latitude)
         const currentLng = Number(store.longitude)
 
-        const rankedStores = stores
-          .filter((item) => hasStoreCoordinates(item))
-          .map((item) => ({
+        const rankedStores = []
+        for (const item of stores) {
+          if (!hasStoreCoordinates(item)) continue
+          rankedStores.push({
             ...item,
             distanceMeters: calculateDistanceMeters(
               currentLat,
@@ -104,14 +107,15 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
               Number(item.latitude),
               Number(item.longitude)
             ),
-          }))
+          })
+        }
+        rankedStores
           .sort((first, second) => first.distanceMeters - second.distanceMeters)
-          .slice(0, MAX_NEARBY_STORES)
 
-        setNearbyStores(rankedStores)
+        dispatchNearbyStores(rankedStores.slice(0, MAX_NEARBY_STORES))
       } catch (error) {
         console.error('Load nearby stores for detail mini map failed:', error)
-        if (!cancelled) setNearbyStores([])
+        if (!cancelled) dispatchNearbyStores([])
       }
     }
 
@@ -126,8 +130,14 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
     if (!open || !hasCoords || !containerRef.current || mapRef.current) return
 
     let cancelled = false
+    let mapInstance = null
+    let onLoad = null
+    let onMouseEnter = null
+    let onMouseLeave = null
+    let markerLayerListenersAttached = false
 
     const setupMap = async () => {
+      if (cancelled || !containerRef.current) return
       const maplibreModule = await import('maplibre-gl')
       if (cancelled || !containerRef.current) return
 
@@ -154,6 +164,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         attributionControl: false,
       })
 
+      mapInstance = map
       mapRef.current = map
       map.boxZoom.disable()
       map.doubleClickZoom.disable()
@@ -166,7 +177,24 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
       map.touchZoomRotate.disableRotation()
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
-      map.on('load', () => {
+      onMouseEnter = (event) => {
+        const feature = event.features?.[0]
+        const coordinates = feature?.geometry?.coordinates
+        if (!feature || !Array.isArray(coordinates)) return
+
+        map.getCanvas().style.cursor = 'pointer'
+        popupRef.current
+          ?.setLngLat(coordinates)
+          .setHTML(`<div>${feature.properties?.name || 'Cửa hàng'}</div>`)
+          .addTo(map)
+      }
+
+      onMouseLeave = () => {
+        map.getCanvas().style.cursor = ''
+        popupRef.current?.remove()
+      }
+
+      onLoad = () => {
         if (cancelled) return
 
         map.addSource('detail-stores', {
@@ -202,34 +230,28 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
           className: 'detail-mini-map-popup',
         })
 
-        map.on('mouseenter', 'detail-store-marker', (event) => {
-          const feature = event.features?.[0]
-          const coordinates = feature?.geometry?.coordinates
-          if (!feature || !Array.isArray(coordinates)) return
+        map.on('mouseenter', 'detail-store-marker', onMouseEnter)
+        map.on('mouseleave', 'detail-store-marker', onMouseLeave)
+        markerLayerListenersAttached = true
 
-          map.getCanvas().style.cursor = 'pointer'
-          popupRef.current
-            ?.setLngLat(coordinates)
-            .setHTML(`<div>${feature.properties?.name || 'Cửa hàng'}</div>`)
-            .addTo(map)
-        })
-
-        map.on('mouseleave', 'detail-store-marker', () => {
-          map.getCanvas().style.cursor = ''
-          popupRef.current?.remove()
-        })
-
-        setMapReady(true)
-      })
+        markMapReady()
+      }
+      map.on('load', onLoad)
     }
 
     setupMap()
 
     return () => {
       cancelled = true
+      if (mapInstance && onLoad) mapInstance.off('load', onLoad)
+      if (mapInstance && markerLayerListenersAttached && onMouseEnter) {
+        mapInstance.off('mouseenter', 'detail-store-marker', onMouseEnter)
+      }
+      if (mapInstance && markerLayerListenersAttached && onMouseLeave) {
+        mapInstance.off('mouseleave', 'detail-store-marker', onMouseLeave)
+      }
       popupRef.current?.remove()
       popupRef.current = null
-      setMapReady(false)
       if (mapRef.current) {
         removeMarkerImages(mapRef.current, Array.from(activeMarkerImageIdsRef.current))
         activeMarkerImageIdsRef.current = new Set()
@@ -250,7 +272,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
   }, [open])
 
   useEffect(() => {
-    if (!mapReady) return
+    if (!mapReadyVersion) return
     const map = mapRef.current
     const source = map?.getSource('detail-stores')
     if (!map || !source) return
@@ -293,7 +315,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         duration: 500,
       })
     }
-  }, [hasCoords, mapFeatures, mapReady, store])
+  }, [hasCoords, mapFeatures, mapReadyVersion, store])
 
   if (!hasCoords) return null
 

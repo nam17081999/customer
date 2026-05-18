@@ -19,20 +19,16 @@ function MenuSection({ title, children }) {
 }
 
 export default function AccountScreen() {
-  const router = useRouter()
+  const { replace } = useRouter()
   const { user, role, isAdmin, isTelesale, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
-  const [pageReady, setPageReady] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
     if (!isAuthenticated) {
-      setPageReady(false)
-      router.replace('/login?from=/account')
-      return
+      replace('/login?from=/account')
     }
-    setPageReady(true)
-  }, [authLoading, isAuthenticated, router])
+  }, [authLoading, isAuthenticated, replace])
 
   const handleSignOut = async () => {
     if (!signOut || signingOut) return
@@ -44,10 +40,10 @@ export default function AccountScreen() {
       console.error('Sign out returned error:', error)
     }
 
-    router.replace('/login')
+    replace('/login')
   }
 
-  if (authLoading || !pageReady) {
+  if (authLoading || !isAuthenticated) {
     return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
   }
 

@@ -116,11 +116,7 @@ function createStoreMarker(text, fontSize = 12) {
 
 function createSelectedLocationMarkerElement() {
   const wrapper = document.createElement('div')
-  wrapper.style.width = '28px'
-  wrapper.style.height = '28px'
-  wrapper.style.display = 'flex'
-  wrapper.style.alignItems = 'center'
-  wrapper.style.justifyContent = 'center'
+  wrapper.style.cssText = 'width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;'
 
   wrapper.innerHTML = `
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -284,13 +280,17 @@ export default function LocationPicker({
   const loadNearbyStores = useCallback(async () => {
     try {
       const stores = await getOrRefreshStores()
-      allStoresRef.current = (stores || [])
-        .map((store) => ({
+      const storesWithCoords = []
+      for (const store of stores || []) {
+        const coords = toLatLng(store)
+        if (!coords) continue
+        storesWithCoords.push({
           id: store.id,
           name: store.name,
-          coords: toLatLng(store),
-        }))
-        .filter((store) => store.coords)
+          coords,
+        })
+      }
+      allStoresRef.current = storesWithCoords
 
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
@@ -336,12 +336,14 @@ export default function LocationPicker({
     mapRef.current = map
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
 
-    map.on('load', () => {
+    const handleLoad = () => {
       ensureNearbyStoresLayers(map)
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
       scheduleMapResize()
-    })
+    }
+
+    map.on('load', handleLoad)
 
     if (map.isStyleLoaded()) {
       ensureNearbyStoresLayers(map)
@@ -396,8 +398,7 @@ export default function LocationPicker({
       }
     }
 
-    map.on('move', updateCenter)
-    map.on('moveend', () => {
+    const handleMoveEnd = () => {
       updateCenter()
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
@@ -407,10 +408,9 @@ export default function LocationPicker({
       if (debugRef.current) {
         console.log('Map center:', { lat, lng })
       }
-    })
+    }
 
-    // Support "tap/click to pin" when unlocked.
-    map.on('click', (e) => {
+    const handleClick = (e) => {
       if (!editableRef.current) return
       const lat = Number(e.lngLat.lat.toFixed(7))
       const lng = Number(e.lngLat.lng.toFixed(7))
@@ -425,12 +425,23 @@ export default function LocationPicker({
       }
       if (onChangeRef.current) onChangeRef.current(lat, lng)
       updateNearbyStores(lat, lng)
-    })
+    }
+
+    map.on('move', updateCenter)
+    map.on('moveend', handleMoveEnd)
+    // Support "tap/click to pin" when unlocked.
+    map.on('click', handleClick)
 
     loadNearbyStores()
 
     return () => {
       clearScheduledMapResize()
+      map.off('load', handleLoad)
+      map.off('move', updateCenter)
+      map.off('moveend', handleMoveEnd)
+      map.off('click', handleClick)
+      markerRef.current?.remove()
+      markerRef.current = null
       map.remove()
       mapRef.current = null
     }

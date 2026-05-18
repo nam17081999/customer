@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -114,7 +114,8 @@ export default function StoreSupplementForm({
 
   const finalSubmitLabel = submitLabel || (isSupplementMode ? 'Hoàn thành bổ sung' : 'Lưu thay đổi')
   const hasCoordinates = hasLocationCoordinates(pickedLat, pickedLng)
-  const [showLocationEditor, setShowLocationEditor] = useState(hasCoordinates)
+  const [locationEditorRequested, setShowLocationEditor] = useState(false)
+  const showLocationEditor = locationEditorRequested || hasCoordinates
   const locationSetupStartedRef = useRef(false)
   const locationView = getLocationStepView({
     resolving: resolvingAddr,
@@ -123,23 +124,20 @@ export default function StoreSupplementForm({
     blocked: geoBlocked,
   })
 
-  useEffect(() => {
-    if (hasCoordinates) {
-      setShowLocationEditor(true)
-    }
-  }, [hasCoordinates])
-
-  useEffect(() => {
-    if (currentStep !== 3) {
-      locationSetupStartedRef.current = false
-      return
-    }
+  function startLocationSetupForStep() {
     if (stepCount < 3 || showLocationEditor || hasCoordinates || locationSetupStartedRef.current) return
-
     locationSetupStartedRef.current = true
     setShowLocationEditor(true)
     void handleStartLocationSetup?.()
-  }, [currentStep, handleStartLocationSetup, hasCoordinates, showLocationEditor, stepCount])
+  }
+
+  function goToStep(nextStep) {
+    if (nextStep !== 3) {
+      locationSetupStartedRef.current = false
+    }
+    setCurrentStep(nextStep)
+    if (nextStep === 3) startLocationSetupForStep()
+  }
 
   async function handlePrimaryAction() {
     if (currentStep < stepCount) {
@@ -149,12 +147,7 @@ export default function StoreSupplementForm({
         nextStep,
       })
       if (shouldContinue === false) return
-      if (nextStep === 3 && !hasCoordinates && !locationSetupStartedRef.current) {
-        locationSetupStartedRef.current = true
-        setShowLocationEditor(true)
-        void handleStartLocationSetup?.()
-      }
-      setCurrentStep(nextStep)
+      goToStep(nextStep)
       return
     }
     await onFinalSubmit?.()
@@ -199,7 +192,7 @@ export default function StoreSupplementForm({
 
       {currentStep === 2 ? (
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(1)} />
+          <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => goToStep(1)} />
           <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
             {stepCount === 2 ? renderPrimaryLabel() : 'Tiếp theo →'}
           </Button>
@@ -208,7 +201,7 @@ export default function StoreSupplementForm({
 
       {currentStep === 3 ? (
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
+          <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => goToStep(2)} />
           <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving || resolvingAddr || geoBlocked}>
             {renderPrimaryLabel()}
           </Button>
@@ -450,7 +443,7 @@ export default function StoreSupplementForm({
           </div>
 
           <div className="hidden gap-2 pt-2 sm:flex">
-            <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(1)} />
+            <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => goToStep(1)} />
             <Button type="button" className="flex-1" onClick={handlePrimaryAction} disabled={saving}>
               {stepCount === 2 ? renderPrimaryLabel() : 'Tiếp theo →'}
             </Button>
@@ -564,7 +557,7 @@ export default function StoreSupplementForm({
               </div>
 
               <div className="hidden gap-2 pt-2 sm:flex">
-                <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => setCurrentStep(2)} />
+                <Button type="button" variant="outline" size="icon" icon={<span>←</span>} onClick={() => goToStep(2)} />
                 <Button
                   type="button"
                   className="flex-1"
