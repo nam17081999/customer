@@ -161,7 +161,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         zoom: DEFAULT_ZOOM,
         minZoom: 3,
         maxZoom: 19,
-        attributionControl: false,
+        attributionControl: true,
       })
 
       mapInstance = map
