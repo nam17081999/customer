@@ -33,7 +33,7 @@ function HighlightedName({ name, term }) {
     const end = start + normQ.length
     if (start > lastEnd) parts.push(text.slice(lastEnd, start))
     parts.push(
-      <mark key={`hl-${start}-${end}`} className="bg-yellow-200 dark:bg-yellow-700 -md px-0.5">
+      <mark key={`hl-${start}-${end}`} className="bg-yellow-200 dark:bg-yellow-700 rounded-md px-0.5">
         {text.slice(start, end)}
       </mark>,
     )
