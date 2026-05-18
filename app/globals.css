@@ -21,6 +21,14 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --surface: #030712;
+  --surface-muted: #111827;
+  --surface-border: #1f2937;
+  --desktop-background: #070a10;
+  --desktop-foreground: #e5e7eb;
+  --desktop-surface: #0b1018;
+  --desktop-surface-muted: #111827;
+  --desktop-border: #273244;
 }
 
 @theme inline {
@@ -34,8 +42,22 @@ html {
 }
 
 @media (min-width: 640px) {
+  :root {
+    --background: var(--desktop-background);
+    --foreground: var(--desktop-foreground);
+    --surface: var(--desktop-surface);
+    --surface-muted: var(--desktop-surface-muted);
+    --surface-border: var(--desktop-border);
+  }
+
   html {
-    font-size: 21px;
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 17px;
   }
 }
 

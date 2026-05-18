@@ -63,3 +63,12 @@ export function ReportIcon({ className }) {
     </svg>
   )
 }
+
+export function OrderIcon({ className }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6h15l-1.5 8.5a2 2 0 01-2 1.5H8.5a2 2 0 01-2-1.7L5 3H3" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20h.01M18 20h.01" />
+    </svg>
+  )
+}

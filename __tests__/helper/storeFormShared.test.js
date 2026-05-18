@@ -22,6 +22,62 @@ describe('extractCoordsFromMapsUrl', () => {
     })
   })
 
+  it('đọc được tọa độ search path từ Google Maps share redirect', () => {
+    expect(extractCoordsFromMapsUrl('https://www.google.com/maps/search/21.069855,+105.707641?entry=tts')).toEqual({
+      lat: 21.069855,
+      lng: 105.707641,
+    })
+  })
+
+  it('đọc được tọa độ query có dấu cộng trước longitude', () => {
+    expect(extractCoordsFromMapsUrl('https://www.google.com/maps?q=21.069855,+105.707641')).toEqual({
+      lat: 21.069855,
+      lng: 105.707641,
+    })
+  })
+
+  it('đọc được tọa độ query có encoded plus trước longitude', () => {
+    expect(extractCoordsFromMapsUrl('https://www.google.com/maps?q=21.069855,%2B105.707641')).toEqual({
+      lat: 21.069855,
+      lng: 105.707641,
+    })
+  })
+
+  it('đọc được tọa độ center URL-encoded trong share metadata', () => {
+    expect(extractCoordsFromMapsUrl('https://maps.googleapis.com/maps/api/staticmap?center=21.02851%2C105.80482&zoom=17')).toEqual({
+      lat: 21.02851,
+      lng: 105.80482,
+    })
+  })
+
+  it('ưu tiên tọa độ place !3d!4d thay vì tâm viewport @lat,lng', () => {
+    expect(extractCoordsFromMapsUrl('https://www.google.com/maps/place/Cua+Hang/@21.00000,105.00000,17z/data=!4m6!3m5!1sabc!8m2!3d21.02851!4d105.80482')).toEqual({
+      lat: 21.02851,
+      lng: 105.80482,
+    })
+  })
+
+  it('ưu tiên marker thay vì center trong static map metadata', () => {
+    expect(extractCoordsFromMapsUrl('https://maps.googleapis.com/maps/api/staticmap?center=21.00000%2C105.00000&markers=21.02851%2C105.80482&zoom=17')).toEqual({
+      lat: 21.02851,
+      lng: 105.80482,
+    })
+  })
+
+  it('đọc được marker có option style trong static map metadata', () => {
+    expect(extractCoordsFromMapsUrl('https://maps.googleapis.com/maps/api/staticmap?center=21.00000%2C105.00000&markers=color:red%7C21.02851%2C105.80482&zoom=17')).toEqual({
+      lat: 21.02851,
+      lng: 105.80482,
+    })
+  })
+
+  it('đọc được tọa độ khi HTML escape ampersand', () => {
+    expect(extractCoordsFromMapsUrl('<meta content="https://maps.googleapis.com/maps/api/staticmap?size=600x315&amp;center=21.02851%2C105.80482&amp;zoom=17">')).toEqual({
+      lat: 21.02851,
+      lng: 105.80482,
+    })
+  })
+
   it('trả về null khi không có tọa độ hợp lệ', () => {
     expect(extractCoordsFromMapsUrl('https://maps.google.com/?q=999,999')).toBeNull()
     expect(extractCoordsFromMapsUrl('https://example.com')).toBeNull()
@@ -47,6 +103,22 @@ describe('resolveMapsLinkCoordinates', () => {
     })
 
     await expect(resolveMapsLinkCoordinates('https://maps.app.goo.gl/abc123', fetcher)).resolves.toEqual({
+      coords: { lat: 21.02851, lng: 105.80482 },
+      error: '',
+    })
+    expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('ưu tiên coords do expand API parse từ Google Maps share page', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      json: async () => ({
+        success: true,
+        finalUrl: 'https://www.google.com/maps/place/Cua+Hang+Minh+Anh',
+        coords: { lat: 21.02851, lng: 105.80482 },
+      }),
+    })
+
+    await expect(resolveMapsLinkCoordinates('https://maps.app.goo.gl/share123', fetcher)).resolves.toEqual({
       coords: { lat: 21.02851, lng: 105.80482 },
       error: '',
     })

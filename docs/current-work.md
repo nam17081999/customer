@@ -1,80 +1,90 @@
 # Current Work
 
 ## Goal
-- Follow up PR review thread: normalize quick-create `name` query from search CTA so extra internal whitespace is collapsed before navigating to `/store/create`.
+- Follow up PR review comments for order/inventory changes and verify the remaining fixes are covered.
 
 ## Task Type
 - Bug Fix
 
 ## Why
-- Search create CTA currently sends `name: searchTerm.trim()`, while CTA visibility logic already uses normalized words.
-- This can create inconsistent URL/form prefill (e.g. `tap hoa   minh anh`) compared with search normalization behavior.
+- PR review flagged two issues in the order/inventory follow-up area.
+- `toInventoryNumber()` must honor fallback values for blank input.
+- Store mini map popup must avoid HTML injection while keeping OSM attribution enabled.
 
 ## In Scope
-- `helper/useHomeSearchController.js`
-- Unit tests around search CTA href generation if needed.
-- `docs/current-work.md`
+- `helper/orderInventoryFlow.js`
+- `components/map/store-detail-mini-map.jsx`
+- Direct regression coverage in `__tests__/helper/orderInventoryFlow.test.js`
+- Update this working-memory file for the current task.
 
 ## Out of Scope
-- Không đổi create flow step/deeplink behavior ngoài normalize query name.
-- Không đổi duplicate/search ranking rules.
-- Không đổi cache/map/auth logic.
+- New order/inventory features outside the flagged review comments.
+- Refactors outside the touched helper/map popup code.
+- Unrelated UI/layout changes.
+- New dependencies.
 
 ## Must Preserve
-- CTA vẫn chỉ hiện theo rule hiện tại.
-- CTA vẫn điều hướng `/store/create?step=2`.
-- Deep-link prefill name vẫn hoạt động.
-- UTF-8 tiếng Việt sạch.
+- Pages Router and current routes.
+- Existing order/inventory create/list/detail behavior.
+- Mini map rendering and nearby-store marker behavior.
+- Dark theme, contrast, and readable sizing.
+- UTF-8 tiếng Việt.
+- OSM attribution compliance and safe popup text rendering.
 
 ## Inputs / Repro / Expected
-- Repro: nhập `tap hoa   minh anh` ở search, bấm CTA `Tạo cửa hàng`.
-- Current: query `name` có thể chứa nhiều khoảng trắng liên tiếp.
-- Expected: query `name` được normalize thành single-space words (vd `tap hoa minh anh`).
+- Input: PR review comments on `toInventoryNumber()` and mini map popup HTML handling.
+- Current: latest branch commits already contain the production-code fixes.
+- Expected: keep those fixes, add regression proof where practical, and confirm no fresh CI/local validation failures in scope.
 
 ## Constraints
-- Sửa tối thiểu, không thêm dependency.
-- Tận dụng helper normalize hiện có.
+- Dùng `apply_patch`.
+- Patch nhỏ, giữ behavior.
+- Không mở rộng scope sang feature work.
 
 ## Required Verification
 - `npm run lint`
-- `npm run test -- __tests__/helper/homeSearch.test.js`
-- `npm run test -- __tests__/helper/storeCreateFlow.test.js`
-- `npm run text:check`
+- `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
 - `git diff --check`
-- Checklist: Search Flow, Create Flow, Tiếng Việt / UI Safety.
+- Checklist:
+  - Checklist chung cho mọi task
+  - Map Flow
+  - Tiếng Việt / UI Safety
 
 ## Definition of Done
-- Query `name` từ CTA được normalize nhất quán với search meta.
-- Test liên quan pass.
-- Không regression flow search/create đã thêm trước đó.
+- Blank-input fallback regression is covered by automated test.
+- Mini map popup remains safe and attributable.
+- Lint/test/diff pass or blockers are documented.
 
 ## Plan
-- Chạy baseline lint/test/build để ghi nhận trạng thái trước khi sửa.
-- Áp dụng fix nhỏ ở `createStoreHref`.
-- Bổ sung/điều chỉnh test unit cho normalize query.
-- Chạy focused verification và cập nhật kết quả.
+- Inspect current branch state vs original comment commit for the two flagged files.
+- Add a focused regression test for blank-string fallback behavior.
+- Re-run lint and targeted unit tests.
+- Summarize CI status and local verification.
 
 ## Done
-- Root cause: `createStoreHref.query.name` chỉ dùng `trim()`, nên giữ nguyên khoảng trắng thừa ở giữa khi bấm CTA từ search.
-- Fix: thêm helper `normalizeCreateStoreName()` để collapse whitespace (trim + split/join 1-space) và dùng helper này khi tạo deeplink `/store/create?name=...&step=2`.
-- Test: bổ sung unit test khóa behavior normalize query name, gồm edge cases rỗng/toàn khoảng trắng/tab/newline.
+- Verified the latest branch already includes the production-code fixes:
+  - `toInventoryNumber()` now returns `fallback` for `null`/blank input before parsing.
+  - `StoreDetailMiniMap` keeps `attributionControl: true` and uses `setDOMContent()` with text content instead of `setHTML()`.
+- Added a focused unit test that locks blank-string fallback behavior for `toInventoryNumber()`.
 
 ## Verification
-- Baseline trước khi sửa:
-  - Pass: `npm run lint`
-  - Pass: `npm run test`
-  - Fail (môi trường): `npm run build` lỗi mạng `getaddrinfo ENOTFOUND fonts.googleapis.com` khi fetch `next/font` (Geist/Geist Mono).
-- Sau khi sửa:
-  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js __tests__/helper/storeCreateFlow.test.js`
-  - Pass: `npm run test -- __tests__/helper/homeSearch.test.js`
-  - Pass: `npm run lint`
-  - Pass: `npm run text:check`
-  - Pass: `git diff --check`
-  - Fail (môi trường): `npm run test:e2e -- e2e/store-search.spec.js` không khởi động web server vì thiếu env `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- Pass: `npm run lint`
+  - 0 errors.
+  - 1 existing warning remains in `pages/orders/[id].js:272` for external `<img>`.
+- Pass: `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
+  - 27 tests passed.
+- Pass: `git diff --check`.
+- Checked GitHub Actions:
+  - `develop` recent runs found, all completed successfully.
+  - Current branch has an in-progress Copilot run (`26043263157`); no failed jobs/logs available yet.
 - Checklist verified:
-  - Search Flow: normalize query name cho CTA deeplink, không đổi rule hiện/ẩn CTA.
-  - Create Flow: deeplink `step=2` giữ nguyên.
-  - Tiếng Việt / UI Safety: text check pass.
+  - Checklist chung cho mọi task: scoped fix, docs reread, no dependency added, lint/test/diff checked.
+  - Map Flow: popup text handling kept safe without changing map source/marker behavior; OSM attribution preserved.
+  - Tiếng Việt / UI Safety: no Vietnamese copy changed; patch stayed small.
 
 ## Risks / Next
-- Chưa có bằng chứng e2e mới trong sandbox do thiếu env Supabase; cần chạy lại `e2e/store-search.spec.js` trên CI hoặc môi trường có đủ env để xác nhận UI flow end-to-end.
+- Did not add an automated test for the mini map popup because the current repo coverage in this area is unit-test focused; popup safety was verified by code inspection plus existing lint.
+- `npm ci` warned that the sandbox is on Node 20 while the repo expects Node 24, but lint and the targeted Vitest run still completed successfully.
+- Files intentionally touched for this request:
+  - `__tests__/helper/orderInventoryFlow.test.js`
+  - `docs/current-work.md`

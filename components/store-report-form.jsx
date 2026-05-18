@@ -16,12 +16,334 @@ const StoreLocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center rounded-2xl bg-gray-900">
-        <span className="text-sm text-gray-400 animate-pulse">Đang tải bản đồ…</span>
+      <div className="flex h-full items-center justify-center rounded-2xl bg-neutral-900">
+        <span className="text-sm text-neutral-400 animate-pulse">Đang tải bản đồ…</span>
       </div>
     ),
   }
 )
+
+function ReportModeChooser({ mode, onEdit, onReason }) {
+  return (
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
+      <p className="text-base font-semibold text-neutral-100">Chọn cách báo cáo</p>
+      <p className="mt-1 text-sm text-neutral-400">
+        Tách riêng khỏi modal để dễ nhập liệu hơn trên điện thoại.
+      </p>
+      {!mode && (
+        <div className="mt-4 grid gap-2">
+          <Button type="button" className="w-full" onClick={onEdit}>
+            Sửa thông tin
+          </Button>
+          <Button type="button" variant="outline" className="w-full" onClick={onReason}>
+            Chỉ báo cáo vấn đề
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ReasonReportSection({ reasons, onToggleReason }) {
+  return (
+    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4 space-y-3">
+      <div>
+        <p className="text-base font-semibold text-neutral-100">Lý do báo cáo</p>
+        <p className="mt-1 text-sm text-neutral-400">Có thể chọn nhiều lý do.</p>
+      </div>
+      <div className="grid gap-2">
+        {REPORT_REASON_OPTIONS.map((option) => {
+          const active = reasons.includes(option.code)
+          return (
+            <button
+              key={option.code}
+              type="button"
+              className={`flex min-h-11 items-center justify-between rounded-xl border p-3 text-left text-base transition ${
+                active
+                  ? 'border-blue-500 bg-blue-500/15 text-blue-100'
+                  : 'border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'
+              }`}
+              onClick={() => onToggleReason(option.code)}
+              aria-pressed={active}
+            >
+              <span>{option.label}</span>
+              <span className={`text-sm ${active ? 'text-blue-300' : 'text-neutral-500'}`}>
+                {active ? 'Đã chọn' : 'Chọn'}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function EditInfoStep({
+  reportAddressDetail,
+  setReportAddressDetail,
+  reportDistrict,
+  setReportDistrict,
+  reportNote,
+  setReportNote,
+  reportPhone,
+  setReportPhone,
+  reportWard,
+  setReportWard,
+}) {
+  return (
+    <div className="space-y-4">
+      <StoreDistrictWardPicker
+        district={reportDistrict}
+        ward={reportWard}
+        districtContainerId="report-district-section"
+        wardContainerId="report-ward-section"
+        onDistrictChange={(item) => {
+          setReportDistrict(item)
+          setReportWard('')
+        }}
+        onWardChange={setReportWard}
+      />
+
+      <div className="space-y-1.5">
+        <Label htmlFor="report-address" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          Địa chỉ cụ thể <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        </Label>
+        <Input
+          id="report-address"
+          value={reportAddressDetail}
+          onChange={(event) => setReportAddressDetail(event.target.value)}
+          placeholder="Số nhà, đường, thôn/xóm/đội..."
+          className="text-base sm:text-base"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="report-phone" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          Số điện thoại <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        </Label>
+        <Input
+          id="report-phone"
+          type="tel"
+          inputMode="numeric"
+          pattern="[0-9+ ]*"
+          value={reportPhone}
+          onChange={(event) => setReportPhone(event.target.value)}
+          placeholder="0901 234 567"
+          className="text-base sm:text-base"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="report-note" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          Ghi chú <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        </Label>
+        <Input
+          id="report-note"
+          value={reportNote}
+          onChange={(event) => setReportNote(event.target.value)}
+          placeholder="VD: Bán từ 6:00 - 22:00"
+          className="text-base sm:text-base"
+        />
+      </div>
+    </div>
+  )
+}
+
+function EditLocationStep({
+  compassError,
+  heading,
+  locationView,
+  mapEditable,
+  mapKey,
+  reportLat,
+  reportLng,
+  resolving,
+  setMapEditable,
+  setReportLat,
+  setReportLng,
+  onGetLocation,
+}) {
+  return (
+    <div className="space-y-3">
+      {resolving ? (
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
+          <svg className="size-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm text-blue-700 dark:text-blue-300">{getLocationLoadingMessage()}</span>
+        </div>
+      ) : null}
+
+      {locationView.hasCoordinates ? (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
+          <p className="text-sm text-green-700 dark:text-green-300">
+            {getLocationReadyMessage()}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/20">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            {locationView.phase === 'bootstrapping'
+              ? getLocationPlaceholderCopy(locationView.phase).description
+              : getLocationNoCoordinatesMessage()}
+          </p>
+        </div>
+      )}
+
+      <div id="report-location-section">
+        {locationView.shouldRenderMap ? (
+          <StoreLocationPicker
+            mapKey={`step2-${mapKey}`}
+            initialLat={reportLat}
+            initialLng={reportLng}
+            onChange={(lat, lng) => {
+              setReportLat(lat)
+              setReportLng(lng)
+            }}
+            editable={mapEditable}
+            onToggleEditable={() => setMapEditable((value) => !value)}
+            onGetLocation={onGetLocation}
+            heading={heading}
+            height="65vh"
+            compassError={compassError}
+            resolvingAddr={resolving}
+            dark={false}
+          />
+        ) : (
+          <div
+            className="flex items-center justify-center rounded-md border border-dashed border-neutral-800 bg-neutral-950 px-4 text-center text-neutral-400"
+            style={{ height: '65vh' }}
+          >
+            <div className="max-w-md space-y-2">
+              <div className="text-base font-medium text-neutral-300">
+                {getLocationPlaceholderCopy(locationView.phase).title}
+              </div>
+              <p className="text-sm text-neutral-400">
+                {getLocationPlaceholderCopy(locationView.phase).description}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EditReportSection({ controller, editSteps, locationView, standaloneEdit }) {
+  const {
+    compassError,
+    currentStep,
+    handleGetLocation,
+    heading,
+    mapEditable,
+    mapKey,
+    reportAddressDetail,
+    reportDistrict,
+    reportLat,
+    reportLng,
+    reportName,
+    reportNote,
+    reportPhone,
+    reportStoreType,
+    reportWard,
+    resolving,
+    setMapEditable,
+    setReportAddressDetail,
+    setReportDistrict,
+    setReportLat,
+    setReportLng,
+    setReportName,
+    setReportNote,
+    setReportPhone,
+    setReportStoreType,
+    setReportWard,
+  } = controller
+
+  return (
+    <div className="space-y-3">
+      <div className={standaloneEdit ? 'space-y-4' : 'rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4 space-y-4'}>
+        <StoreFormStepIndicator steps={editSteps} currentStep={currentStep} />
+
+        {currentStep === 1 && (
+          <div className="space-y-5">
+            <StoreTypePicker
+              id="report-store-type"
+              value={reportStoreType}
+              onChange={setReportStoreType}
+            />
+
+            <div className="space-y-2">
+              <Label htmlFor="report-name" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+                Tên cửa hàng
+              </Label>
+              <Input
+                id="report-name"
+                value={reportName}
+                onChange={(event) => setReportName(event.target.value)}
+                placeholder="VD: Minh Anh"
+                className="h-11 w-full text-base sm:text-base"
+              />
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
+          <EditInfoStep
+            reportAddressDetail={reportAddressDetail}
+            setReportAddressDetail={setReportAddressDetail}
+            reportDistrict={reportDistrict}
+            setReportDistrict={setReportDistrict}
+            reportNote={reportNote}
+            setReportNote={setReportNote}
+            reportPhone={reportPhone}
+            setReportPhone={setReportPhone}
+            reportWard={reportWard}
+            setReportWard={setReportWard}
+          />
+        )}
+
+        {currentStep === 3 && (
+          <EditLocationStep
+            compassError={compassError}
+            heading={heading}
+            locationView={locationView}
+            mapEditable={mapEditable}
+            mapKey={mapKey}
+            reportLat={reportLat}
+            reportLng={reportLng}
+            resolving={resolving}
+            setMapEditable={setMapEditable}
+            setReportLat={setReportLat}
+            setReportLng={setReportLng}
+            onGetLocation={handleGetLocation}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ReportActionBar({ onBack, onPrimaryAction, primaryActionLabel, standaloneEdit, submitting }) {
+  const className = standaloneEdit
+    ? 'fixed inset-x-0 z-[55] border-t border-neutral-800 bg-neutral-950/95 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent'
+    : 'sticky bottom-0 z-10 -mx-3 border-t border-neutral-800 bg-neutral-950/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0'
+
+  return (
+    <div className={className} style={standaloneEdit ? { bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' } : undefined}>
+      <div className={standaloneEdit ? 'mx-auto max-w-screen-md px-3 py-2 sm:px-0 sm:py-0' : ''}>
+        <div className="grid grid-cols-2 gap-2">
+          <Button type="button" variant="outline" className="w-full" onClick={onBack}>
+            Quay lại
+          </Button>
+          <Button type="button" className="w-full" disabled={submitting} onClick={onPrimaryAction}>
+            {primaryActionLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function StoreReportForm({
   store,
@@ -38,35 +360,13 @@ export default function StoreReportForm({
     reasons,
     submitting,
     msgState,
-    reportName,
-    setReportName,
-    reportStoreType,
-    setReportStoreType,
-    reportAddressDetail,
-    setReportAddressDetail,
-    reportWard,
-    setReportWard,
-    reportDistrict,
-    setReportDistrict,
-    reportPhone,
-    setReportPhone,
-    reportNote,
-    setReportNote,
     reportLat,
-    setReportLat,
     reportLng,
-    setReportLng,
-    mapEditable,
-    setMapEditable,
-    heading,
-    compassError,
     resolving,
     currentStep,
     setCurrentStep,
-    mapKey,
     toggleReason,
     resetFeedback,
-    handleGetLocation,
     validateEditStep,
     handleSubmit,
   } = controller
@@ -125,235 +425,33 @@ export default function StoreReportForm({
     <div className="space-y-4">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
       {!hideModeChooser && (
-        <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
-          <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
-          <p className="mt-1 text-sm text-gray-400">
-            Tách riêng khỏi modal để dễ nhập liệu hơn trên điện thoại.
-          </p>
-          {!mode && (
-            <div className="mt-4 grid gap-2">
-              <Button type="button" className="w-full" onClick={() => setMode('edit')}>
-                Sửa thông tin
-              </Button>
-              <Button type="button" variant="outline" className="w-full" onClick={() => setMode('reason')}>
-                Chỉ báo cáo vấn đề
-              </Button>
-            </div>
-          )}
-        </div>
+        <ReportModeChooser
+          mode={mode}
+          onEdit={() => setMode('edit')}
+          onReason={() => setMode('reason')}
+        />
       )}
 
       {mode === 'reason' && (
-        <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-3">
-          <div>
-            <p className="text-base font-semibold text-gray-100">Lý do báo cáo</p>
-            <p className="mt-1 text-sm text-gray-400">Có thể chọn nhiều lý do.</p>
-          </div>
-          <div className="grid gap-2">
-            {REPORT_REASON_OPTIONS.map((option) => {
-              const active = reasons.includes(option.code)
-              return (
-                <button
-                  key={option.code}
-                  type="button"
-                  className={`flex min-h-11 items-center justify-between rounded-xl border px-3 py-3 text-left text-base transition ${
-                    active
-                      ? 'border-blue-500 bg-blue-500/15 text-blue-100'
-                      : 'border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                  }`}
-                  onClick={() => toggleReason(option.code)}
-                  aria-pressed={active}
-                >
-                  <span>{option.label}</span>
-                  <span className={`text-sm ${active ? 'text-blue-300' : 'text-gray-500'}`}>
-                    {active ? 'Đã chọn' : 'Chọn'}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        <ReasonReportSection reasons={reasons} onToggleReason={toggleReason} />
       )}
 
       {mode === 'edit' && (
-        <div className="space-y-3">
-          <div className={standaloneEdit ? 'space-y-4' : 'rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-4'}>
-            <StoreFormStepIndicator steps={editSteps} currentStep={currentStep} />
-
-            {currentStep === 1 && (
-              <div className="space-y-5">
-                <StoreTypePicker
-                  id="report-store-type"
-                  value={reportStoreType}
-                  onChange={setReportStoreType}
-                />
-
-                <div className="space-y-2">
-                  <Label htmlFor="report-name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Tên cửa hàng
-                  </Label>
-                  <Input
-                    id="report-name"
-                    value={reportName}
-                    onChange={(event) => setReportName(event.target.value)}
-                    placeholder="VD: Minh Anh"
-                    className="h-11 w-full text-base sm:text-base"
-                  />
-                </div>
-              </div>
-            )}
-
-            {currentStep === 2 && (
-              <div className="space-y-4">
-                <StoreDistrictWardPicker
-                  district={reportDistrict}
-                  ward={reportWard}
-                  districtContainerId="report-district-section"
-                  wardContainerId="report-ward-section"
-                  onDistrictChange={(item) => {
-                    setReportDistrict(item)
-                    setReportWard('')
-                  }}
-                  onWardChange={setReportWard}
-                />
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="report-address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span>
-                  </Label>
-                  <Input
-                    id="report-address"
-                    value={reportAddressDetail}
-                    onChange={(event) => setReportAddressDetail(event.target.value)}
-                    placeholder="Số nhà, đường, thôn/xóm/đội..."
-                    className="text-base sm:text-base"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="report-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span>
-                  </Label>
-                  <Input
-                    id="report-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9+ ]*"
-                    value={reportPhone}
-                    onChange={(event) => setReportPhone(event.target.value)}
-                    placeholder="0901 234 567"
-                    className="text-base sm:text-base"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="report-note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span>
-                  </Label>
-                  <Input
-                    id="report-note"
-                    value={reportNote}
-                    onChange={(event) => setReportNote(event.target.value)}
-                    placeholder="VD: Bán từ 6:00 - 22:00"
-                    className="text-base sm:text-base"
-                  />
-                </div>
-              </div>
-            )}
-
-            {currentStep === 3 && (
-              <div className="space-y-3">
-                {resolving ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
-                    <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span className="text-sm text-blue-700 dark:text-blue-300">{getLocationLoadingMessage()}</span>
-                  </div>
-                ) : null}
-
-                {locationView.hasCoordinates ? (
-                  <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      {getLocationReadyMessage()}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-900/20">
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      {locationView.phase === 'bootstrapping'
-                        ? getLocationPlaceholderCopy(locationView.phase).description
-                        : getLocationNoCoordinatesMessage()}
-                    </p>
-                  </div>
-                )}
-
-                <div id="report-location-section">
-                  {locationView.shouldRenderMap ? (
-                    <StoreLocationPicker
-                      mapKey={`step2-${mapKey}`}
-                      initialLat={reportLat}
-                      initialLng={reportLng}
-                      onChange={(lat, lng) => {
-                        setReportLat(lat)
-                        setReportLng(lng)
-                      }}
-                      editable={mapEditable}
-                      onToggleEditable={() => setMapEditable((value) => !value)}
-                      onGetLocation={handleGetLocation}
-                      heading={heading}
-                      height="65vh"
-                      compassError={compassError}
-                      resolvingAddr={resolving}
-                      dark={false}
-                    />
-                  ) : (
-                    <div
-                      className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
-                      style={{ height: '65vh' }}
-                    >
-                      <div className="max-w-md space-y-2">
-                        <div className="text-base font-medium text-gray-300">
-                          {getLocationPlaceholderCopy(locationView.phase).title}
-                        </div>
-                        <p className="text-sm text-gray-400">
-                          {getLocationPlaceholderCopy(locationView.phase).description}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <EditReportSection
+          controller={controller}
+          editSteps={editSteps}
+          locationView={locationView}
+          standaloneEdit={standaloneEdit}
+        />
       )}
       {mode && (
-        <div className={`${standaloneEdit ? 'fixed inset-x-0 z-[55] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent' : 'sticky bottom-0 z-10 -mx-3 border-t border-gray-800 bg-black/95 px-3 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0'}`} style={standaloneEdit ? { bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' } : undefined}>
-          <div className={standaloneEdit ? 'mx-auto max-w-screen-md px-3 py-2 sm:px-0 sm:py-0' : ''}>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                goBack()
-              }}
-            >
-              Quay lại
-            </Button>
-            <Button
-              type="button"
-              className="w-full"
-              disabled={submitting}
-              onClick={handlePrimaryAction}
-            >
-              {primaryActionLabel}
-            </Button>
-          </div>
-          </div>
-        </div>
+        <ReportActionBar
+          onBack={goBack}
+          onPrimaryAction={handlePrimaryAction}
+          primaryActionLabel={primaryActionLabel}
+          standaloneEdit={standaloneEdit}
+          submitting={submitting}
+        />
       )}
     </div>
   )

@@ -3,6 +3,8 @@
  * Handles goo.gl, maps.app.goo.gl, and other short URLs
  */
 
+import { extractCoordsFromMapsUrl } from '@/helper/storeFormShared'
+
 // Whitelist of allowed short-link domains to prevent SSRF attacks
 const ALLOWED_HOSTS = [
   'goo.gl',
@@ -12,6 +14,18 @@ const ALLOWED_HOSTS = [
   'www.google.com',
   'google.com',
 ]
+const MAPS_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+const MAX_HTML_CHARS = 500_000
+
+async function fetchExpandedMapsUrl(urlStr, method = 'HEAD') {
+  return fetch(urlStr, {
+    method,
+    redirect: 'follow',
+    headers: {
+      'User-Agent': MAPS_USER_AGENT,
+    },
+  })
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -41,24 +55,40 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid URL format' })
     }
 
-    // Follow redirects to get final URL
-    const response = await fetch(urlStr, {
-      method: 'HEAD',
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    })
+    let finalUrl = urlStr
+    let coords = null
+    let headOk = false
 
-    if (!response.ok) {
-      return res.status(400).json({ error: 'Failed to expand URL' })
+    try {
+      const headResponse = await fetchExpandedMapsUrl(urlStr, 'HEAD')
+      headOk = Boolean(headResponse?.ok)
+      if (headResponse?.url) {
+        finalUrl = headResponse.url
+        coords = extractCoordsFromMapsUrl(finalUrl)
+      }
+    } catch {
+      // Some Google Maps share links do not behave well with HEAD. GET fallback below.
     }
 
-    const finalUrl = response.url
+    if (!coords) {
+      const getResponse = await fetchExpandedMapsUrl(urlStr, 'GET')
+      if (!getResponse.ok && !headOk) {
+        return res.status(400).json({ error: 'Failed to expand URL' })
+      }
+      if (getResponse.url) {
+        finalUrl = getResponse.url
+        coords = extractCoordsFromMapsUrl(finalUrl)
+      }
+      if (!coords && typeof getResponse.text === 'function') {
+        const html = await getResponse.text()
+        coords = extractCoordsFromMapsUrl(String(html || '').slice(0, MAX_HTML_CHARS))
+      }
+    }
 
     return res.status(200).json({ 
       originalUrl: url,
       finalUrl: finalUrl,
+      coords,
       success: true 
     })
 

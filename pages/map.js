@@ -36,6 +36,21 @@ const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 
 const MAP_INTERACTION_SUPPRESS_MS = 500
 
+function addMapEventListener(map, eventName, layerOrHandler, maybeHandler) {
+  if (typeof maybeHandler === 'function') {
+    map.on(eventName, layerOrHandler, maybeHandler)
+    return () => {
+      if (!map.getLayer(layerOrHandler)) return
+      map.off(eventName, layerOrHandler, maybeHandler)
+    }
+  }
+
+  map.on(eventName, layerOrHandler)
+  return () => {
+    map.off(eventName, layerOrHandler)
+  }
+}
+
 function toLatLng(store) {
   let lat = parseCoordinate(store.latitude)
   let lng = parseCoordinate(store.longitude)
@@ -241,9 +256,11 @@ export default function MapPage() {
     let cancelled = false
     let activeMap = null
     let detachMapSetupListeners = null
+    let detachMarkerLayerListeners = null
     markerImageSetupFailedRef.current = false
 
     const initMap = async () => {
+      if (cancelled || !mapContainerRef.current) return
       const maplibreModule = await import('maplibre-gl')
       if (cancelled || !mapContainerRef.current) return
 
@@ -446,10 +463,6 @@ export default function MapPage() {
           }
         }
 
-        markerLayerIds.forEach((layerId) => {
-          map.on('click', layerId, handleMarkerInteraction)
-        })
-
         // Hover tooltip (desktop only) using Popup
         const popup = new maplibregl.Popup({
           closeButton: false,
@@ -460,8 +473,7 @@ export default function MapPage() {
         })
         popupRef.current = popup
 
-        markerLayerIds.forEach((layerId) => {
-          map.on('mousemove', layerId, (e) => {
+        const handleMarkerMouseMove = (e) => {
           if (!e.features?.length) return
           map.getCanvas().style.cursor = 'pointer'
           const f = e.features[0]
@@ -473,22 +485,32 @@ export default function MapPage() {
               (addr ? `<div style="font-size:11px;color:#94a3b8;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr.replace(/</g, '&lt;')}</div>` : '')
             )
             .addTo(map)
-          })
-        })
+        }
 
-        markerLayerIds.forEach((layerId) => {
-          map.on('mouseleave', layerId, () => {
+        const handleMarkerMouseLeave = () => {
           map.getCanvas().style.cursor = ''
           popup.remove()
-          })
+        }
+
+        detachMarkerLayerListeners?.()
+        const markerLayerDetachers = []
+        markerLayerIds.forEach((layerId) => {
+          markerLayerDetachers.push(addMapEventListener(map, 'click', layerId, handleMarkerInteraction))
+          markerLayerDetachers.push(addMapEventListener(map, 'mousemove', layerId, handleMarkerMouseMove))
         })
+        markerLayerIds.forEach((layerId) => {
+          markerLayerDetachers.push(addMapEventListener(map, 'mouseleave', layerId, handleMarkerMouseLeave))
+        })
+        detachMarkerLayerListeners = () => {
+          markerLayerDetachers.forEach((detach) => detach())
+        }
       }
 
-      map.on('load', initializeMapOverlays)
-      map.on('styledata', initializeMapOverlays)
+      const detachLoadListener = addMapEventListener(map, 'load', initializeMapOverlays)
+      const detachStyleDataListener = addMapEventListener(map, 'styledata', initializeMapOverlays)
       detachMapSetupListeners = () => {
-        map.off('load', initializeMapOverlays)
-        map.off('styledata', initializeMapOverlays)
+        detachLoadListener()
+        detachStyleDataListener()
       }
       initializeMapOverlays()
 
@@ -507,6 +529,7 @@ export default function MapPage() {
       if (activeMap) removeMarkerImages(activeMap, activeMarkerImageIdsRef.current)
       activeMarkerImageIdsRef.current = new Set()
       markerImageSetupFailedRef.current = false
+      detachMarkerLayerListeners?.()
       detachMapSetupListeners?.()
       if (activeMap) activeMap.remove()
       mapRef.current = null
