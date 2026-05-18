@@ -2,7 +2,12 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 
 export function toInventoryNumber(value, fallback = 0) {
-  const number = Number(String(value ?? '').replaceAll(',', '.'))
+  if (value == null) return fallback
+
+  const text = String(value).trim()
+  if (text === '') return fallback
+
+  const number = Number(text.replaceAll(',', '.'))
   return Number.isFinite(number) ? number : fallback
 }
 
