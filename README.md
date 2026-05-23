@@ -18,7 +18,7 @@ npm install
 
 # Setup environment
 copy .env.example .env.local
-# Điền thông tin Supabase, Google Maps và NEXT_PUBLIC_IMAGE_BASE_URL vào .env.local
+# Điền thông tin Supabase và Google Maps vào .env.local
 
 # Run development server
 npm run dev
@@ -35,7 +35,6 @@ Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 
 - **Framework**: Next.js 15 + React 19
 - **Database**: Supabase (PostgreSQL)
-- **Image Base URL**: `NEXT_PUBLIC_IMAGE_BASE_URL`
 - **Maps**: Leaflet + React-Leaflet
 - **Styling**: TailwindCSS 4
 - **UI Components**: Radix UI

@@ -75,7 +75,7 @@ Add when text/data can break Vietnamese output:
 ## 5. Data and Safety Rules
 
 - Never hard-delete stores. Use soft delete with `deleted_at`.
-- `image_url` in DB stores filename only, not full URL.
+- Project no longer stores store photos; do not add new store-image logic.
 - After store mutation, update cache correctly:
 - create -> `appendStoreToCache(newStore)`
 - soft delete -> `removeStoreFromCache(id)` (and invalidate if needed)

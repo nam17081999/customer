@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { useTheme } from '@/lib/ThemeContext'
+import { THEME_OPTIONS, getThemeMeta } from '@/helper/theme'
 
 function MenuSection({ title, children }) {
   return (
@@ -21,6 +23,7 @@ function MenuSection({ title, children }) {
 export default function AccountScreen() {
   const { replace } = useRouter()
   const { user, role, isAdmin, isTelesale, isAuthenticated, loading: authLoading, signOut } = useAuth() || {}
+  const { theme, setTheme } = useTheme()
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
@@ -81,11 +84,40 @@ export default function AccountScreen() {
                 <h1 className="text-xl font-semibold text-neutral-100 sm:text-2xl">Menu nhanh</h1>
               </div>
 
+              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold text-neutral-100">Giao diện</h2>
+                    <p className="text-sm text-neutral-400">Chọn màu sáng hoặc tối cho toàn bộ app.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 sm:w-64">
+                    {THEME_OPTIONS.map((option) => {
+                      const meta = getThemeMeta(option)
+                      const active = theme === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          className={`h-11 rounded-md border px-3 text-base font-semibold transition ${active ? 'border-gray-100 bg-gray-100 text-gray-950' : 'border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'}`}
+                          onClick={() => setTheme(option)}
+                          aria-pressed={active}
+                        >
+                          {meta.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
               {(isAdmin || isTelesale) && (
                 <div className="space-y-3">
                   <MenuSection title="Bán hàng">
                     {isAdmin && (
                       <>
+                        <Button asChild>
+                          <Link href="/today">Công việc hôm nay</Link>
+                        </Button>
                         <Button asChild>
                           <Link href="/orders/new">Lên đơn hàng</Link>
                         </Button>
@@ -107,9 +139,14 @@ export default function AccountScreen() {
                       </>
                     )}
                     {isTelesale && !isAdmin && (
-                      <Button asChild>
-                        <Link href="/telesale/overview">Màn telesale</Link>
-                      </Button>
+                      <>
+                        <Button asChild>
+                          <Link href="/today">Công việc hôm nay</Link>
+                        </Button>
+                        <Button asChild variant="outline">
+                          <Link href="/telesale/overview">Màn telesale</Link>
+                        </Button>
+                      </>
                     )}
                   </MenuSection>
 

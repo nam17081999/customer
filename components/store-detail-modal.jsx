@@ -9,6 +9,10 @@ import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance, getStorePhoneNumbers } from '@/helper/validation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
+import {
+  buildStoreDetailActionModel,
+  buildStoreDetailBadges,
+} from '@/helper/storeDetailActions'
 import { useAuth } from '@/lib/AuthContext'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { supabase } from '@/lib/supabaseClient'
@@ -36,22 +40,27 @@ function CloseIcon({ className = 'size-4' }) {
   )
 }
 
-function StatusBadges({ isActive, distance, hasCoords }) {
+function StatusBadges({ isActive, distance, hasCoords, qualityBadges = [] }) {
   return (
     <>
       {isActive && (
-        <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-200 border border-green-500/40">
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-sm font-medium text-green-200 border border-green-500/40">
           <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
           Xác thực
         </span>
       )}
+      {qualityBadges.map((badge) => (
+        <span key={badge.key} className="inline-flex items-center gap-1 rounded-full bg-amber-950/80 px-2 py-0.5 text-sm font-medium text-amber-200 border border-amber-800/70">
+          {badge.label}
+        </span>
+      ))}
       {typeof distance === 'number' ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-300">
+        <span className="inline-flex items-center gap-1 rounded-full bg-gray-800 px-2 py-0.5 text-sm font-medium text-gray-300">
           <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
           {formatDistance(distance)}
         </span>
-      ) : !hasCoords ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-amber-950/80 px-2 py-0.5 text-xs font-medium text-amber-200">
+      ) : !hasCoords && !qualityBadges.some((badge) => badge.key === 'missing-location') ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-950/80 px-2 py-0.5 text-sm font-medium text-amber-200">
           <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21c4.97-4.97 7-8.25 7-11a7 7 0 10-14 0c0 2.75 2.03 6.03 7 11z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5l5 5M14.5 9.5l-5 5" /></svg>
           Chưa có vị trí
         </span>
@@ -60,7 +69,7 @@ function StatusBadges({ isActive, distance, hasCoords }) {
   )
 }
 
-function StoreDetailHeader({ store, storeTypeMeta, storeTypeLabel, isActive, hasCoords, desktop = false }) {
+function StoreDetailHeader({ store, storeTypeMeta, storeTypeLabel, isActive, hasCoords, qualityBadges, desktop = false }) {
   const iconSize = desktop ? 'size-14 rounded-2xl' : 'size-11 rounded-xl'
   const titleClass = desktop ? 'mt-0.5 text-3xl font-bold text-gray-100 leading-tight' : 'mt-0.5 text-xl font-bold text-gray-100 leading-tight'
   const closeClass = desktop
@@ -84,7 +93,7 @@ function StoreDetailHeader({ store, storeTypeMeta, storeTypeLabel, isActive, has
         </DialogClose>
       </div>
       <div className={desktop ? 'mt-3 flex flex-wrap gap-2' : 'mt-2 flex flex-wrap gap-1.5'}>
-        <StatusBadges isActive={isActive} distance={store.distance} hasCoords={hasCoords} />
+        <StatusBadges isActive={isActive} distance={store.distance} hasCoords={hasCoords} qualityBadges={qualityBadges} />
       </div>
     </div>
   )
@@ -179,6 +188,7 @@ function DetailActions({
     onAddToRoute,
     onClose,
     onSupplement,
+    onQuickOrder,
     onEdit,
     onHistory,
     onReport,
@@ -217,6 +227,11 @@ function DetailActions({
         {!isAdmin && (
           <Button variant="outline" size="sm" className="w-full px-3" leftIcon={<svg className="size-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>} onClick={onSupplement}>
             Bổ sung
+          </Button>
+        )}
+        {isAdmin && (
+          <Button variant="outline" size="sm" className="w-full px-3" leftIcon={<svg className="size-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 6h15l-1.5 8.5a2 2 0 01-2 1.5H8.5a2 2 0 01-2-1.7L5 3H3" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20h.01M18 20h.01" /></svg>} onClick={onQuickOrder}>
+            Lên đơn
           </Button>
         )}
         {isAdmin && (
@@ -375,8 +390,20 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
 
   if (!store) return trigger || null
 
-  const hasCoords = hasStoreCoordinates(store)
+  const actionModel = buildStoreDetailActionModel({
+    store,
+    isAdmin,
+    isMapPage: pathname === '/map',
+    hasRouteAction: hasStoreCoordinates(store) && (
+      (isInRoute && typeof onRemoveFromRoute === 'function') ||
+      (!isInRoute && typeof onAddToRoute === 'function')
+    ),
+    isInRoute,
+    from: asPath || '/',
+  })
+  const hasCoords = actionModel.hasCoords
   const isActive = Boolean(store.active)
+  const qualityBadges = buildStoreDetailBadges(store)
   const addressText = formatAddressParts(store)
   const googleMapsHref = hasCoords ? `https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}` : ''
   const storeTypeMeta = getStoreTypeMeta(store.store_type)
@@ -446,6 +473,12 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
     push(`/store/edit/${store.id}?mode=supplement`)
   }
 
+  const handleQuickOrder = (e) => {
+    e.stopPropagation()
+    const href = actionModel.actions.find((action) => action.key === 'quick-order')?.href
+    if (href) push(href)
+  }
+
   const handleOpenMap = (e) => {
     e.stopPropagation()
     push(`/map?storeId=${store.id}&lat=${store.latitude}&lng=${store.longitude}`)
@@ -468,6 +501,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
           storeTypeLabel={storeTypeLabel}
           isActive={isActive}
           hasCoords={hasCoords}
+          qualityBadges={qualityBadges}
         />
 
         <div className="sm:grid sm:min-h-[620px] sm:grid-cols-[minmax(0,1fr)_460px] sm:gap-0 sm:bg-slate-950">
@@ -478,6 +512,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
               storeTypeLabel={storeTypeLabel}
               isActive={isActive}
               hasCoords={hasCoords}
+              qualityBadges={qualityBadges}
               desktop
             />
 
@@ -508,6 +543,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
                 onAddToRoute,
                 onClose: handleDetailOpenChange,
                 onSupplement: handleSupplement,
+                onQuickOrder: handleQuickOrder,
                 onEdit: handleEdit,
                 onHistory: handleOpenHistory,
                 onReport: handleReport,

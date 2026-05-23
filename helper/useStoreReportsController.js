@@ -6,7 +6,7 @@ import { updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import { buildReportStatusChangedDetail, dispatchReportsChanged } from '@/helper/storeReportEvents'
 
-const STORE_REPORTS_SELECT = 'id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, image_url, active, deleted_at)'
+const STORE_REPORTS_SELECT = 'id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, active, deleted_at)'
 
 export function useStoreReportsController() {
   const router = useRouter()

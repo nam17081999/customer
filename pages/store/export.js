@@ -12,7 +12,6 @@ const EXPORT_STORE_SELECT_FIELDS = [
   'id',
   'name',
   'store_type',
-  'image_url',
   'latitude',
   'longitude',
   'address_detail',

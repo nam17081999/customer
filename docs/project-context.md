@@ -85,7 +85,6 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | Service | Dùng cho | Biến env |
 |---|---|---|
 | Supabase | Database + Auth | `NEXT_PUBLIC_SUPABASE_URL`, `ANON_KEY` |
-| Image CDN | Hiển thị ảnh từ filename | `NEXT_PUBLIC_IMAGE_BASE_URL` |
 | Google Maps API | Location picker (create/edit form) | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` |
 | OpenStreetMap | Tile bản đồ (/map) | Không cần key |
 
@@ -101,17 +100,16 @@ Danh sách xã/phường cố định trong `lib/constants.js`.
 ## 21+ Điều Cần Biết Khi Code
 
 1. **Không gọi Supabase trực tiếp để đọc stores** — luôn qua `getOrRefreshStores()`
-2. **`image_url` là tên file**, không phải URL — full URL = `BASE_URL + image_url`
-3. **Soft delete** — dùng `deleted_at`, không bao giờ `DELETE` query
-4. **`active = true`** chỉ khi admin tạo hoặc admin duyệt
-5. **Không có cột `name_search`** trong DB — không thêm field này khi insert
-6. **Pages Router** — file đặt trong `pages/`, không phải `app/`
-7. **TailwindCSS v4** — cú pháp `@import "tailwindcss"` trong globals.css
-8. **Dark mode**: Ứng dụng chạy **Dark Mode duy nhất**. Không có Light Mode.
-9. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
-10. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
-11. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
-12. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/có SĐT/có ảnh/không có vị trí là multi-select.
+2. **Soft delete** — dùng `deleted_at`, không bao giờ `DELETE` query
+3. **`active = true`** chỉ khi admin tạo hoặc admin duyệt
+4. **Không có cột `name_search`** trong DB — không thêm field này khi insert
+5. **Pages Router** — file đặt trong `pages/`, không phải `app/`
+6. **TailwindCSS v4** — cú pháp `@import "tailwindcss"` trong globals.css
+7. **Dark mode**: Ứng dụng chạy **Dark Mode duy nhất**. Không có Light Mode.
+8. **MapTheme**: Trang bản đồ dùng bộ lọc tối (`.dark-map-filter`). Riêng các form nhập liệu (`create/edit`) dùng bản đồ **Sáng** (`dark={false}`) để nhìn lộ trình rõ hơn.
+9. **Font tối thiểu `text-base` (16px)** — app cho người mắt kém, không dùng `text-xs`/`text-[11px]` cho thông tin quan trọng.
+10. **Bản đồ quay theo hướng**: Cần gọi `requestCompassHeading()` TRƯỚC `await` trong hàm xử lý click/thao tác thì mới qua được quyền User Gesture của iOS/Safari.
+11. **Trang `/` có bộ lọc chi tiết**: quận/xã là single-select; loại/có SĐT/không có vị trí là multi-select.
 13. **Trang `/` tự làm mới GPS**: vào trang, sau mỗi 3 phút, và khi quay lại tab/trang.
 14. **Trang `/map` có chấm xanh vị trí hiện tại** ngoài marker cửa hàng, và không hiển thị store không có tọa độ.
 15. **`/store/create` bước 2 có nhánh lưu nhanh cho telesale**: bắt buộc phone hợp lệ, cho phép lưu store chưa có vị trí, có confirm trước khi lưu.

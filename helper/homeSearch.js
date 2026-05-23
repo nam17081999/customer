@@ -2,7 +2,6 @@ import { parseCoordinate } from '@/helper/coordinate'
 import { createSearchQueryMeta, filterAndRankIndexedStores } from '@/helper/storeSearch'
 
 export const FILTER_FLAG_HAS_PHONE = 'has_phone'
-export const FILTER_FLAG_HAS_IMAGE = 'has_image'
 export const FILTER_FLAG_NO_LOCATION = 'has_no_location'
 export const FILTER_FLAG_POTENTIAL = 'is_potential'
 
@@ -118,13 +117,12 @@ export function filterAndSortSearchResults({
     searchTerm,
     currentLocation,
     predicate: (entry) => {
-      const { store, hasPhone, hasImage, hasCoords, normalizedDistrict, normalizedWard, normalizedStoreType } = entry
+      const { store, hasPhone, hasCoords, normalizedDistrict, normalizedWard, normalizedStoreType } = entry
 
       if (selectedDistrict && normalizedDistrict !== parseCoordinateSelectedText(selectedDistrict)) return false
       if (selectedWard && normalizedWard !== parseCoordinateSelectedText(selectedWard)) return false
       if (selectedStoreTypes.length > 0 && !selectedStoreTypes.some((value) => normalizedStoreType === parseCoordinateSelectedText(value))) return false
       if (selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE) && !hasPhone) return false
-      if (selectedDetailFlags.includes(FILTER_FLAG_HAS_IMAGE) && !hasImage) return false
       if (selectedDetailFlags.includes(FILTER_FLAG_NO_LOCATION) && hasCoords) return false
       if (selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL) && !Boolean(store.is_potential)) return false
 

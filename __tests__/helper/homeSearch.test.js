@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
-  FILTER_FLAG_HAS_IMAGE,
   FILTER_FLAG_HAS_PHONE,
   FILTER_FLAG_NO_LOCATION,
   FILTER_FLAG_POTENTIAL,
@@ -25,7 +24,6 @@ function makeStore(overrides = {}) {
     district: 'Hoài Đức',
     ward: 'An Khánh',
     phone: '0901234567',
-    image_url: 'abc.jpg',
     latitude: 21.0,
     longitude: 105.8,
     active: true,
@@ -121,7 +119,7 @@ describe('hasStoreCoordinates', () => {
 describe('filterAndSortSearchResults', () => {
   const stores = [
     makeStore({ id: 1, name: 'Tạp Hóa Minh Anh', created_at: '2026-04-01T00:00:00.000Z' }),
-    makeStore({ id: 2, name: 'Quán Ăn Minh', ward: 'An Thượng', image_url: '', phone: '', active: false, created_at: '2026-04-03T00:00:00.000Z' }),
+    makeStore({ id: 2, name: 'Quán Ăn Minh', ward: 'An Thượng', phone: '', active: false, created_at: '2026-04-03T00:00:00.000Z' }),
     makeStore({ id: 3, name: 'Cửa Hàng Giang', district: 'Quốc Oai', ward: 'Yên Sơn', latitude: null, longitude: null, is_potential: true, created_at: '2026-04-02T00:00:00.000Z' }),
   ]
 
@@ -134,7 +132,7 @@ describe('filterAndSortSearchResults', () => {
       selectedDistrict: 'Hoài Đức',
       selectedWard: 'An Khánh',
       selectedStoreTypes: ['Tạp hóa'],
-      selectedDetailFlags: [FILTER_FLAG_HAS_PHONE, FILTER_FLAG_HAS_IMAGE],
+      selectedDetailFlags: [FILTER_FLAG_HAS_PHONE],
       currentLocation: null,
     })
 
@@ -210,8 +208,8 @@ describe('filterAndSortSearchResults', () => {
 describe('filterAndSortSearchResults regression', () => {
   it('home search vẫn ưu tiên exact match trước near-match mới', () => {
     const indexedStores = buildStoreSearchIndex([
-      makeStore({ id: 1, name: 'Shopii Mart', store_type: 'tap_hoa', phone: '', image_url: '' }),
-      makeStore({ id: 2, name: 'Shoppii Mart', store_type: 'tap_hoa', phone: '', image_url: '' }),
+      makeStore({ id: 1, name: 'Shopii Mart', store_type: 'tap_hoa', phone: '' }),
+      makeStore({ id: 2, name: 'Shoppii Mart', store_type: 'tap_hoa', phone: '' }),
     ], { getHasCoords: hasStoreCoordinates })
 
     const results = filterAndSortSearchResults({

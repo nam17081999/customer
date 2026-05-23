@@ -50,7 +50,6 @@ export function buildStoreSearchIndex(stores, options = {}) {
       normalizedWard: normalizeLooseText(store?.ward),
       normalizedStoreType: normalizeLooseText(store?.store_type),
       hasPhone: Boolean(String(store?.phone || '').trim()),
-      hasImage: Boolean(String(store?.image_url || '').trim()),
       hasCoords: getHasCoords ? Boolean(getHasCoords(store)) : null,
     }
   })

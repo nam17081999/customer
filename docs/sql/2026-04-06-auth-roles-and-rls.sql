@@ -188,7 +188,6 @@ begin
     new.phone is distinct from old.phone or
     new.phone_secondary is distinct from old.phone_secondary or
     new.note is distinct from old.note or
-    new.image_url is distinct from old.image_url or
     new.latitude is distinct from old.latitude or
     new.longitude is distinct from old.longitude or
     new.active is distinct from old.active or

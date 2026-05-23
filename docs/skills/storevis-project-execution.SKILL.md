@@ -1,6 +1,6 @@
 ---
 name: storevis-project-execution
-description: Dùng khi build/fix/refactor NPP Hà Công để bám đúng kiến trúc, business rules, cache flow, map flow, image flow, và accessibility.
+description: Dùng khi build/fix/refactor NPP Hà Công để bám đúng kiến trúc, business rules, cache flow, map flow, và accessibility.
 ---
 
 # NPP Hà Công Project Execution
@@ -27,7 +27,6 @@ Skill này dùng để AI làm việc đúng “luật dự án”, giảm lỗi
 - Trang mới đặt trong `pages/`, không tự chuyển route mới sang `app/`.
 - Đọc danh sách `stores` qua `getOrRefreshStores()` từ `lib/storeCache.js`.
 - Không hard delete stores, chỉ soft delete bằng `deleted_at`.
-- `image_url` lưu filename, không lưu full URL.
 - File có tiếng Việt phải được giữ UTF-8. Không dùng cách ghi file dễ làm vỡ encoding nếu không thật sự cần.
 - Sau mutation phải sync cache đúng hàm:
 - CREATE: `appendStoreToCache(newStore)`.

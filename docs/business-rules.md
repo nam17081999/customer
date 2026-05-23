@@ -85,8 +85,6 @@ User có 2 lựa chọn:
      - Sai địa chỉ
      - Sai vị trí
      - Sai số điện thoại
-     - Ảnh không đúng
-   - **Không** yêu cầu ảnh minh chứng.
 
 **Trạng thái báo cáo**: `pending` → `approved` hoặc `rejected`.
 
@@ -124,7 +122,7 @@ User có 2 lựa chọn:
 - `Quận / Huyện`: chọn **1**
 - `Xã / Phường`: chọn **1**
 - `Loại cửa hàng`: chọn nhiều
-- `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Có ảnh`, `Không có vị trí`)
+- `Chi tiết dữ liệu`: chọn nhiều (`Có số điện thoại`, `Không có vị trí`)
 - Trên mobile, panel lọc được rút gọn:
   - `Quận / Huyện` và `Xã / Phường` dùng `select`
   - Các nhóm còn lại hiển thị dạng lưới 2 cột

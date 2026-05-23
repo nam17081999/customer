@@ -7,7 +7,6 @@ import { Msg } from '@/components/ui/msg'
 import { STORE_TYPE_OPTIONS } from '@/lib/constants'
 import SearchStoreCard from '@/components/search-store-card'
 import {
-  FILTER_FLAG_HAS_IMAGE,
   FILTER_FLAG_HAS_PHONE,
   FILTER_FLAG_NO_LOCATION,
   FILTER_FLAG_POTENTIAL,
@@ -16,7 +15,6 @@ import { useHomeSearchController } from '@/helper/useHomeSearchController'
 
 const DETAIL_FLAG_OPTIONS = [
   { value: FILTER_FLAG_HAS_PHONE, label: 'Có số điện thoại' },
-  { value: FILTER_FLAG_HAS_IMAGE, label: 'Có ảnh' },
   { value: FILTER_FLAG_NO_LOCATION, label: 'Không có vị trí' },
   { value: FILTER_FLAG_POTENTIAL, label: 'Tiềm năng' },
 ]

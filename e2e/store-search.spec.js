@@ -17,7 +17,6 @@ function buildStore(overrides = {}) {
     longitude: Object.prototype.hasOwnProperty.call(overrides, 'longitude') ? overrides.longitude : 105.80492,
     active: overrides.active ?? true,
     is_potential: overrides.is_potential ?? false,
-    image_url: overrides.image_url || null,
     created_at: overrides.created_at || BASE_TIMESTAMP,
     updated_at: overrides.updated_at || BASE_TIMESTAMP,
     last_called_at: overrides.last_called_at || null,

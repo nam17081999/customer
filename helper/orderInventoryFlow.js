@@ -116,6 +116,193 @@ export function buildSalesOrderRpcPayload(payload = {}) {
   }
 }
 
+export function createSalesOrderLine(products = []) {
+  const product = Array.isArray(products) ? products[0] || null : null
+  const unit = product?.units?.find((item) => Number(item.conversion_to_base_qty) > 1)
+    || product?.baseUnit
+    || product?.units?.[0]
+    || null
+
+  return {
+    productId: product?.id || '',
+    productUnitId: unit?.id || '',
+    conversionToBaseQty: unit?.conversion_to_base_qty || 1,
+    quantity: '1',
+    unitPrice: unit?.default_sale_price ?? product?.default_sale_price ?? '',
+    costPriceBase: '',
+    note: '',
+  }
+}
+
+export function createSalesOrderDraft({ draftNumber = 1, products = [], code = '' } = {}) {
+  const safeNumber = Math.max(1, Number(draftNumber) || 1)
+  return {
+    id: `draft-${safeNumber}`,
+    draftNumber: safeNumber,
+    title: `Hóa đơn ${safeNumber}`,
+    code,
+    customerStoreId: '',
+    customerQuery: '',
+    note: '',
+    discountAmount: '',
+    items: [],
+  }
+}
+
+export function addSalesOrderDraft({ drafts = [], products = [], buildCode = () => '' } = {}) {
+  const safeDrafts = Array.isArray(drafts) ? drafts : []
+  const nextNumber = safeDrafts.reduce((max, draft) => Math.max(max, Number(draft?.draftNumber || 0)), 0) + 1
+  const nextDraft = createSalesOrderDraft({
+    draftNumber: nextNumber,
+    products,
+    code: buildCode(nextNumber),
+  })
+
+  return {
+    drafts: [...safeDrafts, nextDraft],
+    activeDraftId: nextDraft.id,
+  }
+}
+
+function salesOrderStoreLabel(store) {
+  return [store?.name, store?.ward, store?.district].filter(Boolean).join(' - ')
+}
+
+export function addSalesOrderDraftForStore({
+  drafts = [],
+  stores = [],
+  queryStoreId,
+  products = [],
+  buildCode = () => '',
+} = {}) {
+  const safeDrafts = Array.isArray(drafts) ? drafts : []
+  const storeId = String(queryStoreId || '').trim()
+  const store = Array.isArray(stores)
+    ? stores.find((item) => String(item?.id) === storeId)
+    : null
+
+  if (!store) {
+    return {
+      created: false,
+      drafts: safeDrafts,
+      activeDraftId: safeDrafts[0]?.id || '',
+    }
+  }
+
+  const result = addSalesOrderDraft({ drafts: safeDrafts, products, buildCode })
+  return {
+    created: true,
+    activeDraftId: result.activeDraftId,
+    drafts: updateSalesOrderDraft(result.drafts, result.activeDraftId, {
+      customerStoreId: String(store.id),
+      customerQuery: salesOrderStoreLabel(store),
+      items: [],
+    }),
+  }
+}
+
+export function updateSalesOrderDraft(drafts = [], draftId, patch = {}) {
+  return (Array.isArray(drafts) ? drafts : []).map((draft) => (
+    String(draft?.id) === String(draftId) ? { ...draft, ...patch } : draft
+  ))
+}
+
+export function closeSalesOrderDraft({ drafts = [], activeDraftId, draftId } = {}) {
+  const safeDrafts = Array.isArray(drafts) ? drafts : []
+  if (safeDrafts.length <= 1) {
+    return {
+      drafts: safeDrafts,
+      activeDraftId: activeDraftId || safeDrafts[0]?.id || '',
+    }
+  }
+
+  const closedIndex = safeDrafts.findIndex((draft) => String(draft?.id) === String(draftId))
+  if (closedIndex === -1) return { drafts: safeDrafts, activeDraftId }
+
+  const nextDrafts = safeDrafts.filter((draft) => String(draft?.id) !== String(draftId))
+  let nextActiveDraftId = activeDraftId
+  if (String(activeDraftId) === String(draftId)) {
+    nextActiveDraftId = nextDrafts[Math.min(closedIndex, nextDrafts.length - 1)]?.id || nextDrafts[0]?.id || ''
+  }
+
+  return {
+    drafts: nextDrafts,
+    activeDraftId: nextActiveDraftId,
+  }
+}
+
+const SALES_ORDER_DRAFT_STORAGE_VERSION = 1
+
+function stringValue(value) {
+  return String(value ?? '')
+}
+
+function normalizeDraftItem(item = {}) {
+  const productId = stringValue(item.productId).trim()
+  const productUnitId = stringValue(item.productUnitId).trim()
+  if (!productId || !productUnitId) return null
+
+  return {
+    productId,
+    productUnitId,
+    conversionToBaseQty: toInventoryNumber(item.conversionToBaseQty, 1) || 1,
+    quantity: stringValue(item.quantity ?? '1'),
+    unitPrice: stringValue(item.unitPrice ?? ''),
+    costPriceBase: stringValue(item.costPriceBase ?? ''),
+    note: stringValue(item.note).trim(),
+  }
+}
+
+function normalizeDraft(draft = {}) {
+  const id = stringValue(draft.id).trim()
+  if (!id) return null
+
+  const draftNumber = Math.max(1, Number(draft.draftNumber) || 1)
+  const title = stringValue(draft.title).trim() || `Hóa đơn ${draftNumber}`
+
+  return {
+    id,
+    draftNumber,
+    title,
+    code: stringValue(draft.code),
+    customerStoreId: stringValue(draft.customerStoreId),
+    customerQuery: stringValue(draft.customerQuery),
+    note: stringValue(draft.note),
+    discountAmount: stringValue(draft.discountAmount),
+    items: (Array.isArray(draft.items) ? draft.items : []).map(normalizeDraftItem).filter(Boolean),
+  }
+}
+
+export function buildSalesOrderDraftStoragePayload({ drafts = [], activeDraftId = '' } = {}) {
+  const safeDrafts = (Array.isArray(drafts) ? drafts : []).map(normalizeDraft).filter(Boolean)
+  if (safeDrafts.length === 0) return null
+
+  const safeActiveDraftId = safeDrafts.some((draft) => draft.id === activeDraftId)
+    ? activeDraftId
+    : safeDrafts[0].id
+
+  return {
+    version: SALES_ORDER_DRAFT_STORAGE_VERSION,
+    activeDraftId: safeActiveDraftId,
+    drafts: safeDrafts,
+  }
+}
+
+export function parseSalesOrderDraftStoragePayload(rawPayload) {
+  if (!rawPayload) return null
+
+  try {
+    const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload
+    if (!payload || payload.version !== SALES_ORDER_DRAFT_STORAGE_VERSION) return null
+    return buildSalesOrderDraftStoragePayload({
+      drafts: payload.drafts,
+      activeDraftId: payload.activeDraftId,
+    })
+  } catch {
+    return null
+  }
+}
+
 export function buildCancelSalesOrderArgs(orderId, userId) {
   const id = cleanId(orderId)
   if (!id) throw new Error('Thiếu đơn hàng cần hủy.')
@@ -360,8 +547,10 @@ export function filterInventoryProducts(products = [], filters = {}) {
   const query = normalizeSearchText(filters.query)
   const category = String(filters.category || '').trim()
   const stockFilter = filters.stockFilter || 'all'
+  const excludedIds = new Set((filters.excludeProductIds || []).map((item) => String(item)))
 
   return products.filter((product) => {
+    if (excludedIds.has(String(product.id))) return false
     if (category && String(product.category || '') !== category) return false
     if (stockFilter === 'low' && !isLowStock(product)) return false
     if (stockFilter === 'out' && !isOutOfStock(product)) return false
@@ -381,9 +570,63 @@ export function filterInventoryProducts(products = [], filters = {}) {
 export function filterSalesOrders(orders = [], storesById = new Map(), filters = {}) {
   const query = normalizeSearchText(filters.query)
   const status = filters.status || 'all'
+  const statuses = Array.isArray(filters.statuses) ? filters.statuses.map((item) => String(item)) : null
+  const datePreset = filters.datePreset || 'all'
+  const creatorId = String(filters.creatorId || '').trim()
+  const now = filters.now instanceof Date ? filters.now : new Date()
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  }
+
+  function addDays(date, days) {
+    const next = new Date(date)
+    next.setDate(next.getDate() + days)
+    return next
+  }
+
+  function getDateRange() {
+    const today = startOfDay(now)
+    const dayOfWeek = today.getDay() || 7
+    const weekStart = addDays(today, 1 - dayOfWeek)
+
+    if (datePreset === 'today') return [today, addDays(today, 1)]
+    if (datePreset === 'yesterday') return [addDays(today, -1), today]
+    if (datePreset === 'week') return [weekStart, addDays(weekStart, 7)]
+    if (datePreset === 'lastWeek') return [addDays(weekStart, -7), weekStart]
+    if (datePreset === 'last7days') return [addDays(today, -6), addDays(today, 1)]
+    if (datePreset === 'month') return [new Date(now.getFullYear(), now.getMonth(), 1), new Date(now.getFullYear(), now.getMonth() + 1, 1)]
+    if (datePreset === 'lastMonth') return [new Date(now.getFullYear(), now.getMonth() - 1, 1), new Date(now.getFullYear(), now.getMonth(), 1)]
+    if (datePreset === 'last30days') return [addDays(today, -29), addDays(today, 1)]
+    if (datePreset === 'quarter') {
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+      return [new Date(now.getFullYear(), quarterStartMonth, 1), new Date(now.getFullYear(), quarterStartMonth + 3, 1)]
+    }
+    if (datePreset === 'lastQuarter') {
+      const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
+      return [new Date(now.getFullYear(), quarterStartMonth - 3, 1), new Date(now.getFullYear(), quarterStartMonth, 1)]
+    }
+    if (datePreset === 'year') return [new Date(now.getFullYear(), 0, 1), new Date(now.getFullYear() + 1, 0, 1)]
+    if (datePreset === 'lastYear') return [new Date(now.getFullYear() - 1, 0, 1), new Date(now.getFullYear(), 0, 1)]
+    return null
+  }
+
+  const dateRange = getDateRange()
 
   return orders.filter((order) => {
+    if (statuses) {
+      if (statuses.length === 0) return false
+      if (!statuses.includes(String(order.status || 'active'))) return false
+    }
     if (status !== 'all' && order.status !== status) return false
+    if (creatorId && String(order.created_by || '') !== creatorId) return false
+
+    if (dateRange) {
+      const createdAt = new Date(order.created_at)
+      if (Number.isNaN(createdAt.getTime())) return false
+      if (createdAt < dateRange[0] || createdAt >= dateRange[1]) return false
+    }
+
     if (!query) return true
 
     const store = storesById.get(String(order.customer_store_id))

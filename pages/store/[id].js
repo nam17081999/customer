@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { Button } from '@/components/ui/button'
 import { getOrRefreshStores } from '@/lib/storeCache'
-import { getFullImageUrl, STORE_PLACEHOLDER_IMAGE } from '@/helper/imageUtils'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 import { DEFAULT_STORE_TYPE, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { hasStoreCoordinates, hasStoreSupplementOpportunity } from '@/helper/storeSupplement'
 import { useAuth } from '@/lib/AuthContext'
+import { buildStoreDetailBadges } from '@/helper/storeDetailActions'
 
 function appendFocusStoreId(path, focusStoreId) {
   const base = String(path || '/').trim() || '/'
@@ -86,9 +86,9 @@ export default function StoreDetailPage() {
   const hasCoords = hasStoreCoordinates(store)
   const canSupplement = hasStoreSupplementOpportunity(store)
   const addressText = formatAddressParts(store)
-  const imageSrc = store?.image_url ? getFullImageUrl(store.image_url) : STORE_PLACEHOLDER_IMAGE
   const storeTypeValue = store?.store_type || DEFAULT_STORE_TYPE
   const storeTypeLabel = STORE_TYPE_OPTIONS.find((option) => option.value === storeTypeValue)?.label || storeTypeValue
+  const qualityBadges = useMemo(() => buildStoreDetailBadges(store || {}), [store])
 
   return (
     <>
@@ -118,16 +118,6 @@ export default function StoreDetailPage() {
 
           {!loading && store && (
             <section className="overflow-hidden rounded-2xl border border-gray-800 bg-gray-950">
-              <div className="relative h-52 w-full bg-gray-900 sm:h-64">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageSrc} alt={store.name} className="h-full w-full object-contain" />
-                {store.active && (
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-green-500/90 px-2 py-0.5 text-xs font-medium text-white">
-                    Xác thực
-                  </span>
-                )}
-              </div>
-
               <div className="space-y-4 p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -144,6 +134,16 @@ export default function StoreDetailPage() {
                     </span>
                   ) : null}
                 </div>
+
+                {qualityBadges.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {qualityBadges.map((badge) => (
+                      <span key={badge.key} className="rounded-full border border-amber-800/70 bg-amber-950/60 px-2 py-1 text-sm font-medium text-amber-100">
+                        {badge.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {addressText && <p className="text-base leading-relaxed text-gray-300">{addressText}</p>}
                 {store.phone && <p className="text-base text-gray-300">{store.phone}</p>}

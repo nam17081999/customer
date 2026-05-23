@@ -3,9 +3,29 @@ version = 1
 name = "customer"
 
 [setup]
-script = ""
+script = '''
+cd "$CODEX_WORKTREE_PATH"
+
+corepack enable
+corepack prepare pnpm@10.17.1 --activate
+
+pnpm config set allow-builds sharp,unrs-resolver
+
+pnpm install
+
+./run/setup.sh
+'''
+
+[cleanup]
+script = '''
+docker compose down --remove-orphans
+
+rm -rf .cache/tmp
+rm -rf node_modules/.cache
+rm -rf .next
+'''
 
 [[actions]]
 name = "Run"
 icon = "run"
-command = "npm run dev"
+command = "pnpm dev"

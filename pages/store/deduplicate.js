@@ -172,14 +172,6 @@ export default function DeduplicatePage() {
          }
       }
 
-      // image merging
-      if (!primaryStore.image_url) {
-         const secWithImg = secondaryStores.find(s => s.image_url)
-         if (secWithImg) {
-            updatesTemp.image_url = secWithImg.image_url
-         }
-      }
-
       // 2. Perform DB Updates
       const timestamp = new Date().toISOString()
       
