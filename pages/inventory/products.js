@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { AlertTriangle, Package, Plus, RefreshCw, Search, ShoppingCart, Truck } from 'lucide-react'
+import { AlertTriangle, BarChart3, Package, Plus, RefreshCw, Search, ShoppingCart, Truck } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -137,6 +137,9 @@ export default function InventoryProductsPage() {
               </Button>
               <Button asChild variant="outline">
                 <Link href="/inventory/stock">Tồn kho</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/inventory/reports"><BarChart3 className="h-4 w-4" /> Thống kê</Link>
               </Button>
               <Button asChild>
                 <Link href="/orders/new"><ShoppingCart className="h-4 w-4" /> Lên đơn</Link>
@@ -299,9 +302,9 @@ export default function InventoryProductsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="max-h-[max(16rem,calc(100svh-28rem))] overflow-y-auto sm:max-h-[max(18rem,calc(100dvh-26rem))]">
                 <CardContent className="p-0">
-                  <div className="hidden grid-cols-[1.4fr_1fr_1fr_1fr] border-b border-gray-800 px-4 py-3 text-sm font-semibold text-gray-300 md:grid">
+                  <div className="sticky top-0 z-10 hidden grid-cols-[1.4fr_1fr_1fr_1fr] border-b border-gray-800 bg-gray-950 px-4 py-3 text-sm font-semibold text-gray-300 md:grid">
                     <div>Hàng hóa</div>
                     <div>Đơn vị</div>
                     <div>Tồn</div>
@@ -313,6 +316,13 @@ export default function InventoryProductsPage() {
                     <div className="p-4 text-gray-400">Chưa có hàng hóa.</div>
                   ) : filteredProducts.map((product) => {
                     const low = Number(product.onHandBaseQty || 0) <= Number(product.min_stock_base_qty || 0)
+                    const onHandBaseQty = Number(product.onHandBaseQty || 0)
+                    const largestUnit = (product.units || [])
+                      .filter((unit) => Number(unit.conversion_to_base_qty || 0) > 1)
+                      .sort((left, right) => Number(right.conversion_to_base_qty || 0) - Number(left.conversion_to_base_qty || 0))[0]
+                    const largestUnitConversion = Number(largestUnit?.conversion_to_base_qty || 0)
+                    const largestUnitCount = largestUnitConversion > 0 ? Math.floor(onHandBaseQty / largestUnitConversion) : 0
+                    const baseUnitRemainder = largestUnitConversion > 0 ? onHandBaseQty - largestUnitCount * largestUnitConversion : onHandBaseQty
                     return (
                       <div key={product.id} className="grid grid-cols-1 gap-3 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:py-3">
                         <div>
@@ -326,11 +336,22 @@ export default function InventoryProductsPage() {
                           </div>
                           <p className="text-sm text-gray-400">{product.sku || 'Chưa có mã'} · {product.category || 'Chưa phân nhóm'}</p>
                         </div>
-                        <div className="text-base text-gray-200">
-                          {product.units.map((unit) => `${unit.unit_name}=${formatInventoryQuantity(unit.conversion_to_base_qty)}`).join(', ')}
+                        <div className="space-y-1 text-base text-gray-200">
+                          {product.units.map((unit) => (
+                            <p key={unit.id || unit.unit_name}>{unit.unit_name} = {formatInventoryQuantity(unit.conversion_to_base_qty)}</p>
+                          ))}
                         </div>
-                        <div>
-                          <p className={low ? 'font-semibold text-amber-200' : 'text-gray-100'}>{formatProductStock(product)}</p>
+                        <div className="space-y-1">
+                          <div className={low ? 'font-semibold text-amber-200' : 'text-gray-100'}>
+                            {largestUnit ? (
+                              <>
+                                <p>{formatInventoryQuantity(largestUnitCount)} {largestUnit.unit_name}</p>
+                                {baseUnitRemainder > 0 && <p>{formatInventoryQuantity(baseUnitRemainder)} {product.base_unit_name}</p>}
+                              </>
+                            ) : (
+                              <p>{formatProductStock(product)}</p>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-400">Tối thiểu {formatInventoryQuantity(product.min_stock_base_qty)} {product.base_unit_name}</p>
                         </div>
                         <div className="text-gray-100">{formatMoney(product.avgCostPerBaseUnit)} / {product.base_unit_name}</div>

@@ -1,84 +1,77 @@
 # Current Work
 
 ## Goal
-- Hide products that are already in the active draft order from `/orders/new` product search results.
+- Thêm màn thống kê đơn hàng và hàng hóa: hàng bán nhiều, lãi/lỗ theo kỳ, khách lấy nhiều hàng, sản phẩm lãi nhất; đồng thời giữ chỉnh UI danh sách hàng hóa đã yêu cầu trước đó.
 
 ## Task Type
-- Bug Fix
+- Feature
 
 ## Why
-- The order screen currently lets users search and add the same product more than once.
-- User wants an already-added product to disappear from search results for the current order.
+- Admin cần xem nhanh hiệu quả bán hàng theo ngày/tuần/tháng/năm, khách hàng mua nhiều và sản phẩm tạo lãi tốt.
 
 ## In Scope
-- Add test-first helper coverage for excluding selected product ids from search.
-- Update product search on `/orders/new` to exclude products already present in the active draft.
-- Keep deletion behavior: after deleting a line, the product should be searchable again.
+- Màn thống kê mới trong nhóm inventory/order.
+- Truy vấn/aggregate dữ liệu `sales_orders`, `sales_order_items`, `products`, `stores` phía client hiện có.
+- Link điều hướng tới màn thống kê từ danh sách hàng hóa.
+- UI danh sách hàng hóa: đơn vị và tồn xuống dòng riêng.
 
 ## Out of Scope
-- Merging duplicate product rows.
-- Changing inventory/order submit payload.
-- Changing product units or pricing behavior.
-- Other order screen layout changes.
+- Thêm bảng/migration/RPC mới.
+- Đổi logic tạo/hủy đơn, trừ tồn, tính giá vốn, cache store.
+- Biểu đồ phức tạp hoặc export file.
+- Báo cáo phiếu nhập/chi phí ngoài `sales_orders` hiện có.
 
 ## Must Preserve
-- Existing active draft behavior.
-- Existing draft persistence.
-- Existing search by product name/SKU.
-- Existing order submit API.
-- UTF-8 Vietnamese text.
+- Chỉ tính đơn `status = active`; đơn hủy không tính doanh thu/lãi/tồn.
+- Lãi dùng snapshot hiện có: `gross_profit_amount` và `line_profit`.
+- Public store reads qua `getOrRefreshStores()`.
+- Auth admin guard, Pages Router, import alias, dark theme, text size/contrast.
+- UTF-8 tiếng Việt.
 
 ## Inputs / Repro / Expected
-- Repro:
-  - Open `/orders/new`.
-  - Add product A to current draft.
-  - Search product A again.
-- Current: product A appears and can be added again.
-- Expected: product A does not appear while it is already in the active draft.
+- Input: admin mở màn thống kê, chọn kỳ ngày/tuần/tháng/năm.
+- Expected:
+  - Hiển thị tổng đơn, doanh thu, giá vốn, lãi gộp, biên lãi.
+  - Bảng sản phẩm bán nhiều theo số lượng gốc/doanh thu/lãi.
+  - Bảng khách mua nhiều theo số đơn/doanh thu/số lượng/lãi.
+  - Bảng sản phẩm lãi nhất theo tổng lãi và biên lãi.
 
 ## Constraints
-- Use `apply_patch`.
-- Tests first.
-- Do not add dependencies.
+- Sửa tối thiểu, không thêm dependency.
+- Query giới hạn hợp lý cho MVP client-side.
 
 ## Required Verification
-- `npm run test -- __tests__/helper/orderInventoryFlow.test.js`
-- `npm run test`
-- `npm run lint`
-- `git diff --check`
-- Targeted mojibake scan on touched files.
-- Smoke `/orders/new`.
+- `npm run lint`.
+- `git diff --check`.
+- Smoke review UI/accessibility cho `/inventory/reports` và `/inventory/products`.
 
 ## Definition of Done
-- Helper test proves selected product ids are excluded.
-- `/orders/new` search no longer shows products already in the active draft.
-- Verification passes or blockers are documented.
+- Có màn thống kê mới truy cập được.
+- Các metric chính tính từ dữ liệu đơn bán active.
+- Product list giữ yêu cầu xuống dòng.
+- Verification ghi rõ kết quả.
 
 ## Plan
-- Add failing test for `filterInventoryProducts(..., excludeProductIds)`.
-- Implement helper filtering.
-- Pass active draft product ids from `/orders/new`.
-- Run verification.
+- Thêm API đọc dữ liệu thống kê đơn bán.
+- Thêm helper aggregate thống kê.
+- Tạo page `/inventory/reports`.
+- Thêm link từ danh sách hàng hóa.
+- Chạy lint và diff check.
 
 ## Done
-- Added test-first coverage in `__tests__/helper/orderInventoryFlow.test.js` for `excludeProductIds`.
-- Extended `filterInventoryProducts()` to skip products whose ids are already selected.
-- Updated `/orders/new` product search to pass product ids from the active draft items.
-- Removed now-unused local `productLabel()` because product filtering is centralized in the helper.
+- Added `/inventory/reports` dashboard with period filters: day, week, month, year, all.
+- Added active sales report loading from `sales_orders` + `sales_order_items`, joined client-side with products and cached stores.
+- Added aggregates for totals, top products by quantity, top products by profit, and top customers by quantity.
+- Added link from `/inventory/products` to the new statistics screen.
+- Updated `/inventory/products` list so units and stock display on separate lines.
 
 ## Verification
-- Initial focused test failed before helper implementation because excluded ids were ignored.
-- Pass: `./node_modules/.bin/vitest run __tests__/helper/orderInventoryFlow.test.js`
-  - 41 tests passed.
-- Pass: `npm exec vitest run`
-  - 36 files passed, 451 tests passed.
-- Pass: `npm run lint`
-  - 0 errors.
-  - 2 existing `<img>` warnings in `pages/orders/[id].js` and `.claude/worktrees/.../pages/orders/[id].js`.
-- Pass: `git diff --check`.
-- Pass: targeted mojibake scan on touched files.
-- Pass: `npm run text:check:staged`.
-- Smoke: `HEAD /orders/new` returned `200` on `http://localhost:3001`.
+- `npm run lint` passed with 0 errors; existing `@next/next/no-img-element` warnings remain in `/Users/nam/Desktop/customer/pages/orders/[id].js` and `/Users/nam/Desktop/customer/.claude/worktrees/condescending-williamson-122bbe/pages/orders/[id].js`.
+- `git diff --check` passed.
+- `node scripts/check-mojibake.js` is blocked by pre-existing `.claude/worktrees/condescending-williamson-122bbe/scripts/check-mojibake.js` self-pattern findings.
+- Custom changed-file mojibake scan passed for modified `.js/.jsx/.md/.json/.css` files.
+- Checklist reviewed: auth/admin guard, store cache read, order status safety, inventory/profit snapshot safety, dark theme/readability.
 
 ## Risks / Next
-- If users need to sell the same product with two different units/prices in one order, the current requested behavior prevents that until the existing row is deleted.
+- Browser smoke test not run in this session.
+- Report currently uses client-side aggregation with a 1000 active-order query limit; large production datasets should move this to paged queries or Supabase RPC.

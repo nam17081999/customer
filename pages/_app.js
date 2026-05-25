@@ -11,7 +11,7 @@ export default function App({ Component, pageProps }) {
   const { pathname } = useRouter()
   const needsBottomPadding = pathname !== '/map' && pathname !== '/'
   return (
-    <>
+    <div className="flex min-h-screen flex-col overflow-hidden">
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <title>NPP Hà Công - Quản lý cửa hàng</title>
@@ -25,12 +25,12 @@ export default function App({ Component, pageProps }) {
           <ErrorBoundary>
             <Navbar />
             {/* pb-16 = space for fixed bottom tab bar on mobile */}
-            <div className={needsBottomPadding ? 'pb-16 sm:pb-0' : ''}>
+            <div className={`${needsBottomPadding ? 'pb-16 sm:pb-0' : ''} min-h-0 flex-1 overflow-hidden`}>
               <Component {...pageProps} />
             </div>
           </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
-    </>
+    </div>
   );
 }

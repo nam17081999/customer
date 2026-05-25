@@ -535,6 +535,98 @@ export function summarizeInventoryProducts(products = []) {
   }
 }
 
+export function getSalesReportDateRange(period, now = new Date()) {
+  const safeNow = now instanceof Date ? now : new Date()
+  const startOfDay = new Date(safeNow.getFullYear(), safeNow.getMonth(), safeNow.getDate())
+  const addDays = (date, days) => {
+    const next = new Date(date)
+    next.setDate(next.getDate() + days)
+    return next
+  }
+  const dayOfWeek = startOfDay.getDay() || 7
+  const weekStart = addDays(startOfDay, 1 - dayOfWeek)
+
+  if (period === 'day') return [startOfDay, addDays(startOfDay, 1)]
+  if (period === 'week') return [weekStart, addDays(weekStart, 7)]
+  if (period === 'month') return [new Date(safeNow.getFullYear(), safeNow.getMonth(), 1), new Date(safeNow.getFullYear(), safeNow.getMonth() + 1, 1)]
+  if (period === 'year') return [new Date(safeNow.getFullYear(), 0, 1), new Date(safeNow.getFullYear() + 1, 0, 1)]
+  return [null, null]
+}
+
+export function summarizeSalesReport({ orders = [], items = [], products = [], stores = [] } = {}) {
+  const productById = new Map(products.map((product) => [String(product.id), product]))
+  const storeById = new Map(stores.map((store) => [String(store.id), store]))
+  const orderById = new Map(orders.map((order) => [String(order.id), order]))
+  const productStats = new Map()
+  const customerStats = new Map()
+
+  for (const item of items) {
+    const order = orderById.get(String(item.sales_order_id))
+    if (!order) continue
+
+    const productId = String(item.product_id)
+    const product = productById.get(productId)
+    const productStat = productStats.get(productId) || {
+      id: productId,
+      name: product?.name || 'Không tìm thấy hàng hóa',
+      sku: product?.sku || '',
+      baseUnitName: product?.base_unit_name || '',
+      quantityBase: 0,
+      revenue: 0,
+      cost: 0,
+      profit: 0,
+      orderCount: new Set(),
+    }
+    productStat.quantityBase += Number(item.quantity_base || 0)
+    productStat.revenue += Number(item.line_total || 0)
+    productStat.cost += Number(item.line_cost_total || 0)
+    productStat.profit += Number(item.line_profit || 0)
+    productStat.orderCount.add(String(item.sales_order_id))
+    productStats.set(productId, productStat)
+
+    const customerId = String(order.customer_store_id)
+    const store = storeById.get(customerId)
+    const customerStat = customerStats.get(customerId) || {
+      id: customerId,
+      name: store?.name || 'Không tìm thấy khách hàng',
+      address: [store?.ward, store?.district].filter(Boolean).join(' - '),
+      orderCount: new Set(),
+      quantityBase: 0,
+      revenue: 0,
+      profit: 0,
+    }
+    customerStat.orderCount.add(String(order.id))
+    customerStat.quantityBase += Number(item.quantity_base || 0)
+    customerStat.revenue += Number(item.line_total || 0)
+    customerStat.profit += Number(item.line_profit || 0)
+    customerStats.set(customerId, customerStat)
+  }
+
+  const normalizeStats = (rows) => rows.map((row) => ({
+    ...row,
+    orderCount: row.orderCount.size,
+    profitMargin: row.revenue > 0 ? (row.profit / row.revenue) * 100 : 0,
+  }))
+
+  const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0)
+  const totalCost = orders.reduce((sum, order) => sum + Number(order.total_cost_amount || 0), 0)
+  const totalProfit = orders.reduce((sum, order) => sum + Number(order.gross_profit_amount || 0), 0)
+
+  return {
+    summary: {
+      orderCount: orders.length,
+      itemCount: items.length,
+      revenue: totalRevenue,
+      cost: totalCost,
+      profit: totalProfit,
+      profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+    },
+    topProductsByQuantity: normalizeStats(Array.from(productStats.values())).sort((left, right) => right.quantityBase - left.quantityBase),
+    topProductsByProfit: normalizeStats(Array.from(productStats.values())).sort((left, right) => right.profit - left.profit),
+    topCustomers: normalizeStats(Array.from(customerStats.values())).sort((left, right) => right.quantityBase - left.quantityBase),
+  }
+}
+
 export function getInventoryProductCategories(products = []) {
   return Array.from(new Set(
     products

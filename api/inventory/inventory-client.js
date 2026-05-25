@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
 import {
   buildCancelPurchaseOrderArgs,
@@ -47,6 +48,77 @@ function normalizeProduct(row, unitsByProduct, stockByProduct) {
     onHandBaseQty: Number(stock?.on_hand_base_qty || 0),
     avgCostPerBaseUnit: Number(stock?.avg_cost_per_base_unit || 0),
   }
+}
+
+function normalizeSalesOrderSearchText(value) {
+  return removeVietnameseTones(String(value || '').trim()).replace(/\s+/g, ' ')
+}
+
+function getSalesOrderDateRange(datePreset, now = new Date()) {
+  const safeNow = now instanceof Date ? now : new Date()
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  }
+
+  function addDays(date, days) {
+    const next = new Date(date)
+    next.setDate(next.getDate() + days)
+    return next
+  }
+
+  const today = startOfDay(safeNow)
+  const dayOfWeek = today.getDay() || 7
+  const weekStart = addDays(today, 1 - dayOfWeek)
+
+  if (datePreset === 'today') return [today, addDays(today, 1)]
+  if (datePreset === 'yesterday') return [addDays(today, -1), today]
+  if (datePreset === 'week') return [weekStart, addDays(weekStart, 7)]
+  if (datePreset === 'lastWeek') return [addDays(weekStart, -7), weekStart]
+  if (datePreset === 'last7days') return [addDays(today, -6), addDays(today, 1)]
+  if (datePreset === 'month') return [new Date(safeNow.getFullYear(), safeNow.getMonth(), 1), new Date(safeNow.getFullYear(), safeNow.getMonth() + 1, 1)]
+  if (datePreset === 'lastMonth') return [new Date(safeNow.getFullYear(), safeNow.getMonth() - 1, 1), new Date(safeNow.getFullYear(), safeNow.getMonth(), 1)]
+  if (datePreset === 'last30days') return [addDays(today, -29), addDays(today, 1)]
+  if (datePreset === 'quarter') {
+    const quarterStartMonth = Math.floor(safeNow.getMonth() / 3) * 3
+    return [new Date(safeNow.getFullYear(), quarterStartMonth, 1), new Date(safeNow.getFullYear(), quarterStartMonth + 3, 1)]
+  }
+  if (datePreset === 'lastQuarter') {
+    const quarterStartMonth = Math.floor(safeNow.getMonth() / 3) * 3
+    return [new Date(safeNow.getFullYear(), quarterStartMonth - 3, 1), new Date(safeNow.getFullYear(), quarterStartMonth, 1)]
+  }
+  if (datePreset === 'year') return [new Date(safeNow.getFullYear(), 0, 1), new Date(safeNow.getFullYear() + 1, 0, 1)]
+  if (datePreset === 'lastYear') return [new Date(safeNow.getFullYear() - 1, 0, 1), new Date(safeNow.getFullYear(), 0, 1)]
+  return null
+}
+
+function applySalesOrderListFilters(queryBuilder, { statuses, creatorId, dateRange, query, matchingCustomerStoreIds }) {
+  let nextQuery = queryBuilder
+
+  if (statuses.length > 0) {
+    nextQuery = nextQuery.in('status', statuses)
+  }
+
+  if (creatorId) {
+    nextQuery = nextQuery.eq('created_by', creatorId)
+  }
+
+  if (dateRange) {
+    nextQuery = nextQuery
+      .gte('created_at', dateRange[0].toISOString())
+      .lt('created_at', dateRange[1].toISOString())
+  }
+
+  if (query || matchingCustomerStoreIds.length > 0) {
+    const searchParts = []
+    if (query) searchParts.push(`code.ilike.%${query}%`)
+    if (matchingCustomerStoreIds.length > 0) searchParts.push(`customer_store_id.in.(${matchingCustomerStoreIds.join(',')})`)
+    if (searchParts.length > 0) {
+      nextQuery = nextQuery.or(searchParts.join(','))
+    }
+  }
+
+  return nextQuery
 }
 
 export async function listProductsWithStock() {
@@ -240,17 +312,56 @@ export async function updateProductUnit(unitId, payload) {
   return data
 }
 
-export async function listSalesOrders(limit = 100) {
-  const { data: orders, error: orderError } = await supabase
-    .from('sales_orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit)
+export async function listSalesOrders(options = 100) {
+  const legacyArrayResult = typeof options === 'number'
+  const params = legacyArrayResult ? { pageSize: options } : (options || {})
+  const page = Math.max(1, Number(params.page) || 1)
+  const pageSize = Math.max(1, Number(params.pageSize) || 100)
+  const query = normalizeSalesOrderSearchText(params.query)
+  const statuses = Array.isArray(params.statuses)
+    ? params.statuses.map((item) => String(item).trim()).filter(Boolean)
+    : []
+  const creatorId = String(params.creatorId || '').trim()
+  const dateRange = getSalesOrderDateRange(params.datePreset || 'all', params.now)
+  const matchingCustomerStoreIds = Array.isArray(params.matchingCustomerStoreIds)
+    ? params.matchingCustomerStoreIds.map((item) => String(item).trim()).filter(Boolean)
+    : []
+
+  if (Array.isArray(params.statuses) && statuses.length === 0) {
+    return legacyArrayResult ? [] : { orders: [], totalCount: 0 }
+  }
+
+  const countQuery = applySalesOrderListFilters(
+    supabase.from('sales_orders').select('id', { count: 'exact' }).limit(1),
+    { statuses, creatorId, dateRange, query, matchingCustomerStoreIds },
+  )
+
+  const orderQuery = applySalesOrderListFilters(
+    supabase
+      .from('sales_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, (page * pageSize) - 1),
+    { statuses, creatorId, dateRange, query, matchingCustomerStoreIds },
+  )
+
+  const [{ count: totalCount, error: countError }, { data: orders, error: orderError }] = await Promise.all([
+    countQuery,
+    orderQuery,
+  ])
+
+  if (countError) throw countError
 
   if (orderError) throw orderError
 
   const orderIds = (orders || []).map((order) => order.id)
-  if (orderIds.length === 0) return []
+  if (orderIds.length === 0) {
+    const emptyResult = {
+      orders: [],
+      totalCount: Number(totalCount || 0),
+    }
+    return legacyArrayResult ? emptyResult.orders : emptyResult
+  }
 
   const { data: items, error: itemError } = await supabase
     .from('sales_order_items')
@@ -264,10 +375,15 @@ export async function listSalesOrders(limit = 100) {
     itemCountByOrder.set(item.sales_order_id, (itemCountByOrder.get(item.sales_order_id) || 0) + 1)
   }
 
-  return (orders || []).map((order) => ({
-    ...order,
-    itemCount: itemCountByOrder.get(order.id) || 0,
-  }))
+  const result = {
+    orders: (orders || []).map((order) => ({
+      ...order,
+      itemCount: itemCountByOrder.get(order.id) || 0,
+    })),
+    totalCount: Number(totalCount || 0),
+  }
+
+  return legacyArrayResult ? result.orders : result
 }
 
 export async function getSalesOrderDetail(orderId) {
@@ -288,6 +404,32 @@ export async function getSalesOrderDetail(orderId) {
 
   if (itemError) throw itemError
   return { order, items: items || [] }
+}
+
+export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
+  let orderQuery = supabase
+    .from('sales_orders')
+    .select('*')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (from) orderQuery = orderQuery.gte('created_at', from)
+  if (to) orderQuery = orderQuery.lt('created_at', to)
+
+  const { data: orders, error: orderError } = await orderQuery
+  if (orderError) throw orderError
+
+  const orderIds = (orders || []).map((order) => order.id)
+  if (orderIds.length === 0) return { orders: [], items: [] }
+
+  const { data: items, error: itemError } = await supabase
+    .from('sales_order_items')
+    .select('*')
+    .in('sales_order_id', orderIds)
+
+  if (itemError) throw itemError
+  return { orders: orders || [], items: items || [] }
 }
 
 export async function listPurchaseOrders(limit = 100) {

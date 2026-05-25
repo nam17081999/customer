@@ -22,6 +22,13 @@ Rule: các guideline cũ về chữ lớn và tap target là **mặc định cho
 - Mobile: nội dung chính ưu tiên 18-19px trở lên, nút chạm tối thiểu 44px.
 - Desktop: nội dung chính có thể dùng 16-17px, bảng/danh sách có thể dày hơn; hành động chính vẫn nên cao 40-44px.
 
+## Scrollable Lists & Tables
+
+- Khi một danh sách/bảng tự cuộn trong panel/card, chỉ vùng list được `overflow-y-auto`; không thêm page-level scroll nếu màn hình đang dùng layout một màn.
+- Header của danh sách/bảng cuộn phải được ghim bằng `sticky top-0` với `z-index` đủ cao và nền opaque theo dark theme để nội dung không chồng chữ.
+- Header phải giữ text đủ tương phản và không nhỏ hơn mức typography desktop/mobile tương ứng.
+- Khi tạo mới hoặc sửa list có header cột, luôn kiểm tra trạng thái dữ liệu dài hơn viewport để xác nhận header vẫn đứng yên khi cuộn.
+
 ---
 
 ## Typography Mobile

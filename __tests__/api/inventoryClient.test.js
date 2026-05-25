@@ -21,6 +21,7 @@ import {
   getPurchaseOrderDetail,
   getSalesOrderDetail,
   listPurchaseOrders,
+  listSalesOrders,
   listStockMovements,
   updateProduct,
   updateProductUnit,
@@ -138,6 +139,62 @@ describe('inventory client detail/list/update reads', () => {
     })
     expect(from).toHaveBeenNthCalledWith(1, 'sales_orders')
     expect(from).toHaveBeenNthCalledWith(2, 'sales_order_items')
+  })
+
+  it('listSalesOrders chỉ lấy đúng trang hiện tại và đẩy bộ lọc xuống query', async () => {
+    const countQuery = {
+      in: vi.fn(() => countQuery),
+      eq: vi.fn(() => countQuery),
+      gte: vi.fn(() => countQuery),
+      lt: vi.fn(() => countQuery),
+      or: vi.fn(() => countQuery),
+      limit: vi.fn(() => countQuery),
+      then: vi.fn((resolve) => resolve({ count: 1, error: null })),
+    }
+    const listQuery = {
+      in: vi.fn(() => listQuery),
+      eq: vi.fn(() => listQuery),
+      gte: vi.fn(() => listQuery),
+      lt: vi.fn(() => listQuery),
+      or: vi.fn(() => listQuery),
+      order: vi.fn(() => listQuery),
+      range: vi.fn(() => listQuery),
+      then: vi.fn((resolve) => resolve({ data: [{ id: 'order-1' }], error: null })),
+    }
+    const countSelect = vi.fn(() => countQuery)
+    const orderSelect = vi.fn(() => listQuery)
+    const itemIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'item-1', sales_order_id: 'order-1' }],
+      error: null,
+    })
+
+    from
+      .mockReturnValueOnce({ select: countSelect })
+      .mockReturnValueOnce({ select: orderSelect })
+      .mockReturnValueOnce({ select: vi.fn(() => ({ in: itemIn })) })
+
+    await expect(listSalesOrders({
+      page: 2,
+      pageSize: 10,
+      query: 'HD079596',
+      statuses: ['active'],
+      creatorId: 'user-1',
+      datePreset: 'all',
+      matchingCustomerStoreIds: ['store-1'],
+    })).resolves.toEqual({
+      orders: [{ id: 'order-1', itemCount: 1 }],
+      totalCount: 1,
+    })
+
+    expect(from).toHaveBeenNthCalledWith(1, 'sales_orders')
+    expect(countSelect).toHaveBeenCalledWith('id', { count: 'exact' })
+    expect(orderSelect).toHaveBeenCalledWith('*')
+    expect(listQuery.range).toHaveBeenCalledWith(10, 19)
+    expect(listQuery.in).toHaveBeenCalledWith('status', ['active'])
+    expect(listQuery.eq).toHaveBeenCalledWith('created_by', 'user-1')
+    expect(listQuery.or).toHaveBeenCalledWith('code.ilike.%hd079596%,customer_store_id.in.(store-1)')
+    expect(from).toHaveBeenNthCalledWith(3, 'sales_order_items')
+    expect(itemIn).toHaveBeenCalledWith('sales_order_id', ['order-1'])
   })
 
   it('listPurchaseOrders trả itemCount theo dòng phiếu', async () => {
