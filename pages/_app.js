@@ -5,7 +5,6 @@ import Head from "next/head";
 import ErrorBoundary from "@/components/error-boundary";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
-import { getThemeInitScript } from "@/helper/theme";
 
 export default function App({ Component, pageProps }) {
   const { pathname } = useRouter()
@@ -18,7 +17,6 @@ export default function App({ Component, pageProps }) {
         <meta name="description" content="Ứng dụng quản lý và theo dõi cửa hàng cho đội ngũ sales" />
         <meta name="theme-color" content="#000000" />
         <link rel="manifest" href="/manifest.json" />
-        <script dangerouslySetInnerHTML={{ __html: getThemeInitScript() }} />
       </Head>
       <ThemeProvider>
         <AuthProvider>

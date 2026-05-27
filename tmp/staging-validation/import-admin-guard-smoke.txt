@@ -1,0 +1,3 @@
+Initialising login role...
+unexpected status 400: {"message":"Failed to run sql query: ERROR:  42501: Admin permission required\nCONTEXT:  PL/pgSQL function import_products_from_preview(jsonb,text,uuid) line 21 at RAISE\n"}
+Try rerunning the command with --debug to troubleshoot the error.

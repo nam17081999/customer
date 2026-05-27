@@ -7,8 +7,9 @@ import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { formatMoney, listPurchaseOrders } from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
 import { getOrderInventoryWorkbenchClasses, summarizePurchaseOrders } from '@/helper/orderInventoryFlow'
+import { loadPurchaseOrdersList } from '@/services/inventory/inventory-page-service'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -38,9 +39,9 @@ export default function PurchaseOrdersPage() {
     setLoading(true)
     setError('')
     try {
-      setOrders(await listPurchaseOrders(200))
+      setOrders((await loadPurchaseOrdersList()).orders)
     } catch (err) {
-      setError(err?.message || 'Không tải được phiếu nhập.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được phiếu nhập.')
       setOrders([])
     } finally {
       setLoading(false)

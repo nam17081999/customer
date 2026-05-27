@@ -8,11 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import {
-  createProductWithUnits,
-  formatMoney,
-  listProductsWithStock,
-} from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
+import { getOperatorErrorMessage } from '@/helper/operatorErrors'
+import { createProductFromForm, loadProductManagementData } from '@/services/inventory/inventory-page-service'
 import {
   filterInventoryProducts,
   formatInventoryQuantity,
@@ -68,10 +66,10 @@ export default function InventoryProductsPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await listProductsWithStock()
+      const { products: data } = await loadProductManagementData()
       setProducts(data)
     } catch (err) {
-      setError(err?.message || 'Không tải được hàng hóa.')
+      setError(getOperatorErrorMessage(err, 'Không tải được hàng hóa.'))
       setProducts([])
     } finally {
       setLoading(false)
@@ -103,12 +101,12 @@ export default function InventoryProductsPage() {
     setError('')
     setMessage('')
     try {
-      await createProductWithUnits({ ...form, createdBy: user?.id || null })
+      await createProductFromForm({ ...form, createdBy: user?.id || null })
       setForm(EMPTY_FORM)
       setMessage('Đã thêm hàng hóa.')
       await loadProducts()
     } catch (err) {
-      setError(err?.message || 'Không thêm được hàng hóa.')
+      setError(getOperatorErrorMessage(err, 'Không thêm được hàng hóa.'))
     } finally {
       setSubmitting(false)
     }

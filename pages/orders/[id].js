@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Head from 'next/head'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ArrowLeft, Printer, RefreshCw, XCircle } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
-import { getOrRefreshStores } from '@/lib/storeCache'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { cancelSalesOrder, formatMoney, getSalesOrderDetail, listProductsWithStock } from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
 import { buildSalesOrderInvoiceModel, formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { cancelSalesOrderById, loadSalesOrderDetailData } from '@/services/inventory/inventory-page-service'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -36,6 +37,7 @@ export default function SalesOrderDetailPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const cancellingRef = useRef(false)
   const [error, setError] = useState('')
 
   const layoutClasses = useMemo(() => getOrderInventoryWorkbenchClasses(), [])
@@ -67,17 +69,13 @@ export default function SalesOrderDetailPage() {
     setLoading(true)
     setError('')
     try {
-      const [detail, storeRows, productRows] = await Promise.all([
-        getSalesOrderDetail(id),
-        getOrRefreshStores(),
-        listProductsWithStock(),
-      ])
+      const { detail, stores: storeRows, products: productRows } = await loadSalesOrderDetailData(id)
       setOrder(detail.order)
       setItems(detail.items)
       setStores(storeRows || [])
       setProducts(productRows || [])
     } catch (err) {
-      setError(err?.message || 'Không tải được chi tiết đơn hàng.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được chi tiết đơn hàng.')
     } finally {
       setLoading(false)
     }
@@ -89,16 +87,18 @@ export default function SalesOrderDetailPage() {
   }, [pageReady, loadDetail])
 
   const handleCancel = async () => {
-    if (!order?.id || order.status === 'cancelled' || cancelling) return
+    if (!order?.id || order.status === 'cancelled' || cancelling || cancellingRef.current) return
     if (!window.confirm(`Hủy đơn ${order.code}? Tồn kho sẽ được cộng lại.`)) return
+    cancellingRef.current = true
     setCancelling(true)
     setError('')
     try {
-      await cancelSalesOrder(order.id, user?.id || null)
+      await cancelSalesOrderById(order.id, user?.id || null)
       await loadDetail()
     } catch (err) {
-      setError(err?.message || 'Không hủy được đơn hàng.')
+      setError(err?.operatorMessage || err?.message || 'Không hủy được đơn hàng.')
     } finally {
+      cancellingRef.current = false
       setCancelling(false)
     }
   }
@@ -269,7 +269,7 @@ export default function SalesOrderDetailPage() {
                     <p>STK: <span className="font-bold">{invoice.paymentInfo.accountNumber}</span></p>
                     <p>Số tiền: <span className="font-bold">{formatMoney(order.total_amount)} VNĐ</span></p>
                   </div>
-                  <img src={invoice.paymentQrUrl} alt={`QR thanh toán ${order.code}`} className="h-24 w-24 border border-gray-900 object-contain p-1" />
+                  <Image src={invoice.paymentQrUrl} alt={`QR thanh toán ${order.code}`} width={96} height={96} unoptimized className="h-24 w-24 border border-gray-900 object-contain p-1" />
                 </div>
 
                 <div className="mt-6 grid grid-cols-3 gap-4 text-center">

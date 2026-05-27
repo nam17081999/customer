@@ -9,14 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
-import { getOrRefreshStores } from '@/lib/storeCache'
-import { cancelSalesOrder, formatMoney, getSalesOrderDetail, listProductsWithStock, listSalesOrders } from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
 import {
   buildSalesOrderInvoiceModel,
   formatInventoryQuantity,
   getOrderInventoryWorkbenchClasses,
   summarizeSalesOrders,
 } from '@/helper/orderInventoryFlow'
+import { cancelSalesOrderById, loadProductManagementData, loadSalesOrderDetailData, loadSalesOrdersIndexData } from '@/services/inventory/inventory-page-service'
 
 const ORDER_FLASH_MESSAGE_KEY = 'storevis:order-flash-message'
 const ORDER_SEARCH_DEBOUNCE_MS = 300
@@ -233,6 +233,7 @@ export default function OrdersListPage() {
   const [stores, setStores] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancellingId, setCancellingId] = useState('')
+  const cancellingRef = useRef('')
   const [error, setError] = useState('')
   const [msgState, setMsgState] = useState(null)
   const [query, setQuery] = useState('')
@@ -319,27 +320,23 @@ export default function OrdersListPage() {
     setLoading(true)
     setError('')
     try {
-      const storeRows = await getOrRefreshStores()
-      if (ordersRequestIdRef.current !== requestId) return
-      setStores(storeRows || [])
-
-      const matchingCustomerStoreIds = getMatchingCustomerStoreIds(storeRows || [], debouncedQuery)
-      const { orders: orderRows, totalCount } = await listSalesOrders({
+      const { stores: storeRows, orders: orderRows, totalCount } = await loadSalesOrdersIndexData({
         page: orderPage,
         pageSize: orderPageSize,
         query: debouncedQuery,
         statuses: statusFilters,
         datePreset,
         creatorId: creatorFilter === 'all' ? '' : creatorFilter,
-        matchingCustomerStoreIds,
-      })
+      }, { matchCustomerStoreIds: getMatchingCustomerStoreIds })
+      if (ordersRequestIdRef.current !== requestId) return
+      setStores(storeRows || [])
 
       if (ordersRequestIdRef.current !== requestId) return
 
       setOrders(orderRows || [])
       setOrdersTotalCount(Number(totalCount || 0))
     } catch (err) {
-      setError(err?.message || 'Không tải được danh sách đơn hàng.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được danh sách đơn hàng.')
       setOrders([])
       setOrdersTotalCount(0)
     } finally {
@@ -351,7 +348,7 @@ export default function OrdersListPage() {
 
   const ensureProductsLoaded = useCallback(async () => {
     if (products.length > 0) return products
-    const productRows = await listProductsWithStock()
+    const { products: productRows } = await loadProductManagementData()
     setProducts(productRows || [])
     return productRows || []
   }, [products])
@@ -569,8 +566,8 @@ export default function OrdersListPage() {
     setError('')
 
     try {
-      const [detail, productRows] = await Promise.all([
-        getSalesOrderDetail(orderId),
+      const [{ detail }, productRows] = await Promise.all([
+        loadSalesOrderDetailData(orderId),
         ensureProductsLoaded(),
       ])
 
@@ -583,7 +580,7 @@ export default function OrdersListPage() {
       }))
     } catch (err) {
       if (detailRequestIdRef.current === requestId) {
-        setError(err?.message || 'Không tải được chi tiết đơn hàng.')
+        setError(err?.operatorMessage || err?.message || 'Không tải được chi tiết đơn hàng.')
       }
     } finally {
       if (detailRequestIdRef.current === requestId) {
@@ -593,17 +590,19 @@ export default function OrdersListPage() {
   }, [ensureProductsLoaded, expandedOrderId, orderDetailCache])
 
   const handleCancelOrder = async (order) => {
-    if (!order?.id || order.status === 'cancelled' || cancellingId) return
+    if (!order?.id || order.status === 'cancelled' || cancellingId || cancellingRef.current) return
     if (!window.confirm(`Hủy đơn ${order.code}? Tồn kho sẽ được cộng lại theo các dòng hàng trong đơn.`)) return
 
+    cancellingRef.current = order.id
     setCancellingId(order.id)
     setError('')
     try {
-      await cancelSalesOrder(order.id, user?.id || null)
+      await cancelSalesOrderById(order.id, user?.id || null)
       await loadOrders()
     } catch (err) {
-      setError(err?.message || 'Không hủy được đơn hàng.')
+      setError(err?.operatorMessage || err?.message || 'Không hủy được đơn hàng.')
     } finally {
+      cancellingRef.current = ''
       setCancellingId('')
     }
   }
@@ -615,7 +614,7 @@ export default function OrdersListPage() {
     try {
       const [productRows, detailRows] = await Promise.all([
         ensureProductsLoaded(),
-        Promise.all(selectedOrders.map((order) => getSalesOrderDetail(order.id))),
+        Promise.all(selectedOrders.map((order) => loadSalesOrderDetailData(order.id).then((result) => result.detail))),
       ])
       const nextInvoices = detailRows.map((detail) => {
         const customer = storesById.get(String(detail.order.customer_store_id))
@@ -629,7 +628,7 @@ export default function OrdersListPage() {
       setPrintInvoices(nextInvoices)
       window.setTimeout(() => window.print(), 100)
     } catch (err) {
-      setError(err?.message || 'Không chuẩn bị được dữ liệu in đơn.')
+      setError(err?.operatorMessage || err?.message || 'Không chuẩn bị được dữ liệu in đơn.')
     } finally {
       setPrinting(false)
     }

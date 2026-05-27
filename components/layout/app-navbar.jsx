@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
+import { buildCommandSearchResults, getOperatorShortcutHref, OPERATOR_QUICK_ACTIONS } from '@/helper/operatorWorkflow'
 import {
   AccountIcon,
   DashboardIcon,
@@ -27,6 +28,10 @@ export default function AppNavbar() {
   const pathname = usePathname()
   const { isAdmin, isTelesale } = useAuth() || {}
   const [searchHref, setSearchHref] = useState('/')
+  const [quickOpen, setQuickOpen] = useState(false)
+  const [quickQuery, setQuickQuery] = useState('')
+  const [commandData, setCommandData] = useState({ products: [], customers: [], orders: [], loaded: false })
+  const [serverCommandResults, setServerCommandResults] = useState([])
   const currentPath = pathname || ''
   const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : 'Người dùng'
   const accountMobileLabel = isAdmin ? 'Admin' : isTelesale ? 'Tele' : 'ND'
@@ -57,6 +62,61 @@ export default function AppNavbar() {
   ]
 
   const navLinks = isAdmin ? adminLinks : isTelesale ? telesaleLinks : guestLinks
+  const fallbackCommandResults = buildCommandSearchResults({
+    query: quickQuery,
+    actions: OPERATOR_QUICK_ACTIONS,
+    products: commandData.products,
+    customers: commandData.customers,
+    orders: commandData.orders,
+  })
+  const commandResults = quickQuery.trim() && serverCommandResults.length > 0 ? serverCommandResults : fallbackCommandResults
+
+  useEffect(() => {
+    if (!quickOpen || !isAdmin || commandData.loaded) return
+    let cancelled = false
+    Promise.all([import('@/api/inventory/inventory-client'), import('@/lib/storeCache')]).then(async ([inventoryClient, storeCache]) => {
+      const [products, customers, orders] = await Promise.all([
+        inventoryClient.listProductsWithStock().catch(() => []),
+        storeCache.getOrRefreshStores().catch(() => []),
+        inventoryClient.listSalesOrders(30).catch(() => []),
+      ])
+      if (cancelled) return
+      setCommandData({
+        products: (products || []).slice(0, 200),
+        customers: customers || [],
+        orders: orders || [],
+        loaded: true,
+      })
+    })
+    return () => { cancelled = true }
+  }, [commandData.loaded, isAdmin, quickOpen])
+
+  useEffect(() => {
+    if (!quickOpen || !isAdmin || !quickQuery.trim()) {
+      setServerCommandResults([])
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      import('@/api/inventory/inventory-client')
+        .then((inventoryClient) => inventoryClient.globalOperatorSearch(quickQuery, 12))
+        .then((rows) => {
+          if (cancelled) return
+          setServerCommandResults((rows || []).map((row) => ({
+            type: row.entity_type,
+            id: row.entity_id,
+            label: row.title,
+            subtitle: row.subtitle,
+            href: row.href,
+          })))
+        })
+        .catch(() => { if (!cancelled) setServerCommandResults([]) })
+    }, 180)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [isAdmin, quickOpen, quickQuery])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -75,13 +135,28 @@ export default function AppNavbar() {
       syncSearchHref(window.sessionStorage.getItem('storevis:last-search-route') || '/')
     }
 
+    const handleKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && String(event.key || '').toLowerCase() === 'k') {
+        event.preventDefault()
+        setQuickOpen((prev) => !prev)
+        return
+      }
+      const href = getOperatorShortcutHref(event)
+      if (href) {
+        event.preventDefault()
+        window.location.assign(href)
+      }
+    }
+
     handlePageShow()
     window.addEventListener('storevis:search-route-changed', handleSearchRouteChanged)
     window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('keydown', handleKeyDown)
 
     return () => {
       window.removeEventListener('storevis:search-route-changed', handleSearchRouteChanged)
       window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
 
@@ -94,6 +169,16 @@ export default function AppNavbar() {
           </Link>
 
           <div className="ml-auto hidden items-center gap-1 sm:flex">
+            {isAdmin && (
+              <button
+                type="button"
+                className="rounded-full border border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                onClick={() => setQuickOpen((prev) => !prev)}
+                aria-expanded={quickOpen}
+              >
+                Ctrl K
+              </button>
+            )}
             {navLinks.map(({ href, active, label, Icon, badge }) => (
               <Link
                 key={href}
@@ -109,6 +194,24 @@ export default function AppNavbar() {
             ))}
           </div>
         </div>
+        {isAdmin && quickOpen && (
+          <div className="absolute right-4 top-13 z-[1100] w-80 rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl shadow-black/50">
+            <input
+              className="mb-2 h-10 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus:border-sky-500"
+              value={quickQuery}
+              onChange={(event) => setQuickQuery(event.target.value)}
+              placeholder="Tìm lệnh, màn hình..."
+              autoFocus
+            />
+            {commandResults.map((result) => (
+              <Link key={`${result.type}-${result.id}`} href={result.href} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-900" onClick={() => { setQuickOpen(false); setQuickQuery('') }}>
+                <span>{result.label}</span>
+                <span className="text-xs text-slate-500">{result.subtitle}</span>
+              </Link>
+            ))}
+            {commandResults.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">Không có kết quả.</p>}
+          </div>
+        )}
       </nav>
 
       <div className="safe-area-bottom fixed inset-x-0 bottom-0 z-[1000] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:hidden">

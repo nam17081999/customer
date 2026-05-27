@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { Plus, Search, Trash2, X } from 'lucide-react'
@@ -7,14 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
-import { getOrRefreshStores } from '@/lib/storeCache'
-import {
-  buildDocumentCode,
-  createSalesOrder,
-  formatMoney,
-  listProductsWithStock,
-  toNumber,
-} from '@/api/inventory/inventory-client'
+import { buildDocumentCode, formatMoney, toNumber } from '@/helper/inventoryFormat'
+import { loadSalesOrderEntryData, submitSalesOrderFromForm } from '@/services/inventory/inventory-page-service'
 import {
   addSalesOrderDraft,
   addSalesOrderDraftForStore,
@@ -22,11 +16,15 @@ import {
   closeSalesOrderDraft,
   createSalesOrderDraft,
   createSalesOrderLine,
+  createMutationRequestId,
   filterInventoryProducts,
+  assertSalesOrderStockAvailable,
+  getSalesOrderStockIssues,
   getSalesOrderCreateRedirect,
   parseSalesOrderDraftStoragePayload,
   updateSalesOrderDraft,
 } from '@/helper/orderInventoryFlow'
+import { getRecentProductsFromOrderDrafts, mergeSalesOrderLine } from '@/helper/operatorWorkflow'
 
 const SALES_ORDER_DRAFTS_STORAGE_KEY = 'storevis:sales-order-drafts:v1'
 const ORDER_FLASH_MESSAGE_KEY = 'storevis:order-flash-message'
@@ -67,6 +65,7 @@ export default function NewSalesOrderPage() {
   const [productQuery, setProductQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [error, setError] = useState('')
   const [msgState, setMsgState] = useState(null)
 
@@ -87,10 +86,7 @@ export default function NewSalesOrderPage() {
     setLoading(true)
     setError('')
     try {
-      const [productRows, storeRows] = await Promise.all([
-        listProductsWithStock(),
-        getOrRefreshStores(),
-      ])
+      const { products: productRows, stores: storeRows } = await loadSalesOrderEntryData()
       setProducts(productRows)
       setStores(storeRows || [])
       setDrafts((prev) => {
@@ -114,7 +110,7 @@ export default function NewSalesOrderPage() {
         return [firstDraft]
       })
     } catch (err) {
-      setError(err?.message || 'Không tải được dữ liệu lên đơn.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được dữ liệu lên đơn.')
     } finally {
       setDraftStorageReady(true)
       setLoading(false)
@@ -131,6 +127,7 @@ export default function NewSalesOrderPage() {
     drafts.find((draft) => draft.id === activeDraftId) || drafts[0] || null
   ), [activeDraftId, drafts])
   const selectedCustomer = useMemo(() => stores.find((store) => String(store.id) === String(activeDraft?.customerStoreId)), [stores, activeDraft?.customerStoreId])
+  const recentProducts = useMemo(() => getRecentProductsFromOrderDrafts(drafts, productsById, 6), [drafts, productsById])
 
   useEffect(() => {
     if (!pageReady || !draftStorageReady || drafts.length === 0 || typeof window === 'undefined') return
@@ -234,8 +231,18 @@ export default function NewSalesOrderPage() {
     if (!activeDraft) return
     const product = productId ? productsById.get(productId) : null
     const nextLine = product ? createSalesOrderLine([product]) : createSalesOrderLine(products)
-    patchActiveDraft({ items: [...activeDraft.items, nextLine] })
+    const result = mergeSalesOrderLine(activeDraft.items, nextLine)
+    patchActiveDraft({ items: result.items })
+    if (result.merged) showSuccessMessage('Đã cộng dồn hàng trùng trong đơn.')
     setProductQuery('')
+  }
+
+  const handleProductSearchKeyDown = (event) => {
+    if (event.key !== 'Enter') return
+    const firstProduct = filteredProducts[0]
+    if (!firstProduct) return
+    event.preventDefault()
+    addProductLine(firstProduct.id)
   }
 
   const removeLine = (index) => {
@@ -279,19 +286,26 @@ export default function NewSalesOrderPage() {
     }
   }, [activeDraft])
 
+  const stockIssues = useMemo(() => getSalesOrderStockIssues(activeDraft?.items || [], productsById), [activeDraft?.items, productsById])
+
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (submitting || !activeDraft) return
+    if (submittingRef.current || submitting || !activeDraft) return
+    submittingRef.current = true
     setSubmitting(true)
     setError('')
     try {
-      await createSalesOrder({
+      assertSalesOrderStockAvailable(activeDraft.items, productsById)
+      const requestId = activeDraft.requestId || createMutationRequestId('sales')
+      if (!activeDraft.requestId) patchActiveDraft({ requestId })
+      await submitSalesOrderFromForm({
         code: activeDraft.code,
         customerStoreId: activeDraft.customerStoreId,
         note: activeDraft.note,
         discountAmount: activeDraft.discountAmount,
         items: activeDraft.items,
         createdBy: user?.id || null,
+        requestId,
       })
 
       const successText = `Đã lên đơn ${activeDraft.code || ''} thành công.`.replace(/\s+/g, ' ').trim()
@@ -316,8 +330,9 @@ export default function NewSalesOrderPage() {
         router.push(getSalesOrderCreateRedirect())
       }
     } catch (err) {
-      setError(err?.message || 'Không tạo được đơn hàng.')
+      setError(err?.operatorMessage || err?.message || 'Không tạo được đơn hàng.')
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -343,6 +358,7 @@ export default function NewSalesOrderPage() {
                   className="h-11 border-gray-700 bg-gray-900 pl-10 text-gray-100 placeholder:text-gray-500"
                   value={productQuery}
                   onChange={(event) => setProductQuery(event.target.value)}
+                  onKeyDown={handleProductSearchKeyDown}
                   placeholder="Tìm hàng hóa"
                 />
                 {productQuery && filteredProducts.length > 0 && (
@@ -403,10 +419,25 @@ export default function NewSalesOrderPage() {
                 <span className="text-base font-semibold">admin</span>
               </div>
             </div>
+            {recentProducts.length > 0 && !productQuery && (
+              <div className="flex gap-2 overflow-x-auto border-t border-gray-900 px-3 py-2">
+                <span className="shrink-0 py-2 text-sm text-gray-500">Gần đây</span>
+                {recentProducts.map((product) => (
+                  <button key={product.id} type="button" className="shrink-0 rounded-full border border-gray-800 bg-gray-900 px-3 py-2 text-sm text-gray-200 hover:border-gray-600" onClick={() => addProductLine(product.id)}>
+                    {product.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
             <div className="border-b border-red-900 bg-red-950 px-4 py-3 text-red-100">{error}</div>
+          )}
+          {stockIssues.length > 0 && !error && (
+            <div className="border-b border-amber-900 bg-amber-950 px-4 py-3 text-amber-100">
+              {stockIssues.map((issue) => issue.message).join('; ')}. Vui lòng giảm số lượng hoặc nhập hàng trước.
+            </div>
           )}
 
           <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -8,14 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import {
-  buildDocumentCode,
-  createPurchaseOrder,
-  formatMoney,
-  listProductsWithStock,
-  toNumber,
-} from '@/api/inventory/inventory-client'
-import { getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { buildDocumentCode, formatMoney, toNumber } from '@/helper/inventoryFormat'
+import { loadPurchaseEntryData, submitPurchaseOrderFromForm } from '@/services/inventory/inventory-page-service'
+import { createMutationRequestId, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
 
 function newLine(products) {
   const product = products[0] || null
@@ -37,6 +32,8 @@ export default function NewPurchaseOrderPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const requestIdRef = useRef(createMutationRequestId('purchase'))
   const [error, setError] = useState('')
   const [code, setCode] = useState('')
   const [supplierName, setSupplierName] = useState('')
@@ -60,12 +57,12 @@ export default function NewPurchaseOrderPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await listProductsWithStock()
+      const { products: data } = await loadPurchaseEntryData()
       setProducts(data)
       setItems((prev) => (prev.length > 0 ? prev : [newLine(data)]))
       setCode((prev) => prev || buildDocumentCode('PN'))
     } catch (err) {
-      setError(err?.message || 'Không tải được hàng hóa.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được hàng hóa.')
     } finally {
       setLoading(false)
     }
@@ -111,21 +108,25 @@ export default function NewPurchaseOrderPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (submitting) return
+    if (submittingRef.current || submitting) return
+    submittingRef.current = true
     setSubmitting(true)
     setError('')
     try {
-      await createPurchaseOrder({
+      await submitPurchaseOrderFromForm({
         code,
         supplierName,
         note,
         items,
         createdBy: user?.id || null,
+        requestId: requestIdRef.current,
       })
+      requestIdRef.current = createMutationRequestId('purchase')
       router.push('/inventory/products')
     } catch (err) {
-      setError(err?.message || 'Không tạo được phiếu nhập.')
+      setError(err?.operatorMessage || err?.message || 'Không tạo được phiếu nhập.')
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }

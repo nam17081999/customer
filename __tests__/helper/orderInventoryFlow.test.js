@@ -10,10 +10,12 @@ import {
   buildSalesOrderInvoiceModel,
   buildPurchaseOrderRpcPayload,
   buildSalesOrderRpcPayload,
+  assertSalesOrderStockAvailable,
   buildSalesOrderPaymentQrUrl,
   closeSalesOrderDraft,
   createSalesOrderDraft,
   createSalesOrderLine,
+  createMutationRequestId,
   filterInventoryProducts,
   filterSalesOrders,
   filterStockMovements,
@@ -22,6 +24,7 @@ import {
   getInventoryProductCategories,
   getOrderInventoryWorkbenchClasses,
   getSalesOrderCreateRedirect,
+  getSalesOrderStockIssues,
   getSalesOrderPaymentInfo,
   parseSalesOrderDraftStoragePayload,
   summarizeInventoryProducts,
@@ -38,6 +41,7 @@ describe('orderInventoryFlow purchase payload', () => {
       supplierName: '  Nhà cung cấp A ',
       note: ' nhập đầu ngày ',
       createdBy: 'user-1',
+      requestId: 'purchase_req_1',
       items: [
         {
           productId: 'product-1',
@@ -71,6 +75,7 @@ describe('orderInventoryFlow purchase payload', () => {
           note: 'thùng 12',
         },
       ],
+      p_request_id: 'purchase_req_1',
     })
   })
 
@@ -79,6 +84,18 @@ describe('orderInventoryFlow purchase payload', () => {
       code: 'PN002',
       items: [{ productId: 'product-1', productUnitId: 'unit-1', quantity: '0', unitCost: '1000' }],
     })).toThrow('Vui lòng thêm ít nhất một dòng hàng nhập.')
+  })
+
+  it('chặn số nhập sai và quy đổi không dương thay vì tự đổi thành 0/1', () => {
+    expect(() => buildPurchaseOrderRpcPayload({
+      code: 'PN003',
+      items: [{ productId: 'p1', productUnitId: 'u1', quantity: 'abc', conversionToBaseQty: '12', unitCost: '1000' }],
+    })).toThrow('Số lượng không hợp lệ.')
+
+    expect(() => buildPurchaseOrderRpcPayload({
+      code: 'PN004',
+      items: [{ productId: 'p1', productUnitId: 'u1', quantity: '1', conversionToBaseQty: '0', unitCost: '1000' }],
+    })).toThrow('Quy đổi phải lớn hơn 0.')
   })
 })
 
@@ -90,6 +107,7 @@ describe('orderInventoryFlow sales payload', () => {
       note: ' giao chiều ',
       discountAmount: '5000',
       createdBy: 'user-1',
+      requestId: 'sales_req_1',
       items: [
         {
           productId: 'product-1',
@@ -118,7 +136,12 @@ describe('orderInventoryFlow sales payload', () => {
           note: '3 thùng',
         },
       ],
+      p_request_id: 'sales_req_1',
     })
+  })
+
+  it('tạo mutation request id ổn định định dạng để dùng idempotency', () => {
+    expect(createMutationRequestId('Sales Order')).toMatch(/^salesorder_/)
   })
 
   it('chặn đơn bán thiếu khách hoặc giảm giá lớn hơn tạm tính', () => {
@@ -134,8 +157,70 @@ describe('orderInventoryFlow sales payload', () => {
     })).toThrow('Giảm giá không được lớn hơn tạm tính.')
   })
 
+  it('làm tròn tiền 2 số và số lượng/quy đổi an toàn cho RPC numeric', () => {
+    const payload = buildSalesOrderRpcPayload({
+      customerStoreId: 'store-1',
+      discountAmount: '0.015',
+      items: [{
+        productId: 'p1',
+        productUnitId: 'u1',
+        quantity: '1.23456',
+        conversionToBaseQty: '10.1234567',
+        unitPrice: '1000.555',
+      }],
+    })
+
+    expect(payload.p_order.discount_amount).toBe(0.02)
+    expect(payload.p_items[0]).toMatchObject({
+      quantity: 1.235,
+      conversion_to_base_qty: 10.123457,
+      unit_price: 1000.56,
+    })
+  })
+
+  it('chặn giá bán sai rõ ràng trước khi gọi RPC', () => {
+    expect(() => buildSalesOrderRpcPayload({
+      customerStoreId: 'store-1',
+      items: [{ productId: 'p1', productUnitId: 'u1', quantity: '1', unitPrice: '12x' }],
+    })).toThrow('Giá bán không hợp lệ.')
+  })
+
   it('đưa người dùng về danh sách đơn sau khi lưu đơn', () => {
     expect(getSalesOrderCreateRedirect()).toBe('/orders')
+  })
+})
+
+describe('orderInventoryFlow sales stock guard', () => {
+  const productsById = new Map([
+    ['p1', { id: 'p1', name: 'Nước suối', base_unit_name: 'chai', onHandBaseQty: 20 }],
+    ['p2', { id: 'p2', name: 'Mì gói', base_unit_name: 'gói', onHandBaseQty: 5 }],
+  ])
+
+  it('cộng dồn nhiều dòng cùng sản phẩm theo đơn vị gốc', () => {
+    expect(getSalesOrderStockIssues([
+      { productId: 'p1', quantity: '1', conversionToBaseQty: '12' },
+      { productId: 'p1', quantity: '10', conversionToBaseQty: '1' },
+      { productId: 'p2', quantity: '2', conversionToBaseQty: '1' },
+    ], productsById)).toEqual([
+      {
+        productId: 'p1',
+        productName: 'Nước suối',
+        requiredBaseQty: 22,
+        onHandBaseQty: 20,
+        unitName: 'chai',
+        message: 'Nước suối thiếu 2 chai',
+      },
+    ])
+  })
+
+  it('chặn submit khi tồn kho không đủ trước khi gọi RPC', () => {
+    expect(() => assertSalesOrderStockAvailable([
+      { productId: 'p2', quantity: '6', conversionToBaseQty: '1' },
+    ], productsById)).toThrow('Không đủ tồn kho: Mì gói thiếu 1 gói.')
+
+    expect(assertSalesOrderStockAvailable([
+      { productId: 'p2', quantity: '5', conversionToBaseQty: '1' },
+    ], productsById)).toBe(true)
   })
 })
 
@@ -555,6 +640,7 @@ describe('orderInventoryFlow sales order drafts', () => {
           customerStoreId: '456',
           customerQuery: '',
           note: 'ghi chú',
+          requestId: expect.stringMatching(/^sales_/),
           discountAmount: '0',
           items: [
             {

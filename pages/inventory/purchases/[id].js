@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
@@ -7,8 +7,9 @@ import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { cancelPurchaseOrder, formatMoney, getPurchaseOrderDetail, listProductsWithStock } from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
 import { formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { cancelPurchaseOrderById, loadPurchaseOrderDetailData } from '@/services/inventory/inventory-page-service'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -27,6 +28,7 @@ export default function PurchaseOrderDetailPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [cancelling, setCancelling] = useState(false)
+  const cancellingRef = useRef(false)
   const [error, setError] = useState('')
   const layoutClasses = useMemo(() => getOrderInventoryWorkbenchClasses(), [])
   const productsById = useMemo(() => new Map(products.map((product) => [String(product.id), product])), [products])
@@ -43,12 +45,12 @@ export default function PurchaseOrderDetailPage() {
     setLoading(true)
     setError('')
     try {
-      const [detail, productRows] = await Promise.all([getPurchaseOrderDetail(id), listProductsWithStock()])
+      const { detail, products: productRows } = await loadPurchaseOrderDetailData(id)
       setOrder(detail.order)
       setItems(detail.items)
       setProducts(productRows || [])
     } catch (err) {
-      setError(err?.message || 'Không tải được chi tiết phiếu nhập.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được chi tiết phiếu nhập.')
     } finally {
       setLoading(false)
     }
@@ -57,16 +59,18 @@ export default function PurchaseOrderDetailPage() {
   useEffect(() => { if (pageReady) loadDetail() }, [pageReady, loadDetail])
 
   const handleCancel = async () => {
-    if (!order?.id || order.cancelled_at || cancelling) return
+    if (!order?.id || order.cancelled_at || cancelling || cancellingRef.current) return
     if (!window.confirm(`Hủy phiếu nhập ${order.code}? Tồn kho sẽ bị trừ lại nếu còn đủ tồn.`)) return
+    cancellingRef.current = true
     setCancelling(true)
     setError('')
     try {
-      await cancelPurchaseOrder(order.id, user?.id || null)
+      await cancelPurchaseOrderById(order.id, user?.id || null)
       await loadDetail()
     } catch (err) {
-      setError(err?.message || 'Không hủy được phiếu nhập.')
+      setError(err?.operatorMessage || err?.message || 'Không hủy được phiếu nhập.')
     } finally {
+      cancellingRef.current = false
       setCancelling(false)
     }
   }

@@ -1,0 +1,12 @@
+Initialising login role...
+DRY RUN: migrations will *not* be pushed to the database.
+Connecting to remote database...
+Would push these migrations:
+ • 20260525000000_harden_order_inventory_mutations.sql
+ • 20260525010000_inventory_accounting_reconciliation.sql
+ • 20260526000000_reporting_aggregate_rpcs.sql
+ • 20260526010000_global_search_rpc.sql
+ • 20260526020000_import_audit_operations.sql
+Finished supabase db push.
+A new version of Supabase CLI is available: v2.101.0 (currently installed v2.98.2)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

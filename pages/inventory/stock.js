@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { RefreshCw, Search } from 'lucide-react'
+import { RefreshCw, Search, ShieldCheck, Wrench } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { listProductsWithStock, listStockMovements } from '@/api/inventory/inventory-client'
+import {
+  loadInventoryStockDashboard,
+  repairStockFromLedgerAndReload,
+  runReconciliationCheckAndReload,
+} from '@/services/inventory/inventory-page-service'
 import { filterStockMovements, formatInventoryQuantity, formatProductStock, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
 
 function formatDateTime(value) {
@@ -28,19 +32,24 @@ const TYPE_LABEL = {
 
 export default function StockReportPage() {
   const router = useRouter()
-  const { isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
+  const { user, isAdmin, isAuthenticated, loading: authLoading } = useAuth() || {}
   const [pageReady, setPageReady] = useState(false)
   const [products, setProducts] = useState([])
   const [movements, setMovements] = useState([])
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
   const [loading, setLoading] = useState(true)
+  const [reconciling, setReconciling] = useState(false)
+  const [repairing, setRepairing] = useState(false)
   const [error, setError] = useState('')
+  const [reconciliationRows, setReconciliationRows] = useState([])
+  const [reconciliationRun, setReconciliationRun] = useState(null)
   const layoutClasses = useMemo(() => getOrderInventoryWorkbenchClasses(), [])
   const productsById = useMemo(() => new Map(products.map((product) => [String(product.id), product])), [products])
   const lowProducts = useMemo(() => products.filter((product) => Number(product.onHandBaseQty || 0) <= Number(product.min_stock_base_qty || 0)), [products])
   const enrichedMovements = useMemo(() => movements.map((row) => ({ ...row, product: productsById.get(String(row.product_id)) || null })), [movements, productsById])
   const filteredMovements = useMemo(() => filterStockMovements(enrichedMovements, { query, type }), [enrichedMovements, query, type])
+  const reconciliationIssues = useMemo(() => reconciliationRows.filter((row) => (row.issue_codes || []).length > 0), [reconciliationRows])
 
   useEffect(() => {
     if (authLoading) return
@@ -53,17 +62,50 @@ export default function StockReportPage() {
     setLoading(true)
     setError('')
     try {
-      const [productRows, movementRows] = await Promise.all([listProductsWithStock(), listStockMovements(250)])
+      const { products: productRows, movements: movementRows, reconciliation } = await loadInventoryStockDashboard()
       setProducts(productRows || [])
       setMovements(movementRows || [])
+      setReconciliationRows(reconciliation || [])
     } catch (err) {
-      setError(err?.message || 'Không tải được báo cáo tồn kho.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được báo cáo tồn kho.')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => { if (pageReady) loadData() }, [pageReady, loadData])
+
+  const handleReconciliationCheck = async () => {
+    if (reconciling) return
+    setReconciling(true)
+    setError('')
+    try {
+      const { run, reconciliation } = await runReconciliationCheckAndReload(user?.id || null)
+      setReconciliationRun(run)
+      setReconciliationRows(reconciliation || [])
+    } catch (err) {
+      setError(err?.operatorMessage || err?.message || 'Không kiểm tra đối soát tồn kho được.')
+    } finally {
+      setReconciling(false)
+    }
+  }
+
+  const handleRepair = async () => {
+    if (repairing) return
+    if (!window.confirm('Sửa tồn hiện tại theo ledger phát sinh? Lợi nhuận lịch sử không bị ghi lại.')) return
+    setRepairing(true)
+    setError('')
+    try {
+      const { repair, reconciliation } = await repairStockFromLedgerAndReload(user?.id || null)
+      setReconciliationRun(repair)
+      setReconciliationRows(reconciliation || [])
+      await loadData()
+    } catch (err) {
+      setError(err?.operatorMessage || err?.message || 'Không sửa tồn theo ledger được.')
+    } finally {
+      setRepairing(false)
+    }
+  }
 
   if (authLoading || !pageReady) return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
 
@@ -74,9 +116,24 @@ export default function StockReportPage() {
         <div className={`${layoutClasses.shell} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h1 className="text-2xl font-bold">Báo cáo tồn kho</h1><p className="text-base text-gray-400">Hàng sắp hết và lịch sử phát sinh kho.</p></div>
-            <Button type="button" variant="outline" onClick={loadData} disabled={loading}><RefreshCw className="h-4 w-4" /> Làm mới</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={handleReconciliationCheck} disabled={reconciling || loading}><ShieldCheck className="h-4 w-4" /> {reconciling ? 'Đang đối soát...' : 'Đối soát'}</Button>
+              <Button type="button" variant="outline" onClick={handleRepair} disabled={repairing || loading || reconciliationIssues.length === 0}><Wrench className="h-4 w-4" /> {repairing ? 'Đang sửa...' : 'Sửa theo ledger'}</Button>
+              <Button type="button" variant="outline" onClick={loadData} disabled={loading}><RefreshCw className="h-4 w-4" /> Làm mới</Button>
+            </div>
           </div>
           {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
+          <Card><CardContent className="grid grid-cols-1 gap-3 p-4 md:grid-cols-4">
+            <div><p className="text-sm text-gray-400">Đối soát</p><p className={reconciliationIssues.length ? 'text-2xl font-bold text-amber-200' : 'text-2xl font-bold text-green-200'}>{reconciliationIssues.length} lỗi</p></div>
+            <div><p className="text-sm text-gray-400">Tồn dưới 0</p><p className="text-2xl font-bold text-red-200">{reconciliationRows.filter((row) => row.negative_ledger || Number(row.replay_on_hand_base_qty || 0) < 0).length}</p></div>
+            <div><p className="text-sm text-gray-400">Orphan movement</p><p className="text-2xl font-bold text-red-200">{reconciliationRows.filter((row) => row.has_orphan_movement).length}</p></div>
+            <div><p className="text-sm text-gray-400">Lần chạy</p><p className="text-base font-semibold text-gray-100">{reconciliationRun?.status || 'Chưa chạy'}</p></div>
+            {reconciliationIssues.length > 0 && (
+              <div className="md:col-span-4 rounded-md border border-amber-900/60 bg-amber-950/20 p-3 text-amber-100">
+                {reconciliationIssues.slice(0, 3).map((row) => `${row.product_name}: ${(row.issue_codes || []).join(', ')}`).join(' · ')}
+              </div>
+            )}
+          </CardContent></Card>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr] min-[1900px]:grid-cols-[430px_1fr]">
             <Card><CardContent className="p-4 space-y-3">
               <h2 className="text-lg font-semibold">Sắp hết hàng</h2>

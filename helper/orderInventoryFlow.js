@@ -1,6 +1,14 @@
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts, toTitleCaseVI } from '@/lib/utils'
 
+export function createMutationRequestId(prefix = 'mut') {
+  const safePrefix = String(prefix || 'mut').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'mut'
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${safePrefix}_${crypto.randomUUID()}`
+  }
+  return `${safePrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
 export function toInventoryNumber(value, fallback = 0) {
   if (value == null) return fallback
 
@@ -9,6 +17,22 @@ export function toInventoryNumber(value, fallback = 0) {
 
   const number = Number(text.replaceAll(',', '.'))
   return Number.isFinite(number) ? number : fallback
+}
+
+function parseInventoryNumber(value, fieldName, { fallback = null, required = true } = {}) {
+  if (value == null || String(value).trim() === '') {
+    if (required) throw new Error(`${fieldName} không được để trống.`)
+    return fallback
+  }
+
+  const number = Number(String(value).trim().replaceAll(',', '.'))
+  if (!Number.isFinite(number)) throw new Error(`${fieldName} không hợp lệ.`)
+  return number
+}
+
+function roundInventoryNumber(value, decimals) {
+  const factor = 10 ** decimals
+  return Math.round((Number(value) + Number.EPSILON) * factor) / factor
 }
 
 export function formatInventoryQuantity(value) {
@@ -27,15 +51,20 @@ function cleanId(value) {
 }
 
 function normalizePositiveLineNumber(value, fieldName) {
-  const number = toInventoryNumber(value, 0)
+  const number = parseInventoryNumber(value, fieldName, { fallback: 0, required: false })
   if (number <= 0) return null
-  if (!Number.isFinite(number)) throw new Error(`${fieldName} không hợp lệ.`)
-  return number
+  return roundInventoryNumber(number, 3)
 }
 
 function normalizeNonNegativeNumber(value, fieldName, fallback = 0) {
-  const number = toInventoryNumber(value, fallback)
+  const number = parseInventoryNumber(value, fieldName, { fallback, required: false })
   if (number < 0) throw new Error(`${fieldName} không được âm.`)
+  return roundInventoryNumber(number, 6)
+}
+
+function normalizePositiveNumber(value, fieldName, fallback = 1) {
+  const number = normalizeNonNegativeNumber(value, fieldName, fallback)
+  if (number <= 0) throw new Error(`${fieldName} phải lớn hơn 0.`)
   return number
 }
 
@@ -56,8 +85,8 @@ export function buildPurchaseOrderRpcPayload(payload = {}) {
         product_id: productId,
         product_unit_id: productUnitId,
         quantity,
-        conversion_to_base_qty: normalizeNonNegativeNumber(item.conversionToBaseQty, 'Quy đổi', 1) || 1,
-        unit_cost: normalizeNonNegativeNumber(item.unitCost, 'Giá nhập', 0),
+        conversion_to_base_qty: normalizePositiveNumber(item.conversionToBaseQty, 'Quy đổi', 1),
+        unit_cost: roundInventoryNumber(normalizeNonNegativeNumber(item.unitCost, 'Giá nhập', 0), 2),
         note: cleanText(item.note),
       }
     })
@@ -73,6 +102,7 @@ export function buildPurchaseOrderRpcPayload(payload = {}) {
       created_by: cleanId(payload.createdBy),
     },
     p_items: items,
+    p_request_id: cleanText(payload.requestId),
   }
 }
 
@@ -91,8 +121,8 @@ export function buildSalesOrderRpcPayload(payload = {}) {
         product_id: productId,
         product_unit_id: productUnitId,
         quantity,
-        conversion_to_base_qty: normalizeNonNegativeNumber(item.conversionToBaseQty, 'Quy đổi', 1) || 1,
-        unit_price: normalizeNonNegativeNumber(item.unitPrice, 'Giá bán', 0),
+        conversion_to_base_qty: normalizePositiveNumber(item.conversionToBaseQty, 'Quy đổi', 1),
+        unit_price: roundInventoryNumber(normalizeNonNegativeNumber(item.unitPrice, 'Giá bán', 0), 2),
         note: cleanText(item.note),
       }
     })
@@ -100,8 +130,8 @@ export function buildSalesOrderRpcPayload(payload = {}) {
 
   if (items.length === 0) throw new Error('Vui lòng thêm ít nhất một dòng hàng bán.')
 
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0)
-  const discountAmount = normalizeNonNegativeNumber(payload.discountAmount, 'Giảm giá', 0)
+  const subtotal = roundInventoryNumber(items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0), 2)
+  const discountAmount = roundInventoryNumber(normalizeNonNegativeNumber(payload.discountAmount, 'Giảm giá', 0), 2)
   if (discountAmount > subtotal) throw new Error('Giảm giá không được lớn hơn tạm tính.')
 
   return {
@@ -113,7 +143,46 @@ export function buildSalesOrderRpcPayload(payload = {}) {
       created_by: cleanId(payload.createdBy),
     },
     p_items: items,
+    p_request_id: cleanText(payload.requestId),
   }
+}
+
+export function getSalesOrderStockIssues(items = [], productsById = new Map()) {
+  const requiredByProductId = new Map()
+
+  for (const item of items || []) {
+    const productId = cleanId(item?.productId)
+    if (!productId) continue
+    const quantity = toInventoryNumber(item?.quantity, 0)
+    const conversion = toInventoryNumber(item?.conversionToBaseQty, 1) || 1
+    if (quantity <= 0 || conversion <= 0) continue
+    requiredByProductId.set(productId, (requiredByProductId.get(productId) || 0) + quantity * conversion)
+  }
+
+  return Array.from(requiredByProductId.entries())
+    .map(([productId, requiredBaseQty]) => {
+      const product = productsById.get(String(productId)) || null
+      const onHandBaseQty = Number(product?.onHandBaseQty || 0)
+      if (!product || requiredBaseQty <= onHandBaseQty) return null
+      const unitName = product.base_unit_name || 'đơn vị gốc'
+      return {
+        productId,
+        productName: product.name || 'Hàng hóa',
+        requiredBaseQty: roundInventoryNumber(requiredBaseQty, 3),
+        onHandBaseQty: roundInventoryNumber(onHandBaseQty, 3),
+        unitName,
+        message: `${product.name || 'Hàng hóa'} thiếu ${formatInventoryQuantity(requiredBaseQty - onHandBaseQty)} ${unitName}`,
+      }
+    })
+    .filter(Boolean)
+}
+
+export function assertSalesOrderStockAvailable(items = [], productsById = new Map()) {
+  const issues = getSalesOrderStockIssues(items, productsById)
+  if (issues.length > 0) {
+    throw new Error(`Không đủ tồn kho: ${issues.map((issue) => issue.message).join('; ')}.`)
+  }
+  return true
 }
 
 export function createSalesOrderLine(products = []) {
@@ -145,6 +214,7 @@ export function createSalesOrderDraft({ draftNumber = 1, products = [], code = '
     customerQuery: '',
     note: '',
     discountAmount: '',
+    requestId: createMutationRequestId('sales'),
     items: [],
   }
 }
@@ -269,6 +339,7 @@ function normalizeDraft(draft = {}) {
     customerQuery: stringValue(draft.customerQuery),
     note: stringValue(draft.note),
     discountAmount: stringValue(draft.discountAmount),
+    requestId: stringValue(draft.requestId).trim() || createMutationRequestId('sales'),
     items: (Array.isArray(draft.items) ? draft.items : []).map(normalizeDraftItem).filter(Boolean),
   }
 }

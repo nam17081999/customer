@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
+import { normalizeOperatorError } from '@/helper/operatorErrors'
 import {
   buildCancelPurchaseOrderArgs,
   buildCancelSalesOrderArgs,
@@ -18,6 +19,24 @@ export function formatMoney(value) {
 
 export function toNumber(value, fallback = 0) {
   return toInventoryNumber(value, fallback)
+}
+
+function logInventoryMutationError(action, error, context = {}) {
+  if (typeof console === 'undefined') return
+  console.error('[inventory_mutation_error]', {
+    action,
+    message: error?.message || 'Unknown inventory mutation error',
+    code: error?.code || null,
+    details: error?.details || null,
+    hint: error?.hint || null,
+    context,
+  })
+}
+
+function throwLoggedInventoryError(action, error, context = {}) {
+  if (!error) return
+  logInventoryMutationError(action, error, context)
+  throw normalizeOperatorError(error)
 }
 
 export function buildDocumentCode(prefix) {
@@ -235,7 +254,7 @@ export async function createPurchaseOrder(payload) {
     code: payload.code || buildDocumentCode('PN'),
   })
   const { data, error } = await supabase.rpc('create_purchase_order_with_items', rpcPayload)
-  if (error) throw error
+  throwLoggedInventoryError('create_purchase_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
 
@@ -245,19 +264,19 @@ export async function createSalesOrder(payload) {
     code: payload.code || buildDocumentCode('DH'),
   })
   const { data, error } = await supabase.rpc('create_sales_order_with_items', rpcPayload)
-  if (error) throw error
+  throwLoggedInventoryError('create_sales_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
 
 export async function cancelSalesOrder(orderId, userId = null) {
   const { data, error } = await supabase.rpc('cancel_sales_order_and_restore_stock', buildCancelSalesOrderArgs(orderId, userId))
-  if (error) throw error
+  throwLoggedInventoryError('cancel_sales_order', error, { orderId })
   return data
 }
 
 export async function cancelPurchaseOrder(purchaseOrderId, userId = null) {
   const { data, error } = await supabase.rpc('cancel_purchase_order_and_remove_stock', buildCancelPurchaseOrderArgs(purchaseOrderId, userId))
-  if (error) throw error
+  throwLoggedInventoryError('cancel_purchase_order', error, { purchaseOrderId })
   return data
 }
 
@@ -489,6 +508,97 @@ export async function listStockMovements(limit = 100) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  if (error) throw error
+  return data || []
+}
+
+export async function getInventoryReconciliationReport() {
+  const { data, error } = await supabase.rpc('get_inventory_reconciliation_report')
+  if (error) throw error
+  return data || []
+}
+
+export async function runInventoryReconciliationCheck(userId = null) {
+  const { data, error } = await supabase.rpc('run_inventory_reconciliation_check', { p_started_by: userId })
+  throwLoggedInventoryError('inventory_reconciliation_check', error, { userId })
+  return data
+}
+
+export async function repairProductStockFromLedger(userId = null) {
+  const { data, error } = await supabase.rpc('repair_product_stock_from_ledger', { p_started_by: userId })
+  throwLoggedInventoryError('inventory_reconciliation_repair', error, { userId })
+  return data
+}
+
+export async function listInventoryReconciliationRuns(limit = 50) {
+  const { data, error } = await supabase
+    .from('inventory_reconciliation_runs')
+    .select('*')
+    .order('started_at', { ascending: false })
+    .limit(Math.max(1, Math.min(Number(limit) || 50, 200)))
+  if (error) throw error
+  return data || []
+}
+
+export async function listOperationAuditEvents({ limit = 50, eventType = null } = {}) {
+  let query = supabase
+    .from('operation_audit_events')
+    .select('*')
+
+  if (eventType) query = query.eq('event_type', eventType)
+
+  query = query
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(Number(limit) || 50, 200)))
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function importProductsFromPreview(rows, { requestId, actorId = null } = {}) {
+  if (!Array.isArray(rows)) throw new Error('Danh sách import không hợp lệ.')
+  if (!requestId || String(requestId).trim().length < 12) throw new Error('Thiếu mã request import.')
+  const { data, error } = await supabase.rpc('import_products_from_preview', {
+    p_rows: rows,
+    p_request_id: String(requestId).trim(),
+    p_actor_id: actorId,
+  })
+  throwLoggedInventoryError('product_import', error, { requestId, rowCount: rows.length })
+  return data
+}
+
+export async function getDashboardAggregateReport({ from = null, to = null } = {}) {
+  const args = { p_from: from, p_to: to }
+  const [sales, purchases, inventory, topProducts, lowStock, customers] = await Promise.all([
+    supabase.rpc('get_sales_summary', args),
+    supabase.rpc('get_purchase_summary', args),
+    supabase.rpc('get_inventory_valuation_summary'),
+    supabase.rpc('get_top_products_report', { ...args, p_limit: 8 }),
+    supabase.rpc('get_low_stock_report', { p_limit: 8 }),
+    supabase.rpc('get_customer_revenue_report', { ...args, p_limit: 8 }),
+  ])
+
+  const responses = { sales, purchases, inventory, topProducts, lowStock, customers }
+  for (const [key, response] of Object.entries(responses)) {
+    if (response.error) throwLoggedInventoryError('dashboard_aggregate_report', response.error, { section: key })
+  }
+
+  return {
+    sales: sales.data?.[0] || null,
+    purchases: purchases.data?.[0] || null,
+    inventory: inventory.data?.[0] || null,
+    topProducts: topProducts.data || [],
+    lowStock: lowStock.data || [],
+    customers: customers.data || [],
+  }
+}
+
+export async function globalOperatorSearch(query, limit = 20) {
+  const { data, error } = await supabase.rpc('global_operator_search', {
+    p_query: String(query || '').trim(),
+    p_limit: limit,
+  })
   if (error) throw error
   return data || []
 }

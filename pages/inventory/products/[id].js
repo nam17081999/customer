@@ -8,8 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
-import { createProductUnit, formatMoney, getProductDetail, updateProduct, updateProductUnit } from '@/api/inventory/inventory-client'
+import { formatMoney } from '@/helper/inventoryFormat'
 import { formatProductStock, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { getOperatorErrorMessage } from '@/helper/operatorErrors'
+import { createProductUnitFromForm, loadProductEditData, saveProductFromForm, saveProductUnitFromForm } from '@/services/inventory/inventory-page-service'
 
 function buildForm(product) {
   return {
@@ -72,13 +74,13 @@ export default function ProductEditPage() {
     setLoading(true)
     setError('')
     try {
-      const row = await getProductDetail(id)
+      const { product: row } = await loadProductEditData(id)
       setProduct(row)
       setForm(buildForm(row))
       setUnitForms(Object.fromEntries((row?.units || []).map((unit) => [unit.id, buildUnitForm(unit)])))
       setNewUnitForm(EMPTY_UNIT_FORM)
     } catch (err) {
-      setError(err?.message || 'Không tải được hàng hóa.')
+      setError(err?.operatorMessage || err?.message || 'Không tải được hàng hóa.')
     } finally {
       setLoading(false)
     }
@@ -103,11 +105,11 @@ export default function ProductEditPage() {
     setError('')
     setMessage('')
     try {
-      const saved = await updateProduct(id, form)
+      const saved = await saveProductFromForm(id, form)
       setProduct((prev) => ({ ...prev, ...saved }))
       setMessage('Đã lưu hàng hóa.')
     } catch (err) {
-      setError(err?.message || 'Không lưu được hàng hóa.')
+      setError(err?.operatorMessage || err?.message || 'Không lưu được hàng hóa.')
     } finally {
       setSubmitting(false)
     }
@@ -119,11 +121,11 @@ export default function ProductEditPage() {
     setError('')
     setMessage('')
     try {
-      await updateProductUnit(unit.id, unitForms[unit.id] || buildUnitForm(unit))
+      await saveProductUnitFromForm(unit.id, unitForms[unit.id] || buildUnitForm(unit))
       setMessage('Đã lưu đơn vị.')
       await loadProduct()
     } catch (err) {
-      setError(err?.message || 'Không lưu được đơn vị.')
+      setError(err?.operatorMessage || err?.message || 'Không lưu được đơn vị.')
     } finally {
       setUnitSubmittingId('')
     }
@@ -135,11 +137,11 @@ export default function ProductEditPage() {
     setError('')
     setMessage('')
     try {
-      await createProductUnit(id, newUnitForm)
+      await createProductUnitFromForm(id, newUnitForm)
       setMessage('Đã thêm đơn vị.')
       await loadProduct()
     } catch (err) {
-      setError(err?.message || 'Không thêm được đơn vị.')
+      setError(err?.operatorMessage || err?.message || 'Không thêm được đơn vị.')
     } finally {
       setUnitSubmittingId('')
     }
