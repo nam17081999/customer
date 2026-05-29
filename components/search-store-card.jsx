@@ -1,4 +1,5 @@
 import { memo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,10 +7,16 @@ import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
-import StoreDetailModal from '@/components/store-detail-modal'
-import TelesaleCallDialog from '@/components/store/telesale-call-dialog'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
 import { DirectionTurnIcon } from '@/components/icons/navigation-icons'
+
+const StoreDetailModal = dynamic(() => import('@/components/store-detail-modal'), {
+  ssr: false,
+})
+
+const TelesaleCallDialog = dynamic(() => import('@/components/store/telesale-call-dialog'), {
+  ssr: false,
+})
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

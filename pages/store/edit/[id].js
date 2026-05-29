@@ -1,9 +1,14 @@
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
-import StoreSupplementForm from '@/components/store/store-supplement-form'
 import { useStoreEditController } from '@/helper/useStoreEditController'
+
+const StoreSupplementForm = dynamic(() => import('@/components/store/store-supplement-form'), {
+  ssr: false,
+  loading: () => <FullPageLoading />,
+})
 
 export default function EditStore() {
   const {

@@ -1,7 +1,5 @@
-'use client'
-
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/router'
 import { useAuth } from '@/lib/AuthContext'
 import { isAuthenticatedRole, resolveUserRole } from '@/lib/authz'
 import { normalizeInternalPath } from '@/features/auth/utils/redirect'
@@ -11,22 +9,22 @@ import { Label } from '@/components/ui/label'
 
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { signIn, signOut, isAuthenticated, isSignedIn, loading: authLoading } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const redirectPath = useMemo(
-    () => normalizeInternalPath(searchParams.get('from'), '/account'),
-    [searchParams],
-  )
+  const redirectPath = useMemo(() => {
+    if (!router.isReady) return '/account'
+    const rawFrom = Array.isArray(router.query.from) ? router.query.from[0] : router.query.from
+    return normalizeInternalPath(rawFrom, '/account')
+  }, [router.isReady, router.query.from])
 
   useEffect(() => {
-    if (authLoading || !isAuthenticated) return
+    if (authLoading || !router.isReady || !isAuthenticated) return
     router.replace(redirectPath)
-  }, [authLoading, isAuthenticated, redirectPath, router])
+  }, [authLoading, isAuthenticated, redirectPath, router, router.isReady])
 
   useEffect(() => {
     if (authLoading || isAuthenticated || !isSignedIn) return

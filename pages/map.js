@@ -1,9 +1,9 @@
 ﻿import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
+import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import StoreDetailModal from '@/components/store-detail-modal'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { parseCoordinate } from '@/helper/coordinate'
@@ -30,6 +30,10 @@ import {
   ensureStoreMarkerImage,
   removeMarkerImages,
 } from '@/helper/mapMarkerImages'
+
+const StoreDetailModal = dynamic(() => import('@/components/store-detail-modal'), {
+  ssr: false,
+})
 
 const DEFAULT_CENTER = [105.6955684, 21.0768617]
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }

@@ -5,7 +5,6 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toTitleCaseVI } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import SearchStoreCard from '@/components/search-store-card'
 import StoreDistrictWardPicker from '@/components/store/store-district-ward-picker'
 import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
 import StoreStepFormLayout from '@/components/store/store-step-form-layout'
@@ -20,6 +19,15 @@ const StoreLocationPicker = dynamic(() => import('@/components/map/store-locatio
   loading: () => (
     <div className="flex items-center justify-center rounded-md bg-gray-900" style={{ height: '65vh' }}>
       <span className="animate-pulse text-sm text-gray-400">Đang tải bản đồ…</span>
+    </div>
+  ),
+})
+
+const SearchStoreCard = dynamic(() => import('@/components/search-store-card'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-md border border-gray-800 bg-gray-950 p-3 text-sm text-gray-400">
+      Đang tải thẻ cửa hàng nghi trùng...
     </div>
   ),
 })

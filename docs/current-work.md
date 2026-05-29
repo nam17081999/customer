@@ -1,49 +1,47 @@
 # Current Work
 
 ## Goal
-Fix create-store flow where step 3 can still block with “store already exists” after the user reviewed possible duplicate suggestions and intentionally continued.
+Thiết kế lại UI/UX lớp giao diện cho các màn vận hành bán hàng/phân phối theo hướng SaaS hiện đại, mobile-first, tối ưu thao tác nhanh, không đổi business logic/API/schema/data flow.
 
 ## Task Type
-bugfix
+refactor
 
 ## In Scope
-- Create-store duplicate detection/confirmation state.
-- Step transition from duplicate warning to final create step.
-- Minimal UI/state logic needed to preserve intentional continue behavior.
+- Presentation layer: layout, màu sắc, responsive, hierarchy, spacing, typography, table/card/form affordance.
+- Reusable UI shell/components cho dashboard, đơn hàng, tồn kho, sản phẩm, báo cáo vận hành.
+- Dark/light theme hiện có, focus states, loading/empty/error visual states ở mức UI.
+- Giữ nguyên hàm load dữ liệu, handler, API client, field names, route contracts.
 
 ## Out of Scope
-- Redesign create-store UI.
-- Change store matching algorithms beyond this bug.
-- Change DB schema, cache architecture, or unrelated report/edit flows.
+- Không đổi business logic, DB schema, Supabase queries/contracts, cache rules, auth rules.
+- Không thêm dependency mới nếu không bắt buộc.
+- Không redesign map/create/edit store flow ngoài scope vận hành bán hàng hiện tại.
+- Không thay đổi logic tính tồn kho, doanh thu, lãi/lỗ, công nợ.
 
 ## Must Preserve
-- Duplicate checks and final validation order.
-- Vietnamese-friendly matching behavior.
-- Store create cache update rules.
-- No hard delete/store-photo logic changes.
-- Existing Pages Router/import conventions.
+- Pages Router và import alias `@/`.
+- Store reads qua `getOrRefreshStores()` khi đọc stores.
+- Existing order/inventory/report flows, form state, submit handlers, validation order.
+- Vietnamese UTF-8 text, contrast cao, touch target lớn.
+- Existing tests/API contracts.
 
 ## Plan
-1. Locate create-store step and duplicate state logic.
-2. Identify stale duplicate flag/error path at step 3.
-3. Patch minimal state transition/reset behavior.
-4. Run focused lint or validation where practical.
-5. Update this file with Done/Verification/Risks.
+1. Audit UI routes/components đang dùng.
+2. Thêm/chuẩn hóa design-system primitives an toàn.
+3. Refactor navigation/shell cho vận hành.
+4. Nâng cấp dashboard/order/inventory/customer-facing layouts UI-only.
+5. Verify lint/tests liên quan và checklist regression.
 
 ## Required Verification
-- Confirm duplicate warning can be intentionally bypassed only via existing next/continue path.
-- Confirm exact duplicate final guard still blocks when no duplicate confirmation exists.
-- Run `npm run lint` and focused create-store e2e.
+- `npm run lint`.
+- Focused tests cho operator/order/inventory/theme nếu phù hợp.
+- Manual code review checklist: no API/schema/business logic changes, responsive classes, dark/light contrast, keyboard/focus states.
 
 ## Done
-- Bound “Vẫn tạo cửa hàng” confirmation to the normalized store name.
-- Final name-duplicate recheck now skips only when the same normalized name was explicitly confirmed.
-- Name changes/reset/new duplicate check clear that confirmation so stale bypass cannot leak.
+Pending.
 
 ## Verification
-- `npm run lint` passed with 0 errors; 1 unrelated existing warning in `.claude/worktrees/condescending-williamson-122bbe/pages/orders/[id].js` about `<img>`.
-- `./node_modules/.bin/playwright test e2e/store-create.spec.js -g 'hiện cảnh báo nghi trùng' --reporter=line` passed.
-- Regression checklist sections verified: Create/Edit duplicate flow, cache mutation path unchanged, Vietnamese matching helper unchanged, UI flow unchanged.
+Pending.
 
 ## Risks / Next
-- Manual browser smoke on real Supabase data still recommended for the exact device/location case.
+Task rất rộng; ưu tiên nền design system và các route vận hành chính trước, tránh rewrite logic sâu.

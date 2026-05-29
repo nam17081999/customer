@@ -1,12 +1,21 @@
 import { useMemo } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import StoreReportAdminDetail from '@/components/store/store-report-admin-detail'
 import { summarizeStoreReport } from '@/helper/storeReportFlow'
 import { useStoreReportsController } from '@/helper/useStoreReportsController'
+
+const StoreReportAdminDetail = dynamic(() => import('@/components/store/store-report-admin-detail'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 text-sm text-gray-400">
+      Đang tải chi tiết báo cáo...
+    </div>
+  ),
+})
 
 export default function StoreReportDetailPage() {
   const router = useRouter()

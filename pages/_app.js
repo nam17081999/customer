@@ -8,7 +8,8 @@ import { ThemeProvider } from "@/lib/ThemeContext";
 
 export default function App({ Component, pageProps }) {
   const { pathname } = useRouter()
-  const needsBottomPadding = pathname !== '/map' && pathname !== '/'
+  const hideChrome = pathname === '/login'
+  const needsBottomPadding = !hideChrome && pathname !== '/map' && pathname !== '/'
   return (
     <div className="flex min-h-screen flex-col overflow-hidden">
       <Head>
@@ -21,7 +22,7 @@ export default function App({ Component, pageProps }) {
       <ThemeProvider>
         <AuthProvider>
           <ErrorBoundary>
-            <Navbar />
+            {!hideChrome && <Navbar />}
             {/* pb-16 = space for fixed bottom tab bar on mobile */}
             <div className={`${needsBottomPadding ? 'pb-16 sm:pb-0' : ''} min-h-0 flex-1 overflow-hidden`}>
               <Component {...pageProps} />

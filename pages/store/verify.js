@@ -11,7 +11,6 @@ import { formatAddressParts } from '@/lib/utils'
 import removeVietnameseTones, { normalizeVietnamesePhonetics } from '@/helper/removeVietnameseTones'
 import { getOrRefreshStores, updateStoresInCache } from '@/lib/storeCache'
 import { formatDateTime } from '@/helper/validation'
-import { buildStoreDiff, logStoreEditHistoryBatch } from '@/lib/storeEditHistory'
 
 export default function VerifyStorePage() {
   const router = useRouter()
@@ -165,6 +164,7 @@ export default function VerifyStorePage() {
     setError('')
     setMessage('')
     const updatedAt = new Date().toISOString()
+    const { buildStoreDiff, logStoreEditHistoryBatch } = await import('@/lib/storeEditHistory')
 
     const { error: updateError } = await supabase
       .from('stores')

@@ -10,19 +10,38 @@ import { appendStoresToCache, getOrRefreshStores, updateStoresInCache } from '@/
 import { DEFAULT_STORE_TYPE, STORE_TYPE_OPTIONS } from '@/lib/constants'
 import { formatAddressParts } from '@/lib/utils'
 import { formatDistance } from '@/helper/validation'
-import {
-  buildImportPreviewRowsFromCsv,
-  buildResolutionPatch,
-  buildRowAddress,
-  buildTemplateCsv,
-  canResolveSystemDuplicate,
-  chunkArray,
-  finalizePreviewRow,
-  getRowContainerVariant,
-  getRowStatusLabel,
-  getRowStatusVariant,
-  prepareExistingStores,
-} from '@/helper/storeImportFlow'
+
+const loadStoreImportFlow = () => import('@/helper/storeImportFlow')
+
+function buildRowAddress(values) {
+  return [values.addressDetail, values.ward, values.district].filter(Boolean).join(', ')
+}
+
+function getRowStatusVariant(status) {
+  if (status === 'ready') return 'border-green-900/70 bg-green-950/20 text-green-200'
+  if (status === 'duplicate') return 'border-amber-900/70 bg-amber-950/20 text-amber-200'
+  return 'border-red-900/70 bg-red-950/20 text-red-200'
+}
+
+function getRowStatusLabel(status) {
+  if (status === 'ready') return 'Sẵn sàng nhập'
+  if (status === 'duplicate') return 'Cần xử lý'
+  return 'Lỗi dữ liệu'
+}
+
+function getRowContainerVariant(status) {
+  if (status === 'ready') return 'border-green-900/40 bg-green-950/10'
+  if (status === 'duplicate') return 'border-amber-900/40 bg-amber-950/10'
+  return 'border-red-900/40 bg-red-950/10'
+}
+
+function canResolveSystemDuplicate(row) {
+  return (
+    row.errors.length === 0
+    && row.duplicateInFileRows.length === 0
+    && (row.phoneDuplicateInFileRows || []).length === 0
+  )
+}
 
 function downloadTextFile(filename, content, mimeType) {
   const blob = new Blob([content], { type: mimeType })
@@ -75,6 +94,7 @@ export default function StoreImportPage() {
     setLoadingStores(true)
     try {
       const stores = await getOrRefreshStores()
+      const { prepareExistingStores } = await loadStoreImportFlow()
       setExistingStores(prepareExistingStores(stores))
     } catch (error) {
       console.error(error)
@@ -106,7 +126,8 @@ export default function StoreImportPage() {
     router.push('/account')
   }, [router])
 
-  const handleDownloadTemplate = useCallback(() => {
+  const handleDownloadTemplate = useCallback(async () => {
+    const { buildTemplateCsv } = await loadStoreImportFlow()
     downloadTextFile(
       'store-import-template.csv',
       buildTemplateCsv(),
@@ -121,6 +142,7 @@ export default function StoreImportPage() {
 
     try {
       const csvText = await file.text()
+      const { buildImportPreviewRowsFromCsv } = await loadStoreImportFlow()
       const { previewRows: nextPreviewRows, error } = buildImportPreviewRowsFromCsv({
         csvText,
         existingStores,
@@ -158,7 +180,8 @@ export default function StoreImportPage() {
     )))
   }, [])
 
-  const handleChooseDuplicateTarget = useCallback((rowNumber, selectedDuplicateId) => {
+  const handleChooseDuplicateTarget = useCallback(async (rowNumber, selectedDuplicateId) => {
+    const { finalizePreviewRow } = await loadStoreImportFlow()
     setPreviewRows((prev) => prev.map((row) => {
       if (row.rowNumber !== rowNumber) return row
       const nextSelectedDuplicateId = row.selectedDuplicateId === selectedDuplicateId ? null : selectedDuplicateId
@@ -174,7 +197,8 @@ export default function StoreImportPage() {
     }))
   }, [])
 
-  const handleSetDuplicateResolution = useCallback((rowNumber, resolutionMode) => {
+  const handleSetDuplicateResolution = useCallback(async (rowNumber, resolutionMode) => {
+    const { finalizePreviewRow } = await loadStoreImportFlow()
     setPreviewRows((prev) => prev.map((row) => {
       if (row.rowNumber !== rowNumber) return row
       const nextResolutionMode = row.resolutionMode === resolutionMode ? '' : resolutionMode
@@ -210,6 +234,7 @@ export default function StoreImportPage() {
     setImportResult('')
 
     try {
+      const { buildResolutionPatch, chunkArray, prepareExistingStores } = await loadStoreImportFlow()
       const createPayloads = createRows.map((row) => ({
         name: row.name,
         store_type: row.storeTypeValue || DEFAULT_STORE_TYPE,

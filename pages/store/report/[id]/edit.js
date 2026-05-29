@@ -1,12 +1,21 @@
 import Head from 'next/head'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
-import StoreReportForm from '@/components/store-report-form'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/router'
 import { useEffect, useMemo, useState } from 'react'
 import { getOrRefreshStores } from '@/lib/storeCache'
+
+const StoreReportForm = dynamic(() => import('@/components/store-report-form'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5 text-base text-gray-400">
+      Đang tải form báo cáo...
+    </div>
+  ),
+})
 
 export default function StoreReportEditPage() {
   const router = useRouter()

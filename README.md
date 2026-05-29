@@ -14,22 +14,22 @@
 
 ```bash
 # Clone & install
-npm install
+pnpm install
 
 # Setup environment
 copy .env.example .env.local
 # Điền thông tin Supabase và Google Maps vào .env.local
 
 # Run development server
-npm run dev
+pnpm dev
 ```
 
 Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 
 ## 📚 Documentation
 
-- **[SETUP.md](./SETUP.md)** - Hướng dẫn cài đặt chi tiết cho developers
-- **[IMPROVEMENTS.md](./IMPROVEMENTS.md)** - Kế hoạch cải thiện và tính năng mới
+- **[SETUP.md](./SETUP.md)** - Hướng dẫn cài đặt, biến môi trường và chạy local
+- **[IMPROVEMENTS.md](./IMPROVEMENTS.md)** - Tổng hợp các hướng nâng cấp kiến trúc, hiệu năng và vận hành
 
 ## 🛠️ Tech Stack
 
@@ -60,10 +60,10 @@ customer/
 
 ## 🔧 Available Scripts
 
-- `npm run dev` - Chạy development server
-- `npm run build` - Build production
-- `npm start` - Chạy production server
-- `npm run lint` - Kiểm tra code với ESLint
+- `pnpm dev` - Chạy development server
+- `pnpm build` - Build production
+- `pnpm start` - Chạy production server
+- `pnpm lint` - Kiểm tra code với ESLint
 
 ## 🌟 Key Features Explained
 
