@@ -70,16 +70,48 @@ function StatusBadges({ isActive, distance, hasCoords, qualityBadges = [] }) {
 }
 
 function StoreDetailHeader({ store, storeTypeMeta, storeTypeLabel, isActive, hasCoords, qualityBadges, desktop = false }) {
-  const iconSize = desktop ? 'size-14 rounded-2xl' : 'size-11 rounded-xl'
-  const titleClass = desktop ? 'mt-0.5 text-3xl font-bold text-gray-100 leading-tight' : 'mt-0.5 text-xl font-bold text-gray-100 leading-tight'
-  const closeClass = desktop
+  const prefersDesktop = typeof window !== 'undefined' ? window.matchMedia('(min-width: 640px)').matches : true
+
+  // If parent explicitly placed this header in a desktop/mobile slot, only render
+  // when it matches the current viewport to avoid duplicate DOM nodes.
+  if (desktop === true && !prefersDesktop) return null
+  if (desktop === false && prefersDesktop) return null
+
+  const isDesktopClient = prefersDesktop
+  const iconSize = isDesktopClient ? 'size-14 rounded-2xl' : 'size-11 rounded-xl'
+  const titleClass = isDesktopClient ? 'mt-0.5 text-3xl font-bold text-gray-100 leading-tight' : 'mt-0.5 text-xl font-bold text-gray-100 leading-tight'
+  const closeClass = isDesktopClient
     ? 'flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-700 bg-gray-900/80 text-gray-300 transition hover:bg-gray-800 hover:text-white'
     : 'absolute right-2.5 top-2.5 size-8 shrink-0 cursor-pointer rounded-full border border-gray-700 bg-gray-900/80 text-gray-300 transition hover:bg-gray-800 hover:text-white'
 
+  if (isDesktopClient) {
+    return (
+      <div className="hidden sm:block">
+        <div className="flex items-start justify-between gap-5">
+          <div className="min-w-0 flex items-start gap-4">
+            <div className={`flex shrink-0 items-center justify-center border border-sky-500/40 bg-sky-500/10 text-sky-300 ${iconSize}`}>
+              {storeTypeMeta.icon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-400">{storeTypeLabel}</p>
+              <OverflowMarquee text={store.name} textClassName={titleClass} />
+            </div>
+          </div>
+          <DialogClose className={closeClass}>
+            <CloseIcon className={'size-4'} />
+          </DialogClose>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <StatusBadges isActive={isActive} distance={store.distance} hasCoords={hasCoords} qualityBadges={qualityBadges} />
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className={desktop ? 'hidden sm:block' : 'sticky top-0 z-10 bg-gray-950/95 backdrop-blur px-3 pb-4 pt-5 sm:hidden'}>
-      <div className={desktop ? 'flex items-start justify-between gap-5' : 'flex items-start justify-between gap-3'}>
-        <div className={desktop ? 'min-w-0 flex items-start gap-4' : 'min-w-0 flex items-start gap-3'}>
+    <div className="sticky top-0 z-10 bg-gray-950/95 backdrop-blur px-3 pb-4 pt-5 sm:hidden">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex items-start gap-3">
           <div className={`flex shrink-0 items-center justify-center border border-sky-500/40 bg-sky-500/10 text-sky-300 ${iconSize}`}>
             {storeTypeMeta.icon}
           </div>
@@ -89,10 +121,10 @@ function StoreDetailHeader({ store, storeTypeMeta, storeTypeLabel, isActive, has
           </div>
         </div>
         <DialogClose className={closeClass}>
-          <CloseIcon className={desktop ? 'size-4' : 'mx-auto size-4'} />
+          <CloseIcon className={'mx-auto size-4'} />
         </DialogClose>
       </div>
-      <div className={desktop ? 'mt-3 flex flex-wrap gap-2' : 'mt-2 flex flex-wrap gap-1.5'}>
+      <div className="mt-2 flex flex-wrap gap-1.5">
         <StatusBadges isActive={isActive} distance={store.distance} hasCoords={hasCoords} qualityBadges={qualityBadges} />
       </div>
     </div>

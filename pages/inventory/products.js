@@ -6,6 +6,7 @@ import { AlertTriangle, BarChart3, Package, Plus, RefreshCw, Search, ShoppingCar
 import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { PrimaryButton } from '@/components/ui/v2'
 import { Input } from '@/components/ui/input'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { formatMoney } from '@/helper/inventoryFormat'
@@ -19,6 +20,7 @@ import {
   getOrderInventoryWorkbenchClasses,
   summarizeInventoryProducts,
 } from '@/helper/orderInventoryFlow'
+import { PageHeader } from '@/components/ui/v2'
 
 const EMPTY_FORM = {
   name: '',
@@ -122,34 +124,24 @@ export default function InventoryProductsPage() {
         <title>Hàng hóa & tồn kho - NPP Hà Công</title>
       </Head>
 
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-screen text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold">Hàng hóa & tồn kho</h1>
-              <p className="text-base text-gray-400">Quản lý mặt hàng, đơn vị quy đổi, tồn hiện tại và cảnh báo thiếu hàng.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <Link href="/inventory/purchases"><Truck className="h-4 w-4" /> Phiếu nhập</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/inventory/stock">Tồn kho</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/inventory/reports"><BarChart3 className="h-4 w-4" /> Thống kê</Link>
-              </Button>
-              <Button asChild>
-                <Link href="/orders/new"><ShoppingCart className="h-4 w-4" /> Lên đơn</Link>
-              </Button>
-              <Button type="button" variant="outline" onClick={loadProducts} disabled={loading}>
-                <RefreshCw className="h-4 w-4" /> Làm mới
-              </Button>
-            </div>
-          </div>
+          <PageHeader
+            title="Hàng hóa & tồn kho"
+            subtitle="Quản lý mặt hàng, đơn vị quy đổi, tồn hiện tại và cảnh báo thiếu hàng."
+            actions={(
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline"><Link href="/inventory/purchases"><Truck className="h-4 w-4" /> Phiếu nhập</Link></Button>
+                <Button asChild variant="outline"><Link href="/inventory/stock">Tồn kho</Link></Button>
+                <Button asChild variant="outline"><Link href="/inventory/reports"><BarChart3 className="h-4 w-4" /> Thống kê</Link></Button>
+                <Button asChild variant="outline"><Link href="/orders/new"><ShoppingCart className="h-4 w-4" /> Lên đơn</Link></Button>
+                <Button type="button" variant="outline" onClick={loadProducts} disabled={loading}><RefreshCw className="h-4 w-4" /> Làm mới</Button>
+              </div>
+            )}
+          />
 
           {(error || message) && (
-            <div className={`rounded-md border px-4 py-3 text-base ${error ? 'border-red-900 bg-red-950/30 text-red-200' : 'border-green-900 bg-green-950/30 text-green-200'}`}>
+            <div className={`rounded-2xl border px-4 py-3 text-base ${error ? 'border-red-900 bg-red-950/25 text-red-200' : 'border-green-900 bg-green-950/25 text-green-200'}`}>
               {error || message}
             </div>
           )}
@@ -198,7 +190,7 @@ export default function InventoryProductsPage() {
                     </label>
                   </div>
 
-                  <div className="rounded-md border border-gray-800 bg-gray-900/70 p-3 space-y-3">
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-900/50 p-3 space-y-3">
                     <p className="text-base font-semibold text-gray-100">Đơn vị thùng mặc định</p>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="block space-y-1">
@@ -227,28 +219,28 @@ export default function InventoryProductsPage() {
                     <Input value={form.note} onChange={(e) => updateForm('note', e.target.value)} />
                   </label>
 
-                  <Button type="submit" className="w-full" disabled={submitting}>
+                  <PrimaryButton type="submit" className="w-full" disabled={submitting}>
                     <Plus className="h-4 w-4" /> {submitting ? 'Đang lưu...' : 'Thêm hàng'}
-                  </Button>
+                  </PrimaryButton>
                 </form>
               </CardContent>
             </Card>
 
             <div className="space-y-4">
               <div className={layoutClasses.summaryGrid}>
-                <div className="rounded-md border border-gray-800 bg-gray-950 p-4">
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4">
                   <p className="text-sm text-gray-400">Số mặt hàng</p>
                   <p className="text-2xl font-bold">{summary.total}</p>
                 </div>
-                <div className="rounded-md border border-amber-900 bg-amber-950/20 p-4">
+                <div className="rounded-2xl border border-amber-900 bg-amber-950/20 p-4">
                   <p className="text-sm text-amber-300">Dưới tồn tối thiểu</p>
                   <p className="text-2xl font-bold text-amber-100">{summary.lowStock}</p>
                 </div>
-                <div className="rounded-md border border-red-900 bg-red-950/20 p-4">
+                <div className="rounded-2xl border border-red-900 bg-red-950/20 p-4">
                   <p className="text-sm text-red-300">Hết hàng</p>
                   <p className="text-2xl font-bold text-red-100">{summary.outOfStock}</p>
                 </div>
-                <div className="rounded-md border border-gray-800 bg-gray-950 p-4">
+                <div className="rounded-2xl border border-slate-800/80 bg-slate-950/70 p-4">
                   <p className="text-sm text-gray-400">Giá trị tồn</p>
                   <p className="text-2xl font-bold">{formatMoney(summary.stockValue)}</p>
                 </div>

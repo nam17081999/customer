@@ -2,6 +2,7 @@ import Head from 'next/head'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
+import { PrimaryButton, Badge, PageHeader } from '@/components/ui/v2'
 import { OverflowMarquee } from '@/components/ui/overflow-marquee'
 import { useAuth } from '@/lib/AuthContext'
 import { useRouter } from 'next/router'
@@ -132,11 +133,11 @@ export default function StoreReportEditPage() {
                 <section className="rounded-2xl border border-emerald-900 bg-emerald-950/20 p-5">
                   <p className="text-lg font-semibold text-emerald-200">Đã gửi báo cáo</p>
                   <p className="mt-2 text-base text-emerald-100">{submitted}</p>
-                  <div className="mt-4">
-                    <Button asChild>
-                      <Link href={backHref}>Quay lại báo cáo</Link>
-                    </Button>
-                  </div>
+                        <div className="mt-4">
+                          <PrimaryButton asChild>
+                            <Link href={backHref}>Quay lại báo cáo</Link>
+                          </PrimaryButton>
+                        </div>
                 </section>
               ) : (
                 <StoreReportForm

@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/AuthContext'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge, PageHeader, FAB, BottomSheet } from '@/components/ui/v2'
+import QuickOrderSheet from '@/components/orders/quick-order-sheet'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
 import { formatMoney } from '@/helper/inventoryFormat'
@@ -145,9 +147,9 @@ function getOrderListCell(order, columnKey, storesById, currentUser) {
     case 'status':
       return {
         content: (
-          <span className={`inline-flex rounded-md border px-3 py-1 text-sm ${order.status === 'cancelled' ? 'border-red-900 bg-red-950/30 text-red-200' : 'border-green-900 bg-green-950/30 text-green-200'}`}>
+          <Badge variant={order.status === 'cancelled' ? 'error' : 'success'}>
             {order.status === 'cancelled' ? 'Đã hủy' : 'Hiệu lực'}
-          </span>
+          </Badge>
         ),
       }
     default:
@@ -255,6 +257,7 @@ export default function OrdersListPage() {
   const [orderPage, setOrderPage] = useState(1)
   const [orderPageSize, setOrderPageSize] = useState(12)
   const [orderPageInput, setOrderPageInput] = useState('1')
+  const [quickOrderOpen, setQuickOrderOpen] = useState(false)
   const orderPageSizeOptions = [8, 12, 16, 24]
   const detailRequestIdRef = useRef(0)
   const columnMenuRef = useRef(null)
@@ -654,19 +657,19 @@ export default function OrdersListPage() {
         `}</style>
       </Head>
 
-      <main className="h-[calc(100svh-3.5rem)] overflow-hidden bg-black text-gray-100 print:bg-white print:text-black sm:h-[calc(100dvh-3rem)]">
+      <main className="h-[calc(100svh-3.5rem)] overflow-hidden text-gray-100 print:bg-white print:text-black sm:h-[calc(100dvh-3rem)]">
         {msgState ? <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg> : null}
         <div className={`${layoutClasses.shell} orders-list-screen-only flex h-full min-h-0 flex-col gap-3 py-3`}>
           <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 xl:grid-cols-[250px_minmax(0,1fr)]">
-            <aside className="relative flex min-h-0 flex-col overflow-hidden rounded-md border border-gray-800 bg-gray-950 p-3">
-              <h1 className="mb-4 text-2xl font-bold">Đơn hàng</h1>
+            <aside className="relative flex min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-950/75 p-3">
+              <PageHeader title="Đơn hàng" subtitle="Lọc, chọn và in đơn trong một workspace." className="mb-4" />
 
               <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
                 <section className="space-y-3">
                   <h2 className="text-base font-semibold text-gray-100">Thời gian</h2>
                   <button
                     type="button"
-                    className="flex h-11 w-full items-center justify-between gap-3 rounded-md border border-gray-700 bg-gray-900 px-3 text-left text-base text-gray-100 hover:bg-gray-800"
+                    className="flex h-11 w-full items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900 px-3 text-left text-base text-gray-100 hover:bg-slate-800"
                     onClick={() => setDateMenuOpen((prev) => !prev)}
                   >
                     <span>{DATE_PRESET_LABELS[datePreset] || 'Tất cả'}</span>
@@ -674,7 +677,7 @@ export default function OrdersListPage() {
                   </button>
                   <button
                     type="button"
-                    className="h-11 w-full rounded-md border border-gray-800 bg-gray-900 px-3 text-left text-base text-gray-300 hover:bg-gray-800"
+                    className="h-11 w-full rounded-xl border border-slate-800 bg-slate-900 px-3 text-left text-base text-gray-300 hover:bg-slate-800"
                     onClick={() => {
                       setDatePreset('all')
                       setDateMenuOpen(false)
@@ -683,7 +686,7 @@ export default function OrdersListPage() {
                     Tất cả thời gian
                   </button>
                   {dateMenuOpen && (
-                    <div className="fixed left-4 right-4 top-24 z-50 grid gap-4 rounded-md border border-gray-800 bg-gray-950 p-4 shadow-2xl shadow-black/50 md:grid-cols-5 xl:left-[280px] xl:right-8">
+                    <div className="fixed left-4 right-4 top-24 z-50 grid gap-4 rounded-3xl border border-slate-800/80 bg-slate-950 p-4 shadow-2xl shadow-black/50 md:grid-cols-5 xl:left-[280px] xl:right-8">
                       {DATE_PRESET_GROUPS.map((group) => (
                         <section key={group.title} className="space-y-2">
                           <h3 className="text-base font-semibold text-gray-100">{group.title}</h3>
@@ -691,7 +694,7 @@ export default function OrdersListPage() {
                             <button
                               key={value}
                               type="button"
-                              className={`block h-10 rounded-full border px-4 text-base ${datePreset === value ? 'border-gray-100 bg-gray-100 text-gray-950' : 'border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'}`}
+                               className={`block h-10 rounded-full border px-4 text-base ${datePreset === value ? 'border-sky-300 bg-sky-300 text-slate-950' : 'border-slate-700 bg-slate-900 text-gray-200 hover:bg-slate-800'}`}
                               onClick={() => {
                                 setDatePreset(value)
                                 setDateMenuOpen(false)
@@ -712,7 +715,7 @@ export default function OrdersListPage() {
                     ['active', 'Hiệu lực'],
                     ['cancelled', 'Đã hủy'],
                   ].map(([value, label]) => (
-                    <label key={value} className="flex h-11 cursor-pointer items-center gap-3 rounded-md border border-gray-800 bg-gray-900 px-3 text-base text-gray-100 hover:bg-gray-800">
+                    <label key={value} className="flex h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 text-base text-gray-100 hover:bg-slate-800">
                       <input
                         type="checkbox"
                         checked={statusFilters.includes(value)}
@@ -727,7 +730,7 @@ export default function OrdersListPage() {
                 <section className="space-y-3">
                   <h2 className="text-base font-semibold text-gray-100">Người tạo</h2>
                   <select
-                    className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+                    className="h-11 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 text-base text-gray-100"
                     value={creatorFilter}
                     onChange={(event) => setCreatorFilter(event.target.value)}
                   >
@@ -738,7 +741,7 @@ export default function OrdersListPage() {
                   </select>
                 </section>
 
-                <section className="rounded-md border border-gray-800 bg-gray-900 p-3">
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
                   <h2 className="mb-3 text-base font-semibold text-gray-100">Tổng quan</h2>
                   <div className="space-y-2 text-base">
                     <div className="flex justify-between gap-3">
@@ -759,12 +762,12 @@ export default function OrdersListPage() {
             </aside>
 
             <section className="flex min-h-0 min-w-0 flex-col overflow-hidden gap-3">
-              <div className="rounded-md border border-gray-800 bg-gray-950 p-2">
+              <div className="rounded-3xl border border-slate-800/80 bg-slate-950/70 p-2">
                 <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(260px,520px)_1fr_auto]">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
                     <Input
-                      className="h-11 border-gray-700 bg-gray-900 pl-10"
+                      className="h-11 border-slate-700 bg-slate-900 pl-10"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                       placeholder="Tìm mã đơn, khách hàng hoặc SĐT"
@@ -772,7 +775,7 @@ export default function OrdersListPage() {
                   </div>
                   <div />
                   <div className="flex flex-wrap justify-start gap-2 lg:justify-end">
-                    <Button asChild>
+                    <Button asChild variant="primary">
                       <Link href="/orders/new"><Plus className="h-4 w-4" /> Lên đơn</Link>
                     </Button>
                     <Button type="button" variant="outline" onClick={handlePrintSelectedOrders} disabled={selectedOrders.length === 0 || printing}>
@@ -790,7 +793,7 @@ export default function OrdersListPage() {
                         Cột hiển thị
                       </Button>
                       {columnMenuOpen && (
-                        <div className="absolute right-0 top-full z-50 mt-2 w-[340px] rounded-md border border-gray-800 bg-gray-950 p-3 shadow-2xl shadow-black/60">
+                        <div className="absolute right-0 top-full z-50 mt-2 w-[340px] rounded-3xl border border-slate-800/80 bg-slate-950 p-3 shadow-2xl shadow-black/60">
                           <div className="mb-3 flex items-center justify-between gap-2">
                             <div>
                               <p className="text-sm font-semibold text-gray-100">Cột hiển thị</p>
@@ -805,7 +808,7 @@ export default function OrdersListPage() {
                               const isChecked = visibleOrderColumnSet.has(column.key)
                               const isLastVisible = visibleOrderColumns.length <= 1 && isChecked
                               return (
-                                <label key={column.key} className="flex items-center gap-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2 text-sm text-gray-100 hover:bg-gray-800">
+                                <label key={column.key} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-sm text-gray-100 hover:bg-slate-800">
                                   <input
                                     type="checkbox"
                                     checked={isChecked}
@@ -826,13 +829,13 @@ export default function OrdersListPage() {
               </div>
 
               {error && (
-                <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>
+                <div className="rounded-2xl border border-red-900 bg-red-950/25 px-4 py-3 text-red-200">{error}</div>
               )}
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-gray-800 bg-gray-950">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-800/80 bg-slate-950/70">
                 <div className="min-h-0 flex-1 overflow-auto">
                   <table className="w-full border-collapse text-base" style={{ minWidth: `${tableMinWidth}px` }}>
-                    <thead className="sticky top-0 z-10 bg-gray-900 text-sm text-gray-300">
+                    <thead className="sticky top-0 z-10 bg-slate-900 text-sm text-gray-300">
                       <tr className="border-b border-gray-800">
                         <th className="px-4 py-3 text-left font-semibold">
                           <input
@@ -965,9 +968,9 @@ export default function OrdersListPage() {
                                         <div>
                                           <div className="flex flex-wrap items-center gap-3">
                                             <h3 className="text-xl font-bold">{expandedOrderInvoice.order.code}</h3>
-                                            <span className={`inline-flex rounded-md border px-3 py-1 text-sm ${isCancelled ? 'border-red-900 bg-red-950/30 text-red-200' : 'border-green-900 bg-green-950/30 text-green-200'}`}>
+                                            <Badge variant={isCancelled ? 'error' : 'success'}>
                                               {isCancelled ? 'Đã hủy' : 'Hiệu lực'}
-                                            </span>
+                                            </Badge>
                                           </div>
                                           <p className="mt-1 text-sm text-gray-400">{formatDateTime(expandedOrderInvoice.order.created_at)} • {getCreatorLabel(expandedOrderInvoice.order, user)}</p>
                                           <p className="mt-2 text-base font-semibold">{expandedOrderInvoice.customerName}</p>
@@ -980,7 +983,7 @@ export default function OrdersListPage() {
                                           <div className="flex justify-between gap-3"><span className="text-gray-400">Tổng phải thu</span><span className="font-semibold">{formatMoney(expandedOrderInvoice.order.total_amount)}</span></div>
                                           <div className="flex justify-between gap-3"><span className="text-gray-400">Lãi gộp</span><span className={Number(expandedOrderInvoice.order.gross_profit_amount || 0) >= 0 ? 'font-semibold text-green-200' : 'font-semibold text-red-200'}>{formatMoney(expandedOrderInvoice.order.gross_profit_amount)}</span></div>
                                           <div><span className="text-gray-500">Số dòng:</span> <span className="font-semibold text-gray-100">{expandedOrderInvoice.lines.length}</span></div>
-                                          <div><span className="text-gray-500">Trạng thái:</span> <span className="font-semibold text-gray-100">{isCancelled ? 'Đã hủy' : 'Hiệu lực'}</span></div>
+                                            <div><span className="text-gray-500">Trạng thái:</span> <Badge variant={isCancelled ? 'error' : 'success'}>{isCancelled ? 'Đã hủy' : 'Hiệu lực'}</Badge></div>
                                           <div><span className="text-gray-500">Ghi chú:</span> <span className="font-semibold text-gray-100">{expandedOrderInvoice.order.note || 'Không có'}</span></div>
                                         </div>
                                       </div>
@@ -1182,6 +1185,20 @@ export default function OrdersListPage() {
           ))}
         </div>
       </main>
+
+      <BottomSheet open={quickOrderOpen} onClose={() => setQuickOrderOpen(false)} height="70vh">
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Lên đơn nhanh</h2>
+          <p className="text-sm text-gray-400">Bắt đầu lên đơn nhanh — sẽ chuyển sang màn tạo đơn với dữ liệu tiền điền.</p>
+          <div>
+            <QuickOrderSheet initialStoreId="" onStart={() => setQuickOrderOpen(false)} />
+          </div>
+        </div>
+      </BottomSheet>
+
+      <FAB onClick={() => setQuickOrderOpen(true)} ariaLabel="Lên đơn nhanh">
+        <Plus className="h-5 w-5" />
+      </FAB>
     </>
   )
 }

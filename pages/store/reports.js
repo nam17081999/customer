@@ -1,6 +1,7 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Badge, PageHeader } from '@/components/ui/v2'
 import { Card, CardContent } from '@/components/ui/card'
 import { REPORT_REASON_OPTIONS } from '@/lib/constants'
 import { summarizeStoreReport } from '@/helper/storeReportFlow'

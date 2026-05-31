@@ -13,10 +13,11 @@ import { buildTodayWorkSummary } from '@/helper/todayWork'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { PageHeader, Badge } from '@/components/ui/v2'
 
 function WorkCard({ card }) {
   return (
-    <Link href={card.href} className="block rounded-md border border-gray-800 bg-gray-950 p-4 hover:border-sky-700 hover:bg-sky-950/20">
+    <Link href={card.href} className="block rounded-3xl border border-slate-800/80 bg-slate-950/70 p-4 transition hover:border-sky-500/40 hover:bg-slate-900/70">
       <p className="text-sm font-medium text-gray-400">{card.label}</p>
       <p className="mt-1 text-3xl font-bold text-gray-100">{card.count}</p>
     </Link>
@@ -25,24 +26,24 @@ function WorkCard({ card }) {
 
 function StoreList({ id, title, items, emptyText, actionLabel = 'Mở', getHref }) {
   return (
-    <section id={id} className="rounded-md border border-gray-800 bg-gray-950">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
+    <section id={id} className="rounded-3xl border border-slate-800/80 bg-slate-950/70">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 px-4 py-3">
         <h2 className="text-lg font-semibold text-gray-100">{title}</h2>
-        <span className="text-sm text-gray-400">{items.length}</span>
+        <Badge>{items.length}</Badge>
       </div>
       {items.length === 0 ? (
         <p className="px-4 py-4 text-base text-gray-400">{emptyText}</p>
       ) : (
-        <div className="divide-y divide-gray-900">
+        <div className="divide-y divide-slate-900/80">
           {items.map((store) => (
             <div key={store.id} className="grid grid-cols-1 gap-3 px-4 py-3 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 <p className="truncate text-base font-semibold text-gray-100">{store.name || 'Chưa có tên'}</p>
                 <p className="mt-1 line-clamp-2 text-sm text-gray-400">{formatAddressParts(store) || 'Chưa có địa chỉ'}</p>
               </div>
-              <Button asChild variant="outline" size="sm">
-                <Link href={getHref(store)}>{actionLabel}</Link>
-              </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={getHref(store)}>{actionLabel}</Link>
+                </Button>
             </div>
           ))}
         </div>
@@ -53,10 +54,10 @@ function StoreList({ id, title, items, emptyText, actionLabel = 'Mở', getHref 
 
 function ProductList({ items }) {
   return (
-    <section className="rounded-md border border-gray-800 bg-gray-950">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
+    <section className="rounded-3xl border border-slate-800/80 bg-slate-950/70">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 px-4 py-3">
         <h2 className="text-lg font-semibold text-gray-100">Hàng sắp hết</h2>
-        <span className="text-sm text-gray-400">{items.length}</span>
+        <Badge variant="warning">{items.length}</Badge>
       </div>
       {items.length === 0 ? (
         <p className="px-4 py-4 text-base text-gray-400">Không có hàng dưới tồn tối thiểu.</p>
@@ -158,21 +159,21 @@ export default function TodayPage() {
       <Head>
         <title>Công việc hôm nay - NPP Hà Công</title>
       </Head>
-      <main className="min-h-screen bg-black text-gray-100">
+    <main className="min-h-screen text-gray-100">
         <div className="mx-auto max-w-6xl space-y-4 px-3 py-4 pb-20 sm:px-4 sm:py-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-100">Công việc hôm nay</h1>
-              <p className="text-base text-gray-400">Các việc cần xử lý nhanh để dữ liệu và vận hành không bị tồn đọng.</p>
-            </div>
-            <Button type="button" variant="outline" onClick={loadData} disabled={loading}>
-              <RefreshCw className="h-4 w-4" />
-              {loading ? 'Đang tải...' : 'Làm mới'}
-            </Button>
-          </div>
+          <PageHeader
+            title="Công việc hôm nay"
+            subtitle="Các việc cần xử lý nhanh để dữ liệu và vận hành không bị tồn đọng."
+            actions={(
+              <Button type="button" variant="outline" onClick={loadData} disabled={loading}>
+                <RefreshCw className="h-4 w-4" />
+                {loading ? 'Đang tải...' : 'Làm mới'}
+              </Button>
+            )}
+          />
 
-          {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
-          {inventoryWarning && <div className="rounded-md border border-amber-900 bg-amber-950/30 px-4 py-3 text-amber-100">{inventoryWarning}</div>}
+          {error && <div className="rounded-2xl border border-red-900/60 bg-red-950/25 px-4 py-3 text-red-200">{error}</div>}
+          {inventoryWarning && <div className="rounded-2xl border border-amber-900/60 bg-amber-950/25 px-4 py-3 text-amber-100">{inventoryWarning}</div>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((card) => <WorkCard key={card.key} card={card} />)}

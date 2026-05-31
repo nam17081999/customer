@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/lib/AuthContext'
+import { useTheme } from '@/lib/ThemeContext'
+import { Sun, Moon } from 'lucide-react'
 import { buildCommandSearchResults, getOperatorShortcutHref, OPERATOR_QUICK_ACTIONS } from '@/helper/operatorWorkflow'
 import {
   AccountIcon,
@@ -27,6 +29,7 @@ function NavBadge({ count, mobile = false }) {
 export default function AppNavbar() {
   const pathname = usePathname()
   const { isAdmin, isTelesale } = useAuth() || {}
+  const { theme, setTheme } = useTheme() || {}
   const [searchHref, setSearchHref] = useState('/')
   const [quickOpen, setQuickOpen] = useState(false)
   const [quickQuery, setQuickQuery] = useState('')
@@ -35,6 +38,7 @@ export default function AppNavbar() {
   const currentPath = pathname || ''
   const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : 'Người dùng'
   const accountMobileLabel = isAdmin ? 'Admin' : isTelesale ? 'Tele' : 'ND'
+  const roleLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : 'Khách'
 
   const guestLinks = [
     { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
@@ -162,69 +166,125 @@ export default function AppNavbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 hidden border-b border-white/10 bg-slate-950/82 backdrop-blur-xl sm:block">
-        <div className="mx-auto flex h-12 w-full max-w-[1900px] items-center gap-1.5 px-3 sm:px-4 2xl:px-6">
-          <Link href="/" className="flex shrink-0 items-center text-sm font-semibold uppercase tracking-[0.1em] text-slate-100">
-            <span>NPP Hà Công</span>
+      {/* Desktop Navigation Header */}
+      <nav className="sticky top-0 z-50 hidden border-b border-slate-800/80 bg-[color:var(--surface)]/92 backdrop-blur-xl transition-all duration-300 ease-in-out sm:block shadow-[0_10px_40px_rgba(2,6,23,0.16)]">
+        <div className="mx-auto flex h-14 w-full max-w-[1900px] items-center gap-3 px-3 sm:px-4 2xl:px-6">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-slate-700/60 bg-slate-900/40 px-3 py-2 transition hover:border-sky-500/40 hover:bg-slate-800/60">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 text-sm font-black text-white shadow-lg shadow-sky-950/30">NH</span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-extrabold tracking-[0.14em] text-slate-100 uppercase">NPP Hà Công</span>
+              <span className="block text-[11px] font-medium text-slate-400">Workbench cho bán hàng, kho và cửa hàng</span>
+            </span>
           </Link>
 
-          <div className="ml-auto hidden items-center gap-1 sm:flex">
+          <div className="hidden items-center gap-2 xl:flex">
+            <span className="rounded-full border border-slate-700/70 bg-slate-900/50 px-3 py-1 text-xs font-semibold text-slate-300">{roleLabel}</span>
             {isAdmin && (
               <button
                 type="button"
-                className="rounded-full border border-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-500 hover:text-white"
+                className="rounded-full border border-slate-700 bg-slate-900/50 px-3 py-1 text-xs font-semibold text-slate-200 hover:border-slate-500 hover:bg-slate-800 hover:text-white transition-all cursor-pointer shadow-inner"
                 onClick={() => setQuickOpen((prev) => !prev)}
                 aria-expanded={quickOpen}
               >
                 Ctrl K
               </button>
             )}
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
             {navLinks.map(({ href, active, label, Icon, badge }) => (
               <Link
                 key={href}
                 href={href}
                 aria-current={active ? 'page' : undefined}
-                className={`relative flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${active ? 'text-white' : 'text-slate-300 hover:text-white'}`}
+                className={`relative flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all duration-200 ${
+                  active
+                    ? 'border-sky-500/35 bg-sky-500/10 text-sky-300'
+                    : 'border-transparent bg-transparent text-slate-300 hover:border-slate-700/70 hover:bg-slate-900/60 hover:text-slate-50'
+                }`}
               >
-                <Icon className={`size-3.5 ${active ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className={`size-4 ${active ? 'text-sky-300' : 'text-slate-400'}`} />
                 <span className="whitespace-nowrap">{label}</span>
-                {active && <span className="absolute inset-x-2.5 -bottom-0.5 h-0.5 rounded-full bg-sky-300" />}
                 <NavBadge count={badge} />
               </Link>
             ))}
+
+            {theme && (
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="ml-1 flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/50 text-slate-200 hover:border-sky-500/40 hover:bg-slate-800 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-none"
+                aria-label="Thay đổi giao diện"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="size-4 text-amber-300" />
+                ) : (
+                  <Moon className="size-4 text-indigo-500" />
+                )}
+              </button>
+            )}
           </div>
         </div>
+        
         {isAdmin && quickOpen && (
-          <div className="absolute right-4 top-13 z-[1100] w-80 rounded-xl border border-slate-800 bg-slate-950 p-2 shadow-2xl shadow-black/50">
+          <div className="absolute right-4 top-13 z-[1100] w-85 rounded-2xl border border-slate-800/90 bg-slate-950 p-2 shadow-2xl shadow-black/80 animate-in fade-in slide-in-from-top-2 duration-150">
             <input
-              className="mb-2 h-10 w-full rounded-lg border border-slate-800 bg-slate-900 px-3 text-sm text-slate-100 outline-none focus:border-sky-500"
+              className="mb-2 h-10 w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 text-sm text-slate-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               value={quickQuery}
               onChange={(event) => setQuickQuery(event.target.value)}
               placeholder="Tìm lệnh, màn hình..."
               autoFocus
             />
-            {commandResults.map((result) => (
-              <Link key={`${result.type}-${result.id}`} href={result.href} className="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-900" onClick={() => { setQuickOpen(false); setQuickQuery('') }}>
-                <span>{result.label}</span>
-                <span className="text-xs text-slate-500">{result.subtitle}</span>
-              </Link>
-            ))}
-            {commandResults.length === 0 && <p className="px-3 py-4 text-sm text-slate-500">Không có kết quả.</p>}
+            <div className="max-h-80 overflow-y-auto space-y-0.5">
+              {commandResults.map((result) => (
+                <Link key={`${result.type}-${result.id}`} href={result.href} className="flex items-center justify-between rounded-xl px-3.5 py-2 text-sm text-slate-200 hover:bg-slate-900 transition-colors" onClick={() => { setQuickOpen(false); setQuickQuery('') }}>
+                  <span className="font-medium text-slate-100">{result.label}</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-900/80 px-2 py-0.5 rounded-md border border-slate-800">{result.subtitle}</span>
+                </Link>
+              ))}
+              {commandResults.length === 0 && <p className="px-3.5 py-4 text-sm text-slate-500 text-center">Không tìm thấy kết quả.</p>}
+            </div>
           </div>
         )}
       </nav>
 
-      <div className="safe-area-bottom fixed inset-x-0 bottom-0 z-[1000] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:hidden">
-        <div className="mx-auto flex h-14 w-full max-w-screen-md">
+      {/* Mobile Top Navigation Header */}
+      <header className="sticky top-0 z-50 flex h-14 w-full items-center justify-between border-b border-slate-800/80 bg-[color:var(--surface)]/94 px-4 backdrop-blur-xl transition-all duration-300 sm:hidden shadow-[0_10px_30px_rgba(2,6,23,0.14)]">
+        <Link href="/" className="flex min-w-0 items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 text-xs font-black text-white shadow-lg shadow-sky-950/30">NH</span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-extrabold tracking-[0.12em] text-slate-100 uppercase">NPP Hà Công</span>
+            <span className="block text-[11px] font-medium text-slate-400">{roleLabel}</span>
+          </span>
+        </Link>
+        {theme && (
+          <button
+            type="button"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-700 bg-slate-900/60 text-slate-200 active:scale-95 transition-all cursor-pointer"
+            aria-label="Thay đổi giao diện"
+          >
+            {theme === 'dark' ? (
+              <Sun className="size-4 text-amber-300" />
+            ) : (
+              <Moon className="size-4 text-indigo-500" />
+            )}
+          </button>
+        )}
+      </header>
+
+      {/* Mobile Fixed Bottom Navigation Bar */}
+      <div className="safe-area-bottom fixed inset-x-0 bottom-0 z-[1000] border-t border-slate-800 bg-[color:var(--surface)]/96 backdrop-blur-xl sm:hidden shadow-[0_-10px_30px_rgba(2,6,23,0.18)]">
+        <div className="mx-auto flex h-16 w-full max-w-screen-md px-1.5">
           {navLinks.map(({ href, active, label, mobileLabel, Icon, badge }) => (
             <Link
               key={href}
               href={href}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${active ? 'text-blue-400' : 'text-gray-500 active:text-gray-200'}`}
+              className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 transition-all duration-200 ${active ? 'bg-sky-500/10 text-sky-300' : 'text-slate-500 active:text-slate-200'}`}
             >
               <Icon className="size-5 shrink-0" />
-              <span className={`w-full truncate text-center text-[9px] font-medium leading-none whitespace-nowrap ${active ? 'text-blue-400' : 'text-gray-500'}`}>
+              <span className={`w-full truncate text-center text-[10px] font-semibold leading-none whitespace-nowrap ${active ? 'text-sky-300' : 'text-slate-500'}`}>
                 {mobileLabel || label}
               </span>
               <NavBadge count={badge} mobile />

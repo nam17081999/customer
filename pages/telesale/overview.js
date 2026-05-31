@@ -2,8 +2,8 @@
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useAuth } from '@/lib/AuthContext'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge, PageHeader, Section } from '@/components/ui/v2'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { formatAddressParts } from '@/lib/utils'
@@ -39,10 +39,8 @@ function getTimeValue(value) {
 function getResultGapMinutes(store) {
   const calledAt = getTimeValue(store?.last_called_at)
   if (!calledAt) return null
-
   const resultAt = getTimeValue(store?.last_call_result_at)
   if (!resultAt) return null
-
   return Math.abs(resultAt - calledAt) / (60 * 1000)
 }
 
@@ -54,15 +52,9 @@ function isResultStale(store) {
 
 function getPriorityTime(store) {
   const group = getPriorityGroup(store)
-  if (group === 0) {
-    return new Date(store?.created_at || store?.updated_at || 0).getTime()
-  }
-  if (group === 1) {
-    return getTimeValue(store?.last_called_at || store?.updated_at || store?.created_at)
-  }
-  if (group === 5) {
-    return getTimeValue(store?.last_order_reported_at || store?.last_call_result_at || store?.last_called_at)
-  }
+  if (group === 0) return new Date(store?.created_at || store?.updated_at || 0).getTime()
+  if (group === 1) return getTimeValue(store?.last_called_at || store?.updated_at || store?.created_at)
+  if (group === 5) return getTimeValue(store?.last_order_reported_at || store?.last_call_result_at || store?.last_called_at)
   return getTimeValue(store?.last_call_result_at || store?.last_called_at)
 }
 
@@ -83,6 +75,9 @@ function isOlderThanDays(value, days) {
 function TelesaleStoreRow({ store, onUpdate }) {
   const addressText = formatAddressParts(store)
   const needsUpdate = isResultStale(store)
+  const resultLabel = getTelesaleResultLabel(store.last_call_result)
+  const resultBadgeVariant = store.last_call_result === 'da_len_don' || store.last_call_result === 'da_bao_don'
+    ? 'success' : 'default'
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-950 px-3 py-3">
@@ -91,19 +86,15 @@ function TelesaleStoreRow({ store, onUpdate }) {
           <p className="truncate text-base font-semibold text-gray-100">{store.name}</p>
           {addressText && <p className="mt-1 line-clamp-2 text-sm text-gray-400">{addressText}</p>}
           <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-gray-800 px-2 py-1 text-gray-200">
-              {getTelesaleResultLabel(store.last_call_result)}
-            </span>
-            <span className="rounded-full bg-gray-800 px-2 py-1 text-gray-200">
-              {formatLastCalledText(store.last_called_at)}
-            </span>
+            {resultLabel && (
+              <Badge variant={resultBadgeVariant}>{resultLabel}</Badge>
+            )}
+            <Badge>{formatLastCalledText(store.last_called_at)}</Badge>
             {store.last_call_result_at && (
-              <span className="rounded-full bg-gray-800 px-2 py-1 text-gray-200">
-                Cập nhật kết quả: {formatLastCalledText(store.last_call_result_at)}
-              </span>
+              <Badge>Cập nhật kết quả: {formatLastCalledText(store.last_call_result_at)}</Badge>
             )}
             {hasReportedOrder(store) && (
-              <span className="rounded-full bg-amber-500/15 px-2 py-1 text-amber-200">Đã lên đơn</span>
+              <Badge variant="success">Đã lên đơn</Badge>
             )}
           </div>
           {store.sales_note && <p className="mt-2 line-clamp-2 text-sm text-gray-300">{store.sales_note}</p>}
@@ -114,7 +105,7 @@ function TelesaleStoreRow({ store, onUpdate }) {
             <Button
               type="button"
               variant="outline"
-              className="shrink-0 border-sky-500/40 text-sky-100 hover:bg-sky-500/10"
+              className="shrink-0 border-blue-500/40 text-blue-100 hover:bg-blue-500/10"
               onClick={() => onUpdate?.(store.id)}
             >
               Cập nhật
@@ -132,6 +123,23 @@ function TelesaleStoreRow({ store, onUpdate }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, variant = 'default' }) {
+  const variants = {
+    default: 'border-gray-800 bg-gray-950',
+    amber: 'border-amber-900 bg-amber-950/25',
+    sky: 'border-sky-900 bg-sky-950/25',
+    violet: 'border-violet-900 bg-violet-950/25',
+    green: 'border-green-900 bg-green-950/25',
+  }
+
+  return (
+    <div className={`rounded-xl border p-3 ${variants[variant] || variants.default}`}>
+      <p className="text-xs uppercase tracking-wide text-gray-400">{label}</p>
+      <p className="mt-1 text-3xl font-bold text-gray-100">{value}</p>
     </div>
   )
 }
@@ -245,91 +253,67 @@ export default function TelesaleOverviewPage() {
 
       <div className="min-h-screen bg-black">
         <div className="mx-auto max-w-screen-md space-y-4 px-3 py-4 sm:px-4 sm:py-6">
-          <div className="flex items-center justify-between gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={handleBack}>
-              ← Quay lại
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
-              {loading ? 'Đang tải...' : 'Làm mới'}
-            </Button>
+          <PageHeader
+            title="Tổng quan telesale"
+            subtitle="Quan sát nhanh nhóm cần gọi và cửa hàng đã lên đơn."
+            actions={
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={handleBack}>
+                  ← Quay lại
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
+                  {loading ? 'Đang tải...' : 'Làm mới'}
+                </Button>
+              </>
+            }
+          />
+
+          {error && (
+            <div className="rounded-xl border border-red-900 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatCard label="Có SĐT" value={summary.totalPhoneStores} />
+            <StatCard label="Chưa gọi" value={summary.neverCalledCount} variant="amber" />
+            <StatCard label="Cần gọi lại" value={summary.needFollowUpCount} variant="sky" />
+            <StatCard label="Còn hàng" value={summary.interestedCount} variant="violet" />
+            <StatCard label="Đã lên đơn" value={summary.reportedCount} variant="green" />
           </div>
 
-          <Card className="rounded-2xl border border-gray-800">
-            <CardContent className="space-y-4 p-4 sm:p-5">
-              <div>
-                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Tổng quan telesale</h1>
-                <p className="text-sm text-gray-400 sm:text-base">
-                  Quan sát nhanh nhóm cần gọi và cửa hàng đã lên đơn.
-                </p>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-100">Danh sách ưu tiên gọi</h2>
+                <span className="text-sm text-gray-400">{summary.queueStores.length} cửa hàng</span>
               </div>
-
-              {error && (
-                <div className="rounded-xl border border-red-900 bg-red-950/30 px-3 py-2 text-sm text-red-200">
-                  {error}
+              {summary.queueStores.length === 0 ? (
+                <p className="text-sm text-gray-400">Chưa có cửa hàng cần ưu tiên gọi.</p>
+              ) : (
+                <div className="space-y-3">
+                  {summary.queueStores.map((store) => (
+                    <TelesaleStoreRow key={store.id} store={store} onUpdate={handleOpenUpdate} />
+                  ))}
                 </div>
               )}
+            </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3">
-                  <p className="text-xs uppercase tracking-wide text-gray-400">Có số điện thoại</p>
-                  <p className="mt-1 text-3xl font-bold text-gray-100">{summary.totalPhoneStores}</p>
-                </div>
-                <div className="rounded-xl border border-amber-900 bg-amber-950/25 p-3">
-                  <p className="text-xs uppercase tracking-wide text-amber-300">Chưa gọi</p>
-                  <p className="mt-1 text-3xl font-bold text-amber-200">{summary.neverCalledCount}</p>
-                </div>
-                <div className="rounded-xl border border-sky-900 bg-sky-950/25 p-3">
-                  <p className="text-xs uppercase tracking-wide text-sky-300">Cần gọi lại</p>
-                  <p className="mt-1 text-3xl font-bold text-sky-200">{summary.needFollowUpCount}</p>
-                </div>
-                <div className="rounded-xl border border-violet-900 bg-violet-950/25 p-3">
-                  <p className="text-xs uppercase tracking-wide text-violet-300">Còn hàng</p>
-                  <p className="mt-1 text-3xl font-bold text-violet-200">{summary.interestedCount}</p>
-                </div>
-                <div className="rounded-xl border border-green-900 bg-green-950/25 p-3">
-                  <p className="text-xs uppercase tracking-wide text-green-300">Đã lên đơn</p>
-                  <p className="mt-1 text-3xl font-bold text-green-200">{summary.reportedCount}</p>
-                </div>
+            <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 sm:p-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-gray-100">Cuộc gọi gần đây</h2>
+                <span className="text-sm text-gray-400">{summary.recentCalls.length} cửa hàng</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Card className="rounded-2xl border border-gray-800">
-              <CardContent className="space-y-3 p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-gray-100">Danh sách ưu tiên gọi</h2>
-                  <span className="text-sm text-gray-400">{summary.queueStores.length} cửa hàng</span>
+              {summary.recentCalls.length === 0 ? (
+                <p className="text-sm text-gray-400">Chưa có cuộc gọi nào được cập nhật.</p>
+              ) : (
+                <div className="space-y-3">
+                  {summary.recentCalls.map((store) => (
+                    <TelesaleStoreRow key={store.id} store={store} onUpdate={handleOpenUpdate} />
+                  ))}
                 </div>
-                {summary.queueStores.length === 0 ? (
-                  <p className="text-sm text-gray-400">Chưa có cửa hàng cần ưu tiên gọi.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {summary.queueStores.map((store) => (
-                      <TelesaleStoreRow key={store.id} store={store} onUpdate={handleOpenUpdate} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-2xl border border-gray-800">
-              <CardContent className="space-y-3 p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-gray-100">Cuộc gọi gần đây</h2>
-                  <span className="text-sm text-gray-400">{summary.recentCalls.length} cửa hàng</span>
-                </div>
-                {summary.recentCalls.length === 0 ? (
-                  <p className="text-sm text-gray-400">Chưa có cuộc gọi nào được cập nhật.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {summary.recentCalls.map((store) => (
-                      <TelesaleStoreRow key={store.id} store={store} onUpdate={handleOpenUpdate} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
 import { Button } from '@/components/ui/button'
+import { PrimaryButton, Badge, PageHeader } from '@/components/ui/v2'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { useAuth } from '@/lib/AuthContext'
 import { formatAddressParts } from '@/lib/utils'
@@ -220,11 +221,11 @@ export default function StoreReportPage() {
                     <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
                     <p className="mt-1 text-sm text-gray-400">Sửa thông tin sẽ sang màn riêng để nhập liệu giống tạo / sửa / bổ sung.</p>
                     <div className="mt-4 grid gap-2">
-                      <Button asChild className="w-full">
-                        <Link href={{ pathname: `/store/report/${store.id}/edit`, query: { from: `/store/report/${store.id}`, distance: reportDistance ?? undefined } }}>
-                          Sửa thông tin
-                        </Link>
-                      </Button>
+                        <PrimaryButton asChild className="w-full">
+                          <Link href={{ pathname: `/store/report/${store.id}/edit`, query: { from: `/store/report/${store.id}`, distance: reportDistance ?? undefined } }}>
+                            Sửa thông tin
+                          </Link>
+                        </PrimaryButton>
                     </div>
                   </div>
 

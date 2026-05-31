@@ -4,6 +4,8 @@ import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { Button } from '@/components/ui/button'
+import { PrimaryButton, Badge, PageHeader } from '@/components/ui/v2'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { getCachedStores, getOrRefreshStores } from '@/lib/storeCache'
@@ -202,26 +204,24 @@ export default function StoreEditHistoryPage() {
                 Admin: {user?.email || '—'}
               </p>
             </div>
-            <Button
+            <PrimaryButton
               type="button"
-              variant="outline"
               onClick={() => {
                 if (from) router.push(String(from))
                 else router.back()
               }}
             >
               Quay lại
-            </Button>
+            </PrimaryButton>
           </div>
 
           <Card className="rounded-2xl border border-gray-800">
             <CardContent className="p-4 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input
+                <Input
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Tìm theo hành động/field/role..."
-                  className="h-11 rounded-xl border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
                   aria-label="Tìm trong lịch sử"
                 />
                 <select

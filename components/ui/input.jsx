@@ -1,3 +1,4 @@
+// shim removed: keep original Input implementation
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,7 @@ const Input = React.forwardRef(
         <input
           type={type}
           className={cn(
-            "flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-base placeholder:text-gray-500 focus:outline-none focus:border-blue-500 focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50 text-gray-100",
+            "flex h-12 w-full rounded-xl border border-slate-700/90 bg-slate-900/92 px-3.5 py-2 text-base text-slate-100 shadow-inner shadow-black/10 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50",
             showClear ? 'pr-9' : '',
             className
           )}
@@ -30,7 +31,7 @@ const Input = React.forwardRef(
           <button
             type="button"
             tabIndex={-1}
-            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-700 hover:text-gray-200 focus:outline-none"
+            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-lg p-1.5 text-slate-500 hover:bg-slate-700 hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
             onClick={() => onChange({ target: { value: '' } })}
             aria-label="Xóa nhanh"
           >

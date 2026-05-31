@@ -8,6 +8,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { formatMoney, getDashboardAggregateReport, getInventoryReconciliationReport, listProductsWithStock, listPurchaseOrders, listSalesOrders } from '@/api/inventory/inventory-client'
 import { buildDashboardHealthSummary, OPERATOR_QUICK_ACTIONS } from '@/helper/operatorWorkflow'
+import { PageHeader, Badge } from '@/components/ui/v2'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -194,140 +195,169 @@ export default function OverviewPage() {
         <title>Tổng quan - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
-        <div className="mx-auto max-w-[1900px] px-3 py-4 sm:px-4 sm:py-6 space-y-4">
-          <div>
-            <Button type="button" variant="outline" size="sm" onClick={handleBack}>
+      <div className="min-h-screen">
+        <div className="mx-auto max-w-[1900px] px-3 py-4 sm:px-4 sm:py-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <Button type="button" variant="outline" size="sm" onClick={handleBack} className="border-slate-800 hover:bg-slate-900 transition-all">
               ← Quay lại
             </Button>
           </div>
 
-          <Card className="rounded-2xl border border-gray-800">
-            <CardContent className="p-4 sm:p-5 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-100">Tổng quan</h1>
-                  <p className="text-base text-gray-400">
-                    Theo dõi số lượng cửa hàng và trạng thái xác thực.
-                  </p>
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={loadDashboard} disabled={loading}>
-                  {loading ? 'Đang tải...' : 'Làm mới'}
-                </Button>
-              </div>
+          <Card className="rounded-3xl border border-slate-800/80 bg-slate-950/70 backdrop-blur-md shadow-2xl">
+            <CardContent className="p-4 sm:p-6 space-y-6">
+              <PageHeader
+                title="Tổng quan"
+                subtitle="Theo dõi số lượng cửa hàng, chất lượng dữ liệu và trạng thái vận hành hệ thống."
+                actions={(
+                  <Button type="button" variant="outline" size="sm" onClick={loadDashboard} disabled={loading} className="border-slate-700 bg-slate-900/60 font-bold hover:bg-slate-800 transition-all cursor-pointer">
+                    {loading ? 'Đang tải...' : 'Làm mới'}
+                  </Button>
+                )}
+              />
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-xl bg-blue-950/30 border border-blue-900 p-3">
-                  <p className="text-xs uppercase tracking-wide text-blue-300">Tổng cửa hàng</p>
-                  <p className="text-3xl font-bold text-blue-200">{summary.totalStores}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                <div className="rounded-2xl bg-blue-950/20 border border-blue-900/50 p-4 transition-all duration-300 hover:bg-blue-950/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-blue-400">Tổng cửa hàng</p>
+                  <p className="mt-1.5 text-3xl font-extrabold text-blue-200">{summary.totalStores}</p>
                 </div>
-                <div className="rounded-xl bg-green-950/30 border border-green-900 p-3">
-                  <p className="text-xs uppercase tracking-wide text-green-300">Đã xác thực</p>
-                  <p className="text-3xl font-bold text-green-200">{summary.verifiedStores}</p>
+                <div className="rounded-2xl bg-emerald-950/20 border border-emerald-900/50 p-4 transition-all duration-300 hover:bg-emerald-950/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-400">Đã xác thực</p>
+                  <p className="mt-1.5 text-3xl font-extrabold text-emerald-200">{summary.verifiedStores}</p>
                 </div>
-                <div className="rounded-xl bg-amber-950/30 border border-amber-900 p-3">
-                  <p className="text-xs uppercase tracking-wide text-amber-300">Chưa xác thực</p>
-                  <p className="text-3xl font-bold text-amber-200">{summary.unverifiedStores}</p>
+                <div className="rounded-2xl bg-amber-950/20 border border-amber-900/50 p-4 transition-all duration-300 hover:bg-amber-950/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-400">Chưa xác thực</p>
+                  <p className="mt-1.5 text-3xl font-extrabold text-amber-200">{summary.unverifiedStores}</p>
                 </div>
-                <div className="rounded-xl bg-purple-950/30 border border-purple-900 p-3">
-                  <p className="text-xs uppercase tracking-wide text-purple-300">Tỷ lệ xác thực</p>
-                  <p className="text-3xl font-bold text-purple-200">{summary.verificationRate}%</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Số huyện có dữ liệu</p>
-                  <p className="text-2xl font-semibold text-gray-100">{summary.districtCount}</p>
-                </div>
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Số xã/phường có dữ liệu</p>
-                  <p className="text-2xl font-semibold text-gray-100">{summary.wardCount}</p>
-                </div>
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Thêm trong 7 ngày</p>
-                  <p className="text-2xl font-semibold text-gray-100">{summary.last7DaysStores}</p>
+                <div className="rounded-2xl bg-indigo-950/20 border border-indigo-900/50 p-4 transition-all duration-300 hover:bg-indigo-950/30">
+                  <p className="text-xs font-bold uppercase tracking-wider text-indigo-400">Tỷ lệ xác thực</p>
+                  <p className="mt-1.5 text-3xl font-extrabold text-indigo-200">{summary.verificationRate}%</p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Cửa hàng có số điện thoại</p>
-                  <p className="text-2xl font-semibold text-gray-100">{summary.storesWithPhone}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/20 hover:bg-slate-900/40 transition-all duration-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Số huyện có dữ liệu</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.districtCount}</p>
                 </div>
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Cửa hàng có tọa độ</p>
-                  <p className="text-2xl font-semibold text-gray-100">{summary.storesWithLocation}</p>
+                <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/20 hover:bg-slate-900/40 transition-all duration-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Số xã/phường có dữ liệu</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.wardCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/20 hover:bg-slate-900/40 transition-all duration-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Thêm trong 7 ngày</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.last7DaysStores}</p>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                <p className="text-sm text-gray-400">Dữ liệu mới nhất</p>
-                <p className="text-base font-medium text-gray-100">{formatDateTime(summary.newestCreatedAt)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 border-t border-slate-800/50 pt-5">
+                <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/20 hover:bg-slate-900/40 transition-all duration-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Cửa hàng có số điện thoại</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.storesWithPhone}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/20 hover:bg-slate-900/40 transition-all duration-200">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Cửa hàng có tọa độ</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{summary.storesWithLocation}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800/80 p-4 bg-slate-900/30 flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Dữ liệu cập nhật mới nhất</p>
+                <p className="text-sm font-extrabold text-blue-400 bg-blue-950/20 border border-blue-900/40 px-3 py-1 rounded-full">{formatDateTime(summary.newestCreatedAt)}</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-gray-800">
-            <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+          <Card className="rounded-2xl border border-slate-800/80 bg-slate-950/70 backdrop-blur-md shadow-2xl">
+            <CardContent className="space-y-5 p-4 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/50 pb-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-100">Vận hành hôm nay</h2>
-                  <p className="text-base text-gray-400">Doanh thu, tồn kho, đối soát và thao tác nhanh.</p>
+                  <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-100">Vận hành hôm nay</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-400">Theo dõi dòng tài chính doanh thu, tồn kho và đối soát tức thì.</p>
                 </div>
-                <div className={health.needsAttention ? 'rounded-full border border-amber-900 bg-amber-950/30 px-3 py-1 text-sm text-amber-200' : 'rounded-full border border-green-900 bg-green-950/30 px-3 py-1 text-sm text-green-200'}>
+                <Badge variant={health.needsAttention ? 'warning' : 'success'} className="uppercase tracking-wide">
                   {health.needsAttention ? 'Cần kiểm tra' : 'Ổn định'}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3.5 lg:grid-cols-6">
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Doanh thu</p>
+                  <p className="mt-1 text-2xl font-extrabold text-emerald-400">{formatMoney(health.revenue)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Lợi nhuận</p>
+                  <p className="mt-1 text-2xl font-extrabold text-sky-400">{formatMoney(health.profit)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Đơn hàng</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{health.activeOrderCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Nhập hàng</p>
+                  <p className="mt-1 text-2xl font-extrabold text-slate-100">{health.activePurchaseCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Tồn thấp</p>
+                  <p className={`mt-1 text-2xl font-extrabold ${health.lowStockCount > 0 ? 'text-amber-400' : 'text-slate-300'}`}>{health.lowStockCount}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 transition-all duration-300 hover:bg-slate-900/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Lệch đối soát</p>
+                  <p className={`mt-1 text-2xl font-extrabold ${health.reconciliationIssueCount > 0 ? 'text-red-400' : 'text-slate-300'}`}>{health.reconciliationIssueCount}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Doanh thu</p><p className="text-2xl font-bold text-green-200">{formatMoney(health.revenue)}</p></div>
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Lợi nhuận</p><p className="text-2xl font-bold text-sky-200">{formatMoney(health.profit)}</p></div>
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Đơn hiệu lực</p><p className="text-2xl font-bold text-gray-100">{health.activeOrderCount}</p></div>
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Nhập hiệu lực</p><p className="text-2xl font-bold text-gray-100">{health.activePurchaseCount}</p></div>
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Tồn thấp</p><p className="text-2xl font-bold text-amber-200">{health.lowStockCount}</p></div>
-                <div className="rounded-xl border border-gray-800 bg-gray-950 p-3"><p className="text-sm text-gray-400">Lệch đối soát</p><p className="text-2xl font-bold text-red-200">{health.reconciliationIssueCount}</p></div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6 border-t border-slate-800/40 pt-4">
                 {OPERATOR_QUICK_ACTIONS.map((action) => (
-                  <Button key={action.key} asChild variant="outline" className="h-11 justify-between">
-                    <a href={action.href}><span>{action.label}</span><span className="text-xs text-gray-500">{action.shortcut}</span></a>
+                  <Button key={action.key} asChild variant="outline" className="h-12 justify-between border-slate-800/80 hover:border-slate-600 bg-slate-900/20 transition-all duration-200 rounded-xl cursor-pointer">
+                    <a href={action.href} className="flex w-full items-center justify-between">
+                      <span className="font-semibold text-slate-200">{action.label}</span>
+                      <span className="rounded bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-slate-400">{action.shortcut}</span>
+                    </a>
                   </Button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-gray-800">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-100">Số cửa hàng theo huyện</h2>
-                <span className="text-sm text-gray-400">{summary.districtRows.length} huyện</span>
+          <Card className="rounded-2xl border border-slate-800/80 bg-slate-950/70 backdrop-blur-md shadow-2xl">
+            <CardContent className="p-4 sm:p-6 space-y-4">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-800/50 pb-4 mb-2">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-100">Số cửa hàng theo huyện</h2>
+                  <p className="mt-0.5 text-sm text-slate-400">Mật độ bao phủ khách hàng trên từng địa bàn.</p>
+                </div>
+                <span className="rounded-full bg-slate-800 px-3.5 py-1 text-xs font-bold text-slate-300 border border-slate-700">{summary.districtRows.length} Huyện</span>
               </div>
 
-              {loading && <p className="text-base text-gray-400">Đang tải dữ liệu...</p>}
+              {loading && (
+                <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                  <p className="text-sm font-semibold text-slate-400">Đang tải dữ liệu địa bàn...</p>
+                </div>
+              )}
 
               {!loading && error && (
-                <div className="rounded-lg border border-red-900 bg-red-950/30 p-3">
-                  <p className="text-base text-red-300">{error}</p>
+                <div className="rounded-2xl border border-red-900 bg-red-950/20 p-4 text-center">
+                  <p className="text-sm font-bold text-red-400">{error}</p>
                 </div>
               )}
 
               {!loading && !error && summary.districtRows.length === 0 && (
-                <p className="text-base text-gray-400">Chưa có dữ liệu cửa hàng.</p>
+                <div className="py-12 text-center rounded-2xl border border-dashed border-slate-850">
+                  <p className="text-base text-slate-500 font-semibold">Chưa có dữ liệu cửa hàng nào được ghi nhận.</p>
+                </div>
               )}
 
               {!loading && !error && summary.districtRows.length > 0 && (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                   {summary.districtRows.map((row) => {
                     const widthPercent = Math.round((row.count / summary.topDistrictCount) * 100)
                     return (
-                      <div key={row.district} className="rounded-xl border border-gray-800 p-3">
-                        <div className="flex items-center justify-between gap-2 mb-2">
-                          <p className="text-base font-medium text-gray-100">{row.district}</p>
-                          <p className="text-base font-semibold text-gray-100">{row.count}</p>
+                      <div key={row.district} className="rounded-2xl border border-slate-800/60 bg-slate-900/30 p-4 hover:bg-slate-900/50 transition-all duration-200">
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <p className="text-base font-bold text-slate-100">{row.district}</p>
+                          <span className="rounded-full bg-blue-500/10 px-3 py-0.5 text-xs font-extrabold text-blue-400 border border-blue-500/20">{row.count} cửa hàng</span>
                         </div>
-                        <div className="h-2 rounded-full bg-gray-800 overflow-hidden">
-                          <div className="h-full rounded-full bg-blue-500" style={{ width: `${widthPercent}%` }} />
+                        <div className="h-2 rounded-full bg-slate-950 overflow-hidden border border-slate-850/50">
+                          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-400 shadow-[0_0_8px_rgba(59,130,246,0.35)]" style={{ width: `${widthPercent}%` }} />
                         </div>
                       </div>
                     )

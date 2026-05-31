@@ -134,7 +134,7 @@ function SearchStoreCard({
             <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
               <button
                 type="button"
-                className="min-w-0 text-left"
+                className="min-w-0 text-left relative z-[99999]"
                 onClick={handleOpenDetail}
               >
                 <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
