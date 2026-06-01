@@ -1,47 +1,62 @@
 # Current Work
 
 ## Goal
-Thiết kế lại UI/UX lớp giao diện cho các màn vận hành bán hàng/phân phối theo hướng SaaS hiện đại, mobile-first, tối ưu thao tác nhanh, không đổi business logic/API/schema/data flow.
+- Thêm skill `design-taste-frontend` từ repo taste-skill vào workspace để dùng chung.
 
 ## Task Type
-refactor
+feature
+
+## Why
+- Người dùng yêu cầu thêm taste-skill vào dự án để dùng cho các task UI/thiết kế.
 
 ## In Scope
-- Presentation layer: layout, màu sắc, responsive, hierarchy, spacing, typography, table/card/form affordance.
-- Reusable UI shell/components cho dashboard, đơn hàng, tồn kho, sản phẩm, báo cáo vận hành.
-- Dark/light theme hiện có, focus states, loading/empty/error visual states ở mức UI.
-- Giữ nguyên hàm load dữ liệu, handler, API client, field names, route contracts.
+- Tạo skill file tại `.github/skills/design-taste-frontend/SKILL.md`.
+- Cập nhật `docs/skills/README.md` để ghi nhận skill mới.
+- Cập nhật `docs/current-work.md` theo template.
 
 ## Out of Scope
-- Không đổi business logic, DB schema, Supabase queries/contracts, cache rules, auth rules.
-- Không thêm dependency mới nếu không bắt buộc.
-- Không redesign map/create/edit store flow ngoài scope vận hành bán hàng hiện tại.
-- Không thay đổi logic tính tồn kho, doanh thu, lãi/lỗ, công nợ.
+- Không chỉnh sửa code app, UI, business logic, schema, cache rules.
+- Không thêm dependency runtime.
 
 ## Must Preserve
-- Pages Router và import alias `@/`.
-- Store reads qua `getOrRefreshStores()` khi đọc stores.
-- Existing order/inventory/report flows, form state, submit handlers, validation order.
-- Vietnamese UTF-8 text, contrast cao, touch target lớn.
-- Existing tests/API contracts.
+- Pages Router và alias import `@/`.
+- Quy tắc cache, search, map, và UTF-8 tiếng Việt.
+- Không thay đổi flow nghiệp vụ hiện có.
 
-## Plan
-1. Audit UI routes/components đang dùng.
-2. Thêm/chuẩn hóa design-system primitives an toàn.
-3. Refactor navigation/shell cho vận hành.
-4. Nâng cấp dashboard/order/inventory/customer-facing layouts UI-only.
-5. Verify lint/tests liên quan và checklist regression.
+## Inputs / Expected
+- Input: https://github.com/Leonxlnx/taste-skill, install name `design-taste-frontend`.
+- Expected: skill file có frontmatter hợp lệ và nằm đúng path workspace.
+
+## Constraints
+- Dùng cấu trúc chuẩn `.github/skills/<name>/SKILL.md` theo hướng dẫn agent-customization.
 
 ## Required Verification
-- `npm run lint`.
-- Focused tests cho operator/order/inventory/theme nếu phù hợp.
-- Manual code review checklist: no API/schema/business logic changes, responsive classes, dark/light contrast, keyboard/focus states.
+- Kiểm tra file mới tồn tại và frontmatter hợp lệ.
+- Regression checklist: Checklist chung cho mọi task.
+
+## Definition of Done
+- Skill file được thêm đúng path với nội dung đầy đủ.
+- `docs/skills/README.md` được cập nhật.
+
+## Output Contract
+- Goal
+- What changed
+- Files touched
+- Verification done
+- Risks or unverified parts
+
+## Plan
+1. Lấy nội dung skill `design-taste-frontend` từ repo taste-skill.
+2. Tạo `.github/skills/design-taste-frontend/SKILL.md`.
+3. Cập nhật `docs/skills/README.md`.
+4. Xác nhận file và nội dung hợp lệ.
 
 ## Done
-Pending.
+- Thêm skill `design-taste-frontend` vào `.github/skills/design-taste-frontend/SKILL.md`.
+- Cập nhật `docs/skills/README.md` để ghi nhận skill mới.
 
 ## Verification
-Pending.
+- Đã kiểm tra file skill mới và frontmatter hợp lệ.
 
 ## Risks / Next
-Task rất rộng; ưu tiên nền design system và các route vận hành chính trước, tránh rewrite logic sâu.
+- Chưa chạy lint/test (không chạm code runtime).

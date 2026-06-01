@@ -5,9 +5,10 @@ function Card({ className, ...props }) {
   return (
     <div
       className={cn(
-        "rounded-md border border-gray-800 bg-gray-950 text-gray-50 shadow-sm",
+        "rounded-xl border border-gray-800 bg-gray-950 text-gray-50",
         className
       )}
+      style={{ boxShadow: 'var(--card-shadow)' }}
       {...props}
     />
   );

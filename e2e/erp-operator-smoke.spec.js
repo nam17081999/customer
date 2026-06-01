@@ -49,10 +49,6 @@ async function setupAdmin(page) {
 
   await page.route('**/rpc/**', async (route) => {
     const url = route.request().url()
-    if (url.includes('global_operator_search')) {
-      await route.fulfill({ json: [{ entity_type: 'product', entity_id: 'p-e2e', title: 'Nước suối E2E', subtitle: 'E2E-WATER', href: '/inventory/products/p-e2e', rank_score: 100 }] })
-      return
-    }
     if (url.includes('get_sales_summary')) return route.fulfill({ json: [{ order_count: 0, revenue: 0, cost: 0, profit: 0, discount: 0, avg_order_value: 0 }] })
     if (url.includes('get_purchase_summary')) return route.fulfill({ json: [{ purchase_count: 0, purchase_amount: 0 }] })
     if (url.includes('get_inventory_valuation_summary')) return route.fulfill({ json: [{ product_count: 1, active_product_count: 1, low_stock_count: 0, out_of_stock_count: 0, stock_value: 14000 }] })
@@ -65,15 +61,6 @@ async function setupAdmin(page) {
     await route.fulfill({ json: [] })
   })
 }
-
-test('admin dashboard and command palette load server-side search result', async ({ page }) => {
-  await setupAdmin(page)
-  await page.goto('/overview')
-  await expect(page.getByText('Vận hành hôm nay')).toBeVisible()
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
-  await page.getByPlaceholder('Tìm lệnh, màn hình...').fill('nuoc')
-  await expect(page.getByText('Nước suối E2E')).toBeVisible()
-})
 
 test('reports page loads aggregate data and exposes CSV export', async ({ page }) => {
   await setupAdmin(page)

@@ -21,6 +21,13 @@
 :root {
   --background: #0a0a0a;
   --foreground: #ededed;
+  --primary: #0ea5e9; /* sky-400 / accent */
+  --primary-600: #0284c7;
+  --muted: #94a3b8;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --focus-ring: 0 0 0 4px rgba(14,165,233,0.12);
+  --card-shadow: 0 6px 24px rgba(2,6,23,0.6);
   --surface: #030712;
   --surface-muted: #111827;
   --surface-border: #1f2937;
@@ -57,6 +64,16 @@ html[data-theme='dark'] {
 html {
   font-size: 19px;
   scrollbar-gutter: stable;
+}
+
+/* small utility for consistent focus styles used by components */
+*:focus {
+  outline: none;
+}
+
+.focus-visible-ring {
+  box-shadow: var(--focus-ring) !important;
+  outline: none !important;
 }
 
 @media (min-width: 640px) {

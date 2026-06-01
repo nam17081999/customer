@@ -8,15 +8,160 @@ import { Button } from '@/components/ui/button'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { useTheme } from '@/lib/ThemeContext'
 import { THEME_OPTIONS, getThemeMeta } from '@/helper/theme'
+import {
+  CalendarCheck,
+  ShoppingCart,
+  List,
+  Package,
+  Truck,
+  ClipboardList,
+  BarChart3,
+  LayoutDashboard,
+  Upload,
+  Download,
+  GitMerge,
+  ShieldCheck,
+  FileBarChart,
+  Users,
+  LogOut,
+  Sun,
+  Moon,
+  User,
+} from 'lucide-react'
 
-function MenuSection({ title, children }) {
+const MENU_SECTIONS = {
+  sales: {
+    label: 'Bán hàng',
+    items: [
+      { href: '/today', label: 'Công việc hôm nay', icon: CalendarCheck, accent: true },
+      { href: '/orders/new', label: 'Lên đơn hàng', icon: ShoppingCart, accent: true },
+      { href: '/orders', label: 'Danh sách đơn', icon: List },
+      { href: '/inventory/products', label: 'Hàng hóa & tồn kho', icon: Package },
+      { href: '/inventory/purchases/new', label: 'Nhập hàng', icon: Truck },
+      { href: '/inventory/purchases', label: 'Phiếu nhập', icon: ClipboardList },
+      { href: '/inventory/stock', label: 'Báo cáo tồn kho', icon: BarChart3 },
+    ],
+  },
+  stores: {
+    label: 'Cửa hàng',
+    items: [
+      { href: '/overview', label: 'Tổng quan', icon: LayoutDashboard },
+      { href: '/store/import', label: 'Nhập dữ liệu', icon: Upload },
+      { href: '/store/export', label: 'Xuất dữ liệu', icon: Download },
+      { href: '/store/deduplicate', label: 'Gộp trùng lặp', icon: GitMerge },
+    ],
+  },
+  admin: {
+    label: 'Quản trị',
+    items: [
+      { href: '/store/verify', label: 'Duyệt cửa hàng', icon: ShieldCheck },
+      { href: '/store/reports', label: 'Duyệt báo cáo', icon: FileBarChart },
+      { href: '/admin/users', label: 'Quản lý tài khoản', icon: Users },
+    ],
+  },
+  telesale: {
+    label: 'Bán hàng',
+    items: [
+      { href: '/today', label: 'Công việc hôm nay', icon: CalendarCheck, accent: true },
+      { href: '/telesale/overview', label: 'Màn telesale', icon: LayoutDashboard },
+    ],
+  },
+}
+
+function SidebarCard({ user, role, isAdmin, theme, setTheme, signingOut, onSignOut }) {
+  const roleLabel = isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'
+  const roleColor = isAdmin ? 'bg-blue-500/15 text-blue-300 border-blue-500/30' : role === 'telesale' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-gray-500/15 text-gray-300 border-gray-500/30'
+
   return (
-    <div className="space-y-3 rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-      <h2 className="text-base font-semibold text-neutral-100">{title}</h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {children}
-      </div>
-    </div>
+    <Card className="rounded-2xl border border-gray-800">
+      <CardContent className="p-5 space-y-5">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gray-800">
+            <User className="h-7 w-7 text-gray-400" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-lg font-semibold text-gray-100">{user?.email}</p>
+            <span className={`mt-1 inline-block rounded-full border px-2.5 py-0.5 text-sm font-medium ${roleColor}`}>
+              {roleLabel}
+            </span>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800" />
+
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-gray-400">Giao diện</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {THEME_OPTIONS.map((option) => {
+              const meta = getThemeMeta(option)
+              const active = theme === option
+              const Icon = option === 'dark' ? Moon : Sun
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={`flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                    active
+                      ? 'border-gray-100 bg-gray-100 text-gray-950'
+                      : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-600 hover:bg-gray-800'
+                  }`}
+                  onClick={() => setTheme(option)}
+                  aria-pressed={active}
+                >
+                  <Icon className="h-4 w-4" />
+                  {meta.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-gray-800" />
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-center gap-2 border-red-900/50 text-red-400 hover:bg-red-950/30 hover:text-red-300"
+          onClick={onSignOut}
+          disabled={signingOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function MenuCard({ section, filterFn }) {
+  const items = filterFn ? section.items.filter(filterFn) : section.items
+  if (items.length === 0) return null
+
+  return (
+    <Card className="rounded-2xl border border-gray-800">
+      <CardContent className="p-5">
+        <h2 className="mb-3 text-lg font-semibold text-gray-100">{section.label}</h2>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {items.map((item) => {
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-base font-medium transition ${
+                  item.accent
+                    ? 'border-blue-500/30 bg-blue-500/10 text-blue-200 hover:bg-blue-500/20'
+                    : 'border-gray-800 bg-gray-900/50 text-gray-200 hover:border-gray-700 hover:bg-gray-800'
+                }`}
+              >
+                <Icon className={`h-5 w-5 shrink-0 ${item.accent ? 'text-blue-400' : 'text-gray-500 group-hover:text-gray-300'}`} />
+                {item.label}
+              </Link>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -56,140 +201,48 @@ export default function AccountScreen() {
         <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-neutral-950">
-        <div className="mx-auto max-w-screen-md px-3 py-4 sm:px-4 sm:py-6">
-          <Card className="rounded-2xl border border-neutral-800">
-            <CardContent className="space-y-4 p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-2 border-b border-neutral-800 pb-3">
-                <div className="min-w-0">
-                  <p className="text-sm text-neutral-400">Tài khoản đăng nhập</p>
-                  <p className="truncate text-base font-semibold text-neutral-200">{user?.email}</p>
-                  <p className="text-sm text-neutral-400">
-                    Quyền: {isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'}
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="shrink-0"
-                >
-                  {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
-                </Button>
-              </div>
+      <div className="min-h-screen bg-black">
+        <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
+          <h1 className="mb-4 text-xl font-bold text-gray-100 sm:hidden">Tài khoản</h1>
 
-              <div>
-                <h1 className="text-xl font-semibold text-neutral-100 sm:text-2xl">Menu nhanh</h1>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-[280px_1fr] sm:items-start">
+            <SidebarCard
+              user={user}
+              role={role}
+              isAdmin={isAdmin}
+              theme={theme}
+              setTheme={setTheme}
+              signingOut={signingOut}
+              onSignOut={handleSignOut}
+            />
 
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-base font-semibold text-neutral-100">Giao diện</h2>
-                    <p className="text-sm text-neutral-400">Chọn màu sáng hoặc tối cho toàn bộ app.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 sm:w-64">
-                    {THEME_OPTIONS.map((option) => {
-                      const meta = getThemeMeta(option)
-                      const active = theme === option
-                      return (
-                        <button
-                          key={option}
-                          type="button"
-                          className={`h-11 rounded-md border px-3 text-base font-semibold transition ${active ? 'border-gray-100 bg-gray-100 text-gray-950' : 'border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'}`}
-                          onClick={() => setTheme(option)}
-                          aria-pressed={active}
-                        >
-                          {meta.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
+            <div className="space-y-4">
               {(isAdmin || isTelesale) && (
-                <div className="space-y-3">
-                  <MenuSection title="Bán hàng">
-                    {isAdmin && (
-                      <>
-                        <Button asChild>
-                          <Link href="/today">Công việc hôm nay</Link>
-                        </Button>
-                        <Button asChild>
-                          <Link href="/orders/new">Lên đơn hàng</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/orders">Danh sách đơn</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/inventory/products">Hàng hóa & tồn kho</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/inventory/purchases/new">Nhập hàng</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/inventory/purchases">Phiếu nhập</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/inventory/stock">Báo cáo tồn kho</Link>
-                        </Button>
-                      </>
-                    )}
-                    {isTelesale && !isAdmin && (
-                      <>
-                        <Button asChild>
-                          <Link href="/today">Công việc hôm nay</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/telesale/overview">Màn telesale</Link>
-                        </Button>
-                      </>
-                    )}
-                  </MenuSection>
-
+                <>
                   {isAdmin && (
                     <>
-                      <MenuSection title="Cửa hàng">
-                        <Button asChild variant="outline">
-                          <Link href="/overview">Màn tổng quan</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/store/import">Nhập dữ liệu cửa hàng</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/store/export">Xuất dữ liệu cửa hàng</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/store/deduplicate">Gộp cửa hàng trùng lặp</Link>
-                        </Button>
-                      </MenuSection>
-
-                      <MenuSection title="Quản trị">
-                        <Button asChild variant="outline">
-                          <Link href="/store/verify">Duyệt cửa hàng</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/store/reports">Duyệt báo cáo</Link>
-                        </Button>
-                        <Button asChild variant="outline">
-                          <Link href="/admin/users">Quản lý tài khoản</Link>
-                        </Button>
-                      </MenuSection>
+                      <MenuCard section={MENU_SECTIONS.sales} />
+                      <MenuCard section={MENU_SECTIONS.stores} />
+                      <MenuCard section={MENU_SECTIONS.admin} />
                     </>
                   )}
-                </div>
+                  {isTelesale && !isAdmin && (
+                    <MenuCard section={MENU_SECTIONS.telesale} />
+                  )}
+                </>
               )}
 
               {isTelesale && !isAdmin && (
-                <div className="rounded-xl border border-neutral-800 bg-neutral-900/70 p-3 text-sm text-neutral-300">
-                  Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
-                </div>
+                <Card className="rounded-2xl border border-gray-800">
+                  <CardContent className="p-4">
+                    <p className="text-base text-gray-400">
+                      Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       </div>
     </>

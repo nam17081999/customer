@@ -4,7 +4,7 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-white cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-base font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-white cursor-pointer",
   {
     variants: {
       variant: {
@@ -14,7 +14,7 @@ const buttonVariants = cva(
         ghost:         "hover:bg-gray-800 text-gray-100",
         link:          "text-blue-400 underline-offset-4 hover:underline",
         // Nút hành động chính (form submit, CTA nổi bật)
-        primary:           "bg-blue-600 text-white hover:bg-blue-700 font-semibold",
+        primary:           "bg-[color:var(--primary)] text-white hover:bg-[color:var(--primary-600)] font-semibold",
         // Nút nguy hiểm - trạng thái bình thường (outline đỏ nhạt)
         destructive:       "border border-red-900/50 text-red-400 hover:bg-red-950/30 hover:border-red-900",
         // Nút nguy hiểm - trạng thái xác nhận (đỏ đậm, cần bấm lần 2)
@@ -51,7 +51,13 @@ const Button = React.forwardRef(
     }
 
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+        onFocus={(e) => e.currentTarget.classList.add('focus-visible-ring')}
+        onBlur={(e) => e.currentTarget.classList.remove('focus-visible-ring')}
+      >
         {renderContent()}
       </Comp>
     );

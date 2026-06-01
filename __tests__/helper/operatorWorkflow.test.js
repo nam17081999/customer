@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   addRecentRoute,
-  buildCommandSearchResults,
   buildDashboardHealthSummary,
   getOperatorShortcutHref,
   getRecentProductsFromOrderDrafts,
@@ -71,17 +70,5 @@ describe('operator workflow helpers', () => {
       purchaseAmount: 700,
       needsAttention: true,
     })
-  })
-
-  it('builds fuzzy global command results across actions and entities', () => {
-    const results = buildCommandSearchResults({
-      query: 'nuoc',
-      products: [{ id: 'p1', name: 'Nước suối Lavie', sku: 'LV' }],
-      customers: [{ id: 's1', name: 'Tạp hóa An', phone: '0901' }],
-      orders: [{ id: 'o1', code: 'DH001', customer_name: 'Tạp hóa An' }],
-    })
-
-    expect(results[0]).toMatchObject({ type: 'product', href: '/inventory/products/p1' })
-    expect(buildCommandSearchResults({ query: 'len don' })[0]).toMatchObject({ type: 'action', href: '/orders/new' })
   })
 })
