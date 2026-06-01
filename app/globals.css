@@ -103,6 +103,11 @@ body {
   font-size: 1rem;
 }
 
+/* Prevent horizontal overflow across the site */
+html, body, #__next {
+  overflow-x: hidden;
+}
+
 html,
 body,
 #__next {
