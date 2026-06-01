@@ -17,7 +17,7 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }) {
     success: 'bg-green-600 text-white',
     error: 'bg-red-600 text-white',
     warning: 'bg-yellow-600 text-white',
-    info: 'bg-blue-600 text-white',
+    info: 'bg-[color:var(--primary)] text-white',
   }
 
   const icons = {
@@ -45,9 +45,10 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }) {
 
   return (
     <div
-      className={`fixed bottom-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 max-w-md ${
+      className={`fixed bottom-4 right-4 z-[9999] flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300 max-w-md ${
         typeStyles[type] || typeStyles.info
       } ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}
+      style={{ boxShadow: 'var(--card-shadow)' }}
     >
       {icons[type]}
       <p className="text-sm font-medium">{message}</p>
@@ -57,6 +58,8 @@ export function Toast({ message, type = 'info', duration = 3000, onClose }) {
           setTimeout(() => onClose?.(), 300)
         }}
         className="ml-auto hover:opacity-80 cursor-pointer"
+        onFocus={(e) => e.currentTarget.classList.add('focus-visible-ring')}
+        onBlur={(e) => e.currentTarget.classList.remove('focus-visible-ring')}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
