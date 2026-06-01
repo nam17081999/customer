@@ -360,7 +360,7 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ minHeight: 'calc(100svh - 3.5rem)', background: 'var(--background)', color: 'var(--foreground)' }} className="overflow-hidden sm:min-h-[calc(100dvh-3rem)]">
+    <div style={{ height: 'calc(100svh - 3.5rem)', background: 'var(--background)', color: 'var(--foreground)' }} className="overflow-hidden sm:h-[calc(100dvh-3rem)]">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
 
       <div className="mx-auto flex h-full max-w-screen-md flex-col gap-4 px-4 pt-5 sm:hidden">
