@@ -66,6 +66,23 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Global box-sizing and media constraints to prevent overflow */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+img, svg, video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Ensure elements never exceed viewport width */
+.no-horiz-overflow, .safe-container {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
 /* small utility for consistent focus styles used by components */
 *:focus {
   outline: none;
