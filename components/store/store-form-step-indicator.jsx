@@ -8,7 +8,7 @@ export default function StoreFormStepIndicator({ steps = [], currentStep = 1, nu
               numbersOnly ? 'h-7 min-w-7 px-2' : 'gap-1.5 px-2.5 py-1'
             } ${
               currentStep === step.num
-                ? 'bg-blue-600 text-white'
+                ? 'bg-[color:var(--primary)] text-white'
                 : currentStep > step.num
                   ? 'bg-green-900/40 text-green-400 border border-green-900/50'
                   : 'bg-gray-800 border border-gray-700 text-gray-400'
