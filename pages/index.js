@@ -360,10 +360,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="h-[calc(100svh-3.5rem)] overflow-hidden bg-black sm:h-[calc(100dvh-3rem)] sm:bg-[#070a10]">
+    <div style={{ minHeight: 'calc(100svh - 3.5rem)', background: 'var(--background)', color: 'var(--foreground)' }} className="overflow-hidden sm:min-h-[calc(100dvh-3rem)]">
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
 
-      <div className="mx-auto flex h-full max-w-screen-md flex-col gap-3 px-3 pt-4 sm:hidden">
+      <div className="mx-auto flex h-full max-w-screen-md flex-col gap-4 px-4 pt-5 sm:hidden">
         <div className="flex shrink-0 flex-col gap-2">
           <div className="flex items-center gap-2">
             <Input
@@ -396,7 +396,7 @@ export default function HomePage() {
           </div>
 
           {showDetailedFilters && (
-            <div id="search-detail-filters" className="overflow-x-hidden rounded-xl border border-gray-800 bg-gray-950 px-2.5 py-2.5 text-gray-100">
+            <div id="search-detail-filters" className="overflow-x-hidden rounded-xl px-3 py-3" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)', color: 'var(--foreground)' }}>
               <div className="max-h-[68vh] overflow-y-auto pr-1">
                 <FilterControls {...filterProps} />
               </div>
