@@ -135,7 +135,7 @@ function MenuCard({ section, filterFn }) {
   if (items.length === 0) return null
 
   return (
-    <Card className="rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.04)', background: 'transparent' }}>
+    <Card className="rounded-xl w-full" style={{ border: '1px solid rgba(255,255,255,0.04)', background: 'transparent' }}>
       <CardContent className="p-5">
         <h2 className="mb-3 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>{section.label}</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -200,7 +200,8 @@ export default function AccountScreen() {
           <h1 className="mb-4 text-xl font-bold sm:hidden" style={{ color: 'var(--foreground)' }}>Tài khoản</h1>
 
           <div className="grid gap-4 sm:grid-cols-[320px_1fr] sm:items-start sm:h-[calc(100vh-3.5rem)]">
-            <SidebarCard
+            <div className="sm:sticky sm:top-6">
+              <SidebarCard
               user={user}
               role={role}
               isAdmin={isAdmin}
@@ -208,9 +209,10 @@ export default function AccountScreen() {
               setTheme={setTheme}
               signingOut={signingOut}
               onSignOut={handleSignOut}
-            />
+              />
+            </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 min-h-0 overflow-auto">
               {(isAdmin || isTelesale) && (
                 <>
                   {isAdmin && (
@@ -227,7 +229,7 @@ export default function AccountScreen() {
               )}
 
               {isTelesale && !isAdmin && (
-                <Card className="rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+                <Card className="rounded-xl w-full" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
                   <CardContent className="p-4">
                     <p className="text-base" style={{ color: 'var(--muted)' }}>
                       Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
