@@ -195,7 +195,7 @@ export default function AccountScreen() {
         <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
-      <div style={{ height: '100svh', background: 'var(--background)', color: 'var(--foreground)' }} className="overflow-auto">
+      <div style={{ minHeight: '100svh', background: 'var(--background)', color: 'var(--foreground)' }} className="safe-container">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
           <h1 className="mb-4 text-xl font-bold sm:hidden" style={{ color: 'var(--foreground)' }}>Tài khoản</h1>
 
@@ -212,7 +212,7 @@ export default function AccountScreen() {
               />
             </div>
 
-            <div className="space-y-4 min-h-0 overflow-auto">
+            <div className="space-y-4">
               {(isAdmin || isTelesale) && (
                 <>
                   {isAdmin && (
