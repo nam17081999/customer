@@ -51,17 +51,18 @@ function HighlightedName({ name, term }) {
 }
 
 function CircleIconButton({ href, label, children, onClick, onPointerDown }) {
-  const className = 'flex size-10 items-center justify-center rounded-full border border-gray-800 bg-gray-800 text-gray-400 transition'
+  const className = 'flex size-10 items-center justify-center rounded-full transition'
   const isLink = Boolean(href)
   const isExternal = isLink && /^https?:/i.test(href)
 
-  if (isLink) {
+    if (isLink) {
     return (
       <a
         href={href}
         aria-label={label}
         title={label}
         className={className}
+        style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15,15,15,0.6)', color: 'var(--muted)' }}
         target={isExternal ? '_blank' : undefined}
         rel={isExternal ? 'noreferrer' : undefined}
         onPointerDown={(event) => {
@@ -78,12 +79,15 @@ function CircleIconButton({ href, label, children, onClick, onPointerDown }) {
     )
   }
 
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={className}
+    return (
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        className={className}
+        style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(15,15,15,0.6)', color: 'var(--muted)' }}
+        onFocus={(e) => e.currentTarget.classList.add('focus-visible-ring')}
+        onBlur={(e) => e.currentTarget.classList.remove('focus-visible-ring')}
       onPointerDown={(event) => {
         event.stopPropagation()
         onPointerDown?.(event)
@@ -129,7 +133,7 @@ function SearchStoreCard({
   if (compact) {
     return (
       <>
-        <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-md">
+        <Card className="overflow-hidden rounded-lg transition duration-200" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
           <CardContent className="p-0">
             <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
               <button
@@ -138,19 +142,19 @@ function SearchStoreCard({
                 onClick={handleOpenDetail}
               >
                 <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                  <div className="flex size-6 items-center justify-center text-sky-300">
+                  <div className="flex size-6 items-center justify-center" style={{ color: 'var(--primary)' }}>
                     {typeMeta.icon}
                   </div>
 
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold leading-snug text-gray-100 text-lg">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold leading-snug text-lg" style={{ color: 'var(--foreground)' }}>
                       <HighlightedName name={store.name} term={searchTerm} />
                     </div>
                   </div>
 
-                  <div className="col-span-2 mt-1 space-y-1">
+                    <div className="col-span-2 mt-1 space-y-1">
                     {distance !== null && distance !== undefined ? (
-                      <span className="inline-flex h-6 items-center gap-1 leading-none text-base text-gray-400">
+                      <span className="inline-flex h-6 items-center gap-1 leading-none text-base" style={{ color: 'var(--muted)' }}>
                         <svg className="size-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -167,7 +171,7 @@ function SearchStoreCard({
                       </span>
                     ) : null}
 
-                    <p className="line-clamp-2 text-base leading-snug text-gray-400">{addressText}</p>
+                    <p className="line-clamp-2 text-base leading-snug" style={{ color: 'var(--muted)' }}>{addressText}</p>
                   </div>
                 </div>
               </button>
@@ -215,7 +219,7 @@ function SearchStoreCard({
 
   return (
     <>
-      <Card className="overflow-hidden rounded-md border border-gray-800 bg-gray-950 transition duration-200 hover:shadow-lg">
+      <Card className="overflow-hidden rounded-lg transition duration-200" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
         <CardContent className="p-4">
           <div className="flex gap-4">
             <button
@@ -228,13 +232,13 @@ function SearchStoreCard({
               </div>
 
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-gray-100 text-lg md:text-xl leading-tight break-words">
+                <h3 className="font-semibold text-lg md:text-xl leading-tight break-words" style={{ color: 'var(--foreground)' }}>
                   <HighlightedName name={store.name} term={searchTerm} />
                 </h3>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {distance !== null && distance !== undefined ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-gray-900 px-2 py-0.5 text-xs font-medium text-gray-200 shadow">
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium" style={{ background: 'rgba(10,10,10,0.6)', color: 'var(--muted)' }}>
                       <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
