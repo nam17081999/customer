@@ -72,24 +72,24 @@ function SidebarCard({ user, role, isAdmin, theme, setTheme, signingOut, onSignO
   const roleLabel = isAdmin ? 'Admin' : role === 'telesale' ? 'Telesale' : 'Khách'
 
   return (
-    <Card style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)', boxShadow: 'var(--card-shadow)' }} className="rounded-xl">
-      <CardContent className="p-5 space-y-5">
+    <Card className="rounded-2xl border-gray-800 bg-gray-950">
+      <CardContent className="p-4 sm:p-5 space-y-5">
         <div className="flex items-center gap-4">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.02), transparent)' }}>
-            <User className="h-7 w-7" style={{ color: 'var(--muted)' }} />
+            <User className="h-7 w-7 text-gray-400" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold" style={{ color: 'var(--foreground)' }}>{user?.email}</p>
-            <span className="mt-1 inline-block rounded-full border px-2.5 py-0.5 text-sm font-medium" style={{ borderColor: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>
+            <p className="truncate text-lg font-semibold text-gray-100">{user?.email}</p>
+            <span className="mt-1 inline-block rounded-full border border-gray-700 px-2.5 py-0.5 text-sm font-medium text-gray-400">
               {roleLabel}
             </span>
           </div>
         </div>
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} />
+        <div className="border-t border-gray-800" />
 
         <div>
-          <h3 className="mb-2 text-sm font-medium" style={{ color: 'var(--muted)' }}>Giao diện</h3>
+          <h3 className="mb-2 text-sm font-medium text-gray-400">Giao diện</h3>
           <div className="grid grid-cols-2 gap-2">
             {THEME_OPTIONS.map((option) => {
               const meta = getThemeMeta(option)
@@ -99,10 +99,13 @@ function SidebarCard({ user, role, isAdmin, theme, setTheme, signingOut, onSignO
                 <button
                   key={option}
                   type="button"
-                  className="flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition"
+                  className={`flex h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition ${
+                    active
+                      ? 'bg-sky-500/15 border-sky-500/50 text-sky-400'
+                      : 'border-gray-700 bg-gray-900 text-gray-100 hover:bg-gray-800'
+                  }`}
                   onClick={() => setTheme(option)}
                   aria-pressed={active}
-                  style={active ? { background: 'var(--primary)', color: 'var(--foreground)', borderColor: 'transparent' } : { background: 'transparent', borderColor: 'rgba(255,255,255,0.04)', color: 'var(--foreground)' }}
                 >
                   <Icon className="h-4 w-4" />
                   {meta.label}
@@ -112,15 +115,14 @@ function SidebarCard({ user, role, isAdmin, theme, setTheme, signingOut, onSignO
           </div>
         </div>
 
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }} />
+        <div className="border-t border-gray-800" />
 
         <Button
           type="button"
-          variant="outline"
+          variant="destructive"
           className="w-full justify-center gap-2"
           onClick={onSignOut}
           disabled={signingOut}
-          style={{ borderColor: 'rgba(255,0,0,0.12)', color: 'rgba(255,120,120,0.95)' }}
         >
           <LogOut className="h-4 w-4" />
           {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
@@ -135,9 +137,9 @@ function MenuCard({ section, filterFn }) {
   if (items.length === 0) return null
 
   return (
-    <Card className="rounded-xl w-full" style={{ border: '1px solid rgba(255,255,255,0.04)', background: 'transparent' }}>
-      <CardContent className="p-5">
-        <h2 className="mb-3 text-lg font-semibold" style={{ color: 'var(--foreground)' }}>{section.label}</h2>
+    <Card className="w-full border-gray-800 bg-transparent">
+      <CardContent className="p-4 sm:p-5">
+        <h2 className="mb-3 text-lg font-semibold text-gray-100">{section.label}</h2>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {items.map((item) => {
             const Icon = item.icon
@@ -145,11 +147,15 @@ function MenuCard({ section, filterFn }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-3 rounded-xl border px-4 py-3 text-base font-medium transition`}
-                style={item.accent ? { borderColor: 'transparent', background: 'linear-gradient(180deg,var(--primary-600), var(--primary) )', color: 'white' } : { borderColor: 'rgba(255,255,255,0.04)', background: 'transparent', color: 'var(--foreground)' }}
+                className={`group flex items-center gap-3 rounded-xl border px-3 sm:px-4 py-3 text-base font-medium transition ${
+                  item.accent
+                    ? 'text-white'
+                    : 'border-gray-700 bg-gray-900 text-gray-100 hover:bg-gray-800'
+                }`}
+                style={item.accent ? { borderColor: 'transparent', background: 'linear-gradient(180deg,var(--primary-600), var(--primary) )' } : {}}
               >
-                <Icon className="h-5 w-5 shrink-0" style={{ color: item.accent ? 'white' : 'var(--muted)' }} />
-                {item.label}
+                <Icon className={`h-5 w-5 shrink-0 ${item.accent ? 'text-white' : 'text-gray-400'}`} />
+                <span className="min-w-0">{item.label}</span>
               </Link>
             )
           })}
@@ -195,11 +201,11 @@ export default function AccountScreen() {
         <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
-      <div style={{ minHeight: '100svh', background: 'var(--background)', color: 'var(--foreground)' }} className="safe-container">
-        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
-          <h1 className="mb-4 text-xl font-bold sm:hidden" style={{ color: 'var(--foreground)' }}>Tài khoản</h1>
+      <div className="min-h-screen bg-black text-gray-100 overflow-x-hidden">
+        <div className="mx-auto max-w-6xl px-3 sm:px-6 py-4 sm:py-6">
+          <h1 className="mb-4 text-2xl font-bold text-gray-100">Tài khoản</h1>
 
-          <div className="grid gap-4 sm:grid-cols-[320px_1fr] sm:items-start sm:h-[calc(100vh-3.5rem)]">
+          <div className="grid gap-4 sm:grid-cols-[320px_1fr] sm:items-start min-w-0">
             <div className="sm:sticky sm:top-6">
               <SidebarCard
               user={user}
@@ -229,9 +235,9 @@ export default function AccountScreen() {
               )}
 
               {isTelesale && !isAdmin && (
-                <Card className="rounded-xl w-full" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
-                  <CardContent className="p-4">
-                    <p className="text-base" style={{ color: 'var(--muted)' }}>
+                <Card className="w-full border-gray-800 bg-gray-950">
+                  <CardContent className="p-4 sm:p-5">
+                    <p className="text-base text-gray-400">
                       Telesale chỉ thấy các màn phục vụ gọi điện và theo dõi trạng thái gọi.
                     </p>
                   </CardContent>

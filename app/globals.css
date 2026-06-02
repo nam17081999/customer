@@ -120,14 +120,11 @@ body {
   font-size: 1rem;
 }
 
-/* Prevent horizontal overflow across the site */
-html, body, #__next {
-  overflow-x: hidden;
-}
-
-  /* Allow body to scroll on desktop; avoid nested scrollbars in app containers */
-  /* body overflow intentionally not forced here */
+/* Prevent horizontal overflow — only on the app wrapper, not html/body.
+   Setting overflow-x:hidden on html or body implicitly turns overflow-y
+   into 'auto', which creates an unwanted vertical scrollbar. */
 #__next {
+  overflow-x: hidden;
   min-height: 100%;
 }
 
