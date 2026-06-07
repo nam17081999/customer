@@ -20,8 +20,8 @@ const StoreLocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center rounded-md bg-neutral-900" style={{ height: '40vh' }}>
-        <span className="animate-pulse text-sm text-neutral-400">Đang tải bản đồ…</span>
+      <div className="flex items-center justify-center rounded-md bg-gray-900" style={{ height: '40vh' }}>
+        <span className="animate-pulse text-sm text-gray-400">Đang tải bản đồ…</span>
       </div>
     ),
   }
@@ -83,7 +83,7 @@ function SupplementStepOne({ data }) {
     <>
       <div className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="supplement-store-type" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          <Label htmlFor="supplement-store-type" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Loại cửa hàng
           </Label>
           <div className="grid grid-cols-2 gap-2">
@@ -102,7 +102,7 @@ function SupplementStepOne({ data }) {
                   className={`min-h-11 rounded-md border px-3 py-2 text-left text-sm transition ${
                     selected
                       ? 'border-blue-500 bg-blue-500/10 text-blue-100'
-                      : 'border-neutral-700 bg-neutral-900 text-neutral-200 hover:border-neutral-500'
+                      : 'border-gray-700 bg-gray-900 text-gray-200 hover:border-gray-500'
                   } ${safeLocks.storeType ? lockedChipClass : ''}`}
                 >
                   {type.label}
@@ -113,7 +113,7 @@ function SupplementStepOne({ data }) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="supplement-name" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          <Label htmlFor="supplement-name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Tên cửa hàng
           </Label>
           <Input
@@ -128,7 +128,7 @@ function SupplementStepOne({ data }) {
         </div>
 
         {isSupplementMode && noEditableFieldsStep1 ? (
-          <div className="rounded-md border border-neutral-800 bg-neutral-900/70 px-3 py-2 text-xs text-neutral-300">
+          <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-300">
             Bước này không còn dữ liệu thiếu. Bạn chỉ cần kiểm tra lại rồi sang bước tiếp theo.
           </div>
         ) : null}
@@ -186,7 +186,7 @@ function SupplementStepTwo({ data }) {
     <>
       <div className="space-y-5">
         <div id="supplement-district-section" className="space-y-1.5">
-          <Label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">Quận / Huyện</Label>
+          <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Quận / Huyện</Label>
           <div className="flex flex-wrap gap-2">
             {visibleDistricts.map((item) => (
               <button
@@ -196,7 +196,7 @@ function SupplementStepTwo({ data }) {
                 className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   isSameArea(district, item)
                     ? 'border border-blue-600 bg-blue-600 text-white'
-                    : 'border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'
+                    : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                 } ${safeLocks.district ? lockedChipClass : ''}`}
                 onClick={() => {
                   if (safeLocks.district) return
@@ -213,7 +213,7 @@ function SupplementStepTwo({ data }) {
 
         {district && wardSuggestions.length > 0 ? (
           <div id="supplement-ward-section" className="space-y-1.5">
-            <Label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">Xã / Phường</Label>
+            <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
             <div className="flex flex-wrap gap-2">
               {visibleWards.map((item) => (
                 <button
@@ -223,7 +223,7 @@ function SupplementStepTwo({ data }) {
                   className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                     isSameArea(ward, item)
                       ? 'border border-blue-600 bg-blue-600 text-white'
-                      : 'border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'
+                      : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
                   } ${safeLocks.ward ? lockedChipClass : ''}`}
                   onClick={() => {
                     if (safeLocks.ward) return
@@ -239,8 +239,8 @@ function SupplementStepTwo({ data }) {
         ) : null}
 
         <div className="space-y-1.5">
-          <Label htmlFor="supplement-address" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-            Địa chỉ cụ thể <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+          <Label htmlFor="supplement-address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+            Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span>
           </Label>
           <Input
             id="supplement-address"
@@ -256,7 +256,7 @@ function SupplementStepTwo({ data }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="supplement-phone" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+          <Label htmlFor="supplement-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
             Số điện thoại
           </Label>
           <Input
@@ -275,7 +275,7 @@ function SupplementStepTwo({ data }) {
 
         {(phone.trim() || phoneSecondary.trim()) ? (
           <div className="space-y-1.5">
-            <Label htmlFor="supplement-phone-secondary" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+            <Label htmlFor="supplement-phone-secondary" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
               Số điện thoại 2
             </Label>
             <Input
@@ -294,8 +294,8 @@ function SupplementStepTwo({ data }) {
         ) : null}
 
         <div className="space-y-1.5">
-          <Label htmlFor="supplement-note" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-            Ghi chú <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+          <Label htmlFor="supplement-note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+            Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span>
           </Label>
           <textarea
             id="supplement-note"
@@ -304,28 +304,28 @@ function SupplementStepTwo({ data }) {
             disabled={safeLocks.note}
             placeholder="VD: Mở cửa từ 6h-11h, chỉ bán thứ 2-7"
             rows={3}
-            className={`w-full resize-none rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-blue-500 focus:outline-none focus:ring-0 ${lockedInputClass}`}
+            className={`w-full resize-none rounded-md border border-gray-700 bg-gray-900 px-3 py-2.5 text-sm text-gray-100 placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-0 ${lockedInputClass}`}
           />
         </div>
 
         {showActiveToggle && typeof setActive === 'function' ? (
-          <div className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900 p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-900 p-3">
             <button
               type="button"
               onClick={() => setActive((value) => !value)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${active ? 'bg-green-500' : 'bg-neutral-600'}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${active ? 'bg-green-500' : 'bg-gray-600'}`}
             >
               <span className={`inline-block size-4 rounded-full bg-white shadow transition-transform ${active ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
             <div>
-              <span className="text-sm font-medium text-neutral-300">Đã xác minh</span>
-              <p className="text-xs text-neutral-400">Cửa hàng đã được kiểm tra thực tế</p>
+              <span className="text-sm font-medium text-gray-300">Đã xác minh</span>
+              <p className="text-xs text-gray-400">Cửa hàng đã được kiểm tra thực tế</p>
             </div>
           </div>
         ) : null}
 
         {isSupplementMode && noEditableFieldsStep2 ? (
-          <div className="rounded-md border border-neutral-800 bg-neutral-900/70 px-3 py-2 text-xs text-neutral-300">
+          <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-300">
             Bước này không còn dữ liệu thiếu. Bạn có thể hoàn thành luôn hoặc sang bước vị trí nếu cửa hàng vẫn chưa có tọa độ.
           </div>
         ) : null}
@@ -374,7 +374,7 @@ function SupplementStepThree({ data }) {
     <>
       {!showLocationEditor ? (
         <div className="space-y-3">
-          <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300">
+          <div className="rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
             Cửa hàng hiện chưa có vị trí. Nếu bạn muốn bổ sung hoặc chỉnh sửa vị trí, hãy bấm <strong>Thêm vị trí</strong>.
           </div>
 
@@ -439,14 +439,14 @@ function SupplementStepThree({ data }) {
               />
             ) : (
               <div
-                className="flex items-center justify-center rounded-md border border-dashed border-neutral-800 bg-neutral-950 px-4 text-center text-neutral-400"
+                className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
                 style={{ height: '65vh' }}
               >
                 <div className="max-w-md space-y-2">
-                  <div className="text-base font-medium text-neutral-300">
+                  <div className="text-base font-medium text-gray-300">
                     {getLocationPlaceholderCopy(locationView.phase).title}
                   </div>
-                  <p className="text-sm text-neutral-400">
+                  <p className="text-sm text-gray-400">
                     {getLocationPlaceholderCopy(locationView.phase).description}
                   </p>
                 </div>
@@ -614,8 +614,8 @@ export default function StoreSupplementForm({
     return removeVietnameseTones(String(a || '')).toLowerCase() === removeVietnameseTones(String(b || '')).toLowerCase()
   }
 
-  const lockedChipClass = 'cursor-not-allowed border-neutral-500 bg-neutral-800 text-neutral-100 opacity-100'
-  const lockedInputClass = 'disabled:cursor-not-allowed disabled:opacity-100 disabled:border-neutral-500 disabled:bg-neutral-800 disabled:text-neutral-100'
+  const lockedChipClass = 'cursor-not-allowed border-gray-500 bg-gray-800 text-gray-100 opacity-100'
+  const lockedInputClass = 'disabled:cursor-not-allowed disabled:opacity-100 disabled:border-gray-500 disabled:bg-gray-800 disabled:text-gray-100'
   const visibleStoreTypes = safeLocks.storeType && storeType
     ? STORE_TYPE_OPTIONS.filter((type) => type.value === storeType)
     : STORE_TYPE_OPTIONS

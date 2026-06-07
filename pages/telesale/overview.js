@@ -243,7 +243,7 @@ export default function TelesaleOverviewPage() {
         <title>Telesale - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="mx-auto max-w-screen-md space-y-4 px-3 py-4 sm:px-4 sm:py-6">
           <div className="flex items-center justify-between gap-2">
             <Button type="button" variant="outline" size="sm" onClick={handleBack}>

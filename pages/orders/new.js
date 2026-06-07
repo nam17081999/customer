@@ -347,7 +347,7 @@ export default function NewSalesOrderPage() {
         <title>Lên đơn - NPP Hà Công</title>
       </Head>
 
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         {msgState ? <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg> : null}
         <form className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-[1900px] flex-col px-3 py-3 sm:px-4" onSubmit={handleSubmit}>
           <div className="sticky top-0 z-40 rounded-md border border-gray-800 bg-gray-950 shadow-lg shadow-black/20">

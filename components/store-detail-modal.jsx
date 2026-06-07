@@ -105,7 +105,7 @@ function StoreInfoGrid({ store, addressText, phoneNumbers, hasCoords, googleMaps
   return (
     <div className="mt-4 grid gap-y-2 sm:mt-6 sm:grid-cols-2 sm:gap-3">
       {addressText && (
-        <div className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:col-span-2 sm:border-slate-800 sm:bg-slate-900/45 sm:p-4">
+        <div className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:col-span-2 sm:border-gray-800 sm:bg-gray-900/45 sm:p-4">
           <svg className="size-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
           </svg>
@@ -122,7 +122,7 @@ function StoreInfoGrid({ store, addressText, phoneNumbers, hasCoords, googleMaps
       )}
 
       {phoneNumbers.map((phoneValue, phoneIndex) => (
-        <div key={`detail-phone-${phoneValue}-${phoneIndex}`} className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:border-slate-800 sm:bg-slate-900/45 sm:p-4">
+        <div key={`detail-phone-${phoneValue}-${phoneIndex}`} className="flex items-center gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:border-gray-800 sm:bg-gray-900/45 sm:p-4">
           <svg className="size-5 shrink-0 text-gray-500" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1C10.07 21 3 13.93 3 5a1 1 0 011-1h3.5a1 1 0 011 1 11.36 11.36 0 00.57 3.56 1 1 0 01-.24 1.01l-1.71 1.72z" />
           </svg>
@@ -139,7 +139,7 @@ function StoreInfoGrid({ store, addressText, phoneNumbers, hasCoords, googleMaps
       ))}
 
       {store.note && (
-        <div className="flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:col-span-2 sm:border-slate-800 sm:bg-slate-900/45 sm:p-4">
+        <div className="flex items-start gap-3 rounded-xl border border-gray-800 bg-gray-950/40 p-2.5 sm:col-span-2 sm:border-gray-800 sm:bg-gray-900/45 sm:p-4">
           <svg className="mt-0.5 size-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
@@ -156,7 +156,7 @@ function StoreInfoGrid({ store, addressText, phoneNumbers, hasCoords, googleMaps
 function MobileMapSection({ store, open, expanded, onToggle }) {
   return (
     <section className="mt-4 space-y-2 sm:hidden">
-      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950/50 p-3 text-left transition hover:border-gray-700 hover:bg-gray-900/70 sm:border-slate-800 sm:bg-slate-900/45 sm:p-4">
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-800 bg-gray-950/50 p-3 text-left transition hover:border-gray-700 hover:bg-gray-900/70 sm:border-gray-800 sm:bg-gray-900/45 sm:p-4">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-200">Bản đồ khu vực</p>
           <p className="mt-0.5 text-xs text-gray-400">
@@ -197,7 +197,7 @@ function DetailActions({
   } = handlers
 
   return (
-    <section className="mt-4 space-y-2 border-t border-gray-800/70 pt-3 sm:mt-auto sm:border-slate-800 sm:pt-5">
+    <section className="mt-4 space-y-2 border-t border-gray-800/70 pt-3 sm:mt-auto sm:border-gray-800 sm:pt-5">
       <p className="px-0.5 text-sm font-semibold text-gray-300">Thao tác</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {hasCoords && !isMapPage && (
@@ -259,7 +259,7 @@ function DetailActions({
 
 function DesktopMapAside({ store, open, hasCoords, isMapPage, isDesktopLayout, googleMapsHref }) {
   return (
-    <aside className="hidden min-h-0 border-l border-slate-800 bg-slate-900/40 p-5 sm:flex sm:flex-col">
+    <aside className="hidden min-h-0 border-l border-gray-800 bg-gray-900/40 p-5 sm:flex sm:flex-col">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div>
           <p className="text-base font-semibold text-gray-100">Bản đồ khu vực</p>
@@ -268,12 +268,12 @@ function DesktopMapAside({ store, open, hasCoords, isMapPage, isDesktopLayout, g
           </p>
         </div>
         {hasCoords && !isMapPage && (
-          <a href={googleMapsHref} target="_blank" rel="noopener noreferrer" aria-label="Mở Google Maps" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-slate-700 bg-slate-950 text-slate-300 transition hover:border-sky-500/70 hover:text-sky-200">
+          <a href={googleMapsHref} target="_blank" rel="noopener noreferrer" aria-label="Mở Google Maps" className="flex size-10 shrink-0 items-center justify-center rounded-full border border-gray-700 bg-gray-950 text-gray-300 transition hover:border-sky-500/70 hover:text-sky-200">
             <DirectionTurnIcon className="size-5" />
           </a>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-inner">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-gray-800 bg-gray-950 shadow-inner">
         {hasCoords && !isMapPage && isDesktopLayout ? (
           <StoreDetailMiniMap store={store} open={open} fill />
         ) : (
@@ -493,7 +493,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
   }
 
   const detailContent = (
-    <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] max-w-md overflow-hidden rounded-md p-0 sm:max-h-[min(84vh,820px)] sm:w-[calc(100%-3rem)] sm:max-w-[1180px] sm:rounded-xl sm:border-slate-700 sm:bg-slate-950 sm:shadow-2xl sm:shadow-black/50">
+    <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] max-w-md overflow-hidden rounded-md p-0 sm:max-h-[min(84vh,820px)] sm:w-[calc(100%-3rem)] sm:max-w-[1180px] sm:rounded-xl sm:border-gray-700 sm:bg-gray-950 sm:shadow-2xl sm:shadow-black/50">
       <div className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-y-auto sm:max-h-[min(82vh,780px)] sm:overflow-hidden">
         <StoreDetailHeader
           store={store}
@@ -504,7 +504,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
           qualityBadges={qualityBadges}
         />
 
-        <div className="sm:grid sm:min-h-[620px] sm:grid-cols-[minmax(0,1fr)_460px] sm:gap-0 sm:bg-slate-950">
+        <div className="sm:grid sm:min-h-[620px] sm:grid-cols-[minmax(0,1fr)_460px] sm:gap-0 sm:bg-gray-950">
           <div className="px-3 pb-4 sm:flex sm:min-h-0 sm:flex-col sm:overflow-y-auto sm:px-6 sm:py-6">
             <StoreDetailHeader
               store={store}

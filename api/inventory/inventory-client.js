@@ -73,7 +73,19 @@ function normalizeSalesOrderSearchText(value) {
   return removeVietnameseTones(String(value || '').trim()).replace(/\s+/g, ' ')
 }
 
-function getSalesOrderDateRange(datePreset, now = new Date()) {
+function getSalesOrderDateRange(datePreset, now = new Date(), dateFrom = null, dateTo = null) {
+  // Custom date range takes precedence when both dates are provided
+  if (dateFrom && dateTo) {
+    const partsFrom = dateFrom.split('-')
+    const partsTo = dateTo.split('-')
+    const from = new Date(Number(partsFrom[0]), Number(partsFrom[1]) - 1, Number(partsFrom[2]))
+    const to = new Date(Number(partsTo[0]), Number(partsTo[1]) - 1, Number(partsTo[2]))
+    to.setDate(to.getDate() + 1) // exclusive end
+    if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+      return [from, to]
+    }
+  }
+
   const safeNow = now instanceof Date ? now : new Date()
 
   function startOfDay(date) {
@@ -140,17 +152,39 @@ function applySalesOrderListFilters(queryBuilder, { statuses, creatorId, dateRan
   return nextQuery
 }
 
-export async function listProductsWithStock() {
-  const { data: products, error: productError } = await supabase
+export async function listProductsWithStock(options) {
+  const legacyArrayResult = options === undefined || options === null || typeof options === 'number'
+  const params = legacyArrayResult ? {} : (options || {})
+  const page = Math.max(1, Number(params.page) || 1)
+  const pageSize = Math.max(1, Number(params.pageSize) || 200)
+
+  // Build query
+  let countQuery = supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null)
+
+  let productQuery = supabase
     .from('products')
     .select('*')
     .is('deleted_at', null)
-    .order('name', { ascending: true })
 
+  if (!legacyArrayResult) {
+    productQuery = productQuery.order('name', { ascending: true }).range((page - 1) * pageSize, (page * pageSize) - 1)
+  } else {
+    productQuery = productQuery.order('name', { ascending: true })
+  }
+
+  const [{ count: totalCount, error: countError }, { data: products, error: productError }] = await Promise.all([
+    countQuery,
+    productQuery,
+  ])
+
+  if (countError) throw countError
   if (productError) throw productError
 
   const productIds = (products || []).map((item) => item.id)
-  if (productIds.length === 0) return []
+  if (productIds.length === 0) return legacyArrayResult ? [] : { products: [], totalCount: Number(totalCount || 0), page, pageSize }
 
   const [{ data: units, error: unitError }, { data: stockRows, error: stockError }] = await Promise.all([
     supabase
@@ -177,7 +211,11 @@ export async function listProductsWithStock() {
 
   const stockByProduct = new Map((stockRows || []).map((row) => [row.product_id, row]))
 
-  return (products || []).map((row) => normalizeProduct(row, unitsByProduct, stockByProduct))
+  const normalized = (products || []).map((row) => normalizeProduct(row, unitsByProduct, stockByProduct))
+
+  return legacyArrayResult
+    ? normalized
+    : { products: normalized, totalCount: Number(totalCount || 0), page, pageSize }
 }
 
 export async function createProductWithUnits(payload) {
@@ -281,8 +319,36 @@ export async function cancelPurchaseOrder(purchaseOrderId, userId = null) {
 }
 
 export async function getProductDetail(productId) {
-  const products = await listProductsWithStock()
-  return products.find((product) => String(product.id) === String(productId)) || null
+  // Direct fetch product — much faster than loading everything
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single()
+  if (productError) {
+    if (productError.code === 'PGRST116') return null
+    throw productError
+  }
+
+  const { data: units } = await supabase
+    .from('product_units')
+    .select('*')
+    .eq('product_id', productId)
+    .order('is_base_unit', { ascending: false })
+    .order('conversion_to_base_qty', { ascending: true })
+
+  const { data: stockRows } = await supabase
+    .from('product_stock')
+    .select('*')
+    .eq('product_id', productId)
+
+  const unitsByProduct = new Map()
+  unitsByProduct.set(product.id, units || [])
+  const stockByProduct = new Map()
+  const stock = (stockRows || [])[0]
+  if (stock) stockByProduct.set(product.id, stock)
+
+  return normalizeProduct(product, unitsByProduct, stockByProduct)
 }
 
 export async function updateProduct(productId, payload) {
@@ -341,7 +407,7 @@ export async function listSalesOrders(options = 100) {
     ? params.statuses.map((item) => String(item).trim()).filter(Boolean)
     : []
   const creatorId = String(params.creatorId || '').trim()
-  const dateRange = getSalesOrderDateRange(params.datePreset || 'all', params.now)
+  const dateRange = getSalesOrderDateRange(params.datePreset || 'all', params.now, params.dateFrom, params.dateTo)
   const matchingCustomerStoreIds = Array.isArray(params.matchingCustomerStoreIds)
     ? params.matchingCustomerStoreIds.map((item) => String(item).trim()).filter(Boolean)
     : []
@@ -568,6 +634,29 @@ export async function importProductsFromPreview(rows, { requestId, actorId = nul
   return data
 }
 
+export async function getLowStockCount() {
+  // Lightweight count query — avoids loading all products
+  const { data, error } = await supabase
+    .rpc('get_low_stock_report', { p_limit: 9999 })
+  if (error) throw error
+  return (data || []).length
+}
+
+export async function getLowStockItems() {
+  const { data, error } = await supabase
+    .rpc('get_low_stock_report', { p_limit: 10 })
+  if (error) throw error
+  return (data || []).map((item) => ({
+    productId: item.product_id,
+    productName: item.product_name,
+    sku: item.sku,
+    onHandQty: Number(item.on_hand_base_qty || 0),
+    minStockQty: Number(item.min_stock_base_qty || 0),
+    baseUnitName: item.base_unit_name,
+    updatedAt: item.updated_at, // ISO string từ DB — timestamp gốc của sự kiện
+  }))
+}
+
 export async function getDashboardAggregateReport({ from = null, to = null } = {}) {
   const args = { p_from: from, p_to: to }
   const [sales, purchases, inventory, topProducts, lowStock, customers] = await Promise.all([
@@ -601,4 +690,17 @@ export async function globalOperatorSearch(query, limit = 20) {
   })
   if (error) throw error
   return data || []
+}
+
+export async function markOrdersPrinted(orderIds) {
+  if (!orderIds || orderIds.length === 0) return
+  const ids = orderIds.map((id) => String(id)).filter(Boolean)
+  if (ids.length === 0) return
+
+  const { error } = await supabase
+    .from('sales_orders')
+    .update({ is_printed: true })
+    .in('id', ids)
+
+  if (error) throw error
 }

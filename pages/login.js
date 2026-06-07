@@ -49,10 +49,21 @@ export default function LoginPage() {
     event.preventDefault()
     if (loading) return
 
+    // Client-side validation
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError('Vui lòng nhập email')
+      return
+    }
+    if (!password) {
+      setError('Vui lòng nhập mật khẩu')
+      return
+    }
+
     setError('')
     setLoading(true)
 
-    const { data, error: signInError } = await signIn(email.trim(), password)
+    const { data, error: signInError } = await signIn(trimmedEmail, password)
     if (signInError) {
       setError('Email hoặc mật khẩu không đúng')
       setLoading(false)

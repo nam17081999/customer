@@ -27,7 +27,7 @@ export default function StoreReportsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="mx-auto max-w-screen-md px-3 py-6 sm:px-4">
           <p className="text-sm text-gray-400">Đang kiểm tra đăng nhập...</p>
         </div>
@@ -43,7 +43,7 @@ export default function StoreReportsPage() {
         <title>Báo cáo cửa hàng - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="mx-auto max-w-screen-md space-y-4 px-3 py-4 sm:px-4 sm:py-6">
           <Card className="rounded-2xl border border-gray-800">
             <CardContent className="space-y-3 p-4 sm:p-5">

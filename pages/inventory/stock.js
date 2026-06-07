@@ -53,8 +53,8 @@ export default function StockReportPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!isAuthenticated) return router.replace('/login?from=/inventory/stock')
-    if (!isAdmin) return router.replace('/account')
+    if (!isAuthenticated) { router.replace('/login?from=/inventory/stock'); return }
+    if (!isAdmin) { router.replace('/account'); return }
     setPageReady(true)
   }, [authLoading, isAuthenticated, isAdmin, router])
 
@@ -112,7 +112,7 @@ export default function StockReportPage() {
   return (
     <>
       <Head><title>Báo cáo tồn kho - NPP Hà Công</title></Head>
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><h1 className="text-2xl font-bold">Báo cáo tồn kho</h1><p className="text-base text-gray-400">Hàng sắp hết và lịch sử phát sinh kho.</p></div>

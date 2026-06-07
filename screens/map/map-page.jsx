@@ -1,0 +1,1613 @@
+import 'maplibre-gl/dist/maplibre-gl.css'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/router'
+import dynamic from 'next/dynamic'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { getOrRefreshStores } from '@/lib/storeCache'
+import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
+import { parseCoordinate } from '@/helper/coordinate'
+import { buildStoreSearchIndex } from '@/helper/storeSearch'
+import {
+  formatRouteDistance,
+  formatRouteDuration,
+  formatShortAddress,
+} from '@/helper/mapRoute'
+import {
+  buildMapMarkerImagePlan,
+  buildMapStoreFeatures,
+  buildMarkerSourceCollections,
+  buildStoreLookupMap,
+  buildVisibleMapStores,
+  createMapFeatureBaseCache,
+} from '@/helper/mapDerivedData'
+import { addMapEventListener, toLatLng } from '@/helper/mapHelpers'
+import { useMapSearchPanelController } from '@/helper/useMapSearchPanelController'
+import { useMapRouteDragController } from '@/helper/useMapRouteDragController'
+import { useMapNavigationController } from '@/helper/useMapNavigationController'
+import { useMapRouteController } from '@/helper/useMapRouteController'
+import {
+  createUserHeadingFanImage,
+  ensureStoreMarkerImage,
+  removeMarkerImages,
+} from '@/helper/mapMarkerImages'
+
+const StoreDetailModal = dynamic(() => import('@/components/store-detail-modal'), {
+  ssr: false,
+})
+
+const DEFAULT_CENTER = [105.6955684, 21.0768617]
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
+
+const MAP_INTERACTION_SUPPRESS_MS = 500
+
+export default function MapPage() {
+  const router = useRouter()
+  const mapContainerRef = useRef(null)
+  const mapRef = useRef(null)
+  const maplibreRef = useRef(null)
+  const popupRef = useRef(null)
+  const activeMarkerImageIdsRef = useRef(new Set())
+  const markerImageSetupFailedRef = useRef(false)
+  const featureBaseCacheRef = useRef(createMapFeatureBaseCache())
+
+  const [stores, setStores] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [highlightedStoreId, setHighlightedStoreId] = useState('')
+  const [selectedStore, setSelectedStore] = useState(null)
+  const [mapReady, setMapReady] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
+  const [isStandalonePwa, setIsStandalonePwa] = useState(false)
+  const [routePanelOpen, setRoutePanelOpen] = useState(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('routePanel') === '1'
+      : false
+  )
+  const searchWrapperRef = useRef(null)
+  const inputRef = useRef(null)
+  const suggestionsRef = useRef(null)
+  const suppressMapInteractionUntilRef = useRef(0)
+
+  const initialTarget = useMemo(() => {
+    if (!router.isReady) return null
+    const rawLat = Array.isArray(router.query.lat) ? router.query.lat[0] : router.query.lat
+    const rawLng = Array.isArray(router.query.lng) ? router.query.lng[0] : router.query.lng
+    const lat = parseCoordinate(rawLat)
+    const lng = parseCoordinate(rawLng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
+    return { lat, lng }
+  }, [router.isReady, router.query.lat, router.query.lng])
+
+  const initialStoreId = useMemo(() => {
+    if (!router.isReady) return ''
+    const rawStoreId = Array.isArray(router.query.storeId) ? router.query.storeId[0] : router.query.storeId
+    return rawStoreId ? String(rawStoreId) : ''
+  }, [router.isReady, router.query.storeId])
+
+  const clearSelectedStore = useCallback(() => {
+    setSelectedStore(null)
+  }, [])
+
+  const {
+    locationError,
+    userLocation,
+    followUserHeading,
+    navLoading,
+    recenterToUserLocation,
+    toggleUserHeadingRotation,
+    disableFollowUserHeading,
+  } = useMapNavigationController({
+    mapRef,
+    mapReady,
+    initialHasRouteTarget: Boolean(initialTarget || initialStoreId),
+    clearSelectedStore,
+  })
+
+  // Detect desktop via pointer capability (not screen width)
+  useEffect(() => {
+    const mq = window.matchMedia('(hover: hover) and (pointer: fine)')
+    setIsDesktop(mq.matches)
+    const handler = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  useEffect(() => {
+    const standaloneMq = window.matchMedia('(display-mode: standalone)')
+    const updateStandaloneState = () => {
+      setIsStandalonePwa(Boolean(standaloneMq.matches || window.navigator.standalone === true))
+    }
+
+    updateStandaloneState()
+    standaloneMq.addEventListener('change', updateStandaloneState)
+    return () => standaloneMq.removeEventListener('change', updateStandaloneState)
+  }, [])
+
+  const storesWithCoords = useMemo(() => {
+    return stores
+      .map((store) => ({ ...store, coords: toLatLng(store) }))
+      .filter((store) => store.coords)
+  }, [stores])
+
+  const {
+    routeStops,
+    setRouteStops,
+    routeGeojson,
+    routeSummary,
+    routeLoading,
+    routeSorting,
+    routeError,
+    hideUnselectedStores,
+    setHideUnselectedStores,
+    routeStopIds,
+    routeStopOrderById,
+    completedRouteStopIdSet,
+    navigationInfo,
+    addStoreToRoute,
+    removeRouteStop,
+    clearRoutePlan,
+    buildRoute,
+    optimizeRouteOrder,
+    resetRouteProgress,
+  } = useMapRouteController({
+    loading,
+    storesWithCoords,
+    userLocation,
+    followUserHeading,
+    mapRef,
+    isDesktop,
+  })
+  const {
+    armedRouteIndex,
+    draggedRouteIndex,
+    dragOverRouteIndex,
+    dragRouteOffset,
+    dragRouteBox,
+    routeListScrollRef,
+    renderedRouteStops,
+    draggedRouteStore,
+    setRouteItemRef,
+    startRouteDrag,
+  } = useMapRouteDragController({
+    routeStops,
+    setRouteStops,
+    resetRouteProgress,
+  })
+
+  const indexedMapStores = useMemo(() => buildStoreSearchIndex(storesWithCoords), [storesWithCoords])
+  const {
+    searchTerm,
+    setSearchTerm,
+    showSuggestions,
+    activeSuggestion,
+    canScrollDown,
+    selectedDistricts,
+    selectedWards,
+    selectedStoreTypes,
+    storesAfterAreaFilters,
+    filteredStores,
+    availableWards,
+    storeCounts,
+    storeTypeCounts,
+    suggestions,
+    filtersActive,
+    handleSearchInputChange,
+    handleSearchFocus,
+    closeSuggestions,
+    moveActiveSuggestion,
+    handleSuggestionsScroll,
+    syncSuggestionScrollHint,
+    toggleDistrict,
+    toggleWard,
+    toggleStoreType,
+    clearFilters,
+  } = useMapSearchPanelController({
+    storesWithCoords,
+    indexedMapStores,
+    currentLocation: userLocation,
+  })
+
+  const visibleMapStores = useMemo(() => buildVisibleMapStores({
+    filteredStores,
+    hideUnselectedStores,
+    routeStopIds,
+  }), [filteredStores, hideUnselectedStores, routeStopIds])
+
+  const storeFeatures = useMemo(() => buildMapStoreFeatures({
+    visibleMapStores,
+    highlightedStoreId,
+    completedRouteStopIdSet,
+    routeStopOrderById,
+    featureBaseCache: featureBaseCacheRef.current,
+  }), [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
+
+  const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
+
+  // Initialize MapLibre
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return
+
+    let cancelled = false
+    let activeMap = null
+    let detachMapSetupListeners = null
+    let detachMarkerLayerListeners = null
+    markerImageSetupFailedRef.current = false
+
+    const initMap = async () => {
+      if (cancelled || !mapContainerRef.current) return
+      const maplibreModule = await import('maplibre-gl')
+      if (cancelled || !mapContainerRef.current) return
+
+      const maplibregl = maplibreModule.default
+      maplibreRef.current = maplibregl
+
+      const map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style: {
+          version: 8,
+          glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '© OpenStreetMap'
+            }
+          },
+          layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+        },
+        center: initialTarget ? [initialTarget.lng, initialTarget.lat] : DEFAULT_CENTER,
+        zoom: initialTarget ? 16 : 13,
+        pitch: 0,
+        minZoom: 3,
+        maxZoom: 20,
+        maxPitch: 0,
+        pitchWithRotate: false,
+        attributionControl: true
+      })
+
+      map.dragRotate.disable()
+      map.touchZoomRotate.disableRotation()
+
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left')
+
+      let mapInitialized = false
+      const initializeMapOverlays = () => {
+        const styleReady = typeof map.isStyleLoaded === 'function' ? map.isStyleLoaded() : map.loaded()
+        if (cancelled || mapInitialized || !styleReady) return
+
+        mapInitialized = true
+        detachMapSetupListeners?.()
+
+        map.addSource('stores', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        map.addSource('stores-highlighted', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        map.addSource('user-location', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        map.addSource('route-path', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        // Base markers
+        map.addLayer({
+          id: 'store-marker-base',
+          type: 'symbol',
+          source: 'stores',
+          layout: {
+            'icon-image': ['case',
+              ['!=', ['get', 'routeOrder'], ''], ['concat', 'smr-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
+              ['concat', 'sm-', ['get', 'storeId']]
+            ],
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'symbol-z-order': 'auto',
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
+          },
+        })
+
+        map.addLayer({
+          id: 'store-marker-highlighted',
+          type: 'symbol',
+          source: 'stores-highlighted',
+          layout: {
+            'icon-image': ['case',
+              ['!=', ['get', 'routeOrder'], ''], ['concat', 'smrh-', ['get', 'storeId'], '-', ['get', 'routeOrder']],
+              ['concat', 'smh-', ['get', 'storeId']]
+            ],
+            'icon-size': ['interpolate', ['linear'], ['zoom'], 7, 0.4, 10, 0.55, 14, 0.8, 17, 1],
+            'icon-anchor': 'center',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'symbol-z-order': 'auto',
+          },
+          paint: {
+            'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
+          },
+        })
+
+        map.addLayer({
+          id: 'route-line-outline',
+          type: 'line',
+          source: 'route-path',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': 'rgba(15, 23, 42, 0.95)',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 9, 16, 12],
+            'line-opacity': 0.95,
+          },
+        }, 'store-marker-base')
+
+        map.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route-path',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 5.5, 16, 7],
+            'line-opacity': 0.95,
+          },
+        }, 'store-marker-base')
+
+        map.addLayer({
+          id: 'user-location-halo',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 9, 12, 12, 16, 16],
+            'circle-color': 'rgba(59, 130, 246, 0.22)',
+          },
+        })
+
+        map.addLayer({
+          id: 'user-location-dot',
+          type: 'circle',
+          source: 'user-location',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 4, 12, 6, 16, 8],
+            'circle-color': '#2563eb',
+            'circle-stroke-color': '#ffffff',
+            'circle-stroke-width': 2,
+          },
+        })
+
+        setMapReady(true)
+
+        try {
+          if (!map.hasImage('user-heading-fan')) {
+            const img = createUserHeadingFanImage()
+            map.addImage('user-heading-fan', { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.dpr })
+          }
+
+          map.addLayer({
+            id: 'user-location-heading',
+            type: 'symbol',
+            source: 'user-location',
+            layout: {
+              'icon-image': 'user-heading-fan',
+              'icon-size': ['interpolate', ['linear'], ['zoom'], 4, 1.05, 8, 0.92, 12, 0.78, 16, 0.62],
+              'icon-rotate': ['get', 'heading'],
+              'icon-rotation-alignment': 'map',
+              'icon-anchor': 'center',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+            },
+            paint: {
+              'icon-opacity': ['case', ['==', ['get', 'hasHeading'], 'yes'], 1, 0],
+            },
+          })
+        } catch (assetError) {
+          console.error('User heading asset setup failed:', assetError)
+        }
+
+        const markerLayerIds = ['store-marker-base', 'store-marker-highlighted']
+
+        const handleMarkerInteraction = (e) => {
+          if (Date.now() < suppressMapInteractionUntilRef.current) return
+          const f = e.features?.[0]
+          if (!f) return
+          const storeId = f.properties.storeId
+          const store = storeMapRef.current.get(storeId)
+          if (store) {
+            const [lng, lat] = f.geometry.coordinates
+            map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 15), duration: 900 })
+            setHighlightedStoreId(String(storeId))
+            setSelectedStore(store)
+          }
+        }
+
+        // Hover tooltip (desktop only) using Popup
+        const popup = new maplibregl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          className: 'store-hover-popup',
+          offset: 14,
+          maxWidth: '320px',
+        })
+        popupRef.current = popup
+
+        const handleMarkerMouseMove = (e) => {
+          if (!e.features?.length) return
+          map.getCanvas().style.cursor = 'pointer'
+          const f = e.features[0]
+          const name = f.properties.name || 'Cửa hàng'
+          const addr = f.properties.address || ''
+          popup.setLngLat(f.geometry.coordinates)
+            .setHTML(
+              `<div style="font-size:13px;font-weight:600;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name.replace(/</g, '&lt;')}</div>` +
+              (addr ? `<div style="font-size:11px;color:#94a3b8;line-height:1.3;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${addr.replace(/</g, '&lt;')}</div>` : '')
+            )
+            .addTo(map)
+        }
+
+        const handleMarkerMouseLeave = () => {
+          map.getCanvas().style.cursor = ''
+          popup.remove()
+        }
+
+        detachMarkerLayerListeners?.()
+        const markerLayerDetachers = []
+        markerLayerIds.forEach((layerId) => {
+          markerLayerDetachers.push(addMapEventListener(map, 'click', layerId, handleMarkerInteraction))
+          markerLayerDetachers.push(addMapEventListener(map, 'mousemove', layerId, handleMarkerMouseMove))
+        })
+        markerLayerIds.forEach((layerId) => {
+          markerLayerDetachers.push(addMapEventListener(map, 'mouseleave', layerId, handleMarkerMouseLeave))
+        })
+        detachMarkerLayerListeners = () => {
+          markerLayerDetachers.forEach((detach) => detach())
+        }
+      }
+
+      const detachLoadListener = addMapEventListener(map, 'load', initializeMapOverlays)
+      const detachStyleDataListener = addMapEventListener(map, 'styledata', initializeMapOverlays)
+      detachMapSetupListeners = () => {
+        detachLoadListener()
+        detachStyleDataListener()
+      }
+      initializeMapOverlays()
+
+      mapRef.current = map
+      activeMap = map
+    }
+
+    initMap().catch((e) => {
+      console.error(e)
+      setError('Không thể khởi tạo bản đồ. Vui lòng tải lại trang.')
+    })
+
+    return () => {
+      cancelled = true
+      if (popupRef.current) popupRef.current.remove()
+      if (activeMap) removeMarkerImages(activeMap, activeMarkerImageIdsRef.current)
+      activeMarkerImageIdsRef.current = new Set()
+      markerImageSetupFailedRef.current = false
+      detachMarkerLayerListeners?.()
+      detachMapSetupListeners?.()
+      if (activeMap) activeMap.remove()
+      mapRef.current = null
+      setMapReady(false)
+    }
+  }, [initialTarget])
+
+  // Fetch stores
+  useEffect(() => {
+    let active = true
+
+    const fetchAllStores = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        const data = await getOrRefreshStores()
+        const visibleStores = (data || []).filter((store) => toLatLng(store))
+        if (active) setStores(visibleStores)
+      } catch (e) {
+        if (active) {
+          console.error(e)
+          setError('Không thể tải dữ liệu cửa hàng. Vui lòng thử lại.')
+        }
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    fetchAllStores()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const applyStoreChange = useCallback((detail = {}) => {
+    const { type, id, ids, store, stores } = detail
+
+    setStores((prev) => {
+      if (type === 'delete' && id != null) {
+        return prev.filter((item) => item.id !== id)
+      }
+
+      if (type === 'verify-many' && Array.isArray(ids) && ids.length > 0) {
+        const idSet = new Set(ids)
+        return prev.map((item) => (
+          idSet.has(item.id) ? { ...item, active: true } : item
+        ))
+      }
+
+      if (type === 'append-many' && Array.isArray(stores) && stores.length > 0) {
+        const byId = new Map(prev.map((item) => [item.id, item]))
+        stores.forEach((item) => {
+          if (item?.id == null) return
+          if (!toLatLng(item)) return
+          byId.set(item.id, item)
+        })
+        return Array.from(byId.values())
+      }
+
+      if (type === 'update' && store?.id != null) {
+        const hasCoords = Boolean(toLatLng(store))
+        let found = false
+        const next = prev
+          .map((item) => {
+            if (item.id !== store.id) return item
+            found = true
+            return hasCoords ? { ...item, ...store } : null
+          })
+          .filter(Boolean)
+
+        if (found) return next
+        return hasCoords ? [...next, store] : next
+      }
+
+      return prev
+    })
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleStoresChanged = async (event) => {
+      const detail = event?.detail || {}
+      const shouldRefetchAll = Boolean(detail.shouldRefetchAll)
+      if (!shouldRefetchAll) applyStoreChange(detail)
+      if (shouldRefetchAll) {
+        try {
+          const data = await getOrRefreshStores()
+          setStores((data || []).filter((store) => toLatLng(store)))
+        } catch (e) {
+          console.error(e)
+        }
+      }
+    }
+
+    window.addEventListener('storevis:stores-changed', handleStoresChanged)
+    return () => window.removeEventListener('storevis:stores-changed', handleStoresChanged)
+  }, [applyStoreChange])
+
+  // Update GeoJSON source when filtered stores change
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    storeMapRef.current = buildStoreLookupMap(visibleMapStores)
+
+    const source = map.getSource('stores')
+    const highlightedSource = map.getSource('stores-highlighted')
+    if (!source || !highlightedSource) return
+
+    const { baseCollection, highlightedCollection } = buildMarkerSourceCollections(storeFeatures)
+    source.setData(baseCollection)
+    highlightedSource.setData(highlightedCollection)
+
+    const { desiredImageIds, pendingImages } = buildMapMarkerImagePlan({
+      storeFeatures,
+      hasImage: (imageId) => map.hasImage(imageId),
+    })
+
+    let frameId = 0
+    let cancelled = false
+    let index = 0
+
+    const removeStaleImages = () => {
+      const staleImageIds = Array.from(activeMarkerImageIdsRef.current).filter((imageId) => !desiredImageIds.has(imageId))
+      if (staleImageIds.length > 0) {
+        removeMarkerImages(map, staleImageIds)
+      }
+      activeMarkerImageIdsRef.current = desiredImageIds
+    }
+
+    if (pendingImages.length === 0) {
+      removeStaleImages()
+      return undefined
+    }
+
+    const flushImageBatch = () => {
+      if (cancelled) return
+
+      if (markerImageSetupFailedRef.current) {
+        removeStaleImages()
+        return
+      }
+
+      const batchEnd = Math.min(index + 18, pendingImages.length)
+      for (; index < batchEnd; index += 1) {
+        const item = pendingImages[index]
+        try {
+          ensureStoreMarkerImage(map, item)
+        } catch (assetError) {
+          markerImageSetupFailedRef.current = true
+          console.error('Store marker image setup failed:', assetError)
+          removeStaleImages()
+          return
+        }
+      }
+
+      if (index < pendingImages.length) {
+        frameId = window.requestAnimationFrame(flushImageBatch)
+        return
+      }
+
+      removeStaleImages()
+    }
+
+    frameId = window.requestAnimationFrame(flushImageBatch)
+
+    return () => {
+      cancelled = true
+      if (frameId) window.cancelAnimationFrame(frameId)
+    }
+  }, [mapReady, storeFeatures, visibleMapStores])
+
+  // Update user location on map
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const pointSource = map.getSource('user-location')
+    if (!pointSource) return
+
+    const features = userLocation
+      ? [{
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [userLocation.longitude, userLocation.latitude],
+        },
+        properties: {
+          heading: userLocation.heading ?? 0,
+          hasHeading: userLocation.heading != null ? 'yes' : 'no',
+        },
+      }]
+      : []
+
+    pointSource.setData({ type: 'FeatureCollection', features })
+  }, [mapReady, userLocation])
+
+  // Update route data on map
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const routeSource = map.getSource('route-path')
+    if (routeSource) routeSource.setData(routeGeojson)
+  }, [mapReady, routeGeojson])
+
+  const flyToStore = useCallback((store, options = {}) => {
+    if (!store?.coords) return
+    const map = mapRef.current
+    if (!map) return
+
+    const { updateSearchTerm = true } = options
+
+    setHighlightedStoreId(String(store.id))
+    map.flyTo({ center: [store.coords.lng, store.coords.lat], zoom: 16, duration: 900 })
+
+    closeSuggestions()
+    if (updateSearchTerm) setSearchTerm(store.name || '')
+    inputRef.current?.blur()
+  }, [closeSuggestions, setSearchTerm])
+
+  const handleSearch = useCallback(() => {
+    const matched = suggestions[0] || null
+    if (matched) flyToStore(matched)
+    closeSuggestions()
+  }, [closeSuggestions, flyToStore, suggestions])
+
+  const showNavigationInfoPanel = followUserHeading && Boolean(navigationInfo)
+
+  // Fly to initial store if set via URL
+  useEffect(() => {
+    if (!router.isReady) return
+    if (!initialStoreId || !mapReady) return
+
+    const matched = storesWithCoords.find((store) => String(store.id) === initialStoreId)
+    if (!matched) return
+
+    flyToStore(matched, { updateSearchTerm: false })
+  }, [router.isReady, initialStoreId, storesWithCoords, mapReady, flyToStore])
+
+  // Disable follow mode when route stops cleared
+  useEffect(() => {
+    if (routeStops.length === 0) {
+      disableFollowUserHeading()
+    }
+  }, [disableFollowUserHeading, routeStops.length])
+
+  const handleToggleUserHeadingRotation = useCallback(() => {
+    toggleUserHeadingRotation({
+      routeStopsLength: routeStops.length,
+      routeFeatureCount: routeGeojson.features.length,
+      buildRoute,
+      onEnableRouteMode: () => setHideUnselectedStores(true),
+    })
+  }, [buildRoute, routeGeojson.features.length, routeStops.length, setHideUnselectedStores, toggleUserHeadingRotation])
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    function onPointerDown(e) {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
+        closeSuggestions()
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [closeSuggestions])
+
+  // Recalculate scroll indicator when suggestions change
+  useEffect(() => {
+    syncSuggestionScrollHint(suggestionsRef.current)
+  }, [suggestions, syncSuggestionScrollHint])
+
+  return (
+    <div className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-gray-950 text-gray-100 flex">
+      {/* Map area */}
+      <div className="relative flex-1 h-full">
+        <div ref={mapContainerRef} className="absolute inset-0" />
+
+        {/* Dark loading overlay */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-950 transition-opacity duration-500"
+          style={{
+            opacity: mapReady ? 0 : 1,
+            visibility: mapReady ? 'hidden' : 'visible',
+          }}
+        >
+          <svg className="h-8 w-8 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-60" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+          </svg>
+          <p className="mt-3 text-sm text-gray-500">Đang tải bản đồ…</p>
+        </div>
+
+        {!showNavigationInfoPanel && (
+          <MapSearchBar
+            searchTerm={searchTerm}
+            inputRef={inputRef}
+            searchWrapperRef={searchWrapperRef}
+            handleSearchInputChange={handleSearchInputChange}
+            handleSearchFocus={handleSearchFocus}
+            moveActiveSuggestion={moveActiveSuggestion}
+            suggestions={suggestions}
+            activeSuggestion={activeSuggestion}
+            flyToStore={flyToStore}
+            handleSearch={handleSearch}
+            closeSuggestions={closeSuggestions}
+            showSuggestions={showSuggestions}
+            canScrollDown={canScrollDown}
+            handleSuggestionsScroll={handleSuggestionsScroll}
+            routeStopIds={routeStopIds}
+            addStoreToRoute={addStoreToRoute}
+            removeRouteStop={removeRouteStop}
+          />
+        )}
+
+        {!routePanelOpen && !showNavigationInfoPanel && (
+          <RouteToggleButton
+            routeStops={routeStops}
+            isStandalonePwa={isStandalonePwa}
+            showNavigationInfoPanel={showNavigationInfoPanel}
+            isDesktop={isDesktop}
+            onToggle={() => setRoutePanelOpen(true)}
+          />
+        )}
+
+        {routePanelOpen && (
+          <MapRoutePanel
+            routeStops={routeStops}
+            renderedRouteStops={renderedRouteStops}
+            completedRouteStopIdSet={completedRouteStopIdSet}
+            draggedRouteIndex={draggedRouteIndex}
+            armedRouteIndex={armedRouteIndex}
+            dragOverRouteIndex={dragOverRouteIndex}
+            draggedRouteStore={draggedRouteStore}
+            dragRouteBox={dragRouteBox}
+            dragRouteOffset={dragRouteOffset}
+            selectedStore={selectedStore}
+            routeStopIds={routeStopIds}
+            hideUnselectedStores={hideUnselectedStores}
+            routeLoading={routeLoading}
+            routeSorting={routeSorting}
+            routeError={routeError}
+            routeSummary={routeSummary}
+            routeGeojson={routeGeojson}
+            isDesktop={isDesktop}
+            isStandalonePwa={isStandalonePwa}
+            routeListScrollRef={routeListScrollRef}
+            addStoreToRoute={addStoreToRoute}
+            removeRouteStop={removeRouteStop}
+            setHideUnselectedStores={setHideUnselectedStores}
+            setRouteItemRef={setRouteItemRef}
+            startRouteDrag={startRouteDrag}
+            clearRoutePlan={clearRoutePlan}
+            buildRoute={buildRoute}
+            optimizeRouteOrder={optimizeRouteOrder}
+            onClose={() => setRoutePanelOpen(false)}
+          />
+        )}
+
+        <MapControlButtons
+          isDesktop={isDesktop}
+          isStandalonePwa={isStandalonePwa}
+          routeStops={routeStops}
+          locationError={locationError}
+          navLoading={navLoading}
+          followUserHeading={followUserHeading}
+          showNavigationInfoPanel={showNavigationInfoPanel}
+          showNavigationInfo={showNavigationInfoPanel}
+          navigationInfo={navigationInfo}
+          recenterToUserLocation={recenterToUserLocation}
+          handleToggleUserHeadingRotation={handleToggleUserHeadingRotation}
+        />
+
+        {/* Navigation info panel */}
+        {showNavigationInfoPanel && navigationInfo && (
+          <div className="absolute z-20" style={{
+            top: isDesktop ? '0.75rem' : undefined,
+            left: isDesktop ? '0.75rem' : '50%',
+            transform: isDesktop ? 'none' : 'translateX(-50%)',
+            bottom: isDesktop ? undefined : '0.6rem',
+          }}>
+            <MapNavigationInfoPanel
+              navigationInfo={navigationInfo}
+              isDesktop={isDesktop}
+              onExit={handleToggleUserHeadingRotation}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Right Sidebar - desktop only (detected via pointer capability) */}
+      {isDesktop && (
+        <MapSidebar
+          storesWithCoords={storesWithCoords}
+          filteredStores={filteredStores}
+          selectedDistricts={selectedDistricts}
+          selectedWards={selectedWards}
+          selectedStoreTypes={selectedStoreTypes}
+          availableWards={availableWards}
+          storeCounts={storeCounts}
+          storeTypeCounts={storeTypeCounts}
+          filtersActive={filtersActive}
+          toggleDistrict={toggleDistrict}
+          toggleWard={toggleWard}
+          toggleStoreType={toggleStoreType}
+          clearFilters={clearFilters}
+        />
+      )}
+
+      <style jsx global>{`
+        .maplibregl-map {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          background: #020617;
+        }
+
+        .maplibregl-canvas-container,
+        .maplibregl-canvas {
+          width: 100% !important;
+          height: 100% !important;
+        }
+
+        /* Hover popup styling */
+        .store-hover-popup .maplibregl-popup-content {
+          background: rgba(15, 23, 42, 0.95);
+          color: #f1f5f9;
+          padding: 6px 10px;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+          pointer-events: none;
+        }
+
+        .store-hover-popup .maplibregl-popup-tip {
+          border-top-color: rgba(15, 23, 42, 0.95);
+        }
+      `}</style>
+
+      <StoreDetailModal
+        store={selectedStore}
+        open={!!selectedStore}
+        onOpenChange={(open) => { if (!open) setSelectedStore(null) }}
+        onAddToRoute={addStoreToRoute}
+        onRemoveFromRoute={removeRouteStop}
+        isInRoute={selectedStore ? routeStopIds.has(String(selectedStore.id)) : false}
+      />
+    </div>
+  )
+}
+
+/* ─── Sub-components ─── */
+
+function MapSearchBar({
+  searchTerm,
+  inputRef,
+  searchWrapperRef,
+  handleSearchInputChange,
+  handleSearchFocus,
+  moveActiveSuggestion,
+  suggestions,
+  activeSuggestion,
+  flyToStore,
+  handleSearch,
+  closeSuggestions,
+  showSuggestions,
+  canScrollDown,
+  handleSuggestionsScroll,
+  routeStopIds,
+  addStoreToRoute,
+  removeRouteStop,
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
+      <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
+        <div className="grid grid-cols-[1fr_auto] items-center">
+          <Input
+            ref={inputRef}
+            placeholder="Tìm cửa hàng..."
+            value={searchTerm}
+            onChange={(e) => handleSearchInputChange(e.target.value)}
+            onFocus={handleSearchFocus}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                moveActiveSuggestion('down', suggestions.length)
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                moveActiveSuggestion('up', suggestions.length)
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+                  flyToStore(suggestions[activeSuggestion])
+                } else {
+                  handleSearch()
+                }
+              } else if (e.key === 'Escape') {
+                closeSuggestions()
+                inputRef.current?.blur()
+              }
+            }}
+            className="h-11 rounded-lg border-gray-700 bg-gray-950 px-3 text-base text-gray-100 placeholder:text-gray-400"
+          />
+        </div>
+
+        {/* Suggestions dropdown */}
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="relative mt-1 rounded-xl bg-gray-900 shadow-xl ring-1 ring-white/15 backdrop-blur-md">
+            <div
+              ref={suggestionsRef}
+              className="max-h-64 overflow-y-auto"
+              onScroll={(e) => handleSuggestionsScroll(e.currentTarget)}
+            >
+              {suggestions.map((store, idx) => (
+                <div
+                  key={store.id}
+                  className={`flex items-center gap-2 border-b border-gray-700/50 px-2 py-2 ${idx === activeSuggestion ? 'bg-sky-500/20' : 'hover:bg-gray-800/80'}`}
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => flyToStore(store)}
+                  >
+                    <div className="truncate text-base font-medium text-gray-100">{store.name}</div>
+                    <div className="truncate text-sm text-gray-400">{formatShortAddress(store)}</div>
+                  </button>
+                  <button
+                    type="button"
+                    className={`shrink-0 rounded-md border px-2 py-1 text-sm transition ${routeStopIds.has(String(store.id))
+                      ? 'border-red-500/40 bg-red-500/15 text-red-200 hover:border-red-400 hover:text-red-100'
+                      : 'border-gray-600/70 bg-gray-950 text-gray-200 hover:border-sky-400 hover:text-sky-200'
+                      }`}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      if (routeStopIds.has(String(store.id))) {
+                        removeRouteStop(store.id)
+                        return
+                      }
+                      addStoreToRoute(store)
+                    }}
+                  >
+                    {routeStopIds.has(String(store.id)) ? 'Bỏ khỏi tuyến' : 'Thêm'}
+                  </button>
+                </div>
+              ))}
+            </div>
+            {canScrollDown && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center rounded-b-xl bg-gradient-to-t from-gray-900 to-transparent pb-1 pt-4">
+                <svg width="14" height="8" viewBox="0 0 14 8" className="text-gray-400">
+                  <path d="M1 1l6 6 6-6" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function RouteToggleButton({ routeStops, isStandalonePwa, showNavigationInfoPanel, isDesktop, onToggle }) {
+  return (
+    <div
+      className="pointer-events-none absolute left-3 z-10"
+      style={{
+        bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem',
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="pointer-events-auto relative rounded-full border border-gray-600/70 bg-gray-950/90 px-4 py-2 text-sm font-medium text-gray-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-200"
+          onClick={onToggle}
+        >
+          {'Tuy\u1ebfn \u0111\u01b0\u1eddng'}
+          {routeStops.length > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-orange-200/80 bg-orange-500 px-1.5 text-xs font-semibold text-orange-950 shadow">
+              {routeStops.length}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MapControlButtons({
+  isDesktop,
+  isStandalonePwa,
+  routeStops,
+  locationError,
+  navLoading,
+  followUserHeading,
+  showNavigationInfoPanel,
+  navigationInfo,
+  recenterToUserLocation,
+  handleToggleUserHeadingRotation,
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute right-3 sm:bottom-3 z-20"
+      style={!isDesktop
+        ? { bottom: isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem' }
+        : undefined}
+    >
+      <div className="pointer-events-auto flex flex-col items-end gap-2">
+        {locationError && (
+          <div className="max-w-[260px] rounded-lg border border-red-500/30 bg-gray-950/95 px-3 py-2 text-xs text-red-200 shadow-lg">
+            {locationError}
+          </div>
+        )}
+        {routeStops.length > 0 && !showNavigationInfoPanel && (
+          <button
+            type="button"
+            onClick={handleToggleUserHeadingRotation}
+            disabled={navLoading}
+            title={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+            aria-label={navLoading ? 'Đang kết nối...' : followUserHeading ? 'Tắt dẫn đường' : 'Bật dẫn đường'}
+            aria-pressed={followUserHeading}
+            className={`flex h-10 w-10 items-center justify-center rounded-full border shadow-lg backdrop-blur transition ${
+              navLoading
+                ? 'border-sky-400/50 bg-sky-500/10 text-sky-300 opacity-80 cursor-wait'
+                : followUserHeading
+                ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                : 'border-gray-600/70 bg-gray-950/90 text-gray-100 hover:border-sky-400 hover:text-sky-300'
+            }`}
+          >
+            {navLoading ? (
+              <svg className="h-4.5 w-4.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+            ) : (
+              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5-9 16-7-7 16-1.7-6.3L9 20z" />
+              </svg>
+            )}
+          </button>
+        )}
+        {!showNavigationInfoPanel && (
+          <button
+            type="button"
+            onClick={recenterToUserLocation}
+            title="Về vị trí đang đứng"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600/70 bg-gray-950/90 text-gray-100 shadow-lg backdrop-blur transition hover:border-sky-400 hover:text-sky-300"
+          >
+            <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v3m0 12v3m9-9h-3M6 12H3" />
+              <circle cx="12" cy="12" r="4" strokeWidth="2" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MapNavigationInfoPanel({ navigationInfo, isDesktop, onExit }) {
+  return (
+    <div className={`rounded-xl border border-gray-700/70 bg-gray-950/95 shadow-lg backdrop-blur ${isDesktop ? 'w-[320px] px-4 py-3 text-sm' : 'w-[calc(100vw-1rem)] px-4 py-3 text-base'}`}>
+      <div className="flex items-center justify-between">
+        <div className="font-semibold text-sky-200">Dẫn đường</div>
+        <button
+          type="button"
+          onClick={onExit}
+          className="flex h-9 items-center justify-center rounded-md border border-red-500/60 bg-red-500/20 px-3 text-sm font-semibold text-red-100 transition hover:border-red-400 hover:bg-red-500/30 hover:text-white"
+        >
+          Thoát
+        </button>
+      </div>
+      <div className="mt-3 space-y-2.5">
+        <div className="rounded-lg border border-gray-800/80 bg-gray-900/60 px-3 py-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">{navigationInfo.currentLabel}</div>
+          <div className="mt-0.5 truncate text-[15px] font-semibold leading-tight text-gray-100">
+            {navigationInfo.currentStore ? navigationInfo.currentStore.name : navigationInfo.currentText}
+          </div>
+        </div>
+        <div className="rounded-lg border border-gray-800/80 bg-gray-900/60 px-3 py-2">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Tiếp theo</div>
+          {navigationInfo.nextStore ? (
+            <div className="mt-0.5 flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-[15px] font-semibold leading-tight text-gray-100">{navigationInfo.nextStore.name}</span>
+              <span className="shrink-0 rounded-full border border-sky-400/35 bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-100">
+                {Math.max(0, Math.round(navigationInfo.nextDistanceMeters || 0))}m
+              </span>
+            </div>
+          ) : (
+            <div className="mt-0.5 text-[15px] font-semibold leading-tight text-gray-100">Đã hoàn thành tuyến</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MapRoutePanel({
+  routeStops,
+  renderedRouteStops,
+  completedRouteStopIdSet,
+  draggedRouteIndex,
+  armedRouteIndex,
+  dragOverRouteIndex,
+  draggedRouteStore,
+  dragRouteBox,
+  dragRouteOffset,
+  selectedStore,
+  routeStopIds,
+  hideUnselectedStores,
+  routeLoading,
+  routeSorting,
+  routeError,
+  routeSummary,
+  routeGeojson,
+  isDesktop,
+  isStandalonePwa,
+  routeListScrollRef,
+  addStoreToRoute,
+  removeRouteStop,
+  setHideUnselectedStores,
+  setRouteItemRef,
+  startRouteDrag,
+  clearRoutePlan,
+  buildRoute,
+  optimizeRouteOrder,
+  onClose,
+}) {
+  const MAP_INTERACTION_SUPPRESS_MS = 500
+  const suppressRef = useRef(0)
+
+  const handleInteraction = (event) => {
+    suppressRef.current = Date.now() + MAP_INTERACTION_SUPPRESS_MS
+    event?.stopPropagation?.()
+  }
+
+  return (
+    <div
+      className="pointer-events-none absolute left-3 right-3 z-30 sm:top-auto"
+      style={{
+        top: isDesktop ? 'auto' : '0.75rem',
+        bottom: isDesktop
+          ? (isStandalonePwa ? 'calc(env(safe-area-inset-bottom) + 0.75rem)' : '0.75rem')
+          : '0.5rem',
+      }}
+    >
+      <div
+        className="pointer-events-auto flex h-full w-full max-w-none overflow-hidden rounded-2xl border border-gray-700/70 bg-gray-950/95 shadow-2xl backdrop-blur sm:h-auto sm:max-h-[min(42rem,calc(100dvh-2rem))] sm:max-w-[26rem]"
+        onPointerDown={handleInteraction}
+        onClick={handleInteraction}
+        onDoubleClick={handleInteraction}
+        onTouchStart={handleInteraction}
+      >
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex items-center justify-between px-4 pb-2 pt-4 sm:pt-3">
+            <div>
+              <p className="text-base font-semibold text-gray-100">{'Tuy\u1ebfn \u0111\u01b0\u1eddng'}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {routeStops.length > 0 && (
+                <button
+                  type="button"
+                  className={`rounded-full border p-2 transition ${hideUnselectedStores
+                    ? 'border-sky-400 bg-sky-500/20 text-sky-100'
+                    : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'
+                    }`}
+                  onClick={() => setHideUnselectedStores((prev) => !prev)}
+                  title={hideUnselectedStores ? 'Hi\u1ec7n t\u1ea5t c\u1ea3 c\u1eeda h\u00e0ng' : '\u1ea8n c\u1eeda h\u00e0ng ngo\u00e0i tuy\u1ebfn'}
+                  aria-label={hideUnselectedStores ? 'Hi\u1ec7n t\u1ea5t c\u1ea3 c\u1eeda h\u00e0ng' : '\u1ea8n c\u1eeda h\u00e0ng ngo\u00e0i tuy\u1ebfn'}
+                >
+                  {hideUnselectedStores ? (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.58 10.58A3 3 0 0014 14a2.99 2.99 0 002.12-.88" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.88 5.09A9.77 9.77 0 0112 4.8c5.05 0 9.27 3.11 10.5 7.2a11.8 11.8 0 01-4.04 5.54M6.61 6.61C4.54 7.84 2.98 9.75 2.5 12c.57 2.37 2.23 4.36 4.5 5.62" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.5 12C3.73 7.91 7.95 4.8 13 4.8S22.27 7.91 23.5 12c-1.23 4.09-5.45 7.2-10.5 7.2S3.73 16.09 2.5 12z" />
+                      <circle cx="13" cy="12" r="3" strokeWidth={2} />
+                    </svg>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                className="rounded-full border border-gray-700 p-2 text-gray-300 transition hover:border-gray-500 hover:text-white"
+                onClick={onClose}
+                aria-label={'\u1ea8n b\u1ea3ng tuy\u1ebfn \u0111\u01b0\u1eddng'}
+                title={'\u1ea8n b\u1ea3ng tuy\u1ebfn \u0111\u01b0\u1eddng'}
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.4} d="M6 12h12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div
+            ref={routeListScrollRef}
+            className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-3 pt-3"
+            onContextMenu={(event) => event.preventDefault()}
+            style={{
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              WebkitTouchCallout: 'none',
+            }}
+          >
+            {selectedStore?.coords && !routeStopIds.has(String(selectedStore.id)) && (
+              <Button variant="outline" className="w-full" onClick={() => addStoreToRoute(selectedStore)}>
+                {'Th\u00eam c\u1eeda h\u00e0ng \u0111ang m\u1edf'}
+              </Button>
+            )}
+
+            {routeStops.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-700 bg-gray-900/70 px-3 py-3 text-sm text-gray-400">
+                {'G\u00f5 t\u00ean c\u1eeda h\u00e0ng \u1edf \u00f4 t\u00ecm ki\u1ebfm r\u1ed3i b\u1ea5m '}<span className="font-medium text-gray-200">{'Th\u00eam'}</span>{' \u0111\u1ec3 \u0111\u01b0a v\u00e0o tuy\u1ebfn.'}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {renderedRouteStops.map(({ store, originalIndex, displayIndex }) => (
+                  completedRouteStopIdSet.has(String(store.id)) ? null : (
+                    <RouteStopCard
+                      key={store.id}
+                      store={store}
+                      originalIndex={originalIndex}
+                      displayIndex={displayIndex}
+                      completedRouteStopIdSet={completedRouteStopIdSet}
+                      draggedRouteIndex={draggedRouteIndex}
+                      armedRouteIndex={armedRouteIndex}
+                      dragOverRouteIndex={dragOverRouteIndex}
+                      setRouteItemRef={setRouteItemRef}
+                      startRouteDrag={startRouteDrag}
+                      removeRouteStop={removeRouteStop}
+                    />
+                  )
+                ))}
+              </div>
+            )}
+
+            {draggedRouteStore && dragRouteBox && (
+              <DraggedRouteCard
+                store={draggedRouteStore}
+                dragRouteBox={dragRouteBox}
+                dragRouteOffset={dragRouteOffset}
+              />
+            )}
+
+            {routeError && (
+              <div className="rounded-xl border border-red-500/30 bg-red-950/30 px-3 py-2 text-sm text-red-200">
+                {routeError}
+              </div>
+            )}
+
+            {routeSummary && (
+              <div className="rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-3 py-2 text-sm text-emerald-100">
+                <div className="font-medium">{'\u0110\u00e3 v\u1ebd tuy\u1ebfn theo \u0111\u01b0\u1eddng th\u1eadt'}</div>
+                <div className="mt-1 text-emerald-200/90">
+                  {formatRouteDistance(routeSummary.distance)} • {formatRouteDuration(routeSummary.duration)}
+                </div>
+                <div className="mt-1 text-xs text-emerald-200/80">
+                  {'Xuất phát và kết thúc tại điểm cố định đã chọn.'}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-700/60 px-4 py-3">
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={routeLoading || routeSorting || routeStops.length < 2}
+                onClick={optimizeRouteOrder}
+              >
+                {routeSorting ? '\u0110ang s\u1eafp' : 'S\u1eafp x\u1ebfp'}
+              </Button>
+              <Button
+                className="w-full"
+                disabled={routeLoading || routeSorting || (routeStops.length === 0)}
+                onClick={async () => {
+                  onClose();
+                  await buildRoute();
+                }}
+              >
+                {routeLoading ? '\u0110ang v\u1ebd' : 'V\u1ebd'}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={routeLoading || routeSorting || (routeStops.length === 0 && routeGeojson.features.length === 0)}
+                onClick={clearRoutePlan}
+              >
+                Xóa
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RouteStopCard({
+  store,
+  originalIndex,
+  displayIndex,
+  completedRouteStopIdSet,
+  draggedRouteIndex,
+  armedRouteIndex,
+  dragOverRouteIndex,
+  setRouteItemRef,
+  startRouteDrag,
+  removeRouteStop,
+}) {
+  return (
+    <div
+      ref={(element) => {
+        setRouteItemRef(displayIndex, element)
+      }}
+      onPointerDown={(event) => startRouteDrag(originalIndex, event)}
+      onContextMenu={(event) => event.preventDefault()}
+      className={`rounded-lg border bg-gray-900/75 px-2.5 py-2 transition ${completedRouteStopIdSet.has(String(store.id)) ? 'opacity-45' : ''} ${originalIndex === draggedRouteIndex
+        ? 'border-gray-700/40 opacity-0'
+        : originalIndex === armedRouteIndex
+          ? 'border-sky-400/80 ring-1 ring-sky-400/50'
+          : dragOverRouteIndex === displayIndex && draggedRouteIndex !== -1
+            ? 'border-sky-400/80 ring-1 ring-sky-400/50'
+            : 'border-gray-700/70'
+        }`}
+    >
+      <div className="flex w-full items-start justify-between gap-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-col">
+            <span className={`truncate font-medium ${completedRouteStopIdSet.has(String(store.id)) ? 'text-gray-400' : 'text-gray-100'}`}>{store.name}</span>
+            <span className={`truncate ${completedRouteStopIdSet.has(String(store.id)) ? 'text-gray-500' : 'text-gray-400'}`}>{formatShortAddress(store)}</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-start justify-end">
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 text-red-300 transition hover:bg-red-950/40"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => removeRouteStop(store.id)}
+            aria-label={`Lo\u1ea1i b\u1ecf c\u1eeda h\u00e0ng ${store.name} kh\u1ecfi tuy\u1ebfn`}
+          >
+            <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DraggedRouteCard({ store, dragRouteBox, dragRouteOffset }) {
+  return (
+    <div
+      className="pointer-events-none fixed z-[400] rounded-lg border border-sky-400/80 bg-gray-900/95 px-2.5 py-2 shadow-2xl ring-1 ring-sky-400/40"
+      style={{
+        left: `${dragRouteBox.left}px`,
+        top: `${dragRouteBox.top}px`,
+        width: `${dragRouteBox.width}px`,
+        transform: `translate(${dragRouteOffset.x}px, ${dragRouteOffset.y}px)`,
+      }}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-2.5">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-medium text-gray-100">{store.name}</span>
+            <span className="truncate text-gray-400">{formatShortAddress(store)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MapSidebar({
+  storesWithCoords,
+  filteredStores,
+  selectedDistricts,
+  selectedWards,
+  selectedStoreTypes,
+  availableWards,
+  storeCounts,
+  storeTypeCounts,
+  filtersActive,
+  toggleDistrict,
+  toggleWard,
+  toggleStoreType,
+  clearFilters,
+}) {
+  return (
+    <div className="flex flex-col w-[345px] h-full bg-gray-900 border-l border-gray-700/60 shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700/60">
+        <h2 className="text-base font-semibold text-gray-100">Bộ lọc khu vực</h2>
+        <div className="flex items-center gap-2">
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs text-sky-400 hover:text-sky-300"
+            >
+              Xóa lọc
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-2 text-sm text-gray-400 border-b border-gray-700/40">
+        Hiển thị <span className="font-semibold text-gray-200">{filteredStores.length}</span> / {storesWithCoords.length} cửa hàng
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-2">Quận / Huyện</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.keys(DISTRICT_WARD_SUGGESTIONS).map((district) => {
+              const active = selectedDistricts.includes(district)
+              const count = storeCounts.districtCounts[district] || 0
+              return (
+                <button
+                  key={district}
+                  type="button"
+                  onClick={() => toggleDistrict(district)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
+                      ? 'bg-sky-500/20 text-sky-300 ring-1 ring-sky-500/40'
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700 ring-1 ring-gray-600/40'
+                    }`}
+                >
+                  {district}
+                  {count > 0 && <span className={`text-[10px] ${active ? 'text-sky-400' : 'text-gray-500'}`}>({count})</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {selectedDistricts.length > 0 && availableWards.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide mb-1">Xã / Phường <span className="normal-case font-normal text-gray-500">(chọn để hiển thị)</span></h3>
+            {selectedDistricts.map((district) => {
+              const wards = DISTRICT_WARD_SUGGESTIONS[district] || []
+              if (wards.length === 0) return null
+              return (
+                <div key={district} className="mb-3">
+                  <div className="text-xs font-medium text-gray-400 mb-1.5">{district}</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {wards.map((ward) => {
+                      const active = selectedWards.includes(ward)
+                      const count = storeCounts.wardCounts[ward] || 0
+                      return (
+                        <button
+                          key={ward}
+                          type="button"
+                          onClick={() => toggleWard(ward)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-sm font-medium transition-colors ${active
+                              ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40'
+                              : 'bg-gray-800 text-gray-400 hover:bg-gray-700 ring-1 ring-gray-600/30'
+                            }`}
+                        >
+                          {ward}
+                          {count > 0 && <span className={`text-[10px] ${active ? 'text-emerald-400' : 'text-gray-500'}`}>({count})</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div>
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-300">Loại cửa hàng</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {STORE_TYPE_OPTIONS.map((storeType) => {
+              const active = selectedStoreTypes.includes(storeType.value)
+              const count = storeTypeCounts[storeType.value] || 0
+              return (
+                <button
+                  key={storeType.value}
+                  type="button"
+                  onClick={() => toggleStoreType(storeType.value)}
+                  className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors ${active
+                    ? 'bg-violet-500/20 text-violet-200 ring-1 ring-violet-500/40'
+                    : 'bg-gray-800 text-gray-300 ring-1 ring-gray-600/40 hover:bg-gray-700'
+                    }`}
+                >
+                  {storeType.label}
+                  {count > 0 && <span className={`text-[10px] ${active ? 'text-violet-300' : 'text-gray-500'}`}>({count})</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

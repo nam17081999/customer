@@ -1,5 +1,6 @@
 import { parseCoordinate } from '@/helper/coordinate'
 import { createSearchQueryMeta, filterAndRankIndexedStores } from '@/helper/storeSearch'
+import { normalizeNameForMatch, extractWords, containsAllInputWords } from '@/helper/duplicateCheck'
 
 export const FILTER_FLAG_HAS_PHONE = 'has_phone'
 export const FILTER_FLAG_NO_LOCATION = 'has_no_location'
@@ -132,13 +133,19 @@ export function filterAndSortSearchResults({
 }
 
 export function shouldShowSearchCreateCta({ indexedStores, searchTerm }) {
-  const queryMeta = createSearchQueryMeta(searchTerm)
-  if (queryMeta.words.length < 2) return false
+  const term = String(searchTerm || '').trim()
+  if (!term) return false
 
-  const exactName = queryMeta.words.join(' ')
-  return !(Array.isArray(indexedStores) ? indexedStores : []).some((entry) => (
-    String(entry?.normalizedName || '').split(/\s+/).filter(Boolean).join(' ') === exactName
-  ))
+  const inputNorm = normalizeNameForMatch(term)
+  if (!inputNorm) return false
+
+  const inputWords = extractWords(inputNorm)
+  if (inputWords.length === 0) return false
+
+  // Dùng cùng logic với findGlobalExactNameMatches
+  const stores = (Array.isArray(indexedStores) ? indexedStores : []).map(e => e.store).filter(Boolean)
+  const hasExactMatch = stores.some((store) => containsAllInputWords(inputWords, store?.name || ''))
+  return !hasExactMatch
 }
 
 export function normalizeCreateStoreName(searchTerm) {

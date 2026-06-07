@@ -141,7 +141,7 @@ export default function NewPurchaseOrderPage() {
         <title>Nhập hàng - NPP Hà Công</title>
       </Head>
 
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <form className={`${layoutClasses.shell} space-y-4`} onSubmit={handleSubmit}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

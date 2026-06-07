@@ -326,7 +326,7 @@ export function StoreExportScreen({ mode = 'all' }) {
         <title>{pageTitle}</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
           <div>
             <Button type="button" variant="outline" size="sm" onClick={handleBack}>

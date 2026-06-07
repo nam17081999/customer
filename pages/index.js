@@ -43,10 +43,10 @@ function FilterControls({
   return (
     <div className={desktop ? 'flex h-full min-h-0 flex-col' : 'space-y-3'}>
       {desktop && (
-        <div className="border-b border-slate-800 px-4 py-4">
+        <div className="border-b border-gray-800 px-4 py-4">
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-300">Bộ lọc</p>
-          <h2 className="mt-1 text-xl font-bold text-slate-100">Lọc cửa hàng</h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <h2 className="mt-1 text-xl font-bold text-gray-100">Lọc cửa hàng</h2>
+          <p className="mt-1 text-sm text-gray-400">
             {activeFilterCount > 0 ? `${activeFilterCount} bộ lọc đang áp dụng` : 'Chưa áp dụng bộ lọc'}
           </p>
         </div>
@@ -133,7 +133,7 @@ function FilterControls({
         </div>
       </div>
 
-      <div className={desktop ? 'border-t border-slate-800 px-4 py-4' : 'sticky bottom-0 flex flex-col gap-2 border-t border-gray-800 bg-gray-950/95 pb-1 pt-2.5 backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:pb-0'}>
+      <div className={desktop ? 'border-t border-gray-800 px-4 py-4' : 'sticky bottom-0 flex flex-col gap-2 border-t border-gray-800 bg-gray-950/95 pb-1 pt-2.5 backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:pb-0'}>
         {!desktop && (
           <p className="text-sm text-gray-400">
             Đang áp dụng <span className="font-semibold text-gray-200">{activeFilterCount}</span> bộ lọc chi tiết
@@ -178,7 +178,7 @@ function ResultsMeta({
 
   if (!hasSearchCriteria) {
     return (
-      <p className={desktop ? 'text-base text-slate-400' : 'text-sm text-gray-400'}>
+      <p className={desktop ? 'text-base text-gray-400' : 'text-sm text-gray-400'}>
         Đang hiển thị <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng gần nhất
       </p>
     )
@@ -186,7 +186,7 @@ function ResultsMeta({
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
-      <p className={desktop ? 'min-w-0 text-base text-slate-400' : 'min-w-0 text-sm text-gray-400'}>
+      <p className={desktop ? 'min-w-0 text-base text-gray-400' : 'min-w-0 text-sm text-gray-400'}>
         Tìm thấy <span className="font-semibold text-gray-200">{searchResults.length}</span> cửa hàng
         {activeFilterCount > 0 && (
           <span> với <span className="font-semibold text-gray-200">{activeFilterCount}</span> bộ lọc</span>
@@ -202,7 +202,7 @@ function ResultsMeta({
         </svg>
         Xóa lọc
       </button>
-      {showCreateStoreCta && (
+      {!desktop && showCreateStoreCta && (
         <Button type="button" variant="outline" className="h-9 shrink-0 px-3 text-sm" onClick={handleCreateStoreClick}>
           + Tạo cửa hàng
         </Button>
@@ -222,17 +222,65 @@ function ResultsList({
   desktop = false,
 }) {
   if (showSkeleton) {
+    if (desktop) {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+              <CardContent className="p-4">
+                <div className="flex gap-4">
+                  <div className="flex min-w-0 flex-1 gap-4">
+                    <div className="size-12 shrink-0 animate-pulse rounded-lg bg-gray-800" />
+                    <div className="min-w-0 flex-1">
+                      <div className="h-7 w-3/5 animate-pulse rounded bg-gray-700" />
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="h-5 w-24 animate-pulse rounded-md bg-gray-800" />
+                      </div>
+                      <div className="mt-3 space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="size-3.5 shrink-0 animate-pulse rounded bg-gray-800" />
+                          <div className="h-6 w-4/5 animate-pulse rounded bg-gray-800" />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="size-3.5 shrink-0 animate-pulse rounded bg-gray-800" />
+                          <div className="h-5 w-3/5 animate-pulse rounded bg-gray-800" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col justify-center gap-2">
+                    <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+                    <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )
+    }
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
-        {[...Array(desktop ? 8 : 10)].map((_, i) => (
-          <Card key={i} className="min-h-[135px] overflow-hidden rounded-md border border-gray-800 bg-gray-950">
-            <CardContent className="p-3">
-              <div className="h-6 w-2/5 animate-pulse rounded bg-gray-700" />
-              <div className="mt-3 h-4 w-3/4 animate-pulse rounded bg-gray-800" />
-              <div className="mt-3 h-4 w-full animate-pulse rounded bg-gray-800" />
-              <div className="mt-4 flex gap-2">
-                <div className="h-10 w-10 animate-pulse rounded-full bg-gray-800" />
-                <div className="h-10 w-10 animate-pulse rounded-full bg-gray-800" />
+        {[...Array(10)].map((_, i) => (
+          <Card key={i} className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+            <CardContent className="p-0">
+              <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
+                <div className="min-w-0">
+                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+                    <div className="size-6 animate-pulse rounded bg-gray-800" />
+                    <div className="min-w-0">
+                      <div className="h-6 w-2/3 animate-pulse rounded bg-gray-700" />
+                    </div>
+                    <div className="col-span-2 mt-1 space-y-1">
+                      <div className="h-5 w-1/3 animate-pulse rounded bg-gray-800" />
+                      <div className="h-5 w-full animate-pulse rounded bg-gray-800" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-col justify-center gap-2">
+                  <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+                  <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -360,7 +408,7 @@ export default function HomePage() {
   }
 
   return (
-    <div style={{ height: 'calc(100svh - 3.5rem)', background: 'var(--background)', color: 'var(--foreground)' }} className="overflow-hidden sm:h-[calc(100dvh-3rem)]">
+    <div className="bg-black overflow-hidden sm:h-[calc(100dvh-3rem)]" style={{ height: 'calc(100svh - 3.5rem)', color: 'var(--foreground)' }}>
       <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg>
 
       <div className="mx-auto flex h-full max-w-screen-md flex-col gap-4 px-4 pt-5 sm:hidden">
@@ -388,7 +436,7 @@ export default function HomePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18M6 12h12m-9 7h6" />
               </svg>
               {activeFilterCount > 0 && (
-                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-sky-500 px-1.5 py-0.5 text-sm font-semibold text-slate-950">
+                <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-sky-500 px-1.5 py-0.5 text-sm font-semibold text-gray-950">
                   {activeFilterCount}
                 </span>
               )}
@@ -413,24 +461,24 @@ export default function HomePage() {
 
       <div className="hidden h-full w-full px-4 py-4 sm:block 2xl:px-6">
         <div className="mx-auto grid h-full w-full max-w-[1900px] grid-cols-[330px_minmax(0,1fr)] gap-4">
-          <aside className="min-h-0 overflow-hidden rounded-lg border border-slate-800 bg-slate-950/88 shadow-2xl shadow-black/20">
+          <aside className="min-h-0 overflow-hidden rounded-lg border border-gray-800 bg-gray-950/88 shadow-2xl shadow-black/20">
             <FilterControls {...filterProps} desktop />
           </aside>
 
-          <main className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-950/70 shadow-2xl shadow-black/20">
-            <div className="shrink-0 border-b border-slate-800 bg-slate-950/85 px-5 py-4">
+          <main className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-gray-800 bg-gray-950/70 shadow-2xl shadow-black/20">
+            <div className="shrink-0 border-b border-gray-800 bg-gray-950/85 px-5 py-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Tìm kiếm cửa hàng</p>
-                  <h1 className="mt-1 text-2xl font-bold text-slate-100">Danh sách cửa hàng</h1>
+                  <p className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">Tìm kiếm cửa hàng</p>
+                  <h1 className="mt-1 text-2xl font-bold text-gray-100">Danh sách cửa hàng</h1>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-right">
-                  <div className="rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2">
-                    <p className="text-sm text-slate-400">Kết quả</p>
-                    <p className="text-xl font-bold text-slate-100">{showSkeleton ? '...' : searchResults.length}</p>
+                  <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2">
+                    <p className="text-sm text-gray-400">Kết quả</p>
+                    <p className="text-xl font-bold text-gray-100">{showSkeleton ? '...' : searchResults.length}</p>
                   </div>
-                  <div className="rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2">
-                    <p className="text-sm text-slate-400">Bộ lọc</p>
+                  <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2">
+                    <p className="text-sm text-gray-400">Bộ lọc</p>
                     <p className="text-xl font-bold text-sky-200">{activeFilterCount}</p>
                   </div>
                 </div>
@@ -444,7 +492,7 @@ export default function HomePage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   autoComplete="off"
-                  className="h-12 rounded-md border-slate-700 bg-slate-900 text-base"
+                  className="h-12 rounded-md border-gray-700 bg-gray-900 text-base"
                 />
                 {showCreateStoreCta && (
                   <Button type="button" onClick={handleCreateStoreClick} className="h-12">

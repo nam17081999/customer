@@ -62,7 +62,7 @@ export default function ProductImportPage() {
   return (
     <>
       <Head><title>Preview import sản phẩm - NPP Hà Công</title></Head>
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className="mx-auto max-w-[1600px] space-y-4 px-3 py-4 sm:px-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

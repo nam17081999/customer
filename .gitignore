@@ -46,3 +46,18 @@ yarn-error.log*
 next-env.d.ts
 
 /docs/current-work.md
+
+# temp files
+/tmp/
+
+# IDE
+.idea/
+
+# codex
+.codex/
+
+# claude
+.claude/
+
+# test account files
+test_account*.mjs

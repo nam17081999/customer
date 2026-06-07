@@ -194,7 +194,7 @@ export default function OverviewPage() {
         <title>Tổng quan - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="mx-auto max-w-[1900px] px-3 py-4 sm:px-4 sm:py-6 space-y-4">
           <div>
             <Button type="button" variant="outline" size="sm" onClick={handleBack}>

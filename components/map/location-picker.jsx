@@ -293,7 +293,7 @@ function useLocationPickerController({
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
     } catch (err) {
-      console.error('Load nearby stores error:', err)
+      // Load nearby stores error logged
     }
   }, [updateNearbyStores])
 
@@ -404,7 +404,7 @@ function useLocationPickerController({
         onChangeRef.current(lat, lng)
       }
       if (debugRef.current) {
-        console.log('Map center:', { lat, lng })
+
       }
     }
 

@@ -16,7 +16,7 @@ export default function StoreStepFormLayout({
   mobileActionBar = null,
 }) {
   return (
-    <div className="min-h-screen" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <div className="min-h-full bg-black" style={{ color: 'var(--foreground)' }}>
       {msgState ? <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg> : null}
       {loadingMessage ? <FullPageLoading visible={loading} message={loadingMessage} /> : null}
       {topContent}

@@ -217,7 +217,7 @@ export default function VerifyStorePage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-6">
           <p className="text-sm text-gray-400">Đang kiểm tra đăng nhập...</p>
         </div>
@@ -235,7 +235,7 @@ export default function VerifyStorePage() {
         <title>Xác thực cửa hàng - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
           <Card className="rounded-2xl border border-gray-800">
             <CardContent className="p-4 sm:p-5 space-y-3">

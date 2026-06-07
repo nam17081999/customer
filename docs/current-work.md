@@ -1,62 +1,28 @@
 # Current Work
 
 ## Goal
-- Thêm skill `design-taste-frontend` từ repo taste-skill vào workspace để dùng chung.
+- Fix mobile overflow trên màn `/account`: đảm bảo nội dung hiển thị full chiều ngang trên mobile.
 
 ## Task Type
-feature
+bugfix
 
-## Why
-- Người dùng yêu cầu thêm taste-skill vào dự án để dùng cho các task UI/thiết kế.
+## Root Cause
+- `html { font-size: 19px }` trên mobile → rem padding lớn hơn chuẩn (`p-5` = 23.75px, `px-4` = 19px).
+- CSS Grid trên mobile không có `grid-template-columns` rõ ràng → grid items dùng `min-width: auto` mặc định → không shrink đúng khi nội dung gần sát mép.
+- Trên màn 320px, text menu link dài ("Công việc hôm nay" ~177px) không vừa text area ~168px → overflow.
 
 ## In Scope
-- Tạo skill file tại `.github/skills/design-taste-frontend/SKILL.md`.
-- Cập nhật `docs/skills/README.md` để ghi nhận skill mới.
-- Cập nhật `docs/current-work.md` theo template.
+- `screens/auth/account-screen.jsx`: padding + grid classes.
 
-## Out of Scope
-- Không chỉnh sửa code app, UI, business logic, schema, cache rules.
-- Không thêm dependency runtime.
-
-## Must Preserve
-- Pages Router và alias import `@/`.
-- Quy tắc cache, search, map, và UTF-8 tiếng Việt.
-- Không thay đổi flow nghiệp vụ hiện có.
-
-## Inputs / Expected
-- Input: https://github.com/Leonxlnx/taste-skill, install name `design-taste-frontend`.
-- Expected: skill file có frontmatter hợp lệ và nằm đúng path workspace.
-
-## Constraints
-- Dùng cấu trúc chuẩn `.github/skills/<name>/SKILL.md` theo hướng dẫn agent-customization.
-
-## Required Verification
-- Kiểm tra file mới tồn tại và frontmatter hợp lệ.
-- Regression checklist: Checklist chung cho mọi task.
-
-## Definition of Done
-- Skill file được thêm đúng path với nội dung đầy đủ.
-- `docs/skills/README.md` được cập nhật.
-
-## Output Contract
-- Goal
-- What changed
-- Files touched
-- Verification done
-- Risks or unverified parts
-
-## Plan
-1. Lấy nội dung skill `design-taste-frontend` từ repo taste-skill.
-2. Tạo `.github/skills/design-taste-frontend/SKILL.md`.
-3. Cập nhật `docs/skills/README.md`.
-4. Xác nhận file và nội dung hợp lệ.
-
-## Done
-- Thêm skill `design-taste-frontend` vào `.github/skills/design-taste-frontend/SKILL.md`.
-- Cập nhật `docs/skills/README.md` để ghi nhận skill mới.
+## Changes
+1. **CardContent padding**: `p-5` → `p-4 sm:p-5` (mobile: 19px thay vì 23.75px) — SidebarCard, MenuCard, info card.
+2. **Link items**: `px-4` → `px-3 sm:px-4` (mobile: 14.25px thay vì 19px).
+3. **Grid**: thêm `grid-cols-1` để mobile có `minmax(0, 1fr)` — grid items shrink đúng, không overflow.
 
 ## Verification
-- Đã kiểm tra file skill mới và frontmatter hợp lệ.
+- `npm run lint` → ✔ No warnings or errors.
+- `npm run build` → ✔ Build succeeds, /account page 5 kB.
+- Playwright (viewport 375×812) → page loads, no overflow, scrollWidth ≤ clientWidth.
 
-## Risks / Next
-- Chưa chạy lint/test (không chạm code runtime).
+## Risks
+- Text menu link sẽ wrap nếu quá dài trên màn rất nhỏ — đây là behavior an toàn.

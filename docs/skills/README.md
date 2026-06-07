@@ -13,23 +13,6 @@ Các skill từ `openai/skills` được lưu trong `docs/skills/openai/`:
 - `openai/playwright-interactive`: Debug UI/browser/Electron tương tác nhanh qua phiên browser bền vững.
 - `openai/screenshot`: Chụp màn hình desktop/app/window/region khi cần kiểm tra visual hoặc khi browser-specific capture không đủ.
 
-## External skills đã thêm
-
-- `design-taste-frontend` — `.github/skills/design-taste-frontend/SKILL.md`
-- `taste-skill` — `.github/skills/taste-skill/SKILL.md`
-- `taste-skill-v1` — `.github/skills/taste-skill-v1/SKILL.md`
-- `gpt-tasteskill` — `.github/skills/gpt-tasteskill/SKILL.md`
-- `image-to-code-skill` — `.github/skills/image-to-code-skill/SKILL.md`
-- `imagegen-frontend-mobile` — `.github/skills/imagegen-frontend-mobile/SKILL.md`
-- `imagegen-frontend-web` — `.github/skills/imagegen-frontend-web/SKILL.md`
-- `brandkit` — `.github/skills/brandkit/SKILL.md`
-- `brutalist-skill` — `.github/skills/brutalist-skill/SKILL.md`
-- `minimalist-skill` — `.github/skills/minimalist-skill/SKILL.md`
-- `output-skill` — `.github/skills/output-skill/SKILL.md`
-- `redesign-skill` — `.github/skills/redesign-skill/SKILL.md`
-- `soft-skill` — `.github/skills/soft-skill/SKILL.md`
-- `stitch-skill` — `.github/skills/stitch-skill/SKILL.md`
-
 ## Cách dùng khuyến nghị
 
 Dùng đồng thời hai skill StoreVis trong mọi task kỹ thuật:

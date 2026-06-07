@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
-import { AlertTriangle, BarChart3, Package, Plus, RefreshCw, Search, ShoppingCart, Truck } from 'lucide-react'
+import { AlertTriangle, BarChart3, ChevronLeft, ChevronRight, Package, Plus, RefreshCw, Search, ShoppingCart, Truck } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,6 +48,9 @@ export default function InventoryProductsPage() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
   const [stockFilter, setStockFilter] = useState('all')
+  const [productPage, setProductPage] = useState(1)
+  const [productPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
     if (authLoading) return
@@ -62,23 +65,26 @@ export default function InventoryProductsPage() {
     setPageReady(true)
   }, [authLoading, isAuthenticated, isAdmin, router])
 
-  const loadProducts = useCallback(async () => {
+  const loadProducts = useCallback(async (page = 1) => {
     setLoading(true)
     setError('')
     try {
-      const { products: data } = await loadProductManagementData()
-      setProducts(data)
+      const result = await loadProductManagementData({ page, pageSize: productPageSize })
+      setProducts(result.products || [])
+      setTotalCount(result.totalCount || 0)
+      setProductPage(result.page || 1)
     } catch (err) {
       setError(getOperatorErrorMessage(err, 'Không tải được hàng hóa.'))
       setProducts([])
+      setTotalCount(0)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [productPageSize])
 
   useEffect(() => {
     if (!pageReady) return
-    loadProducts()
+    loadProducts(1)
   }, [pageReady, loadProducts])
 
   const categories = useMemo(() => getInventoryProductCategories(products), [products])
@@ -122,7 +128,7 @@ export default function InventoryProductsPage() {
         <title>Hàng hóa & tồn kho - NPP Hà Công</title>
       </Head>
 
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -237,8 +243,8 @@ export default function InventoryProductsPage() {
             <div className="space-y-4">
               <div className={layoutClasses.summaryGrid}>
                 <div className="rounded-md border border-gray-800 bg-gray-950 p-4">
-                  <p className="text-sm text-gray-400">Số mặt hàng</p>
-                  <p className="text-2xl font-bold">{summary.total}</p>
+                  <p className="text-sm text-gray-400">Tổng mặt hàng</p>
+                  <p className="text-2xl font-bold">{totalCount}</p>
                 </div>
                 <div className="rounded-md border border-amber-900 bg-amber-950/20 p-4">
                   <p className="text-sm text-amber-300">Dưới tồn tối thiểu</p>
@@ -358,6 +364,44 @@ export default function InventoryProductsPage() {
                   })}
                 </CardContent>
               </Card>
+
+              {/* Pagination */}
+              {totalCount > productPageSize && (
+                <div className="flex items-center justify-between gap-3 px-2 py-2">
+                  <p className="text-sm text-gray-400">
+                    Trang {productPage} / {Math.ceil(totalCount / productPageSize)} ({totalCount} hàng hóa)
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={productPage <= 1}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-gray-500 hover:text-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => {
+                        const next = Math.max(1, productPage - 1)
+                        setProductPage(next)
+                        loadProducts(next)
+                      }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <span className="min-w-[3rem] text-center text-sm text-gray-400">
+                      {productPage} / {Math.ceil(totalCount / productPageSize)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={productPage >= Math.ceil(totalCount / productPageSize)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-gray-700 bg-gray-900 text-gray-300 transition hover:border-gray-500 hover:text-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                      onClick={() => {
+                        const next = Math.min(Math.ceil(totalCount / productPageSize), productPage + 1)
+                        setProductPage(next)
+                        loadProducts(next)
+                      }}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

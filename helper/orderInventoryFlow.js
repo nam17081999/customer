@@ -499,7 +499,7 @@ export function buildSalesOrderInvoiceModel({
   return {
     order,
     customerName: customer?.name || 'Khách hàng',
-    customerPhone: customer?.phone || 'Chưa có SĐT',
+    customerPhone: customer?.phone || '',
     customerAddress,
     lines,
     paymentInfo,

@@ -92,7 +92,7 @@ export default function StoreReportEditPage() {
         <title>Sửa thông tin cửa hàng - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         {!loading && store ? (
           <div className="sticky top-0 z-[140] flex items-center gap-3 border-b border-gray-800 bg-black/95 px-4 py-3 backdrop-blur">
             <Button

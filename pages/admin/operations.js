@@ -37,8 +37,8 @@ export default function AdminOperationsPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!isAuthenticated) return router.replace('/login?from=/admin/operations')
-    if (!isAdmin) return router.replace('/account')
+    if (!isAuthenticated) { router.replace('/login?from=/admin/operations'); return }
+    if (!isAdmin) { router.replace('/account'); return }
     setPageReady(true)
   }, [authLoading, isAuthenticated, isAdmin, router])
 
@@ -87,7 +87,7 @@ export default function AdminOperationsPage() {
   return (
     <>
       <Head><title>Trung tâm vận hành - NPP Hà Công</title></Head>
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className="mx-auto max-w-[1900px] space-y-4 px-3 py-4 sm:px-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

@@ -348,7 +348,7 @@ export default function StoreImportPage() {
         <title>Nhập dữ liệu - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="mx-auto max-w-screen-md space-y-4 px-3 py-4 sm:px-4 sm:py-6">
           <Card className="rounded-2xl border border-gray-800 bg-gray-950">
             <CardContent className="space-y-4 p-4 sm:p-5">

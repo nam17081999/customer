@@ -190,7 +190,7 @@ export default function StoreEditHistoryPage() {
         <title>Lịch sử chỉnh sửa - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full bg-black">
         <div className="max-w-screen-md mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">

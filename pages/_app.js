@@ -1,6 +1,18 @@
 import "../app/globals.css";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 import Navbar from "@/components/navbar";
+import { NotificationToaster } from "@/components/layout/notification-toaster";
+import { useNotifications } from "@/hooks/useNotifications";
+
+import { useAuth } from '@/lib/AuthContext'
+
+// ── Activates notification subscriptions globally ──
+function NotificationRoot() {
+  const { isAdmin } = useAuth() || {}
+  useNotifications(isAdmin)
+  return isAdmin ? <NotificationToaster /> : null
+}
 import Head from "next/head";
 import ErrorBoundary from "@/components/error-boundary";
 import { AuthProvider } from "@/lib/AuthContext";
@@ -23,8 +35,9 @@ export default function App({ Component, pageProps }) {
         <AuthProvider>
           <ErrorBoundary>
             {!hideChrome && <Navbar />}
+          <NotificationRoot />
             {/* pb-16 = space for fixed bottom tab bar on mobile */}
-            <div className={`${needsBottomPadding ? 'pb-16 sm:pb-0' : ''} min-h-0 flex-1 overflow-hidden`}>
+            <div className={`${needsBottomPadding ? 'pb-16 sm:pb-0' : ''} min-h-0 flex-1 bg-black overflow-hidden sm:overflow-y-auto`}>
               <Component {...pageProps} />
             </div>
           </ErrorBoundary>

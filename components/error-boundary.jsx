@@ -36,7 +36,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       // Custom fallback UI
       return (
-        <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center p-4">
+        <div className="min-h-full bg-gray-50 dark:bg-black flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">

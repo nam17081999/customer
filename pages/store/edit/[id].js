@@ -76,7 +76,7 @@ export default function EditStore() {
 
   if (fetchError) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black p-6">
+      <div className="flex min-h-full items-center justify-center bg-black p-6">
         <div className="text-center">
           <p className="mb-4 text-red-400">{fetchError}</p>
           <Button onClick={() => router.back()}>Quay lại</Button>

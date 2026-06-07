@@ -216,10 +216,10 @@ export async function cancelPurchaseOrderById(purchaseOrderId, userId = null, { 
   }
 }
 
-export async function loadProductManagementData({ listProducts = null } = {}) {
+export async function loadProductManagementData({ listProducts = null, page = 1, pageSize = 50 } = {}) {
   try {
     const listRunner = await resolveDep(listProducts, defaultInventoryClient, 'listProductsWithStock')
-    return { products: await listRunner() }
+    return await listRunner({ page, pageSize })
   } catch (error) {
     throw normalizeServiceError(error, 'Không tải được hàng hóa.')
   }

@@ -88,9 +88,33 @@ async function setupSearchFlow(page, overrides = {}) {
   }, state)
 }
 
+/**
+ * Wait for search results to appear.
+ * On desktop viewport both mobile and desktop sections render "Đang hiển thị";
+ * use `.first()` to avoid strict-mode violation.
+ */
 async function waitSearchReady(page, expectedCount = '1') {
-  await expect(page.getByText('Đang hiển thị')).toContainText(expectedCount)
+  await expect(page.getByText('Đang hiển thị').first()).toContainText(expectedCount)
 }
+
+/**
+ * On desktop viewport both mobile (hidden) and desktop (visible) sections
+ * render the same store names. `.first()` is hidden, so `.last()` targets
+ * the visible desktop list.
+ */
+function visibleText(page, text) {
+  return page.getByText(text).last()
+}
+
+/**
+ * Desktop search input placeholder (used on ≥640px viewport).
+ * The mobile input with placeholder 'VD: Tạp Hóa Minh Anh' is sm:hidden on desktop.
+ */
+function desktopInput(page) {
+  return page.getByPlaceholder('Tìm theo tên cửa hàng, ví dụ: Tạp Hóa Minh Anh')
+}
+
+// ──────────────────────────────── Tests ────────────────────────────────
 
 test('trang chủ load store public từ cache override và hiển thị danh sách', async ({ page }) => {
   await setupSearchFlow(page, {
@@ -102,9 +126,9 @@ test('trang chủ load store public từ cache override và hiển thị danh s�
 
   await page.goto('/')
 
-  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
-  await expect(page.getByText('Cửa Hàng Giang')).toBeVisible()
-  await expect(page.getByText('Đang hiển thị')).toContainText('2')
+  await expect(visibleText(page, 'Tạp Hóa Minh Anh')).toBeVisible()
+  await expect(visibleText(page, 'Cửa Hàng Giang')).toBeVisible()
+  await expect(page.getByText('Đang hiển thị').first()).toContainText('2')
 })
 
 test('tìm kiếm tiếng Việt không dấu vẫn khớp tên có dấu', async ({ page }) => {
@@ -116,11 +140,11 @@ test('tìm kiếm tiếng Việt không dấu vẫn khớp tên có dấu', asyn
   })
 
   await page.goto('/')
-  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('tap hoa minh anh')
+  await desktopInput(page).fill('tap hoa minh anh')
 
-  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
-  await expect(page.getByText('Quán Ăn Lan Chi')).not.toBeVisible()
-  await expect(page.getByText('Tìm thấy')).toContainText('1')
+  await expect(visibleText(page, 'Tạp Hóa Minh Anh')).toBeVisible()
+  await expect(visibleText(page, 'Quán Ăn Lan Chi')).not.toBeVisible()
+  await expect(page.getByText('Tìm thấy').first()).toContainText('1')
 })
 
 test('CTA tạo cửa hàng hiện khi query có 2 từ và không trùng tên 100%', async ({ page }) => {
@@ -132,10 +156,10 @@ test('CTA tạo cửa hàng hiện khi query có 2 từ và không trùng tên 1
 
   await page.goto('/')
   await waitSearchReady(page)
-  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh Anh')
+  await desktopInput(page).fill('Minh Anh')
 
-  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toBeVisible()
+  await expect(visibleText(page, 'Tạp Hóa Minh Anh')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Tạo cửa hàng/ }).last()).toBeVisible()
 })
 
 test('CTA tạo cửa hàng ẩn khi query 1 từ hoặc trùng tên 100%', async ({ page }) => {
@@ -147,11 +171,11 @@ test('CTA tạo cửa hàng ẩn khi query 1 từ hoặc trùng tên 100%', asyn
 
   await page.goto('/')
   await waitSearchReady(page)
-  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh')
+  await desktopInput(page).fill('Minh')
   await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toHaveCount(0)
 
-  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('tap hoa   minh anh')
-  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
+  await desktopInput(page).fill('tap hoa   minh anh')
+  await expect(visibleText(page, 'Tạp Hóa Minh Anh')).toBeVisible()
   await expect(page.getByRole('button', { name: /Tạo cửa hàng/ })).toHaveCount(0)
 })
 
@@ -164,8 +188,8 @@ test('click CTA tạo cửa hàng sang thẳng bước 2 và browser back-forwar
 
   await page.goto('/')
   await waitSearchReady(page)
-  await page.getByPlaceholder('VD: Tạp Hóa Minh Anh').fill('Minh Anh')
-  await page.getByRole('button', { name: /Tạo cửa hàng/ }).click()
+  await desktopInput(page).fill('Minh Anh')
+  await page.getByRole('button', { name: /Tạo cửa hàng/ }).last().click()
 
   await expect.poll(() => {
     const currentUrl = new URL(page.url())
@@ -188,7 +212,7 @@ test('click CTA tạo cửa hàng sang thẳng bước 2 và browser back-forwar
   })
   await page.goBack()
   await expect.poll(() => new URL(page.url()).pathname).toBe('/')
-  await expect(page.getByPlaceholder('VD: Tạp Hóa Minh Anh')).toHaveValue('Minh Anh')
+  await expect(desktopInput(page)).toHaveValue('Minh Anh')
 
   await page.goForward()
   await expect.poll(() => new URL(page.url()).pathname).toBe('/store/create')
@@ -196,6 +220,7 @@ test('click CTA tạo cửa hàng sang thẳng bước 2 và browser back-forwar
 })
 
 test('search và filter sync lên URL rồi khôi phục lại state từ route', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 })
   await setupSearchFlow(page, {
     stores: [
       buildStore({ id: 'sync-1', name: 'Tạp Hóa Minh Anh', district: 'Hoài Đức', ward: 'An Khánh' }),
@@ -228,8 +253,8 @@ test('search và filter sync lên URL rồi khôi phục lại state từ route'
   await expect(page.getByPlaceholder('VD: Tạp Hóa Minh Anh')).toHaveValue('minh')
   await expect(page.locator('#search-detail-filters select').nth(0)).toHaveValue('Hoài Đức')
   await expect(page.locator('#search-detail-filters select').nth(1)).toHaveValue('An Khánh')
-  await expect(page.getByText('Tạp Hóa Minh Anh')).toBeVisible()
-  await expect(page.getByText('Quán Ăn Lan Chi')).not.toBeVisible()
+  await expect(page.getByText('Tạp Hóa Minh Anh').first()).toBeVisible()
+  await expect(page.getByText('Quán Ăn Lan Chi').first()).not.toBeVisible()
 })
 
 test('mở detail modal từ search result vẫn hiển thị đúng thông tin cửa hàng', async ({ page }) => {
@@ -245,10 +270,10 @@ test('mở detail modal từ search result vẫn hiển thị đúng thông tin 
   })
 
   await page.goto('/')
-  await page.getByRole('button', { name: /Tạp Hóa Mở Modal/i }).click()
+  await page.getByRole('button', { name: /Tạp Hóa Mở Modal/i }).first().click()
 
   const detailModal = page.getByRole('dialog')
-  await expect(detailModal.getByText('Tạp Hóa Mở Modal')).toBeVisible()
+  await expect(detailModal.getByText('Tạp Hóa Mở Modal').last()).toBeVisible()
   await expect(detailModal.getByText('Đội 3')).toBeVisible()
   await expect(detailModal.getByText('Gần cổng trường')).toBeVisible()
 })

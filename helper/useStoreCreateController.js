@@ -370,6 +370,8 @@ export function useStoreCreateController() {
     setDuplicateCheckLat(null)
     setDuplicateCheckLng(null)
     duplicateGeoRequestedRef.current = false
+    createQueryStepAppliedRef.current = false
+    createQueryAreaPrefillRequestedRef.current = false
     setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
@@ -817,11 +819,12 @@ export function useStoreCreateController() {
       payload: {
         latitude,
         longitude,
-        shouldCheckFinalDuplicates: true,
+        shouldCheckFinalDuplicates: !createQueryStepAppliedRef.current,
       },
     })
   }, [
     currentStep,
+    createQueryStepAppliedRef,
     runDuplicateCheckByButton,
     validateStep2AndGoNext,
     resolvingAddr,

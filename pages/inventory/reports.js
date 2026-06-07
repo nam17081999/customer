@@ -255,7 +255,7 @@ export default function InventoryReportsPage() {
         <title>Thống kê bán hàng - NPP Hà Công</title>
       </Head>
 
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

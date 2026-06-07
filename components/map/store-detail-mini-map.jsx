@@ -327,8 +327,8 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
 
   return (
     <section className={fill ? 'h-full min-h-0' : 'space-y-2'}>
-      <div className={`overflow-hidden border border-neutral-800 bg-neutral-950/40 ${fill ? 'h-full rounded-lg' : 'rounded-2xl'}`}>
-        <div ref={containerRef} className={fill ? 'h-full min-h-[500px] w-full bg-zinc-950' : 'aspect-square w-full bg-zinc-950'} />
+      <div className={`overflow-hidden border border-gray-800 bg-gray-950/40 ${fill ? 'h-full rounded-lg' : 'rounded-2xl'}`}>
+        <div ref={containerRef} className={fill ? 'h-full min-h-[500px] w-full bg-gray-950' : 'aspect-square w-full bg-gray-950'} />
       </div>
     </section>
   )

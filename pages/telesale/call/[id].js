@@ -147,7 +147,7 @@ export default function TelesaleCallResultPage() {
 
   if (!store) {
     return (
-      <div className="min-h-screen bg-black px-3 py-4 sm:px-4 sm:py-6">
+      <div className="min-h-full bg-black px-3 py-4 sm:px-4 sm:py-6">
         <div className="mx-auto max-w-screen-md space-y-4">
           <Card className="rounded-2xl border border-gray-800 bg-gray-950">
             <CardContent className="space-y-4 p-4 sm:p-5">
@@ -170,7 +170,7 @@ export default function TelesaleCallResultPage() {
         <title>Kết quả gọi lên đơn - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black px-3 py-4 sm:px-4 sm:py-6">
+      <div className="min-h-full bg-black px-3 py-4 sm:px-4 sm:py-6">
         <div className="mx-auto max-w-screen-md space-y-4">
           <div className="flex items-center justify-between gap-2">
             <Button type="button" variant="outline" onClick={handleBack}>

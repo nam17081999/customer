@@ -35,8 +35,8 @@ export default function PurchaseOrderDetailPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!isAuthenticated) return router.replace(`/login?from=/inventory/purchases/${id || ''}`)
-    if (!isAdmin) return router.replace('/account')
+    if (!isAuthenticated) { router.replace(`/login?from=/inventory/purchases/${id || ''}`); return }
+    if (!isAdmin) { router.replace('/account'); return }
     setPageReady(true)
   }, [authLoading, isAuthenticated, isAdmin, router, id])
 
@@ -80,7 +80,7 @@ export default function PurchaseOrderDetailPage() {
   return (
     <>
       <Head><title>Chi tiết phiếu nhập - NPP Hà Công</title></Head>
-      <main className="min-h-screen bg-black text-gray-100">
+      <main className="min-h-full bg-black text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

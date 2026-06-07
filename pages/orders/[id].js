@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Head from 'next/head'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { ArrowLeft, Printer, RefreshCw, XCircle } from 'lucide-react'
@@ -11,6 +10,8 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { formatMoney } from '@/helper/inventoryFormat'
 import { buildSalesOrderInvoiceModel, formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
 import { cancelSalesOrderById, loadSalesOrderDetailData } from '@/services/inventory/inventory-page-service'
+import { useReactToPrint } from 'react-to-print'
+import InvoicePrintContent from '@/components/print/InvoicePrintContent'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -103,10 +104,8 @@ export default function SalesOrderDetailPage() {
     }
   }
 
-  const handlePrint = () => {
-    if (!order) return
-    window.print()
-  }
+  const printRef = useRef(null)
+  const handlePrint = useReactToPrint({ contentRef: printRef, pageStyle: '@page { size: A4 landscape; margin: 0; } body { margin: 0; padding: 0; }' })
 
   if (authLoading || !pageReady) return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
 
@@ -115,184 +114,108 @@ export default function SalesOrderDetailPage() {
       <Head>
         <title>Chi tiết đơn hàng - NPP Hà Công</title>
         <style>{`
-          @media print {
-            @page { size: A5 portrait; margin: 8mm; }
-            body { background: #fff !important; }
-            nav, .sales-order-screen-only { display: none !important; }
-            .sales-order-invoice-print { display: block !important; }
-          }
+          .print-hide { display: none; }
         `}</style>
       </Head>
-      <main className="min-h-screen bg-black text-gray-100 print:bg-white print:text-black">
+
+      {/* ===== SCREEN VIEW ===== */}
+      <main className="min-h-full bg-black text-gray-100">
         <div className={`${layoutClasses.shell} space-y-4`}>
-          <div className="sales-order-screen-only space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <Button asChild variant="outline">
-                  <Link href="/orders"><ArrowLeft className="h-4 w-4" /> Đơn hàng</Link>
-                </Button>
-                <h1 className="mt-3 text-2xl font-bold">{order?.code || 'Chi tiết đơn hàng'}</h1>
-                <p className="text-base text-gray-400">{formatDateTime(order?.created_at)}</p>
-              </div>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button asChild variant="outline" size="sm">
+                <Link href="/orders"><ArrowLeft className="h-4 w-4" /> Đơn hàng</Link>
+              </Button>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={loadDetail} disabled={loading}>
-                  <RefreshCw className="h-4 w-4" /> Làm mới
+                <Button type="button" variant="outline" size="sm" onClick={loadDetail} disabled={loading}>
+                  <RefreshCw className="h-4 w-4" />
                 </Button>
-                <Button type="button" variant="outline" onClick={handlePrint} disabled={!order || loading}>
-                  <Printer className="h-4 w-4" /> In đơn
+                <Button type="button" variant="outline" size="sm" onClick={handlePrint} disabled={!order || loading}>
+                  <Printer className="h-4 w-4" /> In
                 </Button>
-                {order && order.status !== 'cancelled' && (
-                  <Button type="button" variant="outline" className="border-red-900/60 text-red-300 hover:bg-red-950/30" onClick={handleCancel} disabled={cancelling}>
-                    <XCircle className="h-4 w-4" /> {cancelling ? 'Đang hủy...' : 'Hủy đơn'}
+                {isAdmin && order && order.status !== 'cancelled' && (
+                  <Button type="button" variant="outline" size="sm" className="border-red-900/60 text-red-300 hover:bg-red-950/30" onClick={handleCancel} disabled={cancelling}>
+                    <XCircle className="h-4 w-4" /> {cancelling ? 'Đang hủy...' : 'Hủy'}
                   </Button>
                 )}
               </div>
             </div>
 
             {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
+
+            {order && (
+              <div>
+                <h1 className="text-2xl font-bold">Khách hàng: {customer?.name || 'Không tìm thấy'}</h1>
+                <p className="mt-0.5 text-sm text-gray-400">{formatDateTime(order.created_at)}</p>
+                {customer && (
+                  <p className="text-sm text-gray-500">{[customer.phone ? `SĐT: ${customer.phone}` : '', [customer.ward, customer.district].filter(Boolean).length > 0 ? `Địa chỉ: ${[customer.ward, customer.district].filter(Boolean).join(', ')}` : ''].filter(Boolean).join(' · ')}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {loading ? (
             <Card><CardContent className="p-4 text-gray-400">Đang tải chi tiết...</CardContent></Card>
           ) : order ? (
-            <>
-              <div className="sales-order-screen-only grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px] min-[1900px]:grid-cols-[1fr_430px]">
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="grid grid-cols-1 gap-3 border-b border-gray-800 px-4 py-3 text-sm font-semibold text-gray-300 md:grid-cols-[1.5fr_0.8fr_0.8fr_0.9fr_0.9fr]">
-                      <div>Hàng hóa</div><div>Đơn vị</div><div>SL</div><div>Thành tiền</div><div>Lãi dòng</div>
-                    </div>
-                    {items.map((item) => {
-                      const product = productsById.get(String(item.product_id))
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-0">
+                  <div className="grid grid-cols-1 gap-3 border-b border-gray-800 px-4 py-3 text-sm font-semibold text-gray-300 md:grid-cols-[1.5fr_0.55fr_0.75fr_0.9fr]">
+                    <div>Hàng hóa</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div>
+                  </div>
+                  {(invoice?.lines?.length > 0 ? invoice?.lines : items)?.map((item) => {
+                    if (item.productName) {
                       return (
-                        <div key={item.id} className="grid grid-cols-1 gap-2 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.5fr_0.8fr_0.8fr_0.9fr_0.9fr]">
-                          <div><p className="font-semibold">{product?.name || item.product_id}</p><p className="text-sm text-gray-400">{product?.sku || 'Chưa có mã'}</p></div>
-                          <div>{formatInventoryQuantity(item.conversion_to_base_qty)} gốc</div>
+                        <div key={item.id} className="grid grid-cols-1 gap-2 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.5fr_0.55fr_0.75fr_0.9fr]">
+                          <div><p className="font-semibold">{item.productName}</p><p className="text-sm text-gray-400">{item.sku || '—'} · {item.unitName}</p></div>
                           <div>{formatInventoryQuantity(item.quantity)}</div>
-                          <div className="font-semibold">{formatMoney(item.line_total)}</div>
-                          <div className={Number(item.line_profit || 0) >= 0 ? 'font-semibold text-green-200' : 'font-semibold text-red-200'}>{formatMoney(item.line_profit)}</div>
+                          <div className="text-gray-300">{formatMoney(item.unitPrice)}</div>
+                          <div className="font-semibold">{formatMoney(item.lineTotal)}</div>
                         </div>
                       )
-                    })}
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-4">
-                  <Card><CardContent className="space-y-2 p-4">
-                    <h2 className="text-lg font-semibold">Khách hàng</h2>
-                    <p className="font-semibold">{customer?.name || 'Không tìm thấy khách hàng'}</p>
-                    <p className="text-gray-400">{customer?.phone || 'Chưa có SĐT'}</p>
-                    <p className="text-gray-400">{[customer?.ward, customer?.district].filter(Boolean).join(', ') || 'Chưa có địa chỉ'}</p>
-                  </CardContent></Card>
-                  <Card><CardContent className="space-y-2 p-4">
-                    <h2 className="text-lg font-semibold">Tổng đơn</h2>
-                    <p>Tạm tính: <span className="font-semibold">{formatMoney(order.subtotal_amount)}</span></p>
-                    <p>Giảm giá: <span className="font-semibold">{formatMoney(order.discount_amount)}</span></p>
-                    <p className="text-xl font-bold">Tổng: {formatMoney(order.total_amount)}</p>
-                    <p className="text-green-200">Lãi gộp: {formatMoney(order.gross_profit_amount)}</p>
-                    <p className="text-gray-400">Trạng thái: {order.status === 'cancelled' ? 'Đã hủy' : 'Đang hiệu lực'}</p>
-                  </CardContent></Card>
-                </div>
-              </div>
-
-              <section className="sales-order-invoice-print mx-auto max-w-[148mm] rounded-sm border border-gray-800 bg-white p-5 font-serif text-sm leading-tight text-gray-950 shadow-sm print:border-0 print:p-0 print:shadow-none">
-                <div className="grid grid-cols-[1fr_auto] gap-4">
-                  <div>
-                    <p className="font-bold uppercase">Công Ty TNHH Phân Phối Hà Công</p>
-                    <p>Địa chỉ: ................................................</p>
-                    <p>Điện thoại: ..............................................</p>
-                    <p>STK: {invoice.paymentInfo.accountNumber} - {invoice.paymentInfo.bankName}</p>
+                    }
+                    const product = productsById.get(String(item.product_id))
+                    return (
+                      <div key={item.id} className="grid grid-cols-1 gap-2 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.5fr_0.55fr_0.75fr_0.9fr]">
+                        <div><p className="font-semibold">{product?.name || item.product_id}</p><p className="text-sm text-gray-400">{product?.sku || '—'}</p></div>
+                        <div>{formatInventoryQuantity(item.quantity)}</div>
+                        <div className="text-gray-300">{formatMoney(item.unit_price || 0)}</div>
+                        <div className="font-semibold">{formatMoney(item.line_total)}</div>
+                      </div>
+                    )
+                  })}
+                  <div className="flex flex-wrap items-start justify-between gap-4 border-t border-gray-800 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      {order.note && <p className="text-sm text-amber-400">📝 {order.note}</p>}
+                    </div>
+                    <div className="shrink-0 rounded-md border border-gray-800 bg-gray-900 px-5 py-3">
+                      {Number(order.discount_amount) > 0 && (
+                        <div className="flex items-baseline justify-between gap-8 text-sm text-gray-400">
+                          <span>Giảm giá</span>
+                          <span className="text-gray-300">-{formatMoney(order.discount_amount)}</span>
+                        </div>
+                      )}
+                      <div className={`flex items-baseline justify-between gap-8 ${Number(order.discount_amount) > 0 ? 'mt-2' : ''}`}>
+                        <span className="text-base font-bold text-gray-100">Khách cần trả</span>
+                        <span className="text-xl font-bold">{formatMoney(order.total_amount)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p>Ngày: {formatDateOnly(order.created_at)}</p>
-                    <p>Số: <span className="font-semibold">{order.code}</span></p>
-                    <p>Loại tiền: VNĐ</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 text-center">
-                  <p className="text-lg font-bold uppercase">Hóa đơn bán hàng</p>
-                  <p className="text-sm">Liên giao khách hàng</p>
-                </div>
-
-                <div className="mt-4 space-y-1">
-                  <p>Tên khách hàng: <span className="font-semibold">{invoice.customerName}</span></p>
-                  <p>Địa chỉ: {invoice.customerAddress}</p>
-                  <p>Điện thoại: {invoice.customerPhone}</p>
-                  <p>NVBH: {user?.email || '................................'} </p>
-                  {order.note && <p>Ghi chú: {order.note}</p>}
-                </div>
-
-                <table className="mt-3 w-full border-collapse text-sm">
-                  <thead>
-                    <tr>
-                      <th className="border border-gray-900 px-1 py-1 text-center font-semibold">STT</th>
-                      <th className="border border-gray-900 px-2 py-1 text-left font-semibold">Tên hàng hóa</th>
-                      <th className="border border-gray-900 px-1 py-1 text-center font-semibold">ĐVT</th>
-                      <th className="border border-gray-900 px-1 py-1 text-right font-semibold">SL</th>
-                      <th className="border border-gray-900 px-2 py-1 text-right font-semibold">Đ.Giá</th>
-                      <th className="border border-gray-900 px-2 py-1 text-right font-semibold">T.Tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoice.lines.map((line, index) => (
-                      <tr key={line.id}>
-                        <td className="border border-gray-900 px-1 py-1 text-center">{index + 1}</td>
-                        <td className="border border-gray-900 px-2 py-1">
-                          <p className="font-semibold">{line.productName}</p>
-                          <p className="text-gray-700">{line.sku}</p>
-                        </td>
-                        <td className="border border-gray-900 px-1 py-1 text-center">{line.unitName}</td>
-                        <td className="border border-gray-900 px-1 py-1 text-right">{formatInventoryQuantity(line.quantity)}</td>
-                        <td className="border border-gray-900 px-2 py-1 text-right">{formatMoney(line.unitPrice)}</td>
-                        <td className="border border-gray-900 px-2 py-1 text-right">{formatMoney(line.lineTotal)}</td>
-                      </tr>
-                    ))}
-                    <tr>
-                      <td className="border border-gray-900 px-1 py-1 text-center" colSpan={5}>Tổng tiền thanh toán</td>
-                      <td className="border border-gray-900 px-2 py-1 text-right font-bold">{formatMoney(order.total_amount)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <div className="mt-3 space-y-1">
-                  <p>Số tiền bằng chữ: <span className="font-semibold italic">{invoice.totalAmountInWords}</span></p>
-                  <p>Quý khách kiểm tra hàng và thanh toán tiền trước khi nhận hàng ra về.</p>
-                  <p>Quý khách được đổi/trả hàng trong vòng 30 ngày nếu hàng còn nguyên vẹn.</p>
-                  <p>Cảm ơn quý khách đã mua hàng.</p>
-                </div>
-
-                <div className="mt-3 grid grid-cols-[1fr_auto] gap-4">
-                  <div>
-                    <p className="font-semibold">Thông tin chuyển khoản</p>
-                    <p>{invoice.paymentInfo.bankName}</p>
-                    <p>STK: <span className="font-bold">{invoice.paymentInfo.accountNumber}</span></p>
-                    <p>Số tiền: <span className="font-bold">{formatMoney(order.total_amount)} VNĐ</span></p>
-                  </div>
-                  <Image src={invoice.paymentQrUrl} alt={`QR thanh toán ${order.code}`} width={96} height={96} unoptimized className="h-24 w-24 border border-gray-900 object-contain p-1" />
-                </div>
-
-                <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="font-semibold">Khách hàng</p>
-                    <p className="mt-14">........................</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">Thủ kho</p>
-                    <p className="mt-14">........................</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">Kế toán</p>
-                    <p className="mt-14">........................</p>
-                  </div>
-                </div>
-              </section>
-            </>
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <Card><CardContent className="p-4 text-gray-400">Không tìm thấy đơn hàng.</CardContent></Card>
           )}
         </div>
       </main>
+
+      {/* ===== PRINT CONTENT (hidden, used by react-to-print) ===== */}
+      <div className="print-hide">
+        {order && invoice && (
+          <InvoicePrintContent ref={printRef} invoice={invoice} order={order} userEmail={user?.email} />
+        )}
+      </div>
     </>
   )
 }
