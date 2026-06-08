@@ -506,11 +506,7 @@ function ResultsList({
           </div>
         )}
         components={{
-          Footer: () => (
-            <div className="pb-4 pt-2 text-center text-sm text-gray-500">
-              Hết kết quả
-            </div>
-          ),
+          Footer: () => null,
         }}
       />
     </div>
