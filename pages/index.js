@@ -412,19 +412,18 @@ function ResultsList({
           <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
             <div className="min-w-0">
               <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                <div className="mt-0.5 size-6 animate-pulse rounded bg-gray-800" />
+                <div className="size-6 animate-pulse rounded bg-gray-800" />
                 <div className="min-w-0">
                   <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
                 </div>
                 <div className="col-span-2 mt-1 space-y-1">
-                  <span className="inline-flex animate-pulse items-center gap-1 rounded-md bg-gray-800 px-2 py-0.5">
-                    <svg className="size-3.5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <span className="inline-flex animate-pulse h-6 items-center gap-1 rounded-md bg-gray-800 px-2">
+                    <svg className="size-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span className="h-3 w-12 rounded bg-gray-700" />
                   </span>
-                  <div className="h-4 w-full animate-pulse rounded bg-gray-800" />
+                  <div className="h-5 w-full animate-pulse rounded bg-gray-800" />
                 </div>
               </div>
             </div>
