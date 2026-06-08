@@ -154,11 +154,7 @@ function SearchStoreCard({
 
                     <div className="col-span-2 mt-1 space-y-1">
                     {distance !== null && distance !== undefined ? (
-                      <span className="inline-flex h-6 items-center gap-1 leading-none text-base" style={{ color: 'var(--muted)' }}>
-                        <svg className="size-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
+                      <span className="inline-flex h-6 items-center leading-none text-base" style={{ color: 'var(--muted)' }}>
                         <span className="leading-none">{formatDistance(distance)}</span>
                       </span>
                     ) : !hasCoordinates ? (
@@ -239,9 +235,6 @@ function SearchStoreCard({
                 <div className="mt-3 flex flex-wrap gap-2">
                   {distance !== null && distance !== undefined ? (
                     <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium" style={{ background: 'rgba(10,10,10,0.6)', color: 'var(--muted)' }}>
-                      <svg className="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
                       {formatDistance(distance)}
                     </span>
                   ) : !hasCoordinates ? (

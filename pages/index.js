@@ -418,9 +418,6 @@ function ResultsList({
                 </div>
                 <div className="col-span-2 mt-1 space-y-1">
                   <span className="inline-flex animate-pulse h-6 items-center gap-1 rounded-md bg-gray-800 px-2">
-                    <svg className="size-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
                     <span className="h-3 w-12 rounded bg-gray-700" />
                   </span>
                   <div className="h-5 w-full animate-pulse rounded bg-gray-800" />
