@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 
 import { Input } from '@/components/ui/input'
@@ -405,54 +405,63 @@ function ResultsList({
   handleCreateStoreClick,
   desktop = false,
 }) {
-  if (showSkeleton) {
-    const SkeletonCard = () => (
-      <Card className="overflow-hidden rounded-lg" style={{ background: 'var(--surface)' }}>
-        <CardContent className="p-0">
-          <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
-            <div className="min-w-0">
-              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                <div className="size-6 animate-pulse rounded bg-gray-800" />
-                <div className="min-w-0">
-                  <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
+  const dataRenderedRef = useRef(false)
+
+  const SkeletonCard = () => (
+    <Card className="overflow-hidden rounded-lg" style={{ background: 'var(--surface)' }}>
+      <CardContent className="p-0">
+        <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
+          <div className="min-w-0">
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+              <div className="size-6 animate-pulse rounded bg-gray-800" />
+              <div className="min-w-0">
+                <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
+              </div>
+              <div className="col-span-2 mt-1 space-y-1">
+                <div className="flex h-6 items-center gap-1">
+                  <div className="size-4 shrink-0 animate-pulse rounded bg-gray-700" />
+                  <div className="h-4 w-16 animate-pulse rounded bg-gray-700" />
                 </div>
-                <div className="col-span-2 mt-1 space-y-1">
-                  <div className="flex h-6 items-center gap-1">
-                    <div className="size-4 shrink-0 animate-pulse rounded bg-gray-700" />
-                    <div className="h-4 w-16 animate-pulse rounded bg-gray-700" />
-                  </div>
-                  <div className="h-[22px] w-full animate-pulse rounded bg-gray-800" />
-                </div>
+                <div className="h-[22px] w-full animate-pulse rounded bg-gray-800" />
               </div>
             </div>
-            <div className="flex flex-col justify-center gap-2">
-              <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-              <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-            </div>
           </div>
-        </CardContent>
-      </Card>
-    )
-
-    if (desktop) {
-      return (
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="pb-2.5"><SkeletonCard /></div>
-          ))}
+          <div className="flex flex-col justify-center gap-2">
+            <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+            <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+          </div>
         </div>
-      )
-    }
+      </CardContent>
+    </Card>
+  )
+
+  const SkeletonList = desktop
+    ? [...Array(8)].map((_, i) => <div key={i} className="pb-2.5"><SkeletonCard /></div>)
+    : [...Array(10)].map((_, i) => <div key={i} className="pb-3"><SkeletonCard /></div>)
+
+  if (showSkeleton) {
+    dataRenderedRef.current = false
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
-        {[...Array(10)].map((_, i) => (
-          <div key={i} className="pb-3"><SkeletonCard /></div>
-        ))}
+        {SkeletonList}
       </div>
     )
   }
 
+  // Track if data has rendered at least once (prevents empty flash)
+  if (searchResults.length > 0) {
+    dataRenderedRef.current = true
+  }
+
   if (searchResults.length === 0) {
+    // During initial transition: keep skeleton instead of flashing empty
+    if (!dataRenderedRef.current) {
+      return (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
+          {SkeletonList}
+        </div>
+      )
+    }
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-12 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-800">
