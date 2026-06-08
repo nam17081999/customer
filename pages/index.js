@@ -356,8 +356,13 @@ function ResultsMeta({
   clearAllFilters,
   desktop = false,
 }) {
+  // During skeleton→data transition: keep skeleton bar to prevent "0 cửa hàng" flash
   if (showSkeleton) {
     return <div className="h-5 w-56 animate-pulse rounded bg-gray-800" aria-hidden="true" />
+  }
+  // searchResults.length=0 but no search criteria → still in transition
+  if (searchResults.length === 0 && !hasSearchCriteria) {
+    return <div className="h-5 w-full max-w-56 animate-pulse rounded bg-gray-800" />
   }
 
   if (!hasSearchCriteria) {
