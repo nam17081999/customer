@@ -407,7 +407,7 @@ function ResultsList({
 }) {
   if (showSkeleton) {
     const SkeletonCard = () => (
-      <Card className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+      <Card className="overflow-hidden rounded-lg" style={{ background: 'var(--surface)' }}>
         <CardContent className="p-0">
           <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
             <div className="min-w-0">

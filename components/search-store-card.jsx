@@ -133,7 +133,7 @@ function SearchStoreCard({
   if (compact) {
     return (
       <>
-        <Card className="overflow-hidden rounded-lg transition duration-200" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+        <Card className="overflow-hidden rounded-lg transition duration-200" style={{ background: 'var(--surface)' }}>
           <CardContent className="p-0">
             <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
               <button
@@ -215,7 +215,7 @@ function SearchStoreCard({
 
   return (
     <>
-      <Card className="overflow-hidden rounded-lg transition duration-200" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+      <Card className="overflow-hidden rounded-lg transition duration-200" style={{ background: 'var(--surface)' }}>
         <CardContent className="p-4">
           <div className="flex gap-4">
             <button
