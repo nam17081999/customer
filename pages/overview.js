@@ -65,7 +65,7 @@ export default function OverviewPage() {
         getOrRefreshStores(),
         listProductsWithStock(),
         listSalesOrders(20),
-        listPurchaseOrders(20),
+        listPurchaseOrders({ page: 1, pageSize: 20 }).then(r => r.orders || []),
         getInventoryReconciliationReport().catch(() => []),
         getDashboardAggregateReport().catch(() => null),
       ])

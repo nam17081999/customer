@@ -517,17 +517,28 @@ export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
   return { orders: orders || [], items: items || [] }
 }
 
-export async function listPurchaseOrders(limit = 100) {
+export async function listPurchaseOrders(params = {}) {
+  const isLegacy = typeof params === 'number'
+  const page = isLegacy ? 1 : Math.max(1, Number(params.page) || 1)
+  const pageSize = isLegacy ? params : Math.max(1, Number(params.pageSize) || 30)
+  const from = (page - 1) * pageSize
+  const to = page * pageSize - 1
+
+  const { count: totalCount, error: countError } = await supabase
+    .from('purchase_orders')
+    .select('id', { count: 'exact', head: true })
+  if (countError) throw countError
+
   const { data: orders, error: orderError } = await supabase
     .from('purchase_orders')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(from, to)
 
   if (orderError) throw orderError
 
   const orderIds = (orders || []).map((order) => order.id)
-  if (orderIds.length === 0) return []
+  if (orderIds.length === 0) return { orders: [], totalCount: Number(totalCount || 0) }
 
   const { data: items, error: itemError } = await supabase
     .from('purchase_order_items')
@@ -541,10 +552,13 @@ export async function listPurchaseOrders(limit = 100) {
     itemCountByOrder.set(item.purchase_order_id, (itemCountByOrder.get(item.purchase_order_id) || 0) + 1)
   }
 
-  return (orders || []).map((order) => ({
-    ...order,
-    itemCount: itemCountByOrder.get(order.id) || 0,
-  }))
+  return {
+    orders: (orders || []).map((order) => ({
+      ...order,
+      itemCount: itemCountByOrder.get(order.id) || 0,
+    })),
+    totalCount: Number(totalCount || 0),
+  }
 }
 
 export async function getPurchaseOrderDetail(purchaseOrderId) {

@@ -452,7 +452,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
       if (onOpenChange) onOpenChange(false)
       else setInternalOpen(false)
       setConfirmDeleteOpen(false)
-      await push('/')
+      try { await push('/') } catch {}
     }
     setDeleting(false)
   }

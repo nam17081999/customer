@@ -1,3 +1,4 @@
+import { useState, useEffect, useMemo } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 
 import { Input } from '@/components/ui/input'
@@ -10,6 +11,8 @@ import {
   FILTER_FLAG_HAS_PHONE,
   FILTER_FLAG_NO_LOCATION,
   FILTER_FLAG_POTENTIAL,
+  SORT_OPTIONS,
+  ACTIVE_STATUS_OPTIONS,
 } from '@/helper/homeSearch'
 import { useHomeSearchController } from '@/helper/useHomeSearchController'
 
@@ -34,11 +37,41 @@ function FilterControls({
   toggleFilterValue,
   clearAllFilters,
   onCollapse,
+  sortBy,
+  setSortBy,
+  activeStatus,
+  setActiveStatus,
   desktop = false,
 }) {
   const buttonBase = desktop
     ? 'rounded-md border px-3 py-2 text-left text-base font-medium transition'
     : 'rounded-lg border px-2.5 py-2 text-sm font-medium transition'
+
+  // Collapsible sections on desktop
+  const [sectionOpen, setSectionOpen] = useState({
+    location: true,
+    type: true,
+    status: true,
+    flags: true,
+    sort: true,
+  })
+
+  const toggleSection = (key) => {
+    setSectionOpen((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const SectionToggle = ({ sectionKey, label, count }) => (
+    <button
+      type="button"
+      onClick={() => toggleSection(sectionKey)}
+      className="flex w-full items-center justify-between text-sm font-semibold text-gray-200"
+    >
+      <span>{label}{count > 0 ? ` (${count})` : ''}</span>
+      <svg className={`h-4 w-4 text-gray-500 transition ${sectionOpen[sectionKey] ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+      </svg>
+    </button>
+  )
 
   return (
     <div className={desktop ? 'flex h-full min-h-0 flex-col' : 'space-y-3'}>
@@ -53,84 +86,235 @@ function FilterControls({
       )}
 
       <div className={desktop ? 'min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4' : 'space-y-3'}>
-        <div className={desktop ? 'space-y-3' : 'grid grid-cols-2 gap-2'}>
+        {/* ── Desktop: Sắp xếp ── */}
+        {desktop && (
+          <div className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <SectionToggle sectionKey="sort" label="Sắp xếp" count={0} />
+            {sectionOpen.sort && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSortBy(opt.value)}
+                    className={`rounded-md border px-3 py-2 text-left text-sm font-medium transition ${
+                      sortBy === opt.value
+                        ? 'border-amber-500 bg-amber-500/15 text-amber-100'
+                        : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Desktop: Trạng thái duyệt ── */}
+        {desktop && (
+          <div className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <SectionToggle sectionKey="status" label="Trạng thái" count={activeStatus !== 'all' ? 1 : 0} />
+            {sectionOpen.status && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {ACTIVE_STATUS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setActiveStatus(opt.value)}
+                    className={`rounded-md border px-3 py-2 text-sm font-medium transition ${
+                      activeStatus === opt.value
+                        ? opt.value === 'all'
+                          ? 'border-gray-600 bg-gray-800 text-gray-100'
+                          : opt.value === 'active'
+                            ? 'border-emerald-500 bg-emerald-500/15 text-emerald-100'
+                            : 'border-orange-500 bg-orange-500/15 text-orange-100'
+                        : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Địa điểm (district + ward) — desktop has collapsible section ── */}
+        {desktop ? (
+          <div className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <SectionToggle sectionKey="location" label="Địa điểm" count={(selectedDistrict ? 1 : 0) + (selectedWard ? 1 : 0)} />
+            {sectionOpen.location && (
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-300">Quận / Huyện</label>
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => {
+                      setSelectedDistrict(e.target.value)
+                      setSelectedWard('')
+                    }}
+                    className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+                  >
+                    <option value="">Tất cả quận</option>
+                    {districtOptions.map((district) => (
+                      <option key={district} value={district}>{district}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-300">Xã / Phường</label>
+                  <select
+                    value={selectedWard}
+                    onChange={(e) => setSelectedWard(e.target.value)}
+                    className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+                  >
+                    <option value="">{selectedDistrict ? 'Tất cả xã' : 'Tất cả xã/phường'}</option>
+                    {wardOptions.map((ward) => (
+                      <option key={ward} value={ward}>{ward}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-300">Quận / Huyện</label>
+              <select
+                value={selectedDistrict}
+                onChange={(e) => {
+                  setSelectedDistrict(e.target.value)
+                  setSelectedWard('')
+                }}
+                className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+              >
+                <option value="">Tất cả quận</option>
+                {districtOptions.map((district) => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-300">Xã / Phường</label>
+              <select
+                value={selectedWard}
+                onChange={(e) => setSelectedWard(e.target.value)}
+                className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
+              >
+                <option value="">{selectedDistrict ? 'Tất cả xã' : 'Tất cả xã/phường'}</option>
+                {wardOptions.map((ward) => (
+                  <option key={ward} value={ward}>{ward}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* ── Loại cửa hàng ── */}
+        {desktop ? (
+          <div className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <SectionToggle sectionKey="type" label="Loại cửa hàng" count={selectedStoreTypes.length} />
+            {sectionOpen.type && (
+              <div className="flex flex-wrap gap-3 pt-1">
+                {STORE_TYPE_OPTIONS.map((type) => {
+                  const active = selectedStoreTypes.includes(type.value)
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => toggleFilterValue(setSelectedStoreTypes, type.value)}
+                      className={`${buttonBase} ${
+                        active
+                          ? 'border-blue-500 bg-blue-500/15 text-blue-100'
+                          : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="mb-2 text-sm font-semibold text-gray-200">Loại cửa hàng</div>
+              <div className="grid grid-cols-2 gap-3">
+                {STORE_TYPE_OPTIONS.map((type) => {
+                  const active = selectedStoreTypes.includes(type.value)
+                  return (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => toggleFilterValue(setSelectedStoreTypes, type.value)}
+                      className={`${buttonBase} ${
+                        active
+                          ? 'border-blue-500 bg-blue-500/15 text-blue-100'
+                          : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Chi tiết dữ liệu ── */}
+        {desktop ? (
+          <div className="space-y-2 rounded-lg border border-gray-800 bg-gray-900/50 p-3">
+            <SectionToggle sectionKey="flags" label="Chi tiết dữ liệu" count={selectedDetailFlags.length} />
+            {sectionOpen.flags && (
+              <div className="flex flex-wrap gap-3 pt-1">
+                {DETAIL_FLAG_OPTIONS.map((flag) => {
+                  const active = selectedDetailFlags.includes(flag.value)
+                  return (
+                    <button
+                      key={flag.value}
+                      type="button"
+                      onClick={() => toggleFilterValue(setSelectedDetailFlags, flag.value)}
+                      className={`${buttonBase} ${
+                        active
+                          ? 'border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-100'
+                          : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                      }`}
+                    >
+                      {flag.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-300">Quận / Huyện</label>
-            <select
-              value={selectedDistrict}
-              onChange={(e) => {
-                setSelectedDistrict(e.target.value)
-                setSelectedWard('')
-              }}
-              className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-            >
-              <option value="">Tất cả quận</option>
-              {districtOptions.map((district) => (
-                <option key={district} value={district}>{district}</option>
-              ))}
-            </select>
+            <div className="mb-2 text-sm font-semibold text-gray-200">Chi tiết dữ liệu</div>
+            <div className="grid grid-cols-2 gap-3">
+              {DETAIL_FLAG_OPTIONS.map((flag) => {
+                const active = selectedDetailFlags.includes(flag.value)
+                return (
+                  <button
+                    key={flag.value}
+                    type="button"
+                    onClick={() => toggleFilterValue(setSelectedDetailFlags, flag.value)}
+                    className={`${buttonBase} ${
+                      active
+                        ? 'border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-100'
+                        : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
+                    }`}
+                  >
+                    {flag.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-300">Xã / Phường</label>
-            <select
-              value={selectedWard}
-              onChange={(e) => setSelectedWard(e.target.value)}
-              className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100"
-            >
-              <option value="">{selectedDistrict ? 'Tất cả xã' : 'Tất cả xã/phường'}</option>
-              {wardOptions.map((ward) => (
-                <option key={ward} value={ward}>{ward}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 text-sm font-semibold text-gray-200">Loại cửa hàng</div>
-          <div className={desktop ? 'flex flex-wrap gap-3' : 'grid grid-cols-2 gap-3'}>
-            {STORE_TYPE_OPTIONS.map((type) => {
-              const active = selectedStoreTypes.includes(type.value)
-              return (
-                <button
-                  key={type.value}
-                  type="button"
-                  onClick={() => toggleFilterValue(setSelectedStoreTypes, type.value)}
-                  className={`${buttonBase} ${
-                    active
-                      ? 'border-blue-500 bg-blue-500/15 text-blue-100'
-                      : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  {type.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-2 text-sm font-semibold text-gray-200">Chi tiết dữ liệu</div>
-          <div className={desktop ? 'flex flex-wrap gap-3' : 'grid grid-cols-2 gap-3'}>
-            {DETAIL_FLAG_OPTIONS.map((flag) => {
-              const active = selectedDetailFlags.includes(flag.value)
-              return (
-                <button
-                  key={flag.value}
-                  type="button"
-                  onClick={() => toggleFilterValue(setSelectedDetailFlags, flag.value)}
-                  className={`${buttonBase} ${
-                    active
-                      ? 'border-fuchsia-500 bg-fuchsia-500/15 text-fuchsia-100'
-                      : 'border-gray-700 bg-gray-900 text-gray-300 hover:bg-gray-800'
-                  }`}
-                >
-                  {flag.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
+        )}
       </div>
 
       <div className={desktop ? 'border-t border-gray-800 px-4 py-4' : 'sticky bottom-0 flex flex-col gap-2 border-t border-gray-800 bg-gray-950/95 pb-1 pt-2.5 backdrop-blur sm:static sm:flex-row sm:items-center sm:justify-between sm:bg-transparent sm:pb-0'}>
@@ -355,6 +539,10 @@ export default function HomePage() {
     setSelectedStoreTypes,
     selectedDetailFlags,
     setSelectedDetailFlags,
+    sortBy,
+    setSortBy,
+    activeStatus,
+    setActiveStatus,
     showDetailedFilters,
     setShowDetailedFilters,
     activeFilterCount,
@@ -379,6 +567,10 @@ export default function HomePage() {
     setSelectedStoreTypes,
     selectedDetailFlags,
     setSelectedDetailFlags,
+    sortBy,
+    setSortBy,
+    activeStatus,
+    setActiveStatus,
     activeFilterCount,
     wardOptions,
     districtOptions,

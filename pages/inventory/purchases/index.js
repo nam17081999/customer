@@ -25,8 +25,12 @@ export default function PurchaseOrdersPage() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const pageSize = 30
   const layoutClasses = useMemo(() => getOrderInventoryWorkbenchClasses(), [])
   const summary = useMemo(() => summarizePurchaseOrders(orders), [orders])
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
   useEffect(() => {
     if (authLoading) return
@@ -35,11 +39,14 @@ export default function PurchaseOrdersPage() {
     setPageReady(true)
   }, [authLoading, isAuthenticated, isAdmin, router])
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (p = 1) => {
     setLoading(true)
     setError('')
+    setPage(p)
     try {
-      setOrders((await loadPurchaseOrdersList()).orders)
+      const result = await loadPurchaseOrdersList({ page: p, pageSize })
+      setOrders(result.orders || [])
+      setTotalCount(result.totalCount || 0)
     } catch (err) {
       setError(err?.operatorMessage || err?.message || 'Không tải được phiếu nhập.')
       setOrders([])
@@ -49,7 +56,7 @@ export default function PurchaseOrdersPage() {
   }, [])
 
   useEffect(() => {
-    if (pageReady) loadOrders()
+    if (pageReady) loadOrders(1)
   }, [pageReady, loadOrders])
 
   if (authLoading || !pageReady) return <FullPageLoading visible message="Đang kiểm tra đăng nhập..." />
@@ -63,7 +70,7 @@ export default function PurchaseOrdersPage() {
             <div><h1 className="text-2xl font-bold">Phiếu nhập</h1><p className="text-base text-gray-400">Theo dõi nhập kho, tổng nhập và phiếu đã hủy.</p></div>
             <div className="flex gap-2">
               <Button asChild><Link href="/inventory/purchases/new"><Plus className="h-4 w-4" /> Nhập hàng</Link></Button>
-              <Button type="button" variant="outline" onClick={loadOrders} disabled={loading}><RefreshCw className="h-4 w-4" /> Làm mới</Button>
+              <Button type="button" variant="outline" onClick={() => loadOrders(page)} disabled={loading}><RefreshCw className="h-4 w-4" /> Làm mới</Button>
             </div>
           </div>
           {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
@@ -86,6 +93,15 @@ export default function PurchaseOrdersPage() {
                 <div>{order.cancelled_at ? <span className="rounded-full border border-red-900 bg-red-950/30 px-3 py-1 text-sm text-red-200">Đã hủy</span> : <span className="rounded-full border border-green-900 bg-green-950/30 px-3 py-1 text-sm text-green-200">Hiệu lực</span>}</div>
               </Link>
             ))}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-gray-800 px-4 py-3">
+                <p className="text-sm text-gray-400">Trang {page} / {totalPages} ({totalCount} phiếu)</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => loadOrders(page - 1)}>Trước</Button>
+                  <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => loadOrders(page + 1)}>Sau</Button>
+                </div>
+              </div>
+            )}
           </CardContent></Card>
         </div>
       </main>

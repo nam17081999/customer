@@ -18,6 +18,8 @@ export function buildCurrentSearchRouteQuery(routerQuery = {}) {
     selectedWard: parseQueryList(routerQuery.wards || routerQuery.ward)[0] || '',
     selectedStoreTypes: parseQueryList(routerQuery.types),
     selectedDetailFlags: parseQueryList(routerQuery.flags),
+    sortBy: routerQuery.sort || '',
+    activeStatus: routerQuery.active || '',
   })
 }
 
@@ -27,6 +29,8 @@ export function buildNextSearchRouteQuery({
   selectedWard,
   selectedStoreTypes,
   selectedDetailFlags,
+  sortBy,
+  activeStatus,
 }) {
   return buildSearchRouteQuery({
     searchTerm,
@@ -34,6 +38,8 @@ export function buildNextSearchRouteQuery({
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
+    sortBy,
+    activeStatus,
   })
 }
 

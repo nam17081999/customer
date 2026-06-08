@@ -93,39 +93,51 @@ export function useNotifications(isAdmin) {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'product_stock' },
         async () => {
-          const feed = getCachedFeed()
-          const stock = await getLowStockItems().catch(() => [])
-          const entries = await newEntries(feed, stock, [])
-          if (entries.length > 0) await insertBatch(entries)
+          try {
+            const feed = getCachedFeed()
+            const stock = await getLowStockItems().catch(() => [])
+            const entries = await newEntries(feed, stock, [])
+            if (entries.length > 0) await insertBatch(entries)
+          } catch (e) {
+            console.warn('[notifications] realtime stock handler failed:', e)
+          }
         },
       )
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'store_reports' },
         async (payload) => {
-          const feed = getCachedFeed()
-          const existingIds = new Set(feed.map(e => e.id))
-          const id = feedId('rp', payload.new.id)
-          if (!existingIds.has(id)) {
-            await insertBatch([{
-              id, type: 'report',
-              title: '🔔 Báo cáo chờ duyệt',
-              detail: `${payload.new.storeName || '—'} - ${payload.new.title || 'Báo cáo'}`,
-              data: { reportTitle: payload.new.title || 'Báo cáo', reportId: payload.new.id, storeName: payload.new.storeName || '' },
-            }])
+          try {
+            const feed = getCachedFeed()
+            const existingIds = new Set(feed.map(e => e.id))
+            const id = feedId('rp', payload.new.id)
+            if (!existingIds.has(id)) {
+              await insertBatch([{
+                id, type: 'report',
+                title: '🔔 Báo cáo chờ duyệt',
+                detail: `${payload.new.storeName || '—'} - ${payload.new.title || 'Báo cáo'}`,
+                data: { reportTitle: payload.new.title || 'Báo cáo', reportId: payload.new.id, storeName: payload.new.storeName || '' },
+              }])
+            }
+          } catch (e) {
+            console.warn('[notifications] realtime report handler failed:', e)
           }
         },
       )
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'stores' },
         async (payload) => {
-          const storeName = payload.new?.name || 'Cửa hàng mới'
-          const id = feedId('sv', payload.new.id)
-          await insertBatch([{
-            id, type: 'store-verify',
-            title: '🏪 Cửa hàng mới',
-            detail: `Cửa hàng ${storeName} cần được duyệt`,
-            data: { storeName, storeId: payload.new.id },
-          }])
+          try {
+            const storeName = payload.new?.name || 'Cửa hàng mới'
+            const id = feedId('sv', payload.new.id)
+            await insertBatch([{
+              id, type: 'store-verify',
+              title: '🏪 Cửa hàng mới',
+              detail: `Cửa hàng ${storeName} cần được duyệt`,
+              data: { storeName, storeId: payload.new.id },
+            }])
+          } catch (e) {
+            console.warn('[notifications] realtime store handler failed:', e)
+          }
         },
       )
       .subscribe()

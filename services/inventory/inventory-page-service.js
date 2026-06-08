@@ -185,10 +185,10 @@ export async function cancelSalesOrderById(orderId, userId = null, { cancelSales
   }
 }
 
-export async function loadPurchaseOrdersList({ listOrders = null } = {}) {
+export async function loadPurchaseOrdersList({ page = 1, pageSize = 30, listOrders = null } = {}) {
   try {
     const listRunner = await resolveDep(listOrders, defaultInventoryClient, 'listPurchaseOrders')
-    return { orders: await listRunner(200) }
+    return await listRunner({ page, pageSize })
   } catch (error) {
     throw normalizeServiceError(error, 'Không tải được phiếu nhập.')
   }

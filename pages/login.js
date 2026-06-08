@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (authLoading || !router.isReady || !isAuthenticated) return
-    router.replace(redirectPath)
+    router.replace(redirectPath).catch(() => {})
   }, [authLoading, isAuthenticated, redirectPath, router, router.isReady])
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function LoginPage() {
       return
     }
 
-    router.replace(redirectPath)
+    router.replace(redirectPath).catch(() => {})
     setLoading(false)
   }
 

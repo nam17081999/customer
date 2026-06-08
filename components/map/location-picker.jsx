@@ -553,7 +553,7 @@ export default function LocationPicker({
             position: 'absolute',
             inset: 0,
             background: dark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
-            backdropBlur: dark ? '4px' : 'none',
+            backdropFilter: dark ? 'blur(4px)' : 'none',
             zIndex: 10,
             pointerEvents: 'none',
             touchAction: 'none',

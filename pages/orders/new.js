@@ -466,7 +466,7 @@ export default function NewSalesOrderPage() {
                   const product = productsById.get(item.productId)
                   const lineTotal = toNumber(item.quantity, 0) * toNumber(item.unitPrice, 0)
                   return (
-                    <div key={`${activeDraft.id}-${index}`} className="mb-2 grid grid-cols-1 gap-2 rounded-md border border-gray-800 bg-gray-900 p-3 xl:grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_150px_150px] xl:items-center">
+                    <div key={`${activeDraft.id}-${item.productId}`} className="mb-2 grid grid-cols-1 gap-2 rounded-md border border-gray-800 bg-gray-900 p-3 xl:grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_150px_150px] xl:items-center">
                       <div className="text-base font-semibold text-gray-300">{index + 1}</div>
                       <Button
                         type="button"
