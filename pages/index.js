@@ -406,50 +406,42 @@ function ResultsList({
   desktop = false,
 }) {
   if (showSkeleton) {
+    const SkeletonCard = () => (
+      <Card className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
+        <CardContent className="p-0">
+          <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
+            <div className="min-w-0">
+              <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
+                <div className="mt-0.5 size-6 animate-pulse rounded bg-gray-800" />
+                <div className="min-w-0">
+                  <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
+                </div>
+                <div className="col-span-2 mt-1 space-y-1">
+                  <span className="inline-flex animate-pulse items-center gap-1 rounded-md bg-gray-800 px-2 py-0.5">
+                    <svg className="size-3.5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="h-3 w-12 rounded bg-gray-700" />
+                  </span>
+                  <div className="h-4 w-full animate-pulse rounded bg-gray-800" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col justify-center gap-2">
+              <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+              <div className="size-10 animate-pulse rounded-full bg-gray-800" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+
     if (desktop) {
       return (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
           {[...Array(8)].map((_, i) => (
-            <Card key={i} className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  <div className="flex min-w-0 flex-1 gap-4">
-                    <div className="size-12 shrink-0 animate-pulse rounded-lg bg-gray-800" />
-                    <div className="min-w-0 flex-1">
-                      <div className="h-7 w-3/5 animate-pulse rounded bg-gray-700" />
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="inline-flex animate-pulse items-center gap-1 rounded-md bg-gray-800 px-2 py-0.5">
-                          <svg className="size-3.5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <span className="h-3 w-14 rounded bg-gray-700" />
-                        </span>
-                      </div>
-                      <div className="mt-3 space-y-1.5 text-base leading-snug">
-                        <div className="flex items-center gap-1.5">
-                          <svg className="size-3.5 shrink-0 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.105 0 2-.893 2-1.995A2 2 0 0012 7a2 2 0 00-2 2.005C10 10.107 10.895 11 12 11z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1114 0z" />
-                          </svg>
-                          <div className="h-5 w-4/5 animate-pulse rounded bg-gray-800" />
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <svg className="size-3.5 shrink-0 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4h5l5 5v7a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 4v6h6" />
-                          </svg>
-                          <div className="h-5 w-3/5 animate-pulse rounded bg-gray-800" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-center justify-center gap-2">
-                    <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-                    <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={i} className="pb-2.5"><SkeletonCard /></div>
           ))}
         </div>
       )
@@ -457,41 +449,7 @@ function ResultsList({
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1" aria-label="Đang tải kết quả">
         {[...Array(10)].map((_, i) => (
-          <Card key={i} className="overflow-hidden rounded-lg" style={{ border: '1px solid rgba(255,255,255,0.06)', background: 'var(--surface)' }}>
-            <CardContent className="p-0">
-              <div className="grid grid-cols-[1fr_auto] gap-2 p-3">
-                <div className="min-w-0">
-                  <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                    <div className="mt-0.5 size-6 animate-pulse rounded bg-gray-800" />
-                    <div className="min-w-0">
-                      <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
-                    </div>
-                    <div className="col-span-2 mt-1 space-y-1">
-                      <span className="inline-flex animate-pulse items-center gap-1 rounded-md bg-gray-800 px-2 py-0.5">
-                        <svg className="size-3.5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span className="h-3 w-12 rounded bg-gray-700" />
-                      </span>
-                      <div className="mt-1 space-y-1">
-                        <div className="flex items-start gap-1.5">
-                          <div className="h-4 w-full animate-pulse rounded bg-gray-800" />
-                        </div>
-                        <div className="flex items-start gap-1.5">
-                          <div className="h-4 w-2/3 animate-pulse rounded bg-gray-800" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col justify-center gap-2">
-                  <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-                  <div className="size-10 animate-pulse rounded-full bg-gray-800" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div key={i} className="pb-3"><SkeletonCard /></div>
         ))}
       </div>
     )
