@@ -26,7 +26,6 @@ const GROUPS = [
     Icon: OrderIcon,
     roles: ['admin', 'telesale'],
     items: [
-      { href: '/today', label: 'Công việc hôm nay' },
       { href: '/orders/new', label: 'Lên đơn hàng', roles: ['admin'] },
       { href: '/orders', label: 'Danh sách đơn', roles: ['admin'] },
       { href: '/telesale/overview', label: 'Telesale', roles: ['telesale'] },
@@ -403,7 +402,6 @@ export default function AppNavbar() {
   // Mobile tab
   const mobileLinks = [
     { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
-    { href: '/today', active: currentPath === '/today', label: 'Công việc', mobileLabel: 'Việc', Icon: OrderIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
     { href: '/account', active: currentPath === '/account', label: accountLabel, mobileLabel: accountMobileLabel, Icon: AccountIcon },

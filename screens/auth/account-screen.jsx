@@ -11,7 +11,6 @@ import { Bell, BellOff, Package, FileText, Store } from 'lucide-react'
 import { loadPreferences, getCachedPreferences, subscribePreferences, setPreference } from '@/lib/notification-store'
 import { THEME_OPTIONS, getThemeMeta } from '@/helper/theme'
 import {
-  CalendarCheck,
   ShoppingCart,
   List,
   Package as PkgIcon,
@@ -37,7 +36,6 @@ const MENU_SECTIONS = {
   sales: {
     label: 'Bán hàng',
     items: [
-      { href: '/today', label: 'Công việc hôm nay', icon: CalendarCheck, accent: true },
       { href: '/orders/new', label: 'Lên đơn hàng', icon: ShoppingCart, accent: true },
       { href: '/orders', label: 'Danh sách đơn', icon: List },
       { href: '/inventory/products', label: 'Hàng hóa & tồn kho', icon: PkgIcon },
@@ -66,7 +64,6 @@ const MENU_SECTIONS = {
   telesale: {
     label: 'Bán hàng',
     items: [
-      { href: '/today', label: 'Công việc hôm nay', icon: CalendarCheck, accent: true },
       { href: '/telesale/overview', label: 'Màn telesale', icon: LayoutDashboard },
     ],
   },
