@@ -417,9 +417,7 @@ function ResultsList({
                   <div className="h-6 w-3/5 animate-pulse rounded bg-gray-700" />
                 </div>
                 <div className="col-span-2 mt-1 space-y-1">
-                  <span className="inline-flex animate-pulse h-6 items-center gap-1 rounded-md bg-gray-800 px-2">
-                    <span className="h-3 w-12 rounded bg-gray-700" />
-                  </span>
+                  <div className="h-6 w-16 animate-pulse rounded-md bg-gray-700" />
                   <div className="h-5 w-full animate-pulse rounded bg-gray-800" />
                 </div>
               </div>
