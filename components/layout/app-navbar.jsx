@@ -15,7 +15,7 @@ import {
   SearchIcon,
 } from '@/components/icons/navigation-icons'
 import { initNotificationSound, playNotificationSound } from '@/lib/notification-sound'
-import { loadFeed, markFeedRead, markAllFeedRead, getCachedFeed } from '@/lib/notification-store'
+import { loadFeed, markFeedRead, markAllFeedRead, getCachedFeed, refreshUnreadCount } from '@/lib/notification-store'
 
 // ─── Menu structure ─────────────────────────────────────────────────
 
@@ -152,14 +152,31 @@ function DropdownGroup({ group, currentPath }) {
 
 function NotificationsPanel({ onClose }) {
   const [feed, setFeed] = useState(() => getCachedFeed())
+  const [loading, setLoading] = useState(false)
+  const mountedRef = useRef(true)
   const itemRefs = useRef({})
   const observerRef = useRef(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
 
-  // Đọc từ cache — realtime đã tự cập nhật, không cần load lại
+  // Load feed từ API nếu cache rỗng (page vừa reload, chưa kịp fetch)
   useEffect(() => {
-    setFeed(getCachedFeed())
+    mountedRef.current = true
+    const cached = getCachedFeed()
+    if (cached.length > 0) {
+      setFeed(cached)
+      return
+    }
+    setLoading(true)
+    loadFeed(50, 0).then((data) => {
+      if (!mountedRef.current) return
+      setFeed(data || [])
+    }).catch(() => {
+      // Keep empty state on error
+    }).finally(() => {
+      if (mountedRef.current) setLoading(false)
+    })
+    return () => { mountedRef.current = false }
   }, [])
 
   // Observer: items chưa đọc trong viewport → đánh dấu đã đọc
@@ -268,7 +285,15 @@ function NotificationsPanel({ onClose }) {
       <div className="fixed inset-0 z-[60]" onClick={closeRef.current} />
       <div className="absolute top-full right-0 pt-4 z-[61]" onClick={(e) => e.stopPropagation()}>
         <div className="w-80 rounded-xl border border-gray-800 bg-gray-950/98 backdrop-blur-2xl shadow-2xl shadow-black/50 py-2 max-h-[75vh] overflow-y-auto">
-          {!anyInventory && !anyReports ? (
+          {loading ? (
+            <div className="px-3 py-6 text-center text-sm text-gray-500">
+              <svg className="mx-auto mb-2 size-5 animate-spin text-gray-500" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Đang tải…
+            </div>
+          ) : !anyInventory && !anyReports ? (
             <div className="px-3 py-6 text-center text-sm text-gray-500">
               <Bell className="mx-auto mb-1.5 size-5 text-gray-600" />
               Không có thông báo
@@ -402,6 +427,7 @@ export default function AppNavbar() {
   // Mobile tab
   const mobileLinks = [
     { href: searchHref, active: currentPath === '/', label: 'Tìm kiếm', mobileLabel: 'Tìm', Icon: SearchIcon },
+    { href: '/orders/new', active: currentPath === '/orders/new', label: 'Lên đơn', mobileLabel: 'Đơn', Icon: OrderIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
     { href: '/account', active: currentPath === '/account', label: accountLabel, mobileLabel: accountMobileLabel, Icon: AccountIcon },
