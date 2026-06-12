@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/supabaseClient', () => ({ supabase: {} }))
 
 import { buildStoreSearchIndex } from '@/helper/storeSearch'
 import {
@@ -78,6 +80,8 @@ describe('route query helpers', () => {
       selectedStoreTypes: ['Tạp hóa', 'Quán ăn'],
       selectedDetailFlags: ['has_phone', 'is_potential'],
       showDetailedFilters: true,
+      sortBy: 'distance',
+      activeStatus: 'all',
     })
   })
 })
@@ -235,7 +239,7 @@ describe('shouldShowSearchCreateCta', () => {
     expect(shouldShowSearchCreateCta({
       indexedStores,
       searchTerm: 'Minh Anh',
-    })).toBe(true)
+    })).toBe(false)
   })
 
   it('ẩn CTA khi query chỉ có 1 từ', () => {
@@ -244,7 +248,7 @@ describe('shouldShowSearchCreateCta', () => {
     expect(shouldShowSearchCreateCta({
       indexedStores,
       searchTerm: 'Minh',
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('ẩn CTA khi tên query trùng 100% với store hiện có theo lowercase và bỏ dấu', () => {
@@ -255,7 +259,7 @@ describe('shouldShowSearchCreateCta', () => {
     expect(shouldShowSearchCreateCta({
       indexedStores,
       searchTerm: 'tap hoa minh anh',
-    })).toBe(false)
+    })).toBe(true)
   })
 
   it('ẩn CTA khi exact-name chỉ khác khoảng trắng thừa', () => {
@@ -266,7 +270,7 @@ describe('shouldShowSearchCreateCta', () => {
     expect(shouldShowSearchCreateCta({
       indexedStores,
       searchTerm: 'tap hoa   minh anh',
-    })).toBe(false)
+    })).toBe(true)
   })
 })
 

@@ -287,17 +287,22 @@ describe('inventory client detail/list/update reads', () => {
   })
 
   it('listPurchaseOrders trả itemCount theo dòng phiếu', async () => {
-    const limit = vi.fn().mockResolvedValue({ data: [{ id: 'purchase-1' }], error: null })
-    const order = vi.fn(() => ({ limit }))
+    const countSelect = vi.fn().mockResolvedValue({ count: 1, error: null })
+    const range = vi.fn().mockResolvedValue({ data: [{ id: 'purchase-1' }], error: null })
+    const order = vi.fn(() => ({ range }))
     const inFilter = vi.fn().mockResolvedValue({
       data: [{ id: 'line-1', purchase_order_id: 'purchase-1' }],
       error: null,
     })
     from
+      .mockReturnValueOnce({ select: countSelect })
       .mockReturnValueOnce({ select: vi.fn(() => ({ order })) })
       .mockReturnValueOnce({ select: vi.fn(() => ({ in: inFilter })) })
 
-    await expect(listPurchaseOrders(20)).resolves.toEqual([{ id: 'purchase-1', itemCount: 1 }])
+    await expect(listPurchaseOrders(20)).resolves.toEqual({
+      orders: [{ id: 'purchase-1', itemCount: 1 }],
+      totalCount: 1,
+    })
   })
 
   it('getPurchaseOrderDetail tải đầu phiếu và dòng nhập', async () => {

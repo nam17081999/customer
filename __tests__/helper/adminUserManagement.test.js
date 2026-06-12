@@ -31,6 +31,8 @@ describe('adminUserManagement', () => {
         email: 'staff@example.com',
         password: '123456',
         role: USER_ROLES.ADMIN,
+        name: '',
+        phone: '',
       },
     })
   })
@@ -55,6 +57,8 @@ describe('adminUserManagement', () => {
       created_at: '2026-04-26T00:00:00.000Z',
       last_sign_in_at: null,
       role: USER_ROLES.ADMIN,
+      name: '',
+      phone: '',
     })
   })
 })

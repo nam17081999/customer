@@ -101,12 +101,12 @@ describe('inventory page service boundary', () => {
   })
 
   it('loads purchase order list/detail and product management data', async () => {
-    await expect(loadPurchaseOrdersList({ listOrders: vi.fn().mockResolvedValue([{ id: 'po1' }]) })).resolves.toEqual({ orders: [{ id: 'po1' }] })
+    await expect(loadPurchaseOrdersList({ listOrders: vi.fn().mockResolvedValue({ orders: [{ id: 'po1' }] }) })).resolves.toEqual({ orders: [{ id: 'po1' }] })
     await expect(loadPurchaseOrderDetailData('po1', {
       getDetail: vi.fn().mockResolvedValue({ order: { id: 'po1' }, items: [] }),
       listProducts: vi.fn().mockResolvedValue([{ id: 'p1' }]),
     })).resolves.toEqual({ detail: { order: { id: 'po1' }, items: [] }, products: [{ id: 'p1' }] })
-    await expect(loadProductManagementData({ listProducts: vi.fn().mockResolvedValue([{ id: 'p1' }]) })).resolves.toEqual({ products: [{ id: 'p1' }] })
+    await expect(loadProductManagementData({ listProducts: vi.fn().mockResolvedValue({ products: [{ id: 'p1' }] }) })).resolves.toEqual({ products: [{ id: 'p1' }] })
   })
 
   it('submits product import through service boundary with safe errors', async () => {
