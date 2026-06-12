@@ -14,7 +14,7 @@ import {
 
 export function formatMoney(value) {
   const number = Number(value || 0)
-  return number.toLocaleString('vi-VN')
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(number)
 }
 
 export function toNumber(value, fallback = 0) {
@@ -231,6 +231,12 @@ export async function createProductWithUnits(payload) {
   const defaultPurchasePrice = payload.defaultPurchasePrice === ''
     ? null
     : toNumber(payload.defaultPurchasePrice, 0)
+  const retailPrice = payload.retailPrice === '' || payload.retailPrice == null
+    ? null
+    : toNumber(payload.retailPrice, 0)
+  const wholesalePrice = payload.wholesalePrice === '' || payload.wholesalePrice == null
+    ? null
+    : toNumber(payload.wholesalePrice, 0)
 
   const { data: product, error: productError } = await supabase
     .from('products')
@@ -241,6 +247,8 @@ export async function createProductWithUnits(payload) {
       base_unit_name: baseUnitName,
       default_sale_price: defaultSalePrice,
       default_purchase_price: defaultPurchasePrice,
+      retail_price: retailPrice,
+      wholesale_price: wholesalePrice,
       min_stock_base_qty: toNumber(payload.minStockBaseQty, 0),
       note: String(payload.note || '').trim() || null,
       created_by: payload.createdBy || null,

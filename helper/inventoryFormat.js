@@ -2,7 +2,7 @@ import { toInventoryNumber } from '@/helper/orderInventoryFlow'
 
 export function formatMoney(value) {
   const number = Number(value || 0)
-  return number.toLocaleString('vi-VN')
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(number)
 }
 
 export function toNumber(value, fallback = 0) {

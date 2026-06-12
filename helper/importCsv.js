@@ -47,6 +47,8 @@ export function validateProductImportRows(rows = []) {
     const sku = String(row.sku || row.SKU || '').trim()
     const unit = String(row.base_unit_name || row.unit || row['Đơn vị'] || '').trim()
     const salePrice = Number(String(row.default_sale_price || row.sale_price || row['Giá bán'] || '0').replaceAll(',', '.'))
+    const retailPrice = Number(String(row.retail_price || row['Giá bán lẻ'] || '0').replaceAll(',', '.'))
+    const wholesalePrice = Number(String(row.wholesale_price || row['Giá bán xỉ'] || '0').replaceAll(',', '.'))
     if (!name) errors.push('Thiếu tên hàng')
     if (!unit) errors.push('Thiếu đơn vị gốc')
     if (!Number.isFinite(salePrice) || salePrice < 0) errors.push('Giá bán không hợp lệ')
@@ -55,6 +57,6 @@ export function validateProductImportRows(rows = []) {
       if (seenSku.has(key)) errors.push('Trùng SKU trong file')
       seenSku.add(key)
     }
-    return { rowNumber: row.__rowNumber, data: { name, sku, baseUnitName: unit, defaultSalePrice: salePrice }, errors }
+    return { rowNumber: row.__rowNumber, data: { name, sku, baseUnitName: unit, defaultSalePrice: salePrice, retailPrice, wholesalePrice }, errors }
   })
 }

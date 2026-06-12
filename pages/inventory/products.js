@@ -308,11 +308,13 @@ export default function InventoryProductsPage() {
 
               <Card className="max-h-[max(16rem,calc(100svh-28rem))] overflow-y-auto sm:max-h-[max(18rem,calc(100dvh-26rem))]">
                 <CardContent className="p-0">
-                  <div className="sticky top-0 z-10 hidden grid-cols-[1.4fr_1fr_1fr_1fr] border-b border-gray-800 bg-gray-950 px-4 py-3 text-sm font-semibold text-gray-300 md:grid">
+                  <div className="sticky top-0 z-10 hidden grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] border-b border-gray-800 bg-gray-950 px-4 py-3 text-sm font-semibold text-gray-300 md:grid">
                     <div>Hàng hóa</div>
                     <div>Đơn vị</div>
                     <div>Tồn</div>
                     <div>Giá vốn</div>
+                    <div>Giá lẻ</div>
+                    <div>Giá xỉ</div>
                   </div>
                   {loading ? (
                     <div className="p-4 text-gray-400">Đang tải...</div>
@@ -328,7 +330,7 @@ export default function InventoryProductsPage() {
                     const largestUnitCount = largestUnitConversion > 0 ? Math.floor(onHandBaseQty / largestUnitConversion) : 0
                     const baseUnitRemainder = largestUnitConversion > 0 ? onHandBaseQty - largestUnitCount * largestUnitConversion : onHandBaseQty
                     return (
-                      <div key={product.id} className="grid grid-cols-1 gap-3 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:py-3">
+                      <div key={product.id} className="grid grid-cols-1 gap-3 border-b border-gray-900 px-4 py-4 last:border-b-0 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_1fr] md:py-3">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <Link href={`/inventory/products/${product.id}`} className="font-semibold text-gray-100 hover:text-sky-200">{product.name}</Link>
@@ -359,6 +361,8 @@ export default function InventoryProductsPage() {
                           <p className="text-sm text-gray-400">Tối thiểu {formatInventoryQuantity(product.min_stock_base_qty)} {product.base_unit_name}</p>
                         </div>
                         <div className="text-gray-100">{formatMoney(product.avgCostPerBaseUnit)} / {product.base_unit_name}</div>
+                        <div className="hidden text-gray-100 sm:block">{formatMoney(product.retail_price)}</div>
+                        <div className="hidden text-gray-100 sm:block">{formatMoney(product.wholesale_price)}</div>
                       </div>
                     )
                   })}

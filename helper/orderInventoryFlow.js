@@ -185,21 +185,31 @@ export function assertSalesOrderStockAvailable(items = [], productsById = new Ma
   return true
 }
 
-export function createSalesOrderLine(products = []) {
+export function createSalesOrderLine(products = [], { priceType = 'retail' } = {}) {
   const product = Array.isArray(products) ? products[0] || null : null
   const unit = product?.units?.find((item) => Number(item.conversion_to_base_qty) > 1)
     || product?.baseUnit
     || product?.units?.[0]
     || null
 
+  let unitPrice
+  if (priceType === 'retail') {
+    unitPrice = unit?.unit_retail_price ?? product?.retail_price ?? unit?.default_sale_price ?? product?.default_sale_price ?? ''
+  } else if (priceType === 'wholesale') {
+    unitPrice = unit?.unit_wholesale_price ?? product?.wholesale_price ?? unit?.default_sale_price ?? product?.default_sale_price ?? ''
+  } else {
+    unitPrice = unit?.default_sale_price ?? product?.default_sale_price ?? ''
+  }
+
   return {
     productId: product?.id || '',
     productUnitId: unit?.id || '',
     conversionToBaseQty: unit?.conversion_to_base_qty || 1,
     quantity: '1',
-    unitPrice: unit?.default_sale_price ?? product?.default_sale_price ?? '',
+    unitPrice,
     costPriceBase: '',
     note: '',
+    priceType,
   }
 }
 
@@ -320,6 +330,7 @@ function normalizeDraftItem(item = {}) {
     unitPrice: stringValue(item.unitPrice ?? ''),
     costPriceBase: stringValue(item.costPriceBase ?? ''),
     note: stringValue(item.note).trim(),
+    priceType: item.priceType === 'retail' || item.priceType === 'wholesale' ? item.priceType : 'retail',
   }
 }
 
@@ -539,6 +550,8 @@ export function buildProductUpdatePayload(payload = {}) {
     category: cleanText(payload.category),
     default_sale_price: normalizeNonNegativeNumber(payload.defaultSalePrice, 'Giá bán', 0),
     default_purchase_price: normalizeOptionalMoney(payload.defaultPurchasePrice, 'Giá nhập'),
+    retail_price: normalizeOptionalMoney(payload.retailPrice, 'Giá bán lẻ'),
+    wholesale_price: normalizeOptionalMoney(payload.wholesalePrice, 'Giá bán xỉ'),
     min_stock_base_qty: normalizeNonNegativeNumber(payload.minStockBaseQty, 'Tồn tối thiểu', 0),
     active: payload.active !== false,
     note: cleanText(payload.note),

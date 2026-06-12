@@ -10,7 +10,7 @@ import { useAuth } from '@/lib/AuthContext'
 import { getOperatorErrorMessage } from '@/helper/operatorErrors'
 import { submitProductImportFromPreview } from '@/services/inventory/inventory-page-service'
 
-const SAMPLE = 'name,sku,base_unit_name,default_sale_price\nNước suối 500ml,NUOC-500,chai,5000'
+const SAMPLE = 'name,sku,base_unit_name,default_sale_price,retail_price,wholesale_price\nNước suối 500ml,NUOC-500,chai,5000,6000,5500'
 
 export default function ProductImportPage() {
   const { user, isAdmin } = useAuth() || {}
@@ -81,7 +81,7 @@ export default function ProductImportPage() {
             <label className="flex min-h-[120px] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-700 bg-gray-950 p-4 text-center hover:border-amber-500">
               <Upload className="h-6 w-6 text-amber-300" />
               <span className="font-semibold">Chọn CSV sản phẩm</span>
-              <span className="text-sm text-gray-400">Cột hỗ trợ: name/ten/Tên hàng, sku, base_unit_name/unit/Đơn vị, default_sale_price/sale_price/Giá bán</span>
+              <span className="text-sm text-gray-400">Cột hỗ trợ: name/ten/Tên hàng, sku, base_unit_name/unit/Đơn vị, default_sale_price/sale_price/Giá bán, retail_price/Giá bán lẻ, wholesale_price/Giá bán xỉ</span>
               <input data-testid="product-import-file" type="file" accept=".csv,text/csv" className="sr-only" onChange={handleFile} />
             </label>
             <textarea data-testid="product-import-raw" value={rawCsv} onChange={(event) => { setFileName('Dán thủ công'); setRawCsv(event.target.value); setImportResult(null) }} rows={5} className="w-full rounded-lg border border-gray-700 bg-gray-950 p-3 text-base text-gray-100" placeholder={SAMPLE} />
@@ -102,11 +102,13 @@ export default function ProductImportPage() {
           <Card><CardContent className="p-0">
             <div className="border-b border-gray-800 p-4"><h2 className="text-lg font-semibold">Validation report</h2><p className="text-sm text-gray-400">Partial failure được hiển thị theo từng dòng để sửa file trước khi import.</p></div>
             {validatedRows.length === 0 ? <div className="p-4 text-gray-400">Dán CSV hoặc chọn file để xem preview.</div> : validatedRows.slice(0, 200).map((row) => (
-              <div key={row.rowNumber} data-testid="import-preview-row" className="grid gap-2 border-b border-gray-900 px-4 py-3 last:border-b-0 md:grid-cols-[90px_1fr_120px_180px_1.3fr]">
+              <div key={row.rowNumber} data-testid="import-preview-row" className="grid gap-2 border-b border-gray-900 px-4 py-3 last:border-b-0 md:grid-cols-[90px_1fr_120px_140px_140px_140px_1.3fr]">
                 <span className="text-gray-400">Dòng {row.rowNumber}</span>
                 <span className="font-semibold">{row.data.name || '—'}</span>
                 <span>{row.data.sku || 'Không SKU'}</span>
                 <span>{formatMoney(row.data.defaultSalePrice || 0)}</span>
+                <span className="hidden sm:block">{formatMoney(row.data.retailPrice || 0)}</span>
+                <span className="hidden sm:block">{formatMoney(row.data.wholesalePrice || 0)}</span>
                 <span className={row.errors.length ? 'text-red-200' : 'text-green-200'}>{row.errors.length ? row.errors.join(', ') : 'OK'}</span>
               </div>
             ))}

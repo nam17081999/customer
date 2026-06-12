@@ -20,6 +20,8 @@ function buildForm(product) {
     category: product?.category || '',
     defaultSalePrice: product?.default_sale_price ?? '',
     defaultPurchasePrice: product?.default_purchase_price ?? '',
+    retailPrice: product?.retail_price ?? '',
+    wholesalePrice: product?.wholesale_price ?? '',
     minStockBaseQty: product?.min_stock_base_qty ?? '',
     active: product?.active !== false,
     note: product?.note || '',
@@ -171,6 +173,8 @@ export default function ProductEditPage() {
                 <label className="block space-y-1"><span className="text-sm text-gray-300">Nhóm</span><Input value={form.category} onChange={(e) => updateForm('category', e.target.value)} /></label>
                 <label className="block space-y-1"><span className="text-sm text-gray-300">Giá bán/gốc</span><Input type="number" min="0" value={form.defaultSalePrice} onChange={(e) => updateForm('defaultSalePrice', e.target.value)} /></label>
                 <label className="block space-y-1"><span className="text-sm text-gray-300">Giá nhập/gốc</span><Input type="number" min="0" value={form.defaultPurchasePrice} onChange={(e) => updateForm('defaultPurchasePrice', e.target.value)} /></label>
+                <label className="block space-y-1"><span className="text-sm text-gray-300">Giá bán lẻ</span><Input type="number" min="0" value={form.retailPrice ?? product?.retail_price ?? ''} onChange={(e) => updateForm('retailPrice', e.target.value)} /></label>
+                <label className="block space-y-1"><span className="text-sm text-gray-300">Giá bán xỉ</span><Input type="number" min="0" value={form.wholesalePrice ?? product?.wholesale_price ?? ''} onChange={(e) => updateForm('wholesalePrice', e.target.value)} /></label>
                 <label className="block space-y-1"><span className="text-sm text-gray-300">Tồn tối thiểu</span><Input type="number" min="0" value={form.minStockBaseQty} onChange={(e) => updateForm('minStockBaseQty', e.target.value)} /></label>
                 <label className="flex items-center gap-3 rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2"><input type="checkbox" checked={form.active} onChange={(e) => updateForm('active', e.target.checked)} className="h-5 w-5" /><span>Còn bán</span></label>
                 <label className="block space-y-1 md:col-span-2"><span className="text-sm text-gray-300">Ghi chú</span><Input value={form.note} onChange={(e) => updateForm('note', e.target.value)} /></label>

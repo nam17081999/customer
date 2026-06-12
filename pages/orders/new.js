@@ -220,11 +220,36 @@ export default function NewSalesOrderPage() {
     const line = activeDraft?.items?.[index]
     const product = productsById.get(line?.productId)
     const unit = product?.units?.find((item) => item.id === unitId)
+    const priceType = line?.priceType || 'retail'
+    let unitPrice
+    if (priceType === 'retail') {
+      unitPrice = unit?.unit_retail_price ?? product?.retail_price ?? unit?.default_sale_price ?? line?.unitPrice
+    } else if (priceType === 'wholesale') {
+      unitPrice = unit?.unit_wholesale_price ?? product?.wholesale_price ?? unit?.default_sale_price ?? line?.unitPrice
+    } else {
+      unitPrice = unit?.default_sale_price ?? line?.unitPrice
+    }
     setItem(index, {
       productUnitId: unitId,
       conversionToBaseQty: unit?.conversion_to_base_qty || 1,
-      unitPrice: unit?.default_sale_price ?? line?.unitPrice,
+      unitPrice,
     })
+  }
+
+  const setPriceType = (index, priceType) => {
+    const line = activeDraft?.items?.[index]
+    if (!line) return
+    const product = productsById.get(line?.productId)
+    const unit = product?.units?.find((u) => u.id === line.productUnitId)
+    let unitPrice
+    if (priceType === 'retail') {
+      unitPrice = unit?.unit_retail_price ?? product?.retail_price ?? unit?.default_sale_price ?? line?.unitPrice
+    } else if (priceType === 'wholesale') {
+      unitPrice = unit?.unit_wholesale_price ?? product?.wholesale_price ?? unit?.default_sale_price ?? line?.unitPrice
+    } else {
+      unitPrice = line?.unitPrice
+    }
+    setItem(index, { priceType, unitPrice })
   }
 
   const addProductLine = (productId = '') => {
@@ -372,7 +397,7 @@ export default function NewSalesOrderPage() {
                       >
                         <span className="block font-semibold">{product.name}</span>
                         <span className="block text-sm text-gray-400">
-                          {product.sku || 'Chưa có mã'} · Giá mặc định {formatMoney(product.default_sale_price || 0)}
+                          {product.sku || 'Chưa có mã'} · Lẻ: {formatMoney(product.retail_price || 0)} · Xỉ: {formatMoney(product.wholesale_price || 0)}
                         </span>
                       </button>
                     ))}
@@ -443,11 +468,12 @@ export default function NewSalesOrderPage() {
           <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_390px]">
             <section className="flex min-h-[520px] flex-col rounded-md border border-gray-800 bg-gray-950 lg:min-h-0">
               <div className="border-b border-gray-800 px-3 py-2">
-                <div className="hidden grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_150px_150px] gap-3 text-sm font-semibold text-gray-300 xl:grid">
+                <div className="hidden grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_120px_150px_150px] gap-3 text-sm font-semibold text-gray-300 xl:grid">
                   <div>STT</div>
                   <div />
                   <div>Tên hàng</div>
                   <div>Đơn vị</div>
+                  <div>Loại giá</div>
                   <div>Số lượng</div>
                   <div>Giá hàng</div>
                   <div>Thành tiền</div>
@@ -466,7 +492,7 @@ export default function NewSalesOrderPage() {
                   const product = productsById.get(item.productId)
                   const lineTotal = toNumber(item.quantity, 0) * toNumber(item.unitPrice, 0)
                   return (
-                    <div key={`${activeDraft.id}-${item.productId}`} className="mb-2 grid grid-cols-1 gap-2 rounded-md border border-gray-800 bg-gray-900 p-3 xl:grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_150px_150px] xl:items-center">
+                    <div key={`${activeDraft.id}-${item.productId}`} className="mb-2 grid grid-cols-1 gap-2 rounded-md border border-gray-800 bg-gray-900 p-3 xl:grid-cols-[52px_44px_minmax(220px,1.5fr)_160px_120px_120px_150px_150px] xl:items-center">
                       <div className="text-base font-semibold text-gray-300">{index + 1}</div>
                       <Button
                         type="button"
@@ -483,7 +509,7 @@ export default function NewSalesOrderPage() {
                         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500 xl:hidden">Tên hàng</span>
                         <p className="truncate text-base font-semibold text-gray-100">{product?.name || 'Hàng hóa'}</p>
                         <p className="truncate text-sm text-gray-400">
-                          {product?.sku || 'Chưa có mã'} · Giá mặc định {formatMoney(product?.default_sale_price || 0)}
+                          {product?.sku || 'Chưa có mã'} · Lẻ: {formatMoney(product?.retail_price || 0)} · Xỉ: {formatMoney(product?.wholesale_price || 0)}
                         </p>
                       </div>
 
@@ -495,6 +521,26 @@ export default function NewSalesOrderPage() {
                           ))}
                         </select>
                       </label>
+
+                      <div className="block">
+                        <span className="mb-1 block text-xs font-semibold uppercase text-gray-500 xl:hidden">Loại giá</span>
+                        <div className="flex h-11 w-full overflow-hidden rounded-md border border-gray-700">
+                          <button
+                            type="button"
+                            className={`flex-1 text-sm font-semibold ${item.priceType === 'retail' ? 'bg-blue-700 text-white' : 'bg-gray-900 text-gray-400 hover:bg-gray-800'}`}
+                            onClick={() => setPriceType(index, 'retail')}
+                          >
+                            Giá lẻ
+                          </button>
+                          <button
+                            type="button"
+                            className={`flex-1 text-sm font-semibold ${item.priceType === 'wholesale' ? 'bg-blue-700 text-white' : 'bg-gray-900 text-gray-400 hover:bg-gray-800'}`}
+                            onClick={() => setPriceType(index, 'wholesale')}
+                          >
+                            Giá xỉ
+                          </button>
+                        </div>
+                      </div>
 
                       <label className="block">
                         <span className="mb-1 block text-xs font-semibold uppercase text-gray-500 xl:hidden">Số lượng</span>
