@@ -9,6 +9,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
 import { buildDocumentCode, formatMoney, toNumber } from '@/helper/inventoryFormat'
 import { loadSalesOrderEntryData, submitSalesOrderFromForm } from '@/services/inventory/inventory-page-service'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   addSalesOrderDraft,
   addSalesOrderDraftForStore,
@@ -25,6 +26,7 @@ import {
   updateSalesOrderDraft,
 } from '@/helper/orderInventoryFlow'
 import { getRecentProductsFromOrderDrafts, mergeSalesOrderLine } from '@/helper/operatorWorkflow'
+import { logAuditEvent } from '@/helper/api/audit-client'
 
 const SALES_ORDER_DRAFTS_STORAGE_KEY = 'storevis:sales-order-drafts:v1'
 const ORDER_FLASH_MESSAGE_KEY = 'storevis:order-flash-message'
@@ -68,6 +70,7 @@ export default function NewSalesOrderPage() {
   const submittingRef = useRef(false)
   const [error, setError] = useState('')
   const [msgState, setMsgState] = useState(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -316,14 +319,26 @@ export default function NewSalesOrderPage() {
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (submittingRef.current || submitting || !activeDraft) return
-    submittingRef.current = true
-    setSubmitting(true)
+    if (!activeDraft.customerStoreId || (activeDraft.items || []).length === 0) return
     setError('')
     try {
       assertSalesOrderStockAvailable(activeDraft.items, productsById)
+    } catch (err) {
+      setError(err?.operatorMessage || err?.message || 'Không tạo được đơn hàng.')
+      return
+    }
+    setShowConfirmDialog(true)
+  }
+
+  const handleConfirmSubmit = async () => {
+    if (submittingRef.current || submitting || !activeDraft) return
+    submittingRef.current = true
+    setSubmitting(true)
+    setShowConfirmDialog(false)
+    try {
       const requestId = activeDraft.requestId || createMutationRequestId('sales')
       if (!activeDraft.requestId) patchActiveDraft({ requestId })
-      await submitSalesOrderFromForm({
+      const createdOrder = await submitSalesOrderFromForm({
         code: activeDraft.code,
         customerStoreId: activeDraft.customerStoreId,
         note: activeDraft.note,
@@ -331,6 +346,19 @@ export default function NewSalesOrderPage() {
         items: activeDraft.items,
         createdBy: user?.id || null,
         requestId,
+      })
+
+      logAuditEvent({
+        eventType: 'sales_order.created',
+        entityType: 'sales_order',
+        entityId: createdOrder?.id || null,
+        metadata: {
+          summary: `Tạo đơn bán ${activeDraft.code || ''}`,
+          code: activeDraft.code,
+          customerStoreId: activeDraft.customerStoreId,
+          requestId,
+          itemCount: activeDraft.items?.length,
+        },
       })
 
       const successText = `Đã lên đơn ${activeDraft.code || ''} thành công.`.replace(/\s+/g, ' ').trim()
@@ -374,6 +402,13 @@ export default function NewSalesOrderPage() {
 
       <main className="min-h-full bg-black text-gray-100">
         {msgState ? <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg> : null}
+        <ConfirmDialog
+          open={showConfirmDialog}
+          onOpenChange={setShowConfirmDialog}
+          title="Xác nhận tạo đơn hàng"
+          description={`Bạn sắp tạo đơn hàng với ${(activeDraft?.items || []).length} mặt hàng, tổng tiền ${formatMoney(totals.total)}.`}
+          onConfirm={handleConfirmSubmit}
+        />
         <form className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-[1900px] flex-col px-3 py-3 sm:px-4" onSubmit={handleSubmit}>
           <div className="sticky top-0 z-40 rounded-md border border-gray-800 bg-gray-950 shadow-lg shadow-black/20">
             <div className="grid grid-cols-1 gap-2 p-2 lg:grid-cols-[420px_1fr_260px]">

@@ -54,6 +54,7 @@ export function useHomeSearchController() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [sortLocation, setSortLocation] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const searchInputRef = useRef(null)
   const virtuosoRef = useRef(null)
   const initializedFromQuery = useRef(false)
@@ -280,12 +281,14 @@ export function useHomeSearchController() {
 
   const loadAllStores = useCallback(async () => {
     setLoading(true)
+    setHasError(false)
     try {
       const data = await getOrRefreshStores()
       setAllStores(data)
       setStoresLoaded(true)
     } catch (err) {
       console.error('Failed to load stores:', err)
+      setHasError(true)
     } finally {
       setLoading(false)
     }
@@ -494,6 +497,8 @@ export function useHomeSearchController() {
     createStoreHref,
     handleCreateStoreClick,
     showSkeleton,
+    hasError,
+    retryLoadStores: loadAllStores,
     SORT_OPTIONS,
     ACTIVE_STATUS_OPTIONS,
   }

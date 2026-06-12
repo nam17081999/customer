@@ -352,21 +352,32 @@ export function StoreExportScreen({ mode = 'all' }) {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Tổng cửa hàng</p>
-                  <p className="text-2xl font-semibold text-gray-100">{stores.length}</p>
+              {!loading && stores.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+                  <svg className="h-12 w-12 mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  <p className="text-base">Chưa có dữ liệu để xuất</p>
                 </div>
-                <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                  <p className="text-sm text-gray-400">Cửa hàng có số điện thoại</p>
-                  <p className="text-2xl font-semibold text-gray-100">{storesWithPhone.length}</p>
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
+                      <p className="text-sm text-gray-400">Tổng cửa hàng</p>
+                      <p className="text-2xl font-semibold text-gray-100">{stores.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
+                      <p className="text-sm text-gray-400">Cửa hàng có số điện thoại</p>
+                      <p className="text-2xl font-semibold text-gray-100">{storesWithPhone.length}</p>
+                    </div>
+                  </div>
 
-              <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
-                <p className="text-sm text-gray-400">Contact sẽ xuất ra VCF</p>
-                <p className="text-2xl font-semibold text-gray-100">{contactsCount}</p>
-              </div>
+                  <div className="rounded-xl border border-gray-800 p-3 bg-gray-950">
+                    <p className="text-sm text-gray-400">Contact sẽ xuất ra VCF</p>
+                    <p className="text-2xl font-semibold text-gray-100">{contactsCount}</p>
+                  </div>
+                </>
+              )}
 
               {error && (
                 <div className="rounded-lg border border-red-900 bg-red-950/30 p-3">

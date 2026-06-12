@@ -803,6 +803,17 @@ export default function MapPage() {
           <p className="mt-3 text-sm text-gray-500">Đang tải bản đồ…</p>
         </div>
 
+        {/* Empty state - no stores with coordinates */}
+        {!loading && stores.length === 0 && mapReady && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-950">
+            <svg className="h-12 w-12 text-gray-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+            </svg>
+            <p className="text-base text-gray-500">Chưa có cửa hàng có tọa độ</p>
+          </div>
+        )}
+
         {!showNavigationInfoPanel && (
           <MapSearchBar
             searchTerm={searchTerm}

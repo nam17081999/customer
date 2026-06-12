@@ -12,6 +12,7 @@ import { buildSalesOrderInvoiceModel, formatInventoryQuantity, getOrderInventory
 import { cancelSalesOrderById, loadSalesOrderDetailData } from '@/services/inventory/inventory-page-service'
 import { useReactToPrint } from 'react-to-print'
 import InvoicePrintContent from '@/components/print/InvoicePrintContent'
+import { logAuditEvent } from '@/helper/api/audit-client'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -95,6 +96,18 @@ export default function SalesOrderDetailPage() {
     setError('')
     try {
       await cancelSalesOrderById(order.id, user?.id || null)
+
+      logAuditEvent({
+        eventType: 'sales_order.cancelled',
+        entityType: 'sales_order',
+        entityId: order.id,
+        metadata: {
+          summary: `Hủy đơn bán ${order.code || ''}`,
+          code: order.code,
+          orderId: order.id,
+        },
+      })
+
       await loadDetail()
     } catch (err) {
       setError(err?.operatorMessage || err?.message || 'Không hủy được đơn hàng.')

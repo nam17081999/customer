@@ -10,6 +10,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { formatMoney } from '@/helper/inventoryFormat'
 import { formatInventoryQuantity, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
 import { cancelPurchaseOrderById, loadPurchaseOrderDetailData } from '@/services/inventory/inventory-page-service'
+import { logAuditEvent } from '@/helper/api/audit-client'
 
 function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
@@ -66,6 +67,18 @@ export default function PurchaseOrderDetailPage() {
     setError('')
     try {
       await cancelPurchaseOrderById(order.id, user?.id || null)
+
+      logAuditEvent({
+        eventType: 'purchase_order.cancelled',
+        entityType: 'purchase_order',
+        entityId: order.id,
+        metadata: {
+          summary: `Hủy phiếu nhập ${order.code || ''}`,
+          code: order.code,
+          purchaseOrderId: order.id,
+        },
+      })
+
       await loadDetail()
     } catch (err) {
       setError(err?.operatorMessage || err?.message || 'Không hủy được phiếu nhập.')

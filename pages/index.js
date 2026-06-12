@@ -408,6 +408,8 @@ function ResultsList({
   searchTerm,
   showCreateStoreCta,
   handleCreateStoreClick,
+  hasError,
+  onRetryLoad,
   desktop = false,
 }) {
   const dataRenderedRef = useRef(false)
@@ -443,6 +445,22 @@ function ResultsList({
   const SkeletonList = desktop
     ? [...Array(8)].map((_, i) => <div key={i} className="pb-2.5"><SkeletonCard /></div>)
     : [...Array(10)].map((_, i) => <div key={i} className="pb-3"><SkeletonCard /></div>)
+
+  if (hasError) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-12 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-900/30">
+          <svg className="h-8 w-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="mb-1 font-medium text-red-300">Không thể tải dữ liệu. Vui lòng thử lại.</p>
+        <Button type="button" onClick={onRetryLoad}>
+          Thử lại
+        </Button>
+      </div>
+    )
+  }
 
   if (showSkeleton) {
     dataRenderedRef.current = false
@@ -545,6 +563,8 @@ export default function HomePage() {
     showCreateStoreCta,
     handleCreateStoreClick,
     showSkeleton,
+    hasError,
+    retryLoadStores,
   } = useHomeSearchController()
 
   const filterProps = {
@@ -586,6 +606,8 @@ export default function HomePage() {
     searchTerm,
     showCreateStoreCta,
     handleCreateStoreClick,
+    hasError,
+    onRetryLoad: retryLoadStores,
   }
 
   return (

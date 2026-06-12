@@ -11,6 +11,7 @@ import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { buildDocumentCode, formatMoney, toNumber } from '@/helper/inventoryFormat'
 import { loadPurchaseEntryData, submitPurchaseOrderFromForm } from '@/services/inventory/inventory-page-service'
 import { createMutationRequestId, getOrderInventoryWorkbenchClasses } from '@/helper/orderInventoryFlow'
+import { logAuditEvent } from '@/helper/api/audit-client'
 
 function newLine(products) {
   const product = products[0] || null
@@ -121,6 +122,18 @@ export default function NewPurchaseOrderPage() {
         createdBy: user?.id || null,
         requestId: requestIdRef.current,
       })
+
+      logAuditEvent({
+        eventType: 'purchase_order.created',
+        entityType: 'purchase_order',
+        metadata: {
+          summary: `Tạo phiếu nhập ${code || ''}`,
+          code,
+          requestId: requestIdRef.current,
+          itemCount: items.length,
+        },
+      })
+
       requestIdRef.current = createMutationRequestId('purchase')
       router.push('/inventory/products')
     } catch (err) {
