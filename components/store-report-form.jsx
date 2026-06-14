@@ -79,6 +79,8 @@ function ReasonReportSection({ reasons, onToggleReason }) {
 }
 
 function EditInfoStep({
+  fieldErrors,
+  setFieldErrors,
   reportAddressDetail,
   setReportAddressDetail,
   reportDistrict,
@@ -100,9 +102,16 @@ function EditInfoStep({
         onDistrictChange={(item) => {
           setReportDistrict(item)
           setReportWard('')
+          if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
         }}
-        onWardChange={setReportWard}
+        onWardChange={(item) => {
+          setReportWard(item)
+          if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
+        }}
       />
+      {fieldErrors.district ? (
+        <div className="text-xs text-red-500">{fieldErrors.district}</div>
+      ) : null}
 
       <div className="space-y-1.5">
         <Label htmlFor="report-address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -127,10 +136,16 @@ function EditInfoStep({
           inputMode="numeric"
           pattern="[0-9+ ]*"
           value={reportPhone}
-          onChange={(event) => setReportPhone(event.target.value)}
+          onChange={(event) => {
+            setReportPhone(event.target.value)
+            if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }))
+          }}
           placeholder="0901 234 567"
           className="text-base sm:text-base"
         />
+        {fieldErrors.phone ? (
+          <div className="text-xs text-red-500">{fieldErrors.phone}</div>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">
@@ -234,6 +249,7 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
   const {
     compassError,
     currentStep,
+    fieldErrors,
     handleGetLocation,
     heading,
     mapEditable,
@@ -248,6 +264,7 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
     reportStoreType,
     reportWard,
     resolving,
+    setFieldErrors,
     setMapEditable,
     setReportAddressDetail,
     setReportDistrict,
@@ -280,16 +297,24 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
               <Input
                 id="report-name"
                 value={reportName}
-                onChange={(event) => setReportName(event.target.value)}
+                onChange={(event) => {
+                  setReportName(event.target.value)
+                  if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
+                }}
                 placeholder="VD: Minh Anh"
                 className="h-11 w-full text-base sm:text-base"
               />
+              {fieldErrors.name ? (
+                <div className="text-xs text-red-500">{fieldErrors.name}</div>
+              ) : null}
             </div>
           </div>
         )}
 
         {currentStep === 2 && (
           <EditInfoStep
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
             reportAddressDetail={reportAddressDetail}
             setReportAddressDetail={setReportAddressDetail}
             reportDistrict={reportDistrict}

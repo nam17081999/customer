@@ -220,6 +220,7 @@ export function StoreExportScreen({ mode = 'all' }) {
   const [pageReady, setPageReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [stores, setStores] = useState([])
 
   useEffect(() => {
@@ -297,15 +298,21 @@ export function StoreExportScreen({ mode = 'all' }) {
   }, [storesWithPhone])
 
   const exportStoresToExcel = async () => {
+    setError('')
+    setSuccess('')
     const csv = buildStoreCsv(stores)
     const stamp = new Date().toISOString().slice(0, 10)
     await exportTextFile(`npp-ha-cong-stores-${stamp}.csv`, csv, 'text/csv;charset=utf-8;')
+    setSuccess(`Đã xuất ${stores.length} cửa hàng thành công.`)
   }
 
   const exportContacts = async () => {
+    setError('')
+    setSuccess('')
     const vcf = buildContactsVcf(storesWithPhone)
     const stamp = new Date().toISOString().slice(0, 10)
     await exportTextFile(`npp-ha-cong-contacts-${stamp}.vcf`, vcf, 'text/vcard;charset=utf-8;')
+    setSuccess(`Đã xuất ${contactsCount} danh bạ thành công.`)
   }
 
   const isDataOnly = mode === 'data'
@@ -382,6 +389,12 @@ export function StoreExportScreen({ mode = 'all' }) {
               {error && (
                 <div className="rounded-lg border border-red-900 bg-red-950/30 p-3">
                   <p className="text-base text-red-300">{error}</p>
+                </div>
+              )}
+
+              {success && (
+                <div className="rounded-lg border border-emerald-900 bg-emerald-950/30 p-3">
+                  <p className="text-base text-emerald-300">{success}</p>
                 </div>
               )}
 

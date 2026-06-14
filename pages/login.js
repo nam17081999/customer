@@ -120,7 +120,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-400 text-center">{error}</p>
+            <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>
           )}
 
           <Button type="submit" className="w-full" disabled={loading || authLoading}>

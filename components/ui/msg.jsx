@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export function Msg({ type = 'info', children, show = true, duration = 2500 }) {
+export function Msg({ type = 'info', children, show = true, duration = 3500 }) {
   const [mounted, setMounted] = useState(show)
   const [visible, setVisible] = useState(show)
   const hideTimerRef = useRef(null)

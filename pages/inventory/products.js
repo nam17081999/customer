@@ -87,6 +87,20 @@ export default function InventoryProductsPage() {
     loadProducts(1)
   }, [pageReady, loadProducts])
 
+  // Consume flash message from sessionStorage (e.g. after creating purchase order)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.sessionStorage.getItem('storevis:flash-message')
+      if (!raw) return
+      window.sessionStorage.removeItem('storevis:flash-message')
+      const parsed = JSON.parse(raw)
+      if (parsed?.text) setMessage(parsed.text)
+    } catch {
+      // ignore parse errors
+    }
+  }, [])
+
   const categories = useMemo(() => getInventoryProductCategories(products), [products])
   const layoutClasses = useMemo(() => getOrderInventoryWorkbenchClasses(), [])
   const filteredProducts = useMemo(() => filterInventoryProducts(products, {

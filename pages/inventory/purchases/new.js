@@ -135,6 +135,14 @@ export default function NewPurchaseOrderPage() {
       })
 
       requestIdRef.current = createMutationRequestId('purchase')
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
+          type: 'success',
+          text: `Đã tạo phiếu nhập ${code || ''} thành công.`,
+          createdAt: Date.now(),
+        }))
+        window.dispatchEvent(new CustomEvent('storevis:flash-message'))
+      }
       router.push('/inventory/products')
     } catch (err) {
       setError(err?.operatorMessage || err?.message || 'Không tạo được phiếu nhập.')

@@ -37,6 +37,7 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
   const [reasons, setReasons] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [msgState, setMsgState] = useState({ type: 'info', text: '', show: false })
+  const [fieldErrors, setFieldErrors] = useState({})
   const msgTimerRef = useRef(null)
   const [reportName, setReportName] = useState(store?.name || '')
   const [reportStoreType, setReportStoreType] = useState(store?.store_type || DEFAULT_STORE_TYPE)
@@ -61,6 +62,7 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
   const resetFeedback = useCallback(() => {
     if (msgTimerRef.current) clearTimeout(msgTimerRef.current)
     setMsgState((prev) => ({ ...prev, show: false }))
+    setFieldErrors({})
   }, [])
 
   useEffect(() => () => {
@@ -104,17 +106,23 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
     return false
   }
 
+  const showFieldError = (field, message) => {
+    setFieldErrors((prev) => ({ ...prev, [field]: message }))
+    scrollToFirstMatchingTarget(getReportErrorSelectors(message))
+    return false
+  }
+
   const validateEditStep = (step) => {
     if (step === 1) {
       if (!String(reportName || '').trim()) {
-        return showErrorWithScroll('Tên cửa hàng không được để trống.')
+        return showFieldError('name', 'Tên cửa hàng không được để trống.')
       }
       return true
     }
 
     if (step === 2) {
       if (!String(reportDistrict || '').trim() || !String(reportWard || '').trim()) {
-        return showErrorWithScroll('Vui lòng nhập đủ quận/huyện và xã/phường.')
+        return showFieldError('district', 'Vui lòng nhập đủ quận/huyện và xã/phường.')
       }
 
       const rawPhone = String(reportPhone || '').trim()
@@ -137,7 +145,7 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
         })
 
         if (validation.error && validation.error !== 'Bạn chưa thay đổi thông tin nào.') {
-          return showErrorWithScroll(validation.error)
+          return showFieldError('phone', validation.error)
         }
       }
     }
@@ -256,6 +264,8 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
     reasons,
     submitting,
     msgState,
+    fieldErrors,
+    setFieldErrors,
     reportName,
     setReportName,
     reportStoreType,
