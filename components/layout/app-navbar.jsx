@@ -430,6 +430,7 @@ export default function AppNavbar() {
     { href: '/orders/new', active: currentPath === '/orders/new', label: 'Lên đơn', mobileLabel: 'Đơn', Icon: OrderIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
+    ...(isAdmin ? [{ href: '/notifications', active: currentPath === '/notifications', label: 'Thông báo', mobileLabel: 'TB', Icon: Bell, badge: badgeCount }] : []),
     { href: '/account', active: currentPath === '/account', label: accountLabel, mobileLabel: accountMobileLabel, Icon: AccountIcon },
   ]
 
