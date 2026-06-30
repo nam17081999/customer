@@ -34,7 +34,7 @@ export function OverflowMarquee({ text, children, className = '', textClassName 
     <div ref={containerRef} className={`overflow-hidden whitespace-nowrap ${className}`}>
       <span
         ref={textRef}
-        className={`inline-block ${shouldAnimate ? 'store-name-marquee' : ''} ${textClassName}`}
+        className={`inline-block ${shouldAnimate ? 'store-name-marquee' : ''} ${textClassName} text-sm text-[color:var(--foreground)] font-medium`}
         style={
           shouldAnimate
             ? {

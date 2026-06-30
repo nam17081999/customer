@@ -1,0 +1,154 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - heading "NPP Hà Công" [level=1] [ref=f1e6]
+        - generic [ref=f1e7]: Quản lý phân phối
+      - navigation [ref=f1e8]:
+        - generic [ref=f1e9]:
+          - generic [ref=f1e10]: Tổng quan
+          - link "Tổng quan" [ref=f1e11] [cursor=pointer]:
+            - /url: /overview
+            - img [ref=f1e12]
+            - generic [ref=f1e17]: Tổng quan
+        - generic [ref=f1e18]:
+          - generic [ref=f1e19]: Cửa hàng
+          - link "Danh sách cửa hàng" [ref=f1e20] [cursor=pointer]:
+            - /url: /
+            - img [ref=f1e21]
+            - generic [ref=f1e25]: Danh sách cửa hàng
+          - link "Thêm cửa hàng" [ref=f1e26] [cursor=pointer]:
+            - /url: /store/create
+            - img [ref=f1e27]
+            - generic [ref=f1e29]: Thêm cửa hàng
+          - link "Báo cáo cửa hàng" [ref=f1e30] [cursor=pointer]:
+            - /url: /store/reports
+            - img [ref=f1e31]
+            - generic [ref=f1e34]: Báo cáo cửa hàng
+          - link "Duyệt cửa hàng" [ref=f1e35] [cursor=pointer]:
+            - /url: /store/verify
+            - img [ref=f1e36]
+            - generic [ref=f1e38]: Duyệt cửa hàng
+          - link "Nhập dữ liệu" [ref=f1e39] [cursor=pointer]:
+            - /url: /store/import
+            - img [ref=f1e40]
+            - generic [ref=f1e43]: Nhập dữ liệu
+          - link "Xuất dữ liệu" [ref=f1e44] [cursor=pointer]:
+            - /url: /store/export
+            - img [ref=f1e45]
+            - generic [ref=f1e48]: Xuất dữ liệu
+          - link "Gộp trùng lặp" [ref=f1e49] [cursor=pointer]:
+            - /url: /store/deduplicate
+            - img [ref=f1e50]
+            - generic [ref=f1e54]: Gộp trùng lặp
+        - generic [ref=f1e55]:
+          - generic [ref=f1e56]: Đơn hàng
+          - link "Danh sách đơn" [ref=f1e57] [cursor=pointer]:
+            - /url: /orders
+            - img [ref=f1e58]
+            - generic [ref=f1e61]: Danh sách đơn
+          - link "Tạo đơn hàng" [ref=f1e62] [cursor=pointer]:
+            - /url: /orders/new
+            - img [ref=f1e63]
+            - generic [ref=f1e66]: Tạo đơn hàng
+        - generic [ref=f1e67]:
+          - generic [ref=f1e68]: Kho hàng
+          - link "Hàng hóa" [ref=f1e69] [cursor=pointer]:
+            - /url: /inventory/products
+            - img [ref=f1e70]
+            - generic [ref=f1e74]: Hàng hóa
+          - link "Nhập kho" [ref=f1e75] [cursor=pointer]:
+            - /url: /inventory/purchases/new
+            - img [ref=f1e76]
+            - generic [ref=f1e79]: Nhập kho
+          - link "Tồn kho" [ref=f1e80] [cursor=pointer]:
+            - /url: /inventory/stock
+            - img [ref=f1e81]
+            - generic [ref=f1e83]: Tồn kho
+          - link "Phiếu nhập" [ref=f1e84] [cursor=pointer]:
+            - /url: /inventory/purchases
+            - img [ref=f1e85]
+            - generic [ref=f1e88]: Phiếu nhập
+          - link "Thống kê kho" [ref=f1e89] [cursor=pointer]:
+            - /url: /inventory/reports
+            - img [ref=f1e90]
+            - generic [ref=f1e92]: Thống kê kho
+        - generic [ref=f1e93]:
+          - generic [ref=f1e94]: Bản đồ
+          - link "Bản đồ" [ref=f1e95] [cursor=pointer]:
+            - /url: /map
+            - img [ref=f1e96]
+            - generic [ref=f1e98]: Bản đồ
+        - generic [ref=f1e99]:
+          - generic [ref=f1e100]: Hệ thống
+          - link "Tài khoản" [ref=f1e101] [cursor=pointer]:
+            - /url: /account
+            - img [ref=f1e102]
+            - generic [ref=f1e105]: Tài khoản
+          - link "Thông báo" [ref=f1e106] [cursor=pointer]:
+            - /url: /notifications
+            - img [ref=f1e107]
+            - generic [ref=f1e110]: Thông báo
+          - link "Quản lý tài khoản" [ref=f1e111] [cursor=pointer]:
+            - /url: /admin/users
+            - img [ref=f1e112]
+            - generic [ref=f1e117]: Quản lý tài khoản
+          - link "Thao tác hệ thống" [ref=f1e118] [cursor=pointer]:
+            - /url: /admin/operations
+            - img [ref=f1e119]
+            - generic [ref=f1e122]: Thao tác hệ thống
+    - generic [ref=f1e123]:
+      - banner [ref=f1e124]:
+        - button "Mở menu" [ref=f1e125] [cursor=pointer]:
+          - img [ref=f1e126]
+        - heading "Thêm cửa hàng" [level=2] [ref=f1e127]
+        - button "K" [ref=f1e129] [cursor=pointer]
+      - main [ref=f1e130]:
+        - generic [ref=f1e132]:
+          - generic [ref=f1e133]:
+            - generic [ref=f1e135]:
+              - generic [ref=f1e136]: "1"
+              - generic [ref=f1e137]: Tên
+            - generic [ref=f1e140]:
+              - generic [ref=f1e141]: "2"
+              - generic [ref=f1e142]: Thông tin
+            - generic [ref=f1e145]:
+              - generic [ref=f1e146]: "3"
+              - generic [ref=f1e147]: Vị trí
+          - generic [ref=f1e148]:
+            - generic [ref=f1e149]:
+              - generic [ref=f1e150]:
+                - generic [ref=f1e151]: Loại cửa hàng
+                - generic [ref=f1e152]:
+                  - button "Tạp hóa" [pressed] [ref=f1e153]:
+                    - generic [ref=f1e154]:
+                      - img [ref=f1e156]
+                      - generic [ref=f1e160]: Tạp hóa
+                  - button "Quán ăn/uống" [ref=f1e161]:
+                    - generic [ref=f1e162]:
+                      - img [ref=f1e164]
+                      - generic [ref=f1e166]: Quán ăn/uống
+                  - button "Kho" [ref=f1e167]:
+                    - generic [ref=f1e168]:
+                      - img [ref=f1e170]
+                      - generic [ref=f1e172]: Kho
+                  - button "Karaoke" [ref=f1e173]:
+                    - generic [ref=f1e174]:
+                      - img [ref=f1e176]
+                      - generic [ref=f1e178]: Karaoke
+                  - button "Khách sạn" [ref=f1e179]:
+                    - generic [ref=f1e180]:
+                      - img [ref=f1e182]
+                      - generic [ref=f1e185]: Khách sạn
+                  - button "Quán game" [ref=f1e186]:
+                    - generic [ref=f1e187]:
+                      - img [ref=f1e189]
+                      - generic [ref=f1e193]: Quán game
+              - generic [ref=f1e194]:
+                - generic [ref=f1e195]: Tên cửa hàng
+                - textbox "Tên cửa hàng" [active] [ref=f1e197]:
+                  - /placeholder: "VD: Minh Anh"
+            - button "Tiếp theo" [ref=f1e200] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f1e206] [cursor=pointer]:
+    - img [ref=f1e207]
+  - alert [ref=f1e210]

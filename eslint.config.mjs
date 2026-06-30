@@ -17,6 +17,7 @@ const eslintConfig = [
       "coverage/**",
       "playwright-report/**",
       "test-results/**",
+      ".claude/**",
     ],
   },
   ...compat.extends("next/core-web-vitals"),

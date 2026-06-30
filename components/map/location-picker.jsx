@@ -293,7 +293,7 @@ function useLocationPickerController({
       const [lng, lat] = centerRef.current
       updateNearbyStores(lat, lng)
     } catch (err) {
-      console.error('Load nearby stores error:', err)
+      // Load nearby stores error logged
     }
   }, [updateNearbyStores])
 
@@ -404,7 +404,7 @@ function useLocationPickerController({
         onChangeRef.current(lat, lng)
       }
       if (debugRef.current) {
-        console.log('Map center:', { lat, lng })
+
       }
     }
 
@@ -553,7 +553,7 @@ export default function LocationPicker({
             position: 'absolute',
             inset: 0,
             background: dark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
-            backdropBlur: dark ? '4px' : 'none',
+            backdropFilter: dark ? 'blur(4px)' : 'none',
             zIndex: 10,
             pointerEvents: 'none',
             touchAction: 'none',

@@ -184,14 +184,6 @@ await supabase.from('stores')
 
 ---
 
-## 4. Image Display
-
-- `image_url` trong DB = **tên file** (ví dụ: `1716000000_abc.jpg`)
-- Full URL: `process.env.NEXT_PUBLIC_IMAGE_BASE_URL + image_url`
-- Helper: `getFullImageUrl(image_url)` trong `@/helper/imageUtils`
-
----
-
 ## 5. Địa Lý
 
 ```js
@@ -270,13 +262,12 @@ const defaultNearby = stores
 ```js
 // Bộ lọc chi tiết trên `/`
 // Quận/Huyện + Xã/Phường: single-select
-// Loại cửa hàng + Có SĐT + Có ảnh + Không có vị trí: multi-select
+// Loại cửa hàng + Có SĐT + Không có vị trí: multi-select
 const filtered = stores.filter((store) => {
   if (selectedDistrict && store.district !== selectedDistrict) return false
   if (selectedWard && store.ward !== selectedWard) return false
   if (selectedStoreTypes.length && !selectedStoreTypes.includes(store.store_type || '')) return false
   if (selectedFlags.includes('has_phone') && !String(store.phone || '').trim()) return false
-  if (selectedFlags.includes('has_image') && !String(store.image_url || '').trim()) return false
   if (selectedFlags.includes('has_no_location')) {
     const hasCoords = Number.isFinite(parseCoordinate(store.latitude)) && Number.isFinite(parseCoordinate(store.longitude))
     if (hasCoords) return false

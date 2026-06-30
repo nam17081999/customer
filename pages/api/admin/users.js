@@ -31,12 +31,16 @@ async function createUser(req, res, adminSupabase) {
     return res.status(400).json({ error: validation.error })
   }
 
-  const { email, password, role } = validation.values
+  const { email, password, role, name, phone } = validation.values
   const { data, error } = await adminSupabase.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
     app_metadata: { role },
+    user_metadata: {
+      ...(name ? { name } : {}),
+      ...(phone ? { phone } : {}),
+    },
   })
 
   if (error) throw error

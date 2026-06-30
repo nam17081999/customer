@@ -11,6 +11,8 @@ import {
   hasStoreCoordinates,
   normalizeCreateStoreName,
   shouldShowSearchCreateCta,
+  SORT_OPTIONS,
+  ACTIVE_STATUS_OPTIONS,
 } from '@/helper/homeSearch'
 import {
   buildCurrentSearchRouteQuery,
@@ -46,10 +48,13 @@ export function useHomeSearchController() {
   const [selectedWard, setSelectedWard] = useState('')
   const [selectedStoreTypes, setSelectedStoreTypes] = useState([])
   const [selectedDetailFlags, setSelectedDetailFlags] = useState([])
+  const [sortBy, setSortBy] = useState('distance')
+  const [activeStatus, setActiveStatus] = useState('all')
   const [showDetailedFilters, setShowDetailedFilters] = useState(false)
   const [currentLocation, setCurrentLocation] = useState(null)
   const [sortLocation, setSortLocation] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [hasError, setHasError] = useState(false)
   const searchInputRef = useRef(null)
   const virtuosoRef = useRef(null)
   const initializedFromQuery = useRef(false)
@@ -57,6 +62,9 @@ export function useHomeSearchController() {
   const lastSearchCriteriaRef = useRef('')
   const isListAtTopRef = useRef(true)
   const pendingSortLocationRef = useRef(null)
+  const routerQueryRef = useRef(router.query)
+  // Keep routerQueryRef current on every render
+  routerQueryRef.current = router.query
 
   const hasSearchCriteria = hasActiveSearchCriteria({
     searchTerm,
@@ -64,6 +72,7 @@ export function useHomeSearchController() {
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
+    activeStatus,
   })
 
   const activeFilterCount = countActiveFilters({
@@ -71,6 +80,7 @@ export function useHomeSearchController() {
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
+    activeStatus,
   })
 
   useEffect(() => {
@@ -82,6 +92,8 @@ export function useHomeSearchController() {
     setSelectedWard(restoredState.selectedWard)
     setSelectedStoreTypes(restoredState.selectedStoreTypes)
     setSelectedDetailFlags(restoredState.selectedDetailFlags)
+    setSortBy(restoredState.sortBy)
+    setActiveStatus(restoredState.activeStatus)
     setShowDetailedFilters(restoredState.showDetailedFilters)
   }, [router.isReady, router.query])
 
@@ -135,8 +147,10 @@ export function useHomeSearchController() {
       selectedWard,
       selectedStoreTypes,
       selectedDetailFlags,
+      sortBy,
+      activeStatus,
     })
-    const currentQuery = buildCurrentSearchRouteQuery(router.query)
+    const currentQuery = buildCurrentSearchRouteQuery(routerQueryRef.current)
 
     if (!shouldSyncSearchRoute(nextQuery, currentQuery)) return
 
@@ -147,7 +161,7 @@ export function useHomeSearchController() {
       persist: persistSearchRoute,
       setTimer: window.setTimeout.bind(window),
     })
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, router, router.isReady, router.pathname, router.query])
+  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, sortBy, activeStatus, router])
 
   const wardOptions = useMemo(() => (
     selectedDistrict
@@ -267,12 +281,14 @@ export function useHomeSearchController() {
 
   const loadAllStores = useCallback(async () => {
     setLoading(true)
+    setHasError(false)
     try {
       const data = await getOrRefreshStores()
       setAllStores(data)
       setStoresLoaded(true)
     } catch (err) {
       console.error('Failed to load stores:', err)
+      setHasError(true)
     } finally {
       setLoading(false)
     }
@@ -349,6 +365,8 @@ export function useHomeSearchController() {
       selectedStoreTypes,
       selectedDetailFlags,
       currentLocation: sortLocation,
+      activeStatus,
+      sortBy,
     })
   }, [
     indexedStores,
@@ -359,6 +377,8 @@ export function useHomeSearchController() {
     selectedStoreTypes,
     selectedDetailFlags,
     sortLocation,
+    activeStatus,
+    sortBy,
   ])
 
   const showCreateStoreCta = useMemo(() => {
@@ -410,6 +430,8 @@ export function useHomeSearchController() {
     setSelectedWard('')
     setSelectedStoreTypes([])
     setSelectedDetailFlags([])
+    setSortBy('distance')
+    setActiveStatus('all')
   }, [])
 
   useEffect(() => {
@@ -439,7 +461,7 @@ export function useHomeSearchController() {
       align: 'start',
       behavior: 'auto',
     })
-  }, [commitSortLocation, currentLocation, searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags])
+  }, [commitSortLocation, currentLocation, searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, sortBy, activeStatus])
 
   return {
     msgState,
@@ -455,6 +477,10 @@ export function useHomeSearchController() {
     setSelectedStoreTypes,
     selectedDetailFlags,
     setSelectedDetailFlags,
+    sortBy,
+    setSortBy,
+    activeStatus,
+    setActiveStatus,
     showDetailedFilters,
     setShowDetailedFilters,
     activeFilterCount,
@@ -469,5 +495,9 @@ export function useHomeSearchController() {
     createStoreHref,
     handleCreateStoreClick,
     showSkeleton,
+    hasError,
+    retryLoadStores: loadAllStores,
+    SORT_OPTIONS,
+    ACTIVE_STATUS_OPTIONS,
   }
 }

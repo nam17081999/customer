@@ -1,5 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('@/lib/supabaseClient', () => ({ supabase: {} }))
+
 import {
   buildCurrentSearchRouteQuery,
   buildNextSearchRouteQuery,

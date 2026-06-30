@@ -15,7 +15,6 @@
 | `phone` | text | NULL | SĐT Việt Nam |
 | `phone_secondary` | text | NULL | SĐT phụ (tuỳ chọn) |
 | `note` | text | NULL | Ghi chú |
-| `image_url` | text | NULL | **Tên file** ảnh trên ImageKit (không phải URL đầy đủ) |
 | `latitude` | float8 | NULL | Vĩ độ |
 | `longitude` | float8 | NULL | Kinh độ |
 | `active` | boolean | NOT NULL | `true` = đã xác thực; `false` = chờ duyệt |
@@ -288,13 +287,6 @@ Quy tắc quyền sau migration:
 
 ---
 
-## Ảnh (hiển thị)
-
-- `image_url` chỉ là **tên file**: `1716000000_abc.jpg`
-- Full URL để hiển thị: `NEXT_PUBLIC_IMAGE_BASE_URL + image_url`
-
----
-
 ## Cache 3-Layer (`lib/storeCache.js`)
 
 ```
@@ -305,7 +297,7 @@ Quy tắc quyền sau migration:
 
 ### SELECT_FIELDS (fields được cache)
 ```
-id, name, store_type, image_url, latitude, longitude, address_detail,
+id, name, store_type, latitude, longitude, address_detail,
 ward, district, phone, phone_secondary, note, active, created_at, updated_at,
 is_potential, last_called_at, last_call_result, last_call_result_at,
 last_order_reported_at, sales_note

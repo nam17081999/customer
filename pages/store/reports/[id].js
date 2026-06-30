@@ -1,19 +1,33 @@
-import { useMemo } from 'react'
-import Head from 'next/head'
-import Link from 'next/link'
-import { useRouter } from 'next/router'
-import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import StoreReportAdminDetail from '@/components/store/store-report-admin-detail'
-import { summarizeStoreReport } from '@/helper/storeReportFlow'
-import { useStoreReportsController } from '@/helper/useStoreReportsController'
+import { useMemo } from "react";
+import Head from "next/head";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/router";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { summarizeStoreReport } from "@/helper/storeReportFlow";
+import { useStoreReportsController } from "@/helper/useStoreReportsController";
+
+const StoreReportAdminDetail = dynamic(
+  () => import("@/components/store/store-report-admin-detail"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-xl border border-gray-800 bg-gray-950 p-4 text-sm text-gray-400">
+        Đang tải chi tiết báo cáo...
+      </div>
+    ),
+  },
+);
 
 export default function StoreReportDetailPage() {
-  const router = useRouter()
+  const router = useRouter();
   const reportId = useMemo(() => {
-    const raw = Array.isArray(router.query.id) ? router.query.id[0] : router.query.id
-    return raw ? String(raw) : ''
-  }, [router.query.id])
+    const raw = Array.isArray(router.query.id)
+      ? router.query.id[0]
+      : router.query.id;
+    return raw ? String(raw) : "";
+  }, [router.query.id]);
 
   const {
     authLoading,
@@ -28,23 +42,23 @@ export default function StoreReportDetailPage() {
     handleReject,
     openConfirmAction,
     handleConfirmAction,
-  } = useStoreReportsController()
+  } = useStoreReportsController();
 
-  const report = reports.find((item) => item.id === reportId) || null
-  const reportHandled = !loading && reportId && reports.length > 0 && !report
-  const isLoading = Boolean(actionLoading[reportId])
+  const report = reports.find((item) => item.id === reportId) || null;
+  const reportHandled = !loading && reportId && reports.length > 0 && !report;
+  const isLoading = Boolean(actionLoading[reportId]);
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full">
         <div className="mx-auto max-w-screen-md px-3 py-6 sm:px-4">
           <p className="text-sm text-gray-400">Đang kiểm tra đăng nhập...</p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!pageReady) return null
+  if (!pageReady) return null;
 
   return (
     <>
@@ -52,7 +66,7 @@ export default function StoreReportDetailPage() {
         <title>Chi tiết báo cáo - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-screen bg-black">
+      <div className="min-h-full">
         <div className="mx-auto max-w-screen-md space-y-4 px-3 py-4 sm:px-4 sm:py-6">
           <div className="flex items-center justify-between gap-3">
             <Button asChild variant="outline">
@@ -82,7 +96,12 @@ export default function StoreReportDetailPage() {
               report={report}
               isLoading={isLoading}
               onReject={() => handleReject(report.id)}
-              onApprove={() => openConfirmAction(report.report_type === 'edit' ? 'edit' : 'reason', report)}
+              onApprove={() =>
+                openConfirmAction(
+                  report.report_type === "edit" ? "edit" : "reason",
+                  report,
+                )
+              }
             />
           ) : null}
 
@@ -97,16 +116,20 @@ export default function StoreReportDetailPage() {
       <ConfirmDialog
         open={confirmAction.open}
         onOpenChange={(open) => {
-          if (!open) closeConfirmAction()
+          if (!open) closeConfirmAction();
         }}
-        title={confirmAction.type === 'edit' ? 'Xác nhận cập nhật cửa hàng' : 'Xác nhận đánh dấu báo cáo'}
+        title={
+          confirmAction.type === "edit"
+            ? "Xác nhận cập nhật cửa hàng"
+            : "Xác nhận đánh dấu báo cáo"
+        }
         description={
-          confirmAction.type === 'edit'
-            ? 'Duyệt và cập nhật cửa hàng theo đề xuất?'
-            : 'Đánh dấu báo cáo này là đã xử lý?'
+          confirmAction.type === "edit"
+            ? "Duyệt và cập nhật cửa hàng theo đề xuất?"
+            : "Đánh dấu báo cáo này là đã xử lý?"
         }
         onConfirm={handleConfirmAction}
       />
     </>
-  )
+  );
 }

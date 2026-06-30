@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_WARD_SUGGESTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
+import { createStore } from '@/api/stores/store-client'
 import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   findNearbySimilarStores,
@@ -58,6 +58,7 @@ export function useStoreCreateController() {
   const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
   const [nameValid, setNameValid] = useState(false)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
+  const [duplicateAllowedName, setDuplicateAllowedName] = useState('')
   const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
   const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
   const duplicateCheckSeqRef = useRef(0)
@@ -365,9 +366,12 @@ export function useStoreCreateController() {
     setDuplicateCheckLoading(false)
     setDuplicateCheckDone(false)
     setNameValid(false)
+    setDuplicateAllowedName('')
     setDuplicateCheckLat(null)
     setDuplicateCheckLng(null)
     duplicateGeoRequestedRef.current = false
+    createQueryStepAppliedRef.current = false
+    createQueryAreaPrefillRequestedRef.current = false
     setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
@@ -436,6 +440,7 @@ export function useStoreCreateController() {
       setDuplicateCheckDone(false)
       setDuplicateCheckLat(null)
       setDuplicateCheckLng(null)
+      setDuplicateAllowedName('')
       duplicateGeoRequestedRef.current = false
       setNameValid(false)
       return
@@ -444,11 +449,13 @@ export function useStoreCreateController() {
     setDuplicateCandidates([])
     setDuplicateCheckError('')
     setDuplicateCheckDone(false)
+    setDuplicateAllowedName('')
     setNameValid(false)
   }, [name])
 
   useEffect(() => {
     setAllowDuplicate(false)
+    setDuplicateAllowedName('')
     setDuplicateCheckDone(false)
     setNameValid(false)
   }, [name])
@@ -507,6 +514,7 @@ export function useStoreCreateController() {
       if (seq !== duplicateCheckSeqRef.current) return
       setDuplicateCandidates(matches)
       setAllowDuplicate(false)
+      setDuplicateAllowedName('')
       setDuplicateCheckDone(true)
       const ok = matches.length === 0
       setNameValid(ok)
@@ -532,9 +540,10 @@ export function useStoreCreateController() {
   }, [duplicateCheckDone, runDuplicateCheckByButton, nameValid, allowDuplicate])
 
   const handleKeepCreateDuplicate = useCallback(() => {
+    setDuplicateAllowedName(toTitleCaseVI(name.trim()))
     setAllowDuplicate(true)
     setCurrentStep(2)
-  }, [])
+  }, [name])
 
   const validateStep2Fields = useCallback(async ({ requirePhone = false } = {}) => {
     const stores = (phone.trim() || phoneSecondary.trim()) ? await getOrRefreshStores() : []
@@ -602,6 +611,7 @@ export function useStoreCreateController() {
 
   const persistStore = useCallback(async ({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) => {
     const normalizedName = toTitleCaseVI(name.trim())
+    const hasConfirmedNameDuplicate = allowDuplicate && duplicateAllowedName === normalizedName
     let storesForPhoneDupes = null
 
     const getStoresForPhoneDupes = async () => {
@@ -644,7 +654,7 @@ export function useStoreCreateController() {
         return false
       }
 
-      if (shouldCheckFinalDuplicates) {
+      if (shouldCheckFinalDuplicates && !hasConfirmedNameDuplicate) {
         let nearDupes = []
         let globalDupes = []
         try {
@@ -685,10 +695,7 @@ export function useStoreCreateController() {
         isTelesale,
       })
 
-      const { data: insertedRows, error: insertError } = await supabase
-        .from('stores')
-        .insert([insertPayload])
-        .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note')
+      const { data: insertedRows, error: insertError } = await createStore(insertPayload)
 
       if (insertError) {
         console.error(insertError)
@@ -727,6 +734,7 @@ export function useStoreCreateController() {
     addressDetail,
     note,
     allowDuplicate,
+    duplicateAllowedName,
     storeType,
     isAdmin,
     isTelesale,
@@ -808,11 +816,12 @@ export function useStoreCreateController() {
       payload: {
         latitude,
         longitude,
-        shouldCheckFinalDuplicates: true,
+        shouldCheckFinalDuplicates: !createQueryStepAppliedRef.current,
       },
     })
   }, [
     currentStep,
+    createQueryStepAppliedRef,
     runDuplicateCheckByButton,
     validateStep2AndGoNext,
     resolvingAddr,

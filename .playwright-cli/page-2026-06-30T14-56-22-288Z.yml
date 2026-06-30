@@ -1,0 +1,110 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - heading "NPP Hà Công" [level=1] [ref=e6]
+        - generic [ref=e7]: Quản lý phân phối
+      - navigation [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]: Tổng quan
+          - link "Tổng quan" [ref=e11] [cursor=pointer]:
+            - /url: /overview
+            - img [ref=e12]
+            - generic [ref=e17]: Tổng quan
+        - generic [ref=e18]:
+          - generic [ref=e19]: Cửa hàng
+          - link "Danh sách cửa hàng" [ref=e20] [cursor=pointer]:
+            - /url: /
+            - img [ref=e21]
+            - generic [ref=e25]: Danh sách cửa hàng
+          - link "Thêm cửa hàng" [ref=e26] [cursor=pointer]:
+            - /url: /store/create
+            - img [ref=e27]
+            - generic [ref=e29]: Thêm cửa hàng
+          - link "Báo cáo cửa hàng" [ref=e30] [cursor=pointer]:
+            - /url: /store/reports
+            - img [ref=e31]
+            - generic [ref=e34]: Báo cáo cửa hàng
+          - link "Duyệt cửa hàng" [ref=e35] [cursor=pointer]:
+            - /url: /store/verify
+            - img [ref=e36]
+            - generic [ref=e38]: Duyệt cửa hàng
+          - link "Nhập dữ liệu" [ref=e39] [cursor=pointer]:
+            - /url: /store/import
+            - img [ref=e40]
+            - generic [ref=e43]: Nhập dữ liệu
+          - link "Xuất dữ liệu" [ref=e44] [cursor=pointer]:
+            - /url: /store/export
+            - img [ref=e45]
+            - generic [ref=e48]: Xuất dữ liệu
+          - link "Gộp trùng lặp" [ref=e49] [cursor=pointer]:
+            - /url: /store/deduplicate
+            - img [ref=e50]
+            - generic [ref=e54]: Gộp trùng lặp
+        - generic [ref=e55]:
+          - generic [ref=e56]: Đơn hàng
+          - link "Danh sách đơn" [ref=e57] [cursor=pointer]:
+            - /url: /orders
+            - img [ref=e58]
+            - generic [ref=e61]: Danh sách đơn
+          - link "Tạo đơn hàng" [ref=e62] [cursor=pointer]:
+            - /url: /orders/new
+            - img [ref=e63]
+            - generic [ref=e66]: Tạo đơn hàng
+        - generic [ref=e67]:
+          - generic [ref=e68]: Kho hàng
+          - link "Hàng hóa" [ref=e69] [cursor=pointer]:
+            - /url: /inventory/products
+            - img [ref=e70]
+            - generic [ref=e74]: Hàng hóa
+          - link "Nhập kho" [ref=e75] [cursor=pointer]:
+            - /url: /inventory/purchases/new
+            - img [ref=e76]
+            - generic [ref=e79]: Nhập kho
+          - link "Tồn kho" [ref=e80] [cursor=pointer]:
+            - /url: /inventory/stock
+            - img [ref=e81]
+            - generic [ref=e83]: Tồn kho
+          - link "Phiếu nhập" [ref=e84] [cursor=pointer]:
+            - /url: /inventory/purchases
+            - img [ref=e85]
+            - generic [ref=e88]: Phiếu nhập
+          - link "Thống kê kho" [ref=e89] [cursor=pointer]:
+            - /url: /inventory/reports
+            - img [ref=e90]
+            - generic [ref=e92]: Thống kê kho
+        - generic [ref=e93]:
+          - generic [ref=e94]: Bản đồ
+          - link "Bản đồ" [ref=e95] [cursor=pointer]:
+            - /url: /map
+            - img [ref=e96]
+            - generic [ref=e98]: Bản đồ
+        - generic [ref=e99]:
+          - generic [ref=e100]: Hệ thống
+          - link "Tài khoản" [ref=e101] [cursor=pointer]:
+            - /url: /account
+            - img [ref=e102]
+            - generic [ref=e105]: Tài khoản
+          - link "Thông báo" [ref=e106] [cursor=pointer]:
+            - /url: /notifications
+            - img [ref=e107]
+            - generic [ref=e110]: Thông báo
+          - link "Quản lý tài khoản" [ref=e111] [cursor=pointer]:
+            - /url: /admin/users
+            - img [ref=e112]
+            - generic [ref=e117]: Quản lý tài khoản
+          - link "Thao tác hệ thống" [ref=e118] [cursor=pointer]:
+            - /url: /admin/operations
+            - img [ref=e119]
+            - generic [ref=e122]: Thao tác hệ thống
+    - generic [ref=e123]:
+      - banner [ref=e124]:
+        - heading "Bảng điều khiển" [level=2] [ref=e125]
+        - button "K" [ref=e127] [cursor=pointer]
+      - main [ref=e128]:
+        - generic [ref=e131]:
+          - img [ref=e133]
+          - generic [ref=e135]: Đang kiểm tra đăng nhập...
+  - button "Open Next.js Dev Tools" [ref=e141] [cursor=pointer]:
+    - img [ref=e142]
+  - alert [ref=e145]

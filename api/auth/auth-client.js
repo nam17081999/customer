@@ -13,6 +13,16 @@ export async function signInWithEmailPassword(email, password) {
   return supabase.auth.signInWithPassword({ email, password })
 }
 
+export async function getAccessToken() {
+  const { data: sessionData } = await supabase.auth.getSession()
+  return sessionData?.session?.access_token || null
+}
+
+export async function verifyUserToken(token) {
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  return { user, error }
+}
+
 function getSupabaseStorageKeys() {
   const keys = new Set(['supabase.auth.token'])
   try {

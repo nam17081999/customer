@@ -23,7 +23,6 @@ function makeStore(overrides = {}) {
     id: 1,
     name: 'Tạp Hóa Minh Anh',
     phone: '0901234567',
-    image_url: 'abc.jpg',
     latitude: 21.0,
     longitude: 105.8,
     store_type: 'Tạp hóa',
@@ -95,7 +94,6 @@ describe('buildStoreSearchIndex', () => {
     expect(entry).toHaveProperty('normalizedWard')
     expect(entry).toHaveProperty('normalizedStoreType')
     expect(entry).toHaveProperty('hasPhone')
-    expect(entry).toHaveProperty('hasImage')
     expect(entry).toHaveProperty('hasCoords')
   })
 
@@ -157,23 +155,10 @@ describe('buildStoreSearchIndex', () => {
     expect(entry.hasPhone).toBe(false)
   })
 
-  it('hasImage = true khi có image_url', () => {
-    const store = makeStore({ image_url: 'photo.jpg' })
-    const [entry] = buildStoreSearchIndex([store])
-    expect(entry.hasImage).toBe(true)
-  })
-
-  it('hasImage = false khi không có ảnh', () => {
-    const store = makeStore({ image_url: '' })
-    const [entry] = buildStoreSearchIndex([store])
-    expect(entry.hasImage).toBe(false)
-  })
-
-  it('trim khoảng trắng khi tính hasPhone và hasImage', () => {
-    const store = makeStore({ phone: '   ', image_url: '   ' })
+  it('trim khoảng trắng khi tính hasPhone', () => {
+    const store = makeStore({ phone: '   ' })
     const [entry] = buildStoreSearchIndex([store])
     expect(entry.hasPhone).toBe(false)
-    expect(entry.hasImage).toBe(false)
   })
 
   it('hasCoords = true khi có tọa độ hợp lệ', () => {

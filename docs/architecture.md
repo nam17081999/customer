@@ -17,7 +17,6 @@
 | UI | React | 19.x |
 | Styling | TailwindCSS v4 | ^4.x |
 | Database + Auth | Supabase (PostgreSQL) | ^2.54 |
-| Image CDN | Config qua `NEXT_PUBLIC_IMAGE_BASE_URL` | — |
 | Map (trang bản đồ) | MapLibre GL + OpenStreetMap | ^4.7 |
 | Map (location picker) | Google Maps API | ^2.x |
 | Virtual List | react-virtuoso | ^4.x |
@@ -71,7 +70,6 @@ customer/
     ├── duplicateCheck.js   # Phát hiện store trùng tên
     ├── geolocation.js      # getBestPosition, requestCompassHeading
     ├── useGeolocation.js   # React hook geolocation
-    ├── imageUtils.js       # getFullImageUrl, STORE_PLACEHOLDER_IMAGE
     ├── removeVietnameseTones.js
     └── validation.js       # isValidPhone, formatDistance, formatDate, v.v.
 ```
@@ -92,7 +90,7 @@ customer/
 [Pages: getOrRefreshStores()] → filter + sort client-side
   - Mặc định trang tìm kiếm: không có tiêu chí thì render toàn bộ cửa hàng, sort gần → xa
   - Trang `/` có bộ lọc chi tiết: quận/xã (single-select) + loại/chi tiết dữ liệu (multi-select)
-  - `Chi tiết dữ liệu` trên `/`: hỗ trợ `Có số điện thoại`, `Có ảnh`, `Không có vị trí`
+  - `Chi tiết dữ liệu` trên `/`: hỗ trợ `Có số điện thoại`, `Không có vị trí`
   - Vị trí người dùng ở `/` được refresh định kỳ mỗi 3 phút và khi quay lại tab/trang
   - Đồng bộ query của `/` lên URL phải có debounce + bỏ qua replace khi query không đổi để tránh flood navigation
 
@@ -264,7 +262,6 @@ customer/
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_IMAGE_BASE_URL=     # https://ik.imagekit.io/customer69/
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 ```
 

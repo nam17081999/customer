@@ -157,8 +157,8 @@ async function getMapCameraEvents(page) {
 async function dragRouteItem(page, itemName, targetName) {
   const sourceButton = page.locator(`button[aria-label*="${itemName}"]`).first()
   const targetButton = page.locator(`button[aria-label*="${targetName}"]`).first()
-  const sourceCard = sourceButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-slate-900/75")]').first()
-  const targetCard = targetButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-slate-900/75")]').first()
+  const sourceCard = sourceButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-gray-900/75")]').first()
+  const targetCard = targetButton.locator('xpath=ancestor::div[contains(@class,"rounded-lg border bg-gray-900/75")]').first()
 
   const sourceBox = await sourceCard.boundingBox()
   const targetBox = await targetCard.boundingBox()

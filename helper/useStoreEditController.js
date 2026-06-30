@@ -1,11 +1,12 @@
 ﻿import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { getOrRefreshStores, updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import { DEFAULT_STORE_TYPE, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
+import { updateStore } from '@/api/stores/store-client'
+import { submitReport } from '@/api/reports/report-client'
 import { resolveMapsLinkCoordinates } from '@/helper/storeFormShared'
 import { hasStoreCoordinates } from '@/helper/storeSupplement'
 import {
@@ -326,7 +327,7 @@ export function useStoreEditController() {
       }
 
       if (isAdmin) {
-        const { error } = await supabase.from('stores').update(updates).eq('id', id)
+        const { error } = await updateStore(id, updates)
         if (error) throw error
         const nextStore = { ...store, ...updates }
         await updateStoreInCache(id, updates)
@@ -349,13 +350,13 @@ export function useStoreEditController() {
           )
         }
       } else {
-        const { error } = await supabase.from('store_reports').insert([{
+        const { error } = await submitReport({
           store_id: id,
           report_type: 'edit',
           reason_codes: null,
           proposed_changes: updates,
           reporter_id: user?.id || null,
-        }])
+        })
         if (error) throw error
       }
 
@@ -443,7 +444,7 @@ export function useStoreEditController() {
         nowIso,
       })
 
-      const { error } = await supabase.from('stores').update(updates).eq('id', id)
+      const { error } = await updateStore(id, updates)
       if (error) throw error
       const nextStore = { ...store, ...updates }
       await updateStoreInCache(id, updates)

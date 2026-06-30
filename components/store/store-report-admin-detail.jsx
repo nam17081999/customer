@@ -68,8 +68,8 @@ export default function StoreReportAdminDetail({
               </span>
               <span className="text-xs text-gray-500">{formatDateTime(report.created_at)}</span>
             </div>
-            <h2 className="text-lg font-bold text-gray-100">{store?.name || 'Cửa hàng không rõ'}</h2>
-            <p className="text-sm text-gray-400">{formatAddressParts(store) || 'Chưa có địa chỉ'}</p>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--foreground)' }}>{store?.name || 'Cửa hàng không rõ'}</h2>
+            <p className="text-sm" style={{ color: 'var(--muted)' }}>{formatAddressParts(store) || 'Chưa có địa chỉ'}</p>
           </div>
           {topAction}
         </div>
@@ -77,8 +77,8 @@ export default function StoreReportAdminDetail({
         {isEdit ? (
           <div className="space-y-3">
             <div>
-              <h3 className="text-base font-semibold text-gray-100">Thông tin đề xuất</h3>
-              <p className="text-sm text-gray-400">So sánh dữ liệu hiện tại với nội dung người dùng muốn cập nhật.</p>
+              <h3 className="text-base font-semibold" style={{ color: 'var(--foreground)' }}>Thông tin đề xuất</h3>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>So sánh dữ liệu hiện tại với nội dung người dùng muốn cập nhật.</p>
             </div>
 
             <div className="space-y-2">
@@ -90,10 +90,10 @@ export default function StoreReportAdminDetail({
                       <p className="text-xs uppercase tracking-wide text-gray-500">Hiện tại</p>
                       <p className="mt-1 text-sm text-gray-300">{formatValue(field.key, store?.[field.key])}</p>
                     </div>
-                    <div className="rounded-lg border border-blue-900 bg-blue-950/20 p-2">
-                      <p className="text-xs uppercase tracking-wide text-blue-300">Đề xuất</p>
-                      <p className="mt-1 text-sm text-blue-100">{formatValue(field.key, reportSummary.proposed[field.key])}</p>
-                    </div>
+                      <div className="rounded-lg border border-blue-900 bg-blue-950/20 p-2" style={{ borderColor: 'rgba(2,132,199,0.12)' }}>
+                        <p className="text-xs uppercase tracking-wide" style={{ color: 'rgba(14,165,233,0.9)' }}>Đề xuất</p>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--primary-600)' }}>{formatValue(field.key, reportSummary.proposed[field.key])}</p>
+                      </div>
                   </div>
                 </div>
               ))}
@@ -106,10 +106,10 @@ export default function StoreReportAdminDetail({
                       <p className="text-xs uppercase tracking-wide text-gray-500">Hiện tại</p>
                       <p className="mt-1 text-sm text-gray-300">{locationOld}</p>
                     </div>
-                    <div className="rounded-lg border border-blue-900 bg-blue-950/20 p-2">
-                      <p className="text-xs uppercase tracking-wide text-blue-300">Đề xuất</p>
-                      <p className="mt-1 text-sm text-blue-100">{locationNew}</p>
-                    </div>
+                      <div className="rounded-lg border border-blue-900 bg-blue-950/20 p-2" style={{ borderColor: 'rgba(2,132,199,0.12)' }}>
+                        <p className="text-xs uppercase tracking-wide" style={{ color: 'rgba(14,165,233,0.9)' }}>Đề xuất</p>
+                        <p className="mt-1 text-sm" style={{ color: 'var(--primary-600)' }}>{locationNew}</p>
+                      </div>
                   </div>
                   {canShowDirection ? (
                     <div className="mt-3">

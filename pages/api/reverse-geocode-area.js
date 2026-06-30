@@ -152,9 +152,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Tọa độ không hợp lệ.' })
     }
 
-    const geoapifyApiKey = process.env.GEOAPIFY_API_KEY || process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY || ''
-    const openMapApiKey = process.env.OPENMAP_API_KEY || process.env.NEXT_PUBLIC_OPENMAP_API_KEY || ''
-    const goongApiKey = process.env.GOONG_API_KEY || process.env.NEXT_PUBLIC_GOONG_API_KEY || ''
+    const geoapifyApiKey = process.env.GEOAPIFY_API_KEY || ''
+    const openMapApiKey = process.env.OPENMAP_API_KEY || ''
+    const goongApiKey = process.env.GOONG_API_KEY || ''
 
     try {
       if (geoapifyApiKey) {

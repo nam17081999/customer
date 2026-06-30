@@ -16,8 +16,8 @@ const StoreLocationPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center rounded-2xl bg-neutral-900">
-        <span className="text-sm text-neutral-400 animate-pulse">Đang tải bản đồ…</span>
+      <div className="flex h-full items-center justify-center rounded-2xl bg-gray-900">
+        <span className="text-sm text-gray-400 animate-pulse">Đang tải bản đồ…</span>
       </div>
     ),
   }
@@ -25,9 +25,9 @@ const StoreLocationPicker = dynamic(
 
 function ReportModeChooser({ mode, onEdit, onReason }) {
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4">
-      <p className="text-base font-semibold text-neutral-100">Chọn cách báo cáo</p>
-      <p className="mt-1 text-sm text-neutral-400">
+    <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4">
+      <p className="text-base font-semibold text-gray-100">Chọn cách báo cáo</p>
+      <p className="mt-1 text-sm text-gray-400">
         Tách riêng khỏi modal để dễ nhập liệu hơn trên điện thoại.
       </p>
       {!mode && (
@@ -46,10 +46,10 @@ function ReportModeChooser({ mode, onEdit, onReason }) {
 
 function ReasonReportSection({ reasons, onToggleReason }) {
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4 space-y-3">
+    <div className="rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-3">
       <div>
-        <p className="text-base font-semibold text-neutral-100">Lý do báo cáo</p>
-        <p className="mt-1 text-sm text-neutral-400">Có thể chọn nhiều lý do.</p>
+        <p className="text-base font-semibold text-gray-100">Lý do báo cáo</p>
+        <p className="mt-1 text-sm text-gray-400">Có thể chọn nhiều lý do.</p>
       </div>
       <div className="grid gap-2">
         {REPORT_REASON_OPTIONS.map((option) => {
@@ -61,13 +61,13 @@ function ReasonReportSection({ reasons, onToggleReason }) {
               className={`flex min-h-11 items-center justify-between rounded-xl border p-3 text-left text-base transition ${
                 active
                   ? 'border-blue-500 bg-blue-500/15 text-blue-100'
-                  : 'border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800'
+                  : 'border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
               }`}
               onClick={() => onToggleReason(option.code)}
               aria-pressed={active}
             >
               <span>{option.label}</span>
-              <span className={`text-sm ${active ? 'text-blue-300' : 'text-neutral-500'}`}>
+              <span className={`text-sm ${active ? 'text-blue-300' : 'text-gray-500'}`}>
                 {active ? 'Đã chọn' : 'Chọn'}
               </span>
             </button>
@@ -79,6 +79,8 @@ function ReasonReportSection({ reasons, onToggleReason }) {
 }
 
 function EditInfoStep({
+  fieldErrors,
+  setFieldErrors,
   reportAddressDetail,
   setReportAddressDetail,
   reportDistrict,
@@ -100,13 +102,20 @@ function EditInfoStep({
         onDistrictChange={(item) => {
           setReportDistrict(item)
           setReportWard('')
+          if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
         }}
-        onWardChange={setReportWard}
+        onWardChange={(item) => {
+          setReportWard(item)
+          if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
+        }}
       />
+      {fieldErrors.district ? (
+        <div className="text-xs text-red-500">{fieldErrors.district}</div>
+      ) : null}
 
       <div className="space-y-1.5">
-        <Label htmlFor="report-address" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-          Địa chỉ cụ thể <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        <Label htmlFor="report-address" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span>
         </Label>
         <Input
           id="report-address"
@@ -118,8 +127,8 @@ function EditInfoStep({
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="report-phone" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-          Số điện thoại <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        <Label htmlFor="report-phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span>
         </Label>
         <Input
           id="report-phone"
@@ -127,15 +136,21 @@ function EditInfoStep({
           inputMode="numeric"
           pattern="[0-9+ ]*"
           value={reportPhone}
-          onChange={(event) => setReportPhone(event.target.value)}
+          onChange={(event) => {
+            setReportPhone(event.target.value)
+            if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: '' }))
+          }}
           placeholder="0901 234 567"
           className="text-base sm:text-base"
         />
+        {fieldErrors.phone ? (
+          <div className="text-xs text-red-500">{fieldErrors.phone}</div>
+        ) : null}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="report-note" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
-          Ghi chú <span className="font-normal text-neutral-400">(không bắt buộc)</span>
+        <Label htmlFor="report-note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+          Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span>
         </Label>
         <Input
           id="report-note"
@@ -212,14 +227,14 @@ function EditLocationStep({
           />
         ) : (
           <div
-            className="flex items-center justify-center rounded-md border border-dashed border-neutral-800 bg-neutral-950 px-4 text-center text-neutral-400"
+            className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
             style={{ height: '65vh' }}
           >
             <div className="max-w-md space-y-2">
-              <div className="text-base font-medium text-neutral-300">
+              <div className="text-base font-medium text-gray-300">
                 {getLocationPlaceholderCopy(locationView.phase).title}
               </div>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-gray-400">
                 {getLocationPlaceholderCopy(locationView.phase).description}
               </p>
             </div>
@@ -234,6 +249,7 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
   const {
     compassError,
     currentStep,
+    fieldErrors,
     handleGetLocation,
     heading,
     mapEditable,
@@ -248,6 +264,7 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
     reportStoreType,
     reportWard,
     resolving,
+    setFieldErrors,
     setMapEditable,
     setReportAddressDetail,
     setReportDistrict,
@@ -262,7 +279,7 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
 
   return (
     <div className="space-y-3">
-      <div className={standaloneEdit ? 'space-y-4' : 'rounded-2xl border border-neutral-800 bg-neutral-950/80 p-4 space-y-4'}>
+      <div className={standaloneEdit ? 'space-y-4' : 'rounded-2xl border border-gray-800 bg-gray-950/80 p-4 space-y-4'}>
         <StoreFormStepIndicator steps={editSteps} currentStep={currentStep} />
 
         {currentStep === 1 && (
@@ -274,22 +291,30 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
             />
 
             <div className="space-y-2">
-              <Label htmlFor="report-name" className="block text-sm font-medium text-neutral-600 dark:text-neutral-300">
+              <Label htmlFor="report-name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                 Tên cửa hàng
               </Label>
               <Input
                 id="report-name"
                 value={reportName}
-                onChange={(event) => setReportName(event.target.value)}
+                onChange={(event) => {
+                  setReportName(event.target.value)
+                  if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
+                }}
                 placeholder="VD: Minh Anh"
                 className="h-11 w-full text-base sm:text-base"
               />
+              {fieldErrors.name ? (
+                <div className="text-xs text-red-500">{fieldErrors.name}</div>
+              ) : null}
             </div>
           </div>
         )}
 
         {currentStep === 2 && (
           <EditInfoStep
+            fieldErrors={fieldErrors}
+            setFieldErrors={setFieldErrors}
             reportAddressDetail={reportAddressDetail}
             setReportAddressDetail={setReportAddressDetail}
             reportDistrict={reportDistrict}
@@ -326,8 +351,8 @@ function EditReportSection({ controller, editSteps, locationView, standaloneEdit
 
 function ReportActionBar({ onBack, onPrimaryAction, primaryActionLabel, standaloneEdit, submitting }) {
   const className = standaloneEdit
-    ? 'fixed inset-x-0 z-[55] border-t border-neutral-800 bg-neutral-950/95 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent'
-    : 'sticky bottom-0 z-10 -mx-3 border-t border-neutral-800 bg-neutral-950/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0'
+    ? 'fixed inset-x-0 z-[55] border-t border-gray-800 bg-gray-950/95 backdrop-blur-md sm:static sm:border-0 sm:bg-transparent'
+    : 'sticky bottom-0 z-10 -mx-3 border-t border-gray-800 bg-gray-950/95 p-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0'
 
   return (
     <div className={className} style={standaloneEdit ? { bottom: 'calc(3.5rem + env(safe-area-inset-bottom))' } : undefined}>

@@ -21,7 +21,7 @@ function validatePassword(password) {
   return ''
 }
 
-export function validateCreateAdminUserInput({ email, password, role } = {}) {
+export function validateCreateAdminUserInput({ email, password, role, name, phone } = {}) {
   const normalizedEmail = normalizeAdminUserEmail(email)
   if (!normalizedEmail) {
     return { error: 'Vui lòng nhập email.' }
@@ -44,6 +44,8 @@ export function validateCreateAdminUserInput({ email, password, role } = {}) {
       email: normalizedEmail,
       password: String(password),
       role: normalizedRole,
+      name: String(name || '').trim(),
+      phone: String(phone || '').trim(),
     },
   }
 }
@@ -67,9 +69,12 @@ export function validateResetAdminUserPasswordInput({ userId, password } = {}) {
 }
 
 export function mapSupabaseAdminUser(user) {
+  const meta = user?.user_metadata || {}
   return {
     id: user.id,
     email: user.email,
+    name: meta.name || '',
+    phone: meta.phone || '',
     created_at: user.created_at,
     last_sign_in_at: user.last_sign_in_at,
     role: resolveUserRole(user),

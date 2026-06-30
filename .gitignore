@@ -38,8 +38,26 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local tooling
+.codegraph/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 
 /docs/current-work.md
+
+# temp files
+/tmp/
+
+# IDE
+.idea/
+
+# codex
+.codex/
+
+# claude
+.claude/
+
+# test account files
+test_account*.mjs

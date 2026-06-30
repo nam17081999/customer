@@ -1,5 +1,7 @@
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/api/db/client'
+import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
+import { normalizeOperatorError } from '@/helper/operatorErrors'
 import {
   buildCancelPurchaseOrderArgs,
   buildCancelSalesOrderArgs,
@@ -12,11 +14,29 @@ import {
 
 export function formatMoney(value) {
   const number = Number(value || 0)
-  return number.toLocaleString('vi-VN')
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(number)
 }
 
 export function toNumber(value, fallback = 0) {
   return toInventoryNumber(value, fallback)
+}
+
+function logInventoryMutationError(action, error, context = {}) {
+  if (typeof console === 'undefined') return
+  console.error('[inventory_mutation_error]', {
+    action,
+    message: error?.message || 'Unknown inventory mutation error',
+    code: error?.code || null,
+    details: error?.details || null,
+    hint: error?.hint || null,
+    context,
+  })
+}
+
+function throwLoggedInventoryError(action, error, context = {}) {
+  if (!error) return
+  logInventoryMutationError(action, error, context)
+  throw normalizeOperatorError(error)
 }
 
 export function buildDocumentCode(prefix) {
@@ -49,26 +69,131 @@ function normalizeProduct(row, unitsByProduct, stockByProduct) {
   }
 }
 
-export async function listProductsWithStock() {
-  const { data: products, error: productError } = await supabase
+function normalizeSalesOrderSearchText(value) {
+  return removeVietnameseTones(String(value || '').trim()).replace(/\s+/g, ' ')
+}
+
+function getSalesOrderDateRange(datePreset, now = new Date(), dateFrom = null, dateTo = null) {
+  // Custom date range takes precedence when both dates are provided
+  if (dateFrom && dateTo) {
+    const partsFrom = dateFrom.split('-')
+    const partsTo = dateTo.split('-')
+    const from = new Date(Number(partsFrom[0]), Number(partsFrom[1]) - 1, Number(partsFrom[2]))
+    const to = new Date(Number(partsTo[0]), Number(partsTo[1]) - 1, Number(partsTo[2]))
+    to.setDate(to.getDate() + 1) // exclusive end
+    if (!isNaN(from.getTime()) && !isNaN(to.getTime())) {
+      return [from, to]
+    }
+  }
+
+  const safeNow = now instanceof Date ? now : new Date()
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  }
+
+  function addDays(date, days) {
+    const next = new Date(date)
+    next.setDate(next.getDate() + days)
+    return next
+  }
+
+  const today = startOfDay(safeNow)
+  const dayOfWeek = today.getDay() || 7
+  const weekStart = addDays(today, 1 - dayOfWeek)
+
+  if (datePreset === 'today') return [today, addDays(today, 1)]
+  if (datePreset === 'yesterday') return [addDays(today, -1), today]
+  if (datePreset === 'week') return [weekStart, addDays(weekStart, 7)]
+  if (datePreset === 'lastWeek') return [addDays(weekStart, -7), weekStart]
+  if (datePreset === 'last7days') return [addDays(today, -6), addDays(today, 1)]
+  if (datePreset === 'month') return [new Date(safeNow.getFullYear(), safeNow.getMonth(), 1), new Date(safeNow.getFullYear(), safeNow.getMonth() + 1, 1)]
+  if (datePreset === 'lastMonth') return [new Date(safeNow.getFullYear(), safeNow.getMonth() - 1, 1), new Date(safeNow.getFullYear(), safeNow.getMonth(), 1)]
+  if (datePreset === 'last30days') return [addDays(today, -29), addDays(today, 1)]
+  if (datePreset === 'quarter') {
+    const quarterStartMonth = Math.floor(safeNow.getMonth() / 3) * 3
+    return [new Date(safeNow.getFullYear(), quarterStartMonth, 1), new Date(safeNow.getFullYear(), quarterStartMonth + 3, 1)]
+  }
+  if (datePreset === 'lastQuarter') {
+    const quarterStartMonth = Math.floor(safeNow.getMonth() / 3) * 3
+    return [new Date(safeNow.getFullYear(), quarterStartMonth - 3, 1), new Date(safeNow.getFullYear(), quarterStartMonth, 1)]
+  }
+  if (datePreset === 'year') return [new Date(safeNow.getFullYear(), 0, 1), new Date(safeNow.getFullYear() + 1, 0, 1)]
+  if (datePreset === 'lastYear') return [new Date(safeNow.getFullYear() - 1, 0, 1), new Date(safeNow.getFullYear(), 0, 1)]
+  return null
+}
+
+function applySalesOrderListFilters(queryBuilder, { statuses, creatorId, dateRange, query, matchingCustomerStoreIds }) {
+  let nextQuery = queryBuilder
+
+  if (statuses.length > 0) {
+    nextQuery = nextQuery.in('status', statuses)
+  }
+
+  if (creatorId) {
+    nextQuery = nextQuery.eq('created_by', creatorId)
+  }
+
+  if (dateRange) {
+    nextQuery = nextQuery
+      .gte('created_at', dateRange[0].toISOString())
+      .lt('created_at', dateRange[1].toISOString())
+  }
+
+  if (query || matchingCustomerStoreIds.length > 0) {
+    const searchParts = []
+    if (query) searchParts.push(`code.ilike.%${query}%`)
+    if (matchingCustomerStoreIds.length > 0) searchParts.push(`customer_store_id.in.(${matchingCustomerStoreIds.join(',')})`)
+    if (searchParts.length > 0) {
+      nextQuery = nextQuery.or(searchParts.join(','))
+    }
+  }
+
+  return nextQuery
+}
+
+export async function listProductsWithStock(options) {
+  const legacyArrayResult = options === undefined || options === null || typeof options === 'number'
+  const params = legacyArrayResult ? {} : (options || {})
+  const page = Math.max(1, Number(params.page) || 1)
+  const pageSize = Math.max(1, Number(params.pageSize) || 200)
+
+  // Build query
+  let countQuery = db
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null)
+
+  let productQuery = db
     .from('products')
     .select('*')
     .is('deleted_at', null)
-    .order('name', { ascending: true })
 
+  if (!legacyArrayResult) {
+    productQuery = productQuery.order('name', { ascending: true }).range((page - 1) * pageSize, (page * pageSize) - 1)
+  } else {
+    productQuery = productQuery.order('name', { ascending: true })
+  }
+
+  const [{ count: totalCount, error: countError }, { data: products, error: productError }] = await Promise.all([
+    countQuery,
+    productQuery,
+  ])
+
+  if (countError) throw countError
   if (productError) throw productError
 
   const productIds = (products || []).map((item) => item.id)
-  if (productIds.length === 0) return []
+  if (productIds.length === 0) return legacyArrayResult ? [] : { products: [], totalCount: Number(totalCount || 0), page, pageSize }
 
   const [{ data: units, error: unitError }, { data: stockRows, error: stockError }] = await Promise.all([
-    supabase
+    db
       .from('product_units')
       .select('*')
       .in('product_id', productIds)
       .order('is_base_unit', { ascending: false })
       .order('conversion_to_base_qty', { ascending: true }),
-    supabase
+    db
       .from('product_stock')
       .select('*')
       .in('product_id', productIds),
@@ -86,7 +211,11 @@ export async function listProductsWithStock() {
 
   const stockByProduct = new Map((stockRows || []).map((row) => [row.product_id, row]))
 
-  return (products || []).map((row) => normalizeProduct(row, unitsByProduct, stockByProduct))
+  const normalized = (products || []).map((row) => normalizeProduct(row, unitsByProduct, stockByProduct))
+
+  return legacyArrayResult
+    ? normalized
+    : { products: normalized, totalCount: Number(totalCount || 0), page, pageSize }
 }
 
 export async function createProductWithUnits(payload) {
@@ -102,8 +231,14 @@ export async function createProductWithUnits(payload) {
   const defaultPurchasePrice = payload.defaultPurchasePrice === ''
     ? null
     : toNumber(payload.defaultPurchasePrice, 0)
+  const retailPrice = payload.retailPrice === '' || payload.retailPrice == null
+    ? null
+    : toNumber(payload.retailPrice, 0)
+  const wholesalePrice = payload.wholesalePrice === '' || payload.wholesalePrice == null
+    ? null
+    : toNumber(payload.wholesalePrice, 0)
 
-  const { data: product, error: productError } = await supabase
+  const { data: product, error: productError } = await db
     .from('products')
     .insert([{
       name,
@@ -112,6 +247,8 @@ export async function createProductWithUnits(payload) {
       base_unit_name: baseUnitName,
       default_sale_price: defaultSalePrice,
       default_purchase_price: defaultPurchasePrice,
+      retail_price: retailPrice,
+      wholesale_price: wholesalePrice,
       min_stock_base_qty: toNumber(payload.minStockBaseQty, 0),
       note: String(payload.note || '').trim() || null,
       created_by: payload.createdBy || null,
@@ -143,13 +280,13 @@ export async function createProductWithUnits(payload) {
     })
   }
 
-  const { error: unitError } = await supabase
+  const { error: unitError } = await db
     .from('product_units')
     .insert(units)
 
   if (unitError) throw unitError
 
-  await supabase
+  await db
     .from('product_stock')
     .insert([{ product_id: product.id }])
     .throwOnError()
@@ -162,8 +299,8 @@ export async function createPurchaseOrder(payload) {
     ...payload,
     code: payload.code || buildDocumentCode('PN'),
   })
-  const { data, error } = await supabase.rpc('create_purchase_order_with_items', rpcPayload)
-  if (error) throw error
+  const { data, error } = await db.rpc('create_purchase_order_with_items', rpcPayload)
+  throwLoggedInventoryError('create_purchase_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
 
@@ -172,32 +309,60 @@ export async function createSalesOrder(payload) {
     ...payload,
     code: payload.code || buildDocumentCode('DH'),
   })
-  const { data, error } = await supabase.rpc('create_sales_order_with_items', rpcPayload)
-  if (error) throw error
+  const { data, error } = await db.rpc('create_sales_order_with_items', rpcPayload)
+  throwLoggedInventoryError('create_sales_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
 
 export async function cancelSalesOrder(orderId, userId = null) {
-  const { data, error } = await supabase.rpc('cancel_sales_order_and_restore_stock', buildCancelSalesOrderArgs(orderId, userId))
-  if (error) throw error
+  const { data, error } = await db.rpc('cancel_sales_order_and_restore_stock', buildCancelSalesOrderArgs(orderId, userId))
+  throwLoggedInventoryError('cancel_sales_order', error, { orderId })
   return data
 }
 
 export async function cancelPurchaseOrder(purchaseOrderId, userId = null) {
-  const { data, error } = await supabase.rpc('cancel_purchase_order_and_remove_stock', buildCancelPurchaseOrderArgs(purchaseOrderId, userId))
-  if (error) throw error
+  const { data, error } = await db.rpc('cancel_purchase_order_and_remove_stock', buildCancelPurchaseOrderArgs(purchaseOrderId, userId))
+  throwLoggedInventoryError('cancel_purchase_order', error, { purchaseOrderId })
   return data
 }
 
 export async function getProductDetail(productId) {
-  const products = await listProductsWithStock()
-  return products.find((product) => String(product.id) === String(productId)) || null
+  // Direct fetch product — much faster than loading everything
+  const { data: product, error: productError } = await db
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single()
+  if (productError) {
+    if (productError.code === 'PGRST116') return null
+    throw productError
+  }
+
+  const { data: units } = await db
+    .from('product_units')
+    .select('*')
+    .eq('product_id', productId)
+    .order('is_base_unit', { ascending: false })
+    .order('conversion_to_base_qty', { ascending: true })
+
+  const { data: stockRows } = await db
+    .from('product_stock')
+    .select('*')
+    .eq('product_id', productId)
+
+  const unitsByProduct = new Map()
+  unitsByProduct.set(product.id, units || [])
+  const stockByProduct = new Map()
+  const stock = (stockRows || [])[0]
+  if (stock) stockByProduct.set(product.id, stock)
+
+  return normalizeProduct(product, unitsByProduct, stockByProduct)
 }
 
 export async function updateProduct(productId, payload) {
   if (!productId) throw new Error('Thiếu hàng hóa cần sửa.')
   const updatePayload = buildProductUpdatePayload(payload)
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('products')
     .update(updatePayload)
     .eq('id', productId)
@@ -215,7 +380,7 @@ export async function createProductUnit(productId, payload) {
     ...buildProductUnitPayload({ ...payload, isBaseUnit: false }),
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('product_units')
     .insert([unitPayload])
     .select('*')
@@ -229,7 +394,7 @@ export async function updateProductUnit(unitId, payload) {
   if (!unitId) throw new Error('Thiếu đơn vị cần sửa.')
   const unitPayload = buildProductUnitPayload(payload)
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('product_units')
     .update(unitPayload)
     .eq('id', unitId)
@@ -240,19 +405,58 @@ export async function updateProductUnit(unitId, payload) {
   return data
 }
 
-export async function listSalesOrders(limit = 100) {
-  const { data: orders, error: orderError } = await supabase
-    .from('sales_orders')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit)
+export async function listSalesOrders(options = 100) {
+  const legacyArrayResult = typeof options === 'number'
+  const params = legacyArrayResult ? { pageSize: options } : (options || {})
+  const page = Math.max(1, Number(params.page) || 1)
+  const pageSize = Math.max(1, Number(params.pageSize) || 100)
+  const query = normalizeSalesOrderSearchText(params.query)
+  const statuses = Array.isArray(params.statuses)
+    ? params.statuses.map((item) => String(item).trim()).filter(Boolean)
+    : []
+  const creatorId = String(params.creatorId || '').trim()
+  const dateRange = getSalesOrderDateRange(params.datePreset || 'all', params.now, params.dateFrom, params.dateTo)
+  const matchingCustomerStoreIds = Array.isArray(params.matchingCustomerStoreIds)
+    ? params.matchingCustomerStoreIds.map((item) => String(item).trim()).filter(Boolean)
+    : []
+
+  if (Array.isArray(params.statuses) && statuses.length === 0) {
+    return legacyArrayResult ? [] : { orders: [], totalCount: 0 }
+  }
+
+  const countQuery = applySalesOrderListFilters(
+    db.from('sales_orders').select('id', { count: 'exact' }).limit(1),
+    { statuses, creatorId, dateRange, query, matchingCustomerStoreIds },
+  )
+
+  const orderQuery = applySalesOrderListFilters(
+    db
+      .from('sales_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, (page * pageSize) - 1),
+    { statuses, creatorId, dateRange, query, matchingCustomerStoreIds },
+  )
+
+  const [{ count: totalCount, error: countError }, { data: orders, error: orderError }] = await Promise.all([
+    countQuery,
+    orderQuery,
+  ])
+
+  if (countError) throw countError
 
   if (orderError) throw orderError
 
   const orderIds = (orders || []).map((order) => order.id)
-  if (orderIds.length === 0) return []
+  if (orderIds.length === 0) {
+    const emptyResult = {
+      orders: [],
+      totalCount: Number(totalCount || 0),
+    }
+    return legacyArrayResult ? emptyResult.orders : emptyResult
+  }
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('sales_order_items')
     .select('sales_order_id,id')
     .in('sales_order_id', orderIds)
@@ -264,15 +468,20 @@ export async function listSalesOrders(limit = 100) {
     itemCountByOrder.set(item.sales_order_id, (itemCountByOrder.get(item.sales_order_id) || 0) + 1)
   }
 
-  return (orders || []).map((order) => ({
-    ...order,
-    itemCount: itemCountByOrder.get(order.id) || 0,
-  }))
+  const result = {
+    orders: (orders || []).map((order) => ({
+      ...order,
+      itemCount: itemCountByOrder.get(order.id) || 0,
+    })),
+    totalCount: Number(totalCount || 0),
+  }
+
+  return legacyArrayResult ? result.orders : result
 }
 
 export async function getSalesOrderDetail(orderId) {
   if (!orderId) throw new Error('Thiếu đơn hàng cần xem.')
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await db
     .from('sales_orders')
     .select('*')
     .eq('id', orderId)
@@ -280,29 +489,73 @@ export async function getSalesOrderDetail(orderId) {
 
   if (orderError) throw orderError
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('sales_order_items')
-    .select('*')
+    .select('*, products!inner(name)')
     .eq('sales_order_id', orderId)
     .order('created_at', { ascending: true })
 
   if (itemError) throw itemError
-  return { order, items: items || [] }
+  return {
+    order,
+    items: (items || []).map((it) => ({
+      ...it,
+      product_name: it.products?.name || '',
+      products: undefined,
+    })),
+  }
 }
 
-export async function listPurchaseOrders(limit = 100) {
-  const { data: orders, error: orderError } = await supabase
+export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
+  let orderQuery = db
+    .from('sales_orders')
+    .select('*')
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (from) orderQuery = orderQuery.gte('created_at', from)
+  if (to) orderQuery = orderQuery.lt('created_at', to)
+
+  const { data: orders, error: orderError } = await orderQuery
+  if (orderError) throw orderError
+
+  const orderIds = (orders || []).map((order) => order.id)
+  if (orderIds.length === 0) return { orders: [], items: [] }
+
+  const { data: items, error: itemError } = await db
+    .from('sales_order_items')
+    .select('*')
+    .in('sales_order_id', orderIds)
+
+  if (itemError) throw itemError
+  return { orders: orders || [], items: items || [] }
+}
+
+export async function listPurchaseOrders(params = {}) {
+  const isLegacy = typeof params === 'number'
+  const page = isLegacy ? 1 : Math.max(1, Number(params.page) || 1)
+  const pageSize = isLegacy ? params : Math.max(1, Number(params.pageSize) || 30)
+  const from = (page - 1) * pageSize
+  const to = page * pageSize - 1
+
+  const { count: totalCount, error: countError } = await db
+    .from('purchase_orders')
+    .select('id', { count: 'exact', head: true })
+  if (countError) throw countError
+
+  const { data: orders, error: orderError } = await db
     .from('purchase_orders')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(from, to)
 
   if (orderError) throw orderError
 
   const orderIds = (orders || []).map((order) => order.id)
-  if (orderIds.length === 0) return []
+  if (orderIds.length === 0) return { orders: [], totalCount: Number(totalCount || 0) }
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('purchase_order_items')
     .select('purchase_order_id,id')
     .in('purchase_order_id', orderIds)
@@ -314,15 +567,18 @@ export async function listPurchaseOrders(limit = 100) {
     itemCountByOrder.set(item.purchase_order_id, (itemCountByOrder.get(item.purchase_order_id) || 0) + 1)
   }
 
-  return (orders || []).map((order) => ({
-    ...order,
-    itemCount: itemCountByOrder.get(order.id) || 0,
-  }))
+  return {
+    orders: (orders || []).map((order) => ({
+      ...order,
+      itemCount: itemCountByOrder.get(order.id) || 0,
+    })),
+    totalCount: Number(totalCount || 0),
+  }
 }
 
 export async function getPurchaseOrderDetail(purchaseOrderId) {
   if (!purchaseOrderId) throw new Error('Thiếu phiếu nhập cần xem.')
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await db
     .from('purchase_orders')
     .select('*')
     .eq('id', purchaseOrderId)
@@ -330,7 +586,7 @@ export async function getPurchaseOrderDetail(purchaseOrderId) {
 
   if (orderError) throw orderError
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('purchase_order_items')
     .select('*')
     .eq('purchase_order_id', purchaseOrderId)
@@ -341,7 +597,7 @@ export async function getPurchaseOrderDetail(purchaseOrderId) {
 }
 
 export async function listStockMovements(limit = 100) {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('stock_movements')
     .select('*')
     .order('created_at', { ascending: false })
@@ -349,4 +605,131 @@ export async function listStockMovements(limit = 100) {
 
   if (error) throw error
   return data || []
+}
+
+export async function getInventoryReconciliationReport() {
+  const { data, error } = await db.rpc('get_inventory_reconciliation_report')
+  if (error) throw error
+  return data || []
+}
+
+export async function runInventoryReconciliationCheck(userId = null) {
+  const { data, error } = await db.rpc('run_inventory_reconciliation_check', { p_started_by: userId })
+  throwLoggedInventoryError('inventory_reconciliation_check', error, { userId })
+  return data
+}
+
+export async function repairProductStockFromLedger(userId = null) {
+  const { data, error } = await db.rpc('repair_product_stock_from_ledger', { p_started_by: userId })
+  throwLoggedInventoryError('inventory_reconciliation_repair', error, { userId })
+  return data
+}
+
+export async function listInventoryReconciliationRuns(limit = 50) {
+  const { data, error } = await db
+    .from('inventory_reconciliation_runs')
+    .select('*')
+    .order('started_at', { ascending: false })
+    .limit(Math.max(1, Math.min(Number(limit) || 50, 200)))
+  if (error) throw error
+  return data || []
+}
+
+export async function listOperationAuditEvents({ limit = 50, eventType = null } = {}) {
+  let query = db
+    .from('operation_audit_events')
+    .select('*')
+
+  if (eventType) query = query.eq('event_type', eventType)
+
+  query = query
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(Number(limit) || 50, 200)))
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function importProductsFromPreview(rows, { requestId, actorId = null } = {}) {
+  if (!Array.isArray(rows)) throw new Error('Danh sách import không hợp lệ.')
+  if (!requestId || String(requestId).trim().length < 12) throw new Error('Thiếu mã request import.')
+  const { data, error } = await db.rpc('import_products_from_preview', {
+    p_rows: rows,
+    p_request_id: String(requestId).trim(),
+    p_actor_id: actorId,
+  })
+  throwLoggedInventoryError('product_import', error, { requestId, rowCount: rows.length })
+  return data
+}
+
+export async function getLowStockCount() {
+  // Lightweight count query — avoids loading all products
+  const { data, error } = await db
+    .rpc('get_low_stock_report', { p_limit: 9999 })
+  if (error) throw error
+  return (data || []).length
+}
+
+export async function getLowStockItems() {
+  const { data, error } = await db
+    .rpc('get_low_stock_report', { p_limit: 10 })
+  if (error) throw error
+  return (data || []).map((item) => ({
+    productId: item.product_id,
+    productName: item.product_name,
+    sku: item.sku,
+    onHandQty: Number(item.on_hand_base_qty || 0),
+    minStockQty: Number(item.min_stock_base_qty || 0),
+    baseUnitName: item.base_unit_name,
+    updatedAt: item.updated_at, // ISO string từ DB — timestamp gốc của sự kiện
+  }))
+}
+
+export async function getDashboardAggregateReport({ from = null, to = null } = {}) {
+  const args = { p_from: from, p_to: to }
+  const [sales, purchases, inventory, topProducts, lowStock, customers] = await Promise.all([
+    db.rpc('get_sales_summary', args),
+    db.rpc('get_purchase_summary', args),
+    db.rpc('get_inventory_valuation_summary'),
+    db.rpc('get_top_products_report', { ...args, p_limit: 8 }),
+    db.rpc('get_low_stock_report', { p_limit: 8 }),
+    db.rpc('get_customer_revenue_report', { ...args, p_limit: 8 }),
+  ])
+
+  const responses = { sales, purchases, inventory, topProducts, lowStock, customers }
+  for (const [key, response] of Object.entries(responses)) {
+    if (response.error) throwLoggedInventoryError('dashboard_aggregate_report', response.error, { section: key })
+  }
+
+  return {
+    sales: sales.data?.[0] || null,
+    purchases: purchases.data?.[0] || null,
+    inventory: inventory.data?.[0] || null,
+    topProducts: topProducts.data || [],
+    lowStock: lowStock.data || [],
+    customers: customers.data || [],
+  }
+}
+
+export async function globalOperatorSearch(query, limit = 20) {
+  const { data, error } = await db.rpc('global_operator_search', {
+    p_query: String(query || '').trim(),
+    p_limit: limit,
+  })
+  if (error) throw error
+  return data || []
+}
+
+export async function markOrdersPrinted(orderIds) {
+  if (!orderIds || orderIds.length === 0) return
+  const ids = orderIds.map((id) => String(id)).filter(Boolean)
+  if (ids.length === 0) return
+
+  const { error } = await db
+    .from('sales_orders')
+    .update({ is_printed: true })
+    .in('id', ids)
+
+  if (error) throw error
 }
