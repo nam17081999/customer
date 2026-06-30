@@ -163,7 +163,7 @@ describe('inventory client atomic RPC writes', () => {
     await expect(runInventoryReconciliationCheck('user-1')).resolves.toEqual({ id: 'run-1', status: 'succeeded' })
     await expect(repairProductStockFromLedger('user-1')).resolves.toEqual({ id: 'run-2', repaired_count: 1 })
 
-    expect(rpc).toHaveBeenNthCalledWith(1, 'get_inventory_reconciliation_report')
+    expect(rpc).toHaveBeenNthCalledWith(1, 'get_inventory_reconciliation_report', undefined)
     expect(rpc).toHaveBeenNthCalledWith(2, 'run_inventory_reconciliation_check', { p_started_by: 'user-1' })
     expect(rpc).toHaveBeenNthCalledWith(3, 'repair_product_stock_from_ledger', { p_started_by: 'user-1' })
   })
@@ -224,7 +224,7 @@ describe('inventory client detail/list/update reads', () => {
 
     await expect(getSalesOrderDetail('order-1')).resolves.toEqual({
       order: { id: 'order-1' },
-      items: [{ id: 'item-1' }],
+      items: [{ id: 'item-1', product_name: '', products: undefined }],
     })
     expect(from).toHaveBeenNthCalledWith(1, 'sales_orders')
     expect(from).toHaveBeenNthCalledWith(2, 'sales_order_items')

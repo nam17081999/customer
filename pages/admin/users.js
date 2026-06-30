@@ -166,7 +166,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [getAccessToken]);
+  }, []);
 
   useEffect(() => {
     if (!pageReady) return;

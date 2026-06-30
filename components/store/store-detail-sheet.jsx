@@ -37,7 +37,7 @@ export default function StoreDetailSheet({ store, open, onOpenChange }) {
 
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '0 16px 12px' }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}>
             <span>{typeMeta.icon}</span>
             <span className="truncate">{store.name}</span>
           </h3>

@@ -76,7 +76,7 @@ function StoreCard({ store, distance, onOpenDetail }) {
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDetail(store) } }}
     >
       <div className="store-card-top">
-        <div className="min-w-0">
+        <div className="flex-1 min-w-0">
           <div className="store-card-name">
             <span className="store-type-icon shrink-0">{typeMeta.icon}</span>
             <span className="truncate">{store.name}</span>
@@ -88,17 +88,17 @@ function StoreCard({ store, distance, onOpenDetail }) {
             <span className={`store-card-type ${store.active ? 'store-type-tap-hoa' : 'store-type-kho'}`}>
               {store.active ? 'Đã xác thực' : 'Chưa xác thực'}
             </span>
+            {distVal != null && (
+              <span className="dist-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                {formatDistance(distVal)}
+              </span>
+            )}
           </div>
         </div>
-        {distVal != null && (
-          <span className="dist-badge">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            {formatDistance(distVal)}
-          </span>
-        )}
       </div>
       <div className="store-card-body">
         {addressText && (

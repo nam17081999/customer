@@ -93,7 +93,6 @@ export default function NotificationsPage() {
       observer.disconnect()
       observerRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feed])
 
   const handleMarkRead = async (id) => {

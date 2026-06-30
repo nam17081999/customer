@@ -104,6 +104,7 @@ function HalfInvoice({ invoice, order, label }) {
                 </span>
               </td>
               <td className="pay-right">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={invoice.paymentQrUrl} alt="" className="qr" />
               </td>
             </tr>

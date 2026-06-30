@@ -161,7 +161,7 @@ export function useHomeSearchController() {
       persist: persistSearchRoute,
       setTimer: window.setTimeout.bind(window),
     })
-  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, sortBy, activeStatus, router.isReady])
+  }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, sortBy, activeStatus, router])
 
   const wardOptions = useMemo(() => (
     selectedDistrict
@@ -414,8 +414,6 @@ export function useHomeSearchController() {
     selectedWard,
     selectedStoreTypes,
     selectedDetailFlags,
-    sortBy,
-    activeStatus,
   ])
 
   const showSkeleton = loading || !storesLoaded

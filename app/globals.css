@@ -783,6 +783,8 @@ html {
         display: flex;
         align-items: center;
         gap: 12px;
+        min-width: 0;
+        flex: 1;
     }
     .dt-modal-close {
         width: 28px;
@@ -2643,6 +2645,8 @@ html {
         display: flex;
         align-items: center;
         gap: 12px;
+        min-width: 0;
+        overflow: hidden;
     }
     .store-card-row {
         font-size: 13px;
