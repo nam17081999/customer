@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Đăng nhập" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Dành cho tài khoản telesale hoặc admin
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - text: Email
+        - textbox "Email" [ref=e11]:
+          - /placeholder: admin@example.com
+      - generic [ref=e12]:
+        - text: Mật khẩu
+        - textbox "Mật khẩu" [ref=e14]:
+          - /placeholder: ••••••••
+      - button "Đăng nhập" [ref=e15] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e21] [cursor=pointer]:
+    - img [ref=e22]
+  - alert [ref=e25]

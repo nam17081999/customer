@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { toTitleCaseVI } from '@/lib/utils'
 import { DISTRICT_WARD_SUGGESTIONS, DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
+import { createStore } from '@/api/stores/store-client'
 import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
   findNearbySimilarStores,
@@ -695,10 +695,7 @@ export function useStoreCreateController() {
         isTelesale,
       })
 
-      const { data: insertedRows, error: insertError } = await supabase
-        .from('stores')
-        .insert([insertPayload])
-        .select('id,name,store_type,address_detail,ward,district,phone,phone_secondary,note,latitude,longitude,active,is_potential,created_at,updated_at,last_called_at,last_call_result,last_call_result_at,last_order_reported_at,sales_note')
+      const { data: insertedRows, error: insertError } = await createStore(insertPayload)
 
       if (insertError) {
         console.error(insertError)

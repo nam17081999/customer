@@ -1,7 +1,7 @@
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/api/db/client'
 
 export async function getPendingReportCount() {
-  const { count, error } = await supabase
+  const { count, error } = await db
     .from('store_reports')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'pending')
@@ -11,7 +11,7 @@ export async function getPendingReportCount() {
 }
 
 export async function getPendingReportItems() {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('store_reports')
     .select('id, store_id, report_type, status, created_at, store:stores!inner(name)')
     .eq('status', 'pending')

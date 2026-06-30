@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/api/db/client'
 
 /**
  * Log an audit event into operation_audit_events.
@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabaseClient'
  */
 export async function logAuditEvent({ eventType, entityType, entityId, metadata = {} }) {
   try {
-    const { error } = await supabase
+    const { error } = await db
       .from('operation_audit_events')
       .insert({
         event_type: eventType,

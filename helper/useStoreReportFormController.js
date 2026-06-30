@@ -3,7 +3,7 @@ import { DEFAULT_STORE_TYPE } from '@/lib/constants'
 import { getBestPosition, getGeoErrorMessage, requestCompassHeading, clearPositionCache } from '@/helper/geolocation'
 import { getLocationRefreshOptions } from '@/helper/locationPolicy'
 import { buildReportLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
-import { supabase } from '@/lib/supabaseClient'
+import { submitReport } from '@/api/reports/report-client'
 import {
   buildStoreReportPayload,
   getStoreReportSuccessMessage,
@@ -243,7 +243,7 @@ export function useStoreReportFormController({ store, user, onSubmitted, initial
     })
 
     setSubmitting(true)
-    const { error: submitError } = await supabase.from('store_reports').insert([payload])
+    const { error: submitError } = await submitReport(payload)
 
     if (submitError) {
       console.error(submitError)

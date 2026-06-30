@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/api/db/client'
 import { getLowStockItems } from '@/api/inventory/inventory-client'
 import { getPendingReportItems } from '@/api/reports/report-stats-client'
 import { loadFeed, getCachedFeed, appendToFeed, loadPreferences, refreshUnreadCount } from '@/lib/notification-store'
@@ -88,7 +88,7 @@ export function useNotifications(isAdmin) {
   useEffect(() => {
     if (!isAdmin) return
 
-    const channel = supabase
+    const channel = db
       .channel('notifications-realtime-v3')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'product_stock' },
@@ -142,6 +142,6 @@ export function useNotifications(isAdmin) {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { db.removeChannel(channel) }
   }, [isAdmin])
 }

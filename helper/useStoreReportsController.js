@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/lib/AuthContext'
 import { updateStoreInCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
 import { buildReportStatusChangedDetail, dispatchReportsChanged } from '@/helper/storeReportEvents'
+import { fetchPendingReports, updateReportStatus as updateReportStatusDb, applyReportEdit } from '@/api/reports/report-client'
 
 const STORE_REPORTS_SELECT = 'id, store_id, report_type, reason_codes, reason_note, proposed_changes, status, created_at, store:stores!inner(id, name, store_type, address_detail, ward, district, phone, note, latitude, longitude, active, deleted_at)'
 
@@ -54,12 +54,7 @@ export function useStoreReportsController() {
     setError('')
     setMessage('')
     try {
-      const { data, error: fetchError } = await supabase
-        .from('store_reports')
-        .select(STORE_REPORTS_SELECT)
-        .eq('status', 'pending')
-        .is('stores.deleted_at', null)
-        .order('created_at', { ascending: false })
+      const { data, error: fetchError } = await fetchPendingReports()
 
       if (fetchError) throw fetchError
       setReports(data || [])
@@ -77,12 +72,9 @@ export function useStoreReportsController() {
     void loadReports()
   }, [pageReady, loadReports])
 
-  const updateReportStatus = useCallback(async ({ reportId, status, errorMessage, successMessage }) => {
+  const updateReportStatusAction = useCallback(async ({ reportId, status, errorMessage, successMessage }) => {
     markActionLoading(reportId, true)
-    const { error: updateError } = await supabase
-      .from('store_reports')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', reportId)
+    const { error: updateError } = await updateReportStatusDb(reportId, status)
 
     if (updateError) {
       setError(errorMessage)
@@ -96,22 +88,22 @@ export function useStoreReportsController() {
   }, [markActionLoading, removeHandledReport])
 
   const handleReject = useCallback(async (reportId) => {
-    await updateReportStatus({
+    await updateReportStatusAction({
       reportId,
       status: 'rejected',
       errorMessage: 'Từ chối thất bại. Vui lòng thử lại.',
       successMessage: 'Đã từ chối báo cáo.',
     })
-  }, [updateReportStatus])
+  }, [updateReportStatusAction])
 
   const handleApproveReason = useCallback(async (reportId) => {
-    await updateReportStatus({
+    await updateReportStatusAction({
       reportId,
       status: 'approved',
       errorMessage: 'Cập nhật thất bại. Vui lòng thử lại.',
       successMessage: 'Đã đánh dấu báo cáo.',
     })
-  }, [updateReportStatus])
+  }, [updateReportStatusAction])
 
   const handleApproveEdit = useCallback(async (report) => {
     const reportId = report?.id
@@ -129,28 +121,13 @@ export function useStoreReportsController() {
       return
     }
 
-    const updatedAt = new Date().toISOString()
-    const storeUpdates = { ...proposed, updated_at: updatedAt }
+    const storeUpdates = { ...proposed, updated_at: new Date().toISOString() }
 
-    const { error: updateStoreError } = await supabase
-      .from('stores')
-      .update(storeUpdates)
-      .eq('id', storeId)
+    const { error: updateStoreError } = await applyReportEdit(storeId, storeUpdates, reportId)
 
     if (updateStoreError) {
       console.error(updateStoreError)
       setError('Không cập nhật được cửa hàng. Vui lòng thử lại.')
-      markActionLoading(reportId, false)
-      return
-    }
-
-    const { error: updateReportError } = await supabase
-      .from('store_reports')
-      .update({ status: 'approved', updated_at: new Date().toISOString() })
-      .eq('id', reportId)
-
-    if (updateReportError) {
-      setError('Cập nhật trạng thái báo cáo thất bại.')
       markActionLoading(reportId, false)
       return
     }

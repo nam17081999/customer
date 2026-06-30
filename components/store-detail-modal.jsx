@@ -15,9 +15,9 @@ import {
 } from '@/helper/storeDetailActions'
 import { useAuth } from '@/lib/AuthContext'
 import { getStoreTypeMeta } from '@/components/store/store-type-icon'
-import { supabase } from '@/lib/supabaseClient'
 import { removeStoreFromCache } from '@/lib/storeCache'
 import { buildStoreDiff, logStoreEditHistory } from '@/lib/storeEditHistory'
+import { softDeleteStore } from '@/api/stores/store-client'
 
 const StoreDetailMiniMap = dynamic(() => import('@/components/map/store-detail-mini-map'), {
   ssr: false,
@@ -417,11 +417,7 @@ export default function StoreDetailModal({ store, trigger, open, onOpenChange, o
 
   const handleDelete = async () => {
     setDeleting(true)
-    const nowIso = new Date().toISOString()
-    const { error } = await supabase
-      .from('stores')
-      .update({ deleted_at: nowIso, updated_at: nowIso })
-      .eq('id', store.id)
+    const { error } = await softDeleteStore(store.id)
     if (!error) {
       try {
         const changes = buildStoreDiff(store, { deleted_at: nowIso })

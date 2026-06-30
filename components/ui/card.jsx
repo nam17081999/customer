@@ -1,39 +1,61 @@
-import * as React from "react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 function Card({ className, ...props }) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-gray-800 bg-gray-950 text-gray-50",
+        "rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] text-[var(--fg)] overflow-hidden",
         className
       )}
-      style={{ boxShadow: 'var(--card-shadow)' }}
       {...props}
     />
-  );
+  )
 }
 
 function CardHeader({ className, ...props }) {
-  return <div className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between px-5 py-4 border-b border-[var(--border)]",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
 function CardTitle({ className, ...props }) {
   return (
-    <h3 className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
-  );
+    <h3
+      className={cn("text-[15px] font-semibold text-[var(--fg)]", className)}
+      {...props}
+    />
+  )
 }
 
 function CardDescription({ className, ...props }) {
-  return <p className={cn("text-sm text-gray-500 dark:text-gray-400", className)} {...props} />;
+  return (
+    <p
+      className={cn("text-sm text-[var(--muted)]", className)}
+      {...props}
+    />
+  )
 }
 
 function CardContent({ className, ...props }) {
-  return <div className={cn("p-6 pt-0", className)} {...props} />;
+  return <div className={cn("p-5", className)} {...props} />
 }
 
 function CardFooter({ className, ...props }) {
-  return <div className={cn("flex items-center p-6 pt-0", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-5 py-4 border-t border-[var(--border)]",
+        className
+      )}
+      {...props}
+    />
+  )
 }
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }

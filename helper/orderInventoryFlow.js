@@ -728,6 +728,8 @@ export function filterInventoryProducts(products = [], filters = {}) {
   return products.filter((product) => {
     if (excludedIds.has(String(product.id))) return false
     if (category && String(product.category || '') !== category) return false
+    if (stockFilter === 'active' && product.active === false) return false
+    if (stockFilter === 'inactive' && product.active !== false) return false
     if (stockFilter === 'low' && !isLowStock(product)) return false
     if (stockFilter === 'out' && !isOutOfStock(product)) return false
     if (stockFilter === 'available' && isOutOfStock(product)) return false

@@ -1,90 +1,104 @@
-import Head from 'next/head'
-import Link from 'next/link'
-import dynamic from 'next/dynamic'
-import { Button } from '@/components/ui/button'
-import { OverflowMarquee } from '@/components/ui/overflow-marquee'
-import { useAuth } from '@/lib/AuthContext'
-import { useRouter } from 'next/router'
-import { useEffect, useMemo, useState } from 'react'
-import { getOrRefreshStores } from '@/lib/storeCache'
+import Head from "next/head";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { Button } from "@/components/ui/button";
+import { OverflowMarquee } from "@/components/ui/overflow-marquee";
+import { useAuth } from "@/lib/AuthContext";
+import { useRouter } from "next/router";
+import { useEffect, useMemo, useState } from "react";
+import { getOrRefreshStores } from "@/lib/storeCache";
 
-const StoreReportForm = dynamic(() => import('@/components/store-report-form'), {
-  ssr: false,
-  loading: () => (
-    <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5 text-base text-gray-400">
-      Đang tải form báo cáo...
-    </div>
-  ),
-})
+const StoreReportForm = dynamic(
+  () => import("@/components/store-report-form"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5 text-base text-gray-400">
+        Đang tải form báo cáo...
+      </div>
+    ),
+  },
+);
 
 export default function StoreReportEditPage() {
-  const router = useRouter()
-  const { user } = useAuth() || {}
-  const [store, setStore] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [submitted, setSubmitted] = useState('')
+  const router = useRouter();
+  const { user } = useAuth() || {};
+  const [store, setStore] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState("");
 
   const storeId = useMemo(() => {
-    if (!router.isReady) return ''
-    const raw = Array.isArray(router.query.id) ? router.query.id[0] : router.query.id
-    return raw ? String(raw) : ''
-  }, [router.isReady, router.query.id])
+    if (!router.isReady) return "";
+    const raw = Array.isArray(router.query.id)
+      ? router.query.id[0]
+      : router.query.id;
+    return raw ? String(raw) : "";
+  }, [router.isReady, router.query.id]);
 
   const backHref = useMemo(() => {
-    const raw = Array.isArray(router.query.from) ? router.query.from[0] : router.query.from
-    return raw ? String(raw) : `/store/report/${storeId}`
-  }, [router.query.from, storeId])
+    const raw = Array.isArray(router.query.from)
+      ? router.query.from[0]
+      : router.query.from;
+    return raw ? String(raw) : `/store/report/${storeId}`;
+  }, [router.query.from, storeId]);
 
   const reportDistance = useMemo(() => {
-    const raw = Array.isArray(router.query.distance) ? router.query.distance[0] : router.query.distance
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) ? parsed : null
-  }, [router.query.distance])
+    const raw = Array.isArray(router.query.distance)
+      ? router.query.distance[0]
+      : router.query.distance;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }, [router.query.distance]);
 
-  const pushSearchWithNotice = async (text, type = 'success') => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('storevis:flash-message', JSON.stringify({
-        type,
-        text,
-        createdAt: Date.now(),
-      }))
-      window.dispatchEvent(new CustomEvent('storevis:flash-message'))
+  const pushSearchWithNotice = async (text, type = "success") => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem(
+        "storevis:flash-message",
+        JSON.stringify({
+          type,
+          text,
+          createdAt: Date.now(),
+        }),
+      );
+      window.dispatchEvent(new CustomEvent("storevis:flash-message"));
     }
-    await router.push('/')
-  }
+    await router.push("/");
+  };
 
   useEffect(() => {
-    if (!router.isReady || !storeId) return
+    if (!router.isReady || !storeId) return;
 
-    let active = true
+    let active = true;
     const loadStore = async () => {
-      setLoading(true)
-      setError('')
+      setLoading(true);
+      setError("");
       try {
-        const stores = await getOrRefreshStores()
-        if (!active) return
-        const matched = stores.find((item) => String(item.id) === storeId)
+        const stores = await getOrRefreshStores();
+        if (!active) return;
+        const matched = stores.find((item) => String(item.id) === storeId);
         if (!matched) {
-          setError('Không tìm thấy cửa hàng để báo cáo.')
-          setStore(null)
+          setError("Không tìm thấy cửa hàng để báo cáo.");
+          setStore(null);
         } else {
-          setStore(matched)
+          setStore(matched);
         }
       } catch (err) {
-        console.error('Load store for report edit failed:', err)
+        console.error("Load store for report edit failed:", err);
         if (active) {
-          setError('Không tải được thông tin cửa hàng.')
-          setStore(null)
+          setError("Không tải được thông tin cửa hàng.");
+          setStore(null);
         }
       } finally {
-        if (active) setLoading(false)
+        if (active) setLoading(false);
       }
-    }
+    };
 
-    loadStore()
-    return () => { active = false }
-  }, [router.isReady, storeId])
+    loadStore();
+    return () => {
+      active = false;
+    };
+  }, [router.isReady, storeId]);
 
   return (
     <>
@@ -92,28 +106,43 @@ export default function StoreReportEditPage() {
         <title>Sửa thông tin cửa hàng - NPP Hà Công</title>
       </Head>
 
-      <div className="min-h-full bg-black">
+      <div className="min-h-full">
         {!loading && store ? (
-          <div className="sticky top-0 z-[140] flex items-center gap-3 border-b border-gray-800 bg-black/95 px-4 py-3 backdrop-blur">
+          <div className="sticky top-0 z-[140] flex items-center gap-3 border-b border-gray-800/95 px-4 py-3 backdrop-blur">
             <Button
               size="icon"
               variant="ghost"
               onClick={() => router.push(backHref)}
-              icon={(
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              icon={
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
                 </svg>
-              )}
+              }
             />
             <div>
-              <h1 className="text-base font-semibold leading-tight text-white">Sửa cửa hàng</h1>
-              <OverflowMarquee text={store.name} className="max-w-[220px]" textClassName="text-xs text-gray-400" />
+              <h1 className="text-base font-semibold leading-tight text-white">
+                Sửa cửa hàng
+              </h1>
+              <OverflowMarquee
+                text={store.name}
+                className="max-w-[220px]"
+                textClassName="text-xs text-gray-400"
+              />
             </div>
           </div>
         ) : null}
 
         <div className="mx-auto max-w-screen-md space-y-3 px-3 py-3 pb-24 sm:px-4 sm:py-4 sm:pb-8">
-
           {loading ? (
             <div className="rounded-2xl border border-gray-800 bg-gray-950 p-5 text-base text-gray-400">
               Đang tải thông tin cửa hàng…
@@ -130,7 +159,9 @@ export default function StoreReportEditPage() {
             <>
               {submitted ? (
                 <section className="rounded-2xl border border-emerald-900 bg-emerald-950/20 p-5">
-                  <p className="text-lg font-semibold text-emerald-200">Đã gửi báo cáo</p>
+                  <p className="text-lg font-semibold text-emerald-200">
+                    Đã gửi báo cáo
+                  </p>
                   <p className="mt-2 text-base text-emerald-100">{submitted}</p>
                   <div className="mt-4">
                     <Button asChild>
@@ -146,11 +177,11 @@ export default function StoreReportEditPage() {
                   initialMode="edit"
                   hideModeChooser
                   onCancel={() => {
-                    void router.push(backHref)
+                    void router.push(backHref);
                   }}
                   onSubmitted={(message) => {
-                    setSubmitted(message)
-                    void pushSearchWithNotice(message)
+                    setSubmitted(message);
+                    void pushSearchWithNotice(message);
                   }}
                 />
               )}
@@ -159,5 +190,5 @@ export default function StoreReportEditPage() {
         </div>
       </div>
     </>
-  )
+  );
 }

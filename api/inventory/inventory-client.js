@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient'
+import { db } from '@/api/db/client'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { toTitleCaseVI } from '@/lib/utils'
 import { normalizeOperatorError } from '@/helper/operatorErrors'
@@ -159,12 +159,12 @@ export async function listProductsWithStock(options) {
   const pageSize = Math.max(1, Number(params.pageSize) || 200)
 
   // Build query
-  let countQuery = supabase
+  let countQuery = db
     .from('products')
     .select('id', { count: 'exact', head: true })
     .is('deleted_at', null)
 
-  let productQuery = supabase
+  let productQuery = db
     .from('products')
     .select('*')
     .is('deleted_at', null)
@@ -187,13 +187,13 @@ export async function listProductsWithStock(options) {
   if (productIds.length === 0) return legacyArrayResult ? [] : { products: [], totalCount: Number(totalCount || 0), page, pageSize }
 
   const [{ data: units, error: unitError }, { data: stockRows, error: stockError }] = await Promise.all([
-    supabase
+    db
       .from('product_units')
       .select('*')
       .in('product_id', productIds)
       .order('is_base_unit', { ascending: false })
       .order('conversion_to_base_qty', { ascending: true }),
-    supabase
+    db
       .from('product_stock')
       .select('*')
       .in('product_id', productIds),
@@ -238,7 +238,7 @@ export async function createProductWithUnits(payload) {
     ? null
     : toNumber(payload.wholesalePrice, 0)
 
-  const { data: product, error: productError } = await supabase
+  const { data: product, error: productError } = await db
     .from('products')
     .insert([{
       name,
@@ -280,13 +280,13 @@ export async function createProductWithUnits(payload) {
     })
   }
 
-  const { error: unitError } = await supabase
+  const { error: unitError } = await db
     .from('product_units')
     .insert(units)
 
   if (unitError) throw unitError
 
-  await supabase
+  await db
     .from('product_stock')
     .insert([{ product_id: product.id }])
     .throwOnError()
@@ -299,7 +299,7 @@ export async function createPurchaseOrder(payload) {
     ...payload,
     code: payload.code || buildDocumentCode('PN'),
   })
-  const { data, error } = await supabase.rpc('create_purchase_order_with_items', rpcPayload)
+  const { data, error } = await db.rpc('create_purchase_order_with_items', rpcPayload)
   throwLoggedInventoryError('create_purchase_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
@@ -309,26 +309,26 @@ export async function createSalesOrder(payload) {
     ...payload,
     code: payload.code || buildDocumentCode('DH'),
   })
-  const { data, error } = await supabase.rpc('create_sales_order_with_items', rpcPayload)
+  const { data, error } = await db.rpc('create_sales_order_with_items', rpcPayload)
   throwLoggedInventoryError('create_sales_order', error, { requestId: rpcPayload.p_request_id, code: rpcPayload.p_order.code })
   return data
 }
 
 export async function cancelSalesOrder(orderId, userId = null) {
-  const { data, error } = await supabase.rpc('cancel_sales_order_and_restore_stock', buildCancelSalesOrderArgs(orderId, userId))
+  const { data, error } = await db.rpc('cancel_sales_order_and_restore_stock', buildCancelSalesOrderArgs(orderId, userId))
   throwLoggedInventoryError('cancel_sales_order', error, { orderId })
   return data
 }
 
 export async function cancelPurchaseOrder(purchaseOrderId, userId = null) {
-  const { data, error } = await supabase.rpc('cancel_purchase_order_and_remove_stock', buildCancelPurchaseOrderArgs(purchaseOrderId, userId))
+  const { data, error } = await db.rpc('cancel_purchase_order_and_remove_stock', buildCancelPurchaseOrderArgs(purchaseOrderId, userId))
   throwLoggedInventoryError('cancel_purchase_order', error, { purchaseOrderId })
   return data
 }
 
 export async function getProductDetail(productId) {
   // Direct fetch product — much faster than loading everything
-  const { data: product, error: productError } = await supabase
+  const { data: product, error: productError } = await db
     .from('products')
     .select('*')
     .eq('id', productId)
@@ -338,14 +338,14 @@ export async function getProductDetail(productId) {
     throw productError
   }
 
-  const { data: units } = await supabase
+  const { data: units } = await db
     .from('product_units')
     .select('*')
     .eq('product_id', productId)
     .order('is_base_unit', { ascending: false })
     .order('conversion_to_base_qty', { ascending: true })
 
-  const { data: stockRows } = await supabase
+  const { data: stockRows } = await db
     .from('product_stock')
     .select('*')
     .eq('product_id', productId)
@@ -362,7 +362,7 @@ export async function getProductDetail(productId) {
 export async function updateProduct(productId, payload) {
   if (!productId) throw new Error('Thiếu hàng hóa cần sửa.')
   const updatePayload = buildProductUpdatePayload(payload)
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('products')
     .update(updatePayload)
     .eq('id', productId)
@@ -380,7 +380,7 @@ export async function createProductUnit(productId, payload) {
     ...buildProductUnitPayload({ ...payload, isBaseUnit: false }),
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('product_units')
     .insert([unitPayload])
     .select('*')
@@ -394,7 +394,7 @@ export async function updateProductUnit(unitId, payload) {
   if (!unitId) throw new Error('Thiếu đơn vị cần sửa.')
   const unitPayload = buildProductUnitPayload(payload)
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('product_units')
     .update(unitPayload)
     .eq('id', unitId)
@@ -425,12 +425,12 @@ export async function listSalesOrders(options = 100) {
   }
 
   const countQuery = applySalesOrderListFilters(
-    supabase.from('sales_orders').select('id', { count: 'exact' }).limit(1),
+    db.from('sales_orders').select('id', { count: 'exact' }).limit(1),
     { statuses, creatorId, dateRange, query, matchingCustomerStoreIds },
   )
 
   const orderQuery = applySalesOrderListFilters(
-    supabase
+    db
       .from('sales_orders')
       .select('*')
       .order('created_at', { ascending: false })
@@ -456,7 +456,7 @@ export async function listSalesOrders(options = 100) {
     return legacyArrayResult ? emptyResult.orders : emptyResult
   }
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('sales_order_items')
     .select('sales_order_id,id')
     .in('sales_order_id', orderIds)
@@ -481,7 +481,7 @@ export async function listSalesOrders(options = 100) {
 
 export async function getSalesOrderDetail(orderId) {
   if (!orderId) throw new Error('Thiếu đơn hàng cần xem.')
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await db
     .from('sales_orders')
     .select('*')
     .eq('id', orderId)
@@ -489,18 +489,25 @@ export async function getSalesOrderDetail(orderId) {
 
   if (orderError) throw orderError
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('sales_order_items')
-    .select('*')
+    .select('*, products!inner(name)')
     .eq('sales_order_id', orderId)
     .order('created_at', { ascending: true })
 
   if (itemError) throw itemError
-  return { order, items: items || [] }
+  return {
+    order,
+    items: (items || []).map((it) => ({
+      ...it,
+      product_name: it.products?.name || '',
+      products: undefined,
+    })),
+  }
 }
 
 export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
-  let orderQuery = supabase
+  let orderQuery = db
     .from('sales_orders')
     .select('*')
     .eq('status', 'active')
@@ -516,7 +523,7 @@ export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
   const orderIds = (orders || []).map((order) => order.id)
   if (orderIds.length === 0) return { orders: [], items: [] }
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('sales_order_items')
     .select('*')
     .in('sales_order_id', orderIds)
@@ -532,12 +539,12 @@ export async function listPurchaseOrders(params = {}) {
   const from = (page - 1) * pageSize
   const to = page * pageSize - 1
 
-  const { count: totalCount, error: countError } = await supabase
+  const { count: totalCount, error: countError } = await db
     .from('purchase_orders')
     .select('id', { count: 'exact', head: true })
   if (countError) throw countError
 
-  const { data: orders, error: orderError } = await supabase
+  const { data: orders, error: orderError } = await db
     .from('purchase_orders')
     .select('*')
     .order('created_at', { ascending: false })
@@ -548,7 +555,7 @@ export async function listPurchaseOrders(params = {}) {
   const orderIds = (orders || []).map((order) => order.id)
   if (orderIds.length === 0) return { orders: [], totalCount: Number(totalCount || 0) }
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('purchase_order_items')
     .select('purchase_order_id,id')
     .in('purchase_order_id', orderIds)
@@ -571,7 +578,7 @@ export async function listPurchaseOrders(params = {}) {
 
 export async function getPurchaseOrderDetail(purchaseOrderId) {
   if (!purchaseOrderId) throw new Error('Thiếu phiếu nhập cần xem.')
-  const { data: order, error: orderError } = await supabase
+  const { data: order, error: orderError } = await db
     .from('purchase_orders')
     .select('*')
     .eq('id', purchaseOrderId)
@@ -579,7 +586,7 @@ export async function getPurchaseOrderDetail(purchaseOrderId) {
 
   if (orderError) throw orderError
 
-  const { data: items, error: itemError } = await supabase
+  const { data: items, error: itemError } = await db
     .from('purchase_order_items')
     .select('*')
     .eq('purchase_order_id', purchaseOrderId)
@@ -590,7 +597,7 @@ export async function getPurchaseOrderDetail(purchaseOrderId) {
 }
 
 export async function listStockMovements(limit = 100) {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('stock_movements')
     .select('*')
     .order('created_at', { ascending: false })
@@ -601,25 +608,25 @@ export async function listStockMovements(limit = 100) {
 }
 
 export async function getInventoryReconciliationReport() {
-  const { data, error } = await supabase.rpc('get_inventory_reconciliation_report')
+  const { data, error } = await db.rpc('get_inventory_reconciliation_report')
   if (error) throw error
   return data || []
 }
 
 export async function runInventoryReconciliationCheck(userId = null) {
-  const { data, error } = await supabase.rpc('run_inventory_reconciliation_check', { p_started_by: userId })
+  const { data, error } = await db.rpc('run_inventory_reconciliation_check', { p_started_by: userId })
   throwLoggedInventoryError('inventory_reconciliation_check', error, { userId })
   return data
 }
 
 export async function repairProductStockFromLedger(userId = null) {
-  const { data, error } = await supabase.rpc('repair_product_stock_from_ledger', { p_started_by: userId })
+  const { data, error } = await db.rpc('repair_product_stock_from_ledger', { p_started_by: userId })
   throwLoggedInventoryError('inventory_reconciliation_repair', error, { userId })
   return data
 }
 
 export async function listInventoryReconciliationRuns(limit = 50) {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('inventory_reconciliation_runs')
     .select('*')
     .order('started_at', { ascending: false })
@@ -629,7 +636,7 @@ export async function listInventoryReconciliationRuns(limit = 50) {
 }
 
 export async function listOperationAuditEvents({ limit = 50, eventType = null } = {}) {
-  let query = supabase
+  let query = db
     .from('operation_audit_events')
     .select('*')
 
@@ -647,7 +654,7 @@ export async function listOperationAuditEvents({ limit = 50, eventType = null } 
 export async function importProductsFromPreview(rows, { requestId, actorId = null } = {}) {
   if (!Array.isArray(rows)) throw new Error('Danh sách import không hợp lệ.')
   if (!requestId || String(requestId).trim().length < 12) throw new Error('Thiếu mã request import.')
-  const { data, error } = await supabase.rpc('import_products_from_preview', {
+  const { data, error } = await db.rpc('import_products_from_preview', {
     p_rows: rows,
     p_request_id: String(requestId).trim(),
     p_actor_id: actorId,
@@ -658,14 +665,14 @@ export async function importProductsFromPreview(rows, { requestId, actorId = nul
 
 export async function getLowStockCount() {
   // Lightweight count query — avoids loading all products
-  const { data, error } = await supabase
+  const { data, error } = await db
     .rpc('get_low_stock_report', { p_limit: 9999 })
   if (error) throw error
   return (data || []).length
 }
 
 export async function getLowStockItems() {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .rpc('get_low_stock_report', { p_limit: 10 })
   if (error) throw error
   return (data || []).map((item) => ({
@@ -682,12 +689,12 @@ export async function getLowStockItems() {
 export async function getDashboardAggregateReport({ from = null, to = null } = {}) {
   const args = { p_from: from, p_to: to }
   const [sales, purchases, inventory, topProducts, lowStock, customers] = await Promise.all([
-    supabase.rpc('get_sales_summary', args),
-    supabase.rpc('get_purchase_summary', args),
-    supabase.rpc('get_inventory_valuation_summary'),
-    supabase.rpc('get_top_products_report', { ...args, p_limit: 8 }),
-    supabase.rpc('get_low_stock_report', { p_limit: 8 }),
-    supabase.rpc('get_customer_revenue_report', { ...args, p_limit: 8 }),
+    db.rpc('get_sales_summary', args),
+    db.rpc('get_purchase_summary', args),
+    db.rpc('get_inventory_valuation_summary'),
+    db.rpc('get_top_products_report', { ...args, p_limit: 8 }),
+    db.rpc('get_low_stock_report', { p_limit: 8 }),
+    db.rpc('get_customer_revenue_report', { ...args, p_limit: 8 }),
   ])
 
   const responses = { sales, purchases, inventory, topProducts, lowStock, customers }
@@ -706,7 +713,7 @@ export async function getDashboardAggregateReport({ from = null, to = null } = {
 }
 
 export async function globalOperatorSearch(query, limit = 20) {
-  const { data, error } = await supabase.rpc('global_operator_search', {
+  const { data, error } = await db.rpc('global_operator_search', {
     p_query: String(query || '').trim(),
     p_limit: limit,
   })
@@ -719,7 +726,7 @@ export async function markOrdersPrinted(orderIds) {
   const ids = orderIds.map((id) => String(id)).filter(Boolean)
   if (ids.length === 0) return
 
-  const { error } = await supabase
+  const { error } = await db
     .from('sales_orders')
     .update({ is_printed: true })
     .in('id', ids)
