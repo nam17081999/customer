@@ -185,6 +185,7 @@ html {
         border: none;
         text-decoration: none;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
     .btn:disabled {
         opacity: 0.5;
@@ -2627,6 +2628,7 @@ html {
         cursor: pointer;
         outline: none;
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
     }
     .store-card-top {
         display: flex;
