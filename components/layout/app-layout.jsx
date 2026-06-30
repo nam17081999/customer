@@ -18,7 +18,7 @@ export default function AppLayout({ children, title, subtitle }) {
           onMenuClick={() => setSidebarOpen((v) => !v)}
         />
 
-        <main className="flex-1 flex flex-col content">{children}
+        <main className="flex-1 flex flex-col overflow-y-auto content">{children}
         </main>
       </div>
     </div>
