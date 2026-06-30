@@ -184,6 +184,7 @@ html {
         white-space: nowrap;
         border: none;
         text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
     }
     .btn:disabled {
         opacity: 0.5;
@@ -2625,9 +2626,7 @@ html {
         padding: 16px;
         cursor: pointer;
         outline: none;
-    }
-    .store-card:hover {
-        background: var(--surface2);
+        -webkit-tap-highlight-color: transparent;
     }
     .store-card-top {
         display: flex;
