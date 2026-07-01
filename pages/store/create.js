@@ -3,15 +3,15 @@ import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { FullPageLoading } from '@/components/ui/full-page-loading'
+import { Msg } from '@/components/ui/msg'
 import { toTitleCaseVI } from '@/lib/utils'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import StoreDistrictWardPicker from '@/components/store/store-district-ward-picker'
-import StoreMapsLinkFields from '@/components/store/store-maps-link-fields'
-import StoreStepFormLayout from '@/components/store/store-step-form-layout'
 import StoreTypePicker from '@/components/store/store-type-picker'
-import { buildCreateSteps, shouldShowCreateMobileActionBar } from '@/helper/storeCreateFlow'
 import { getLocationStepView } from '@/helper/storeLocationStep'
-import { getLocationBlockedMessage, getLocationLoadingMessage, getLocationPlaceholderCopy, getLocationReadyMessage } from '@/helper/locationUi'
+import { getLocationBlockedMessage, getLocationPlaceholderCopy } from '@/helper/locationUi'
 import { useStoreCreateController } from '@/helper/useStoreCreateController'
 
 const StoreLocationPicker = dynamic(() => import('@/components/map/store-location-picker'), {
@@ -34,8 +34,16 @@ const SearchStoreCard = dynamic(() => import('@/components/search-store-card'), 
 
 export default function AddStore() {
   const createFormId = 'store-create-form'
-  const duplicateActionAnchorRef = useRef(null)
-  const [showDuplicateMobileActions, setShowDuplicateMobileActions] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setIsMobile(window.innerWidth <= 600)
+    const onResize = () => setIsMobile(window.innerWidth <= 600)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const {
     isAdmin,
     telesaleNoStep3,
@@ -61,8 +69,6 @@ export default function AddStore() {
     setFieldErrors,
     loading,
     resolvingAddr,
-    currentStep,
-    setCurrentStep,
     duplicateCandidates,
     duplicateCheckLoading,
     duplicateCheckError,
@@ -75,45 +81,40 @@ export default function AddStore() {
     compassError,
     geoBlocked,
     step2Key,
-    mapsLink,
-    setMapsLink,
-    mapsLinkLoading,
-    mapsLinkError,
     confirmCreate,
     dismissConfirmCreate,
-    handleMapsLink,
     handleLocationChange,
     handleGetLocation,
-    handleStep1Next,
-    validateStep2AndGoNext,
     handleKeepCreateDuplicate,
+    markUserChangedDistrictWard,
     handleConfirmCreate,
     handleSubmit,
     resetCreateForm,
   } = useStoreCreateController()
 
+  const sheetOpen = !allowDuplicate && isMobile && duplicateCandidates.length > 0
+
   useEffect(() => {
-    if (currentStep !== 1 || allowDuplicate || duplicateCandidates.length === 0) {
-      setShowDuplicateMobileActions(false)
-      return
+    if (sheetOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
     }
+    return () => { document.body.style.overflow = '' }
+  }, [sheetOpen])
 
-    const node = duplicateActionAnchorRef.current
-    if (!node || typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return
+  useEffect(() => {
+    if (!sheetOpen) return
+    const handler = (e) => { if (e.key === 'Escape') handleKeepCreateDuplicate() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [sheetOpen, handleKeepCreateDuplicate])
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowDuplicateMobileActions(entry.isIntersecting)
-      },
-      {
-        threshold: 0.2,
-        rootMargin: '0px 0px -72px 0px',
-      }
-    )
-
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [allowDuplicate, currentStep, duplicateCandidates.length])
+  useEffect(() => {
+    if (nameInputRef.current) {
+      try { nameInputRef.current.focus() } catch { /* noop */ }
+    }
+  }, [nameInputRef])
 
   function renderDuplicatePanel() {
     if (allowDuplicate) return null
@@ -126,43 +127,81 @@ export default function AddStore() {
     }
     if (duplicateCandidates.length === 0) return null
 
+    if (isMobile) {
+      return (
+        <>
+          <div className="filter-backdrop open" onClick={handleKeepCreateDuplicate} />
+          <div className="filter-sheet open">
+            <div className="sheet-handle" />
+            <div className="sheet-title">Phát hiện cửa hàng có thể đã được tạo</div>
+            <div className="space-y-2">
+              {duplicateCandidates.map((store) => (
+                <SearchStoreCard
+                  key={store.id}
+                  store={store}
+                  distance={store.distance}
+                  compact
+                />
+              ))}
+            </div>
+            <div className="mt-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
+              Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <button type="button" className="apply-btn !bg-transparent !text-[var(--fg)] border border-[var(--border)]" onClick={resetCreateForm}>
+                Quay lại
+              </button>
+              <button type="button" className="apply-btn" onClick={handleKeepCreateDuplicate}>
+                Vẫn tạo cửa hàng
+              </button>
+            </div>
+          </div>
+        </>
+      )
+    }
+
     return (
-      <>
-        <div className="my-2 text-sm font-semibold text-gray-100">
-          Phát hiện cửa hàng có thể đã được tạo
-        </div>
-        <div className="space-y-2">
-          {duplicateCandidates.map((store) => (
-            <SearchStoreCard
-              key={store.id}
-              store={store}
-              distance={store.distance}
-              compact
-            />
-          ))}
-        </div>
-        <div className="mt-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
-          Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
-        </div>
-        <div ref={duplicateActionAnchorRef} className="mt-3 h-1 w-full sm:hidden" aria-hidden="true" />
-        <div className="mt-3 hidden items-center gap-2 sm:flex">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={resetCreateForm}
-          >
-            Quay lại
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={handleKeepCreateDuplicate}
-          >
-            Vẫn tạo cửa hàng
-          </Button>
-        </div>
-      </>
+      <Dialog open onOpenChange={(open) => { if (!open) handleKeepCreateDuplicate() }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base text-gray-100">
+              Phát hiện cửa hàng có thể đã được tạo
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 px-4">
+            {duplicateCandidates.map((store) => (
+              <SearchStoreCard
+                key={store.id}
+                store={store}
+                distance={store.distance}
+                compact
+              />
+            ))}
+          </div>
+          <div className="px-4 pb-4">
+            <div className="mb-3 rounded-md border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-400">
+              Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={resetCreateForm}
+              >
+                Quay lại
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={handleKeepCreateDuplicate}
+              >
+                Vẫn tạo cửa hàng
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     )
   }
 
@@ -173,149 +212,102 @@ export default function AddStore() {
     blocked: geoBlocked,
   })
 
-  const steps = buildCreateSteps(telesaleNoStep3)
-  const showMobileActionBarBase = shouldShowCreateMobileActionBar({
-    currentStep,
-    allowDuplicate,
-    duplicateCandidates,
-  })
-  const shouldShowDuplicateFixedActions = currentStep === 1 && !allowDuplicate && duplicateCandidates.length > 0 && showDuplicateMobileActions
-  const showMobileActionBar = showMobileActionBarBase || shouldShowDuplicateFixedActions
-
-  const mobileActionBar = showMobileActionBar ? (
-    <>
-      {currentStep === 1 && (allowDuplicate || duplicateCandidates.length === 0) ? (
-        <Button
-          type="button"
-          onClick={handleStep1Next}
-          className="w-full"
-        >
-          Tiếp theo
-        </Button>
-      ) : null}
-
-      {currentStep === 2 && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            icon={<span>←</span>}
-            onClick={() => setCurrentStep(1)}
-          />
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={() => validateStep2AndGoNext()}
-          >
-            {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
-          </Button>
-        </div>
-      )}
-
-      {currentStep === 3 && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            icon={<span>←</span>}
-            onClick={() => setCurrentStep(2)}
-          />
-          <Button
-            type="submit"
-            disabled={loading || resolvingAddr || geoBlocked}
-            className="flex-1"
-            leftIcon={(resolvingAddr || loading) ? (
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : undefined}
-          >
-            {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
-          </Button>
-        </div>
-      )}
-      {shouldShowDuplicateFixedActions ? (
-        <div className="flex gap-2 sm:hidden">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={resetCreateForm}
-          >
-            Quay lại
-          </Button>
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={handleKeepCreateDuplicate}
-          >
-            Vẫn tạo cửa hàng
-          </Button>
-        </div>
-      ) : null}
-    </>
-  ) : null
-
   return (
     <>
-      <StoreStepFormLayout
-        msgState={msgState}
-        loading={loading}
-        loadingMessage="Đang tạo cửa hàng…"
-        steps={steps}
-        currentStep={currentStep}
-        onSubmit={handleSubmit}
-        formId={createFormId}
-        mobileActionBar={mobileActionBar}
-      >
-        {currentStep === 1 && (
-          <>
-            <div className="space-y-5">
-              <StoreTypePicker value={storeType} onChange={setStoreType} />
-              <div className="space-y-2">
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Tên cửa hàng</Label>
-                <Input
-                  ref={nameInputRef}
-                  id="name"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
-                  }}
-                  placeholder="VD: Minh Anh"
-                  className="h-11 w-full text-base sm:text-base"
+      <div className="min-h-full" style={{ color: 'var(--foreground)' }}>
+        {msgState ? (
+          <Msg type={msgState.type} show={msgState.show}>
+            {msgState.text}
+          </Msg>
+        ) : null}
+        <FullPageLoading visible={loading} message="Đang tạo cửa hàng…" />
+
+          <form
+            id={createFormId}
+            onSubmit={handleSubmit}
+            className="space-y-4 pb-20"
+          >
+            {/* Name + Store Type */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                Tên cửa hàng
+              </Label>
+              <div className="flex gap-2">
+                <StoreTypePicker
+                  value={storeType}
+                  onChange={setStoreType}
+                  inline
                 />
-              </div>
-              {fieldErrors.name ? (
-                <div className="text-xs text-red-600">{fieldErrors.name}</div>
-              ) : null}
-              {duplicateCheckLoading ? (
-                <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
-                  Đang kiểm tra trùng tên gần đây và toàn hệ thống…
+                <div className="flex-1 min-w-0">
+                  <Input
+                    ref={nameInputRef}
+                    id="name"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }))
+                    }}
+                    placeholder="VD: Minh Anh"
+                    className="h-11 w-full text-base sm:text-base"
+                  />
+                  {fieldErrors.name ? (
+                    <div className="text-xs text-red-600 mt-1">{fieldErrors.name}</div>
+                  ) : null}
                 </div>
-              ) : null}
-              {renderDuplicatePanel()}
+              </div>
             </div>
 
-            {(allowDuplicate || duplicateCandidates.length === 0) ? (
-              <div className="hidden pt-2 sm:block">
-                <Button
-                  type="button"
-                  onClick={handleStep1Next}
-                  className="w-full"
-                >
-                  Tiếp theo
-                </Button>
+            {/* Duplicate check loading */}
+            {duplicateCheckLoading ? (
+              <div className="rounded-md border border-gray-800 bg-gray-900/70 px-3 py-2 text-xs text-gray-200">
+                Đang kiểm tra trùng tên gần đây và toàn hệ thống…
               </div>
             ) : null}
-          </>
-        )}
 
-        {currentStep === 2 && (
-          <>
+            {geoBlocked ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-800 dark:bg-red-900/20">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  {getLocationBlockedMessage()}
+                </p>
+              </div>
+            ) : null}
+
+            <div id="create-location-section">
+              {createLocationView.shouldRenderMap ? (
+                <StoreLocationPicker
+                  mapKey={`step2-${step2Key}`}
+                  initialLat={pickedLat}
+                  initialLng={pickedLng}
+                  onChange={handleLocationChange}
+                  editable={mapEditable}
+                  onToggleEditable={() => setMapEditable((value) => !value)}
+                  onGetLocation={handleGetLocation}
+                  heading={heading}
+                  height="50vh"
+                  compassError={compassError}
+                  geoBlocked={geoBlocked}
+                  onReload={() => window.location.reload()}
+                  resolvingAddr={resolvingAddr}
+                  dark={false}
+                />
+              ) : (
+                <div
+                  className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
+                  style={{ height: '50vh' }}
+                >
+                  <div className="max-w-md space-y-2">
+                    <div className="text-base font-medium text-gray-300">
+                      {getLocationPlaceholderCopy(createLocationView.phase).title}
+                    </div>
+                    <p className="text-sm text-gray-400">
+                      {getLocationPlaceholderCopy(createLocationView.phase).description}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* District / Ward - auto-filled from map */}
             <StoreDistrictWardPicker
               district={district}
               ward={ward}
@@ -324,16 +316,19 @@ export default function AddStore() {
               districtError={fieldErrors.district}
               wardError={fieldErrors.ward}
               onDistrictChange={(item) => {
+                markUserChangedDistrictWard()
                 setDistrict(item)
                 setWard('')
                 if (fieldErrors.district) setFieldErrors((prev) => ({ ...prev, district: '' }))
               }}
               onWardChange={(item) => {
+                markUserChangedDistrictWard()
                 setWard(item)
                 if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
               }}
             />
 
+            {/* Address detail */}
             <div className="space-y-1.5">
               <Label htmlFor="address_detail" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                 Địa chỉ cụ thể <span className="font-normal text-gray-400">(không bắt buộc)</span>
@@ -353,12 +348,10 @@ export default function AddStore() {
               />
             </div>
 
+            {/* Phone */}
             <div className="space-y-1.5">
               <Label htmlFor="phone" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
-                Số điện thoại
-                <span className="font-normal text-gray-400">
-                  {telesaleNoStep3 ? ' (bắt buộc để lưu ở bước 2)' : ' (không bắt buộc)'}
-                </span>
+                Số điện thoại <span className="font-normal text-gray-400">(không bắt buộc)</span>
               </Label>
               <Input
                 id="phone"
@@ -376,6 +369,7 @@ export default function AddStore() {
               {fieldErrors.phone ? <div className="text-xs text-red-600">{fieldErrors.phone}</div> : null}
             </div>
 
+            {/* Phone 2 - conditional */}
             {(phone.trim() || phoneSecondary.trim()) ? (
               <div className="space-y-1.5">
                 <Label htmlFor="phone-secondary" className="block text-sm font-medium text-gray-300">
@@ -398,6 +392,7 @@ export default function AddStore() {
               </div>
             ) : null}
 
+            {/* Note */}
             <div className="space-y-1.5">
               <Label htmlFor="note" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
                 Ghi chú <span className="font-normal text-gray-400">(không bắt buộc)</span>
@@ -410,143 +405,34 @@ export default function AddStore() {
                 className="text-base sm:text-base"
               />
             </div>
-            <div className="hidden gap-2 pt-2 sm:flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                icon={<span>←</span>}
-                onClick={() => setCurrentStep(1)}
-              />
-              <Button
-                type="button"
-                className="flex-1"
-                onClick={() => validateStep2AndGoNext()}
-              >
-                {telesaleNoStep3 ? 'Lưu cửa hàng' : 'Tiếp theo →'}
-              </Button>
-            </div>
-          </>
-        )}
 
-        {currentStep === 3 && (
-          <>
-            {resolvingAddr ? (
-              <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-900/20">
-                <svg className="h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <span className="text-sm text-blue-700 dark:text-blue-300">{getLocationLoadingMessage()}</span>
-              </div>
-            ) : null}
+            {/* Duplicate panel */}
+            {renderDuplicatePanel()}
 
-            {!resolvingAddr && pickedLat != null && !geoBlocked ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  {getLocationReadyMessage()}
-                </p>
-              </div>
-            ) : null}
-
-            {geoBlocked ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 dark:border-red-800 dark:bg-red-900/20">
-                <p className="text-sm text-red-700 dark:text-red-300">
-                  ❌ {getLocationBlockedMessage()}
-                </p>
-              </div>
-            ) : null}
-
-            <div id="create-location-section">
-              {createLocationView.shouldRenderMap ? (
-                <StoreLocationPicker
-                  mapKey={`step2-${step2Key}`}
-                  initialLat={pickedLat}
-                  initialLng={pickedLng}
-                  onChange={handleLocationChange}
-                  editable={mapEditable}
-                  onToggleEditable={() => setMapEditable((value) => !value)}
-                  onGetLocation={handleGetLocation}
-                  heading={heading}
-                  height="65vh"
-                  compassError={compassError}
-                  geoBlocked={geoBlocked}
-                  onReload={() => window.location.reload()}
-                  resolvingAddr={resolvingAddr}
-                  dark={false}
-                />
-              ) : (
-                <div
-                  className="flex items-center justify-center rounded-md border border-dashed border-gray-800 bg-gray-950 px-4 text-center text-gray-400"
-                  style={{ height: '65vh' }}
+            {/* Submit */}
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 px-3 py-3 backdrop-blur-md">
+              <div className="mx-auto max-w-screen-md">
+                <Button
+                  type="submit"
+                  disabled={loading || resolvingAddr}
+                  className="w-full"
+                  leftIcon={(resolvingAddr || loading) ? (
+                    <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : undefined}
                 >
-                  <div className="max-w-md space-y-2">
-                    <div className="text-base font-medium text-gray-300">
-                      {getLocationPlaceholderCopy(createLocationView.phase).title}
-                    </div>
-                    <p className="text-sm text-gray-400">
-                      {getLocationPlaceholderCopy(createLocationView.phase).description}
-                    </p>
-                  </div>
-                </div>
-              )}
+                  {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : 'Lưu cửa hàng'}
+                </Button>
+              </div>
             </div>
-
-            <div className="space-y-2 pt-2 md:hidden">
-              <StoreMapsLinkFields
-                value={mapsLink}
-                loading={mapsLinkLoading}
-                error={mapsLinkError}
-                mobile
-                showDirectionIcon
-                onChange={setMapsLink}
-                onSubmit={() => handleMapsLink(mapsLink)}
-              />
-            </div>
-
-            <div className="hidden space-y-1.5 pt-2 md:block">
-              <StoreMapsLinkFields
-                value={mapsLink}
-                loading={mapsLinkLoading}
-                error={mapsLinkError}
-                showDirectionIcon
-                onChange={setMapsLink}
-                onSubmit={() => handleMapsLink(mapsLink)}
-              />
-            </div>
-
-            <div className="hidden gap-2 pt-2 sm:flex">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                icon={<span>←</span>}
-                onClick={() => setCurrentStep(2)}
-              />
-              <Button
-                type="submit"
-                form={createFormId}
-                disabled={loading || resolvingAddr || geoBlocked}
-                className="flex-1"
-                leftIcon={(resolvingAddr || loading) ? (
-                  <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                ) : undefined}
-              >
-                {resolvingAddr ? 'Đang lấy vị trí...' : loading ? 'Đang lưu...' : '✓ Lưu cửa hàng'}
-              </Button>
-            </div>
-          </>
-        )}
-      </StoreStepFormLayout>
+          </form>
+      </div>
 
       <ConfirmDialog
         open={confirmCreate.open}
-        onOpenChange={(open) => {
-          if (!open) dismissConfirmCreate()
-        }}
+        onClose={dismissConfirmCreate}
         title={confirmCreate.type === 'quick-save' ? 'Xác nhận lưu không vị trí' : 'Xác nhận tạo cửa hàng'}
         description={
           confirmCreate.type === 'quick-save'

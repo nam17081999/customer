@@ -278,7 +278,7 @@ export default function AdminOperationsPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline">
-                  <Link href="/inventory/stock">Mở đối soát kho</Link>
+                  <Link href="/inventory/reports">Mở đối soát kho</Link>
                 </Button>
                 <Button asChild variant="outline">
                   <Link href="/inventory/reports">Mở báo cáo</Link>

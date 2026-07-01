@@ -4,7 +4,7 @@ export const OPERATOR_QUICK_ACTIONS = [
   { key: 'new-order', label: 'Lên đơn', href: '/orders/new', shortcut: 'Alt+1' },
   { key: 'orders', label: 'Đơn hàng', href: '/orders', shortcut: 'Alt+2' },
   { key: 'products', label: 'Hàng hóa', href: '/inventory/products', shortcut: 'Alt+3' },
-  { key: 'stock', label: 'Tồn kho', href: '/inventory/stock', shortcut: 'Alt+4' },
+  { key: 'stock', label: 'Tồn kho', href: '/inventory/reports', shortcut: 'Alt+4' },
   { key: 'reports', label: 'Thống kê', href: '/inventory/reports', shortcut: 'Alt+5' },
   { key: 'customers', label: 'Khách hàng', href: '/', shortcut: 'Alt+6' },
 ]

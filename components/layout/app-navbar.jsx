@@ -40,7 +40,6 @@ const GROUPS = [
       { href: '/inventory/products', label: 'Hàng hóa & tồn kho' },
       { href: '/inventory/purchases/new', label: 'Nhập hàng' },
       { href: '/inventory/purchases', label: 'Phiếu nhập' },
-      { href: '/inventory/stock', label: 'Báo cáo tồn kho' },
     ],
   },
   {
@@ -429,7 +428,7 @@ export default function AppNavbar() {
     { href: '/orders/new', active: currentPath === '/orders/new', label: 'Lên đơn', mobileLabel: 'Đơn', Icon: OrderIcon },
     { href: '/map', active: currentPath === '/map', label: 'Bản đồ', mobileLabel: 'Bản đồ', Icon: MapIcon },
     { href: '/store/create', active: currentPath === '/store/create', label: 'Thêm', mobileLabel: 'Thêm', Icon: PlusIcon },
-    ...(isAdmin ? [{ href: '/notifications', active: currentPath === '/notifications', label: 'Thông báo', mobileLabel: 'TB', Icon: Bell, badge: badgeCount }] : []),
+    ...(isAdmin ? [{ active: currentPath === '/account', label: 'Tài khoản', mobileLabel: 'TK', Icon: User }] : []),
     { href: '/account', active: currentPath === '/account', label: accountLabel, mobileLabel: accountMobileLabel, Icon: AccountIcon },
   ]
 
