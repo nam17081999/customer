@@ -16,7 +16,6 @@ const PAGE_TITLES = {
   '/inventory/products': { title: 'Hàng hóa' },
   '/inventory/purchases/new': { title: 'Nhập hàng', subtitle: 'Tạo phiếu nhập kho' },
   '/inventory/purchases': { title: 'Phiếu nhập', subtitle: 'Danh sách phiếu nhập kho' },
-  '/inventory/stock': { title: 'Báo cáo tồn kho', subtitle: 'Thống kê tồn kho' },
   '/inventory/reports': { title: 'Báo cáo', subtitle: 'Thống kê kinh doanh' },
   '/orders/new': { title: 'Lên đơn hàng', subtitle: 'Tạo đơn hàng mới' },
   '/orders': { title: 'Đơn hàng', subtitle: 'Danh sách đơn hàng' },
@@ -29,7 +28,6 @@ const PAGE_TITLES = {
   '/store/deduplicate': { title: 'Gộp trùng lặp', subtitle: 'Xử lý cửa hàng trùng' },
   '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Người dùng hệ thống' },
   '/admin/operations': { title: 'Thao tác', subtitle: 'Quản trị hệ thống' },
-  '/notifications': { title: 'Thông báo', subtitle: 'Thông báo hệ thống' },
   '/account': { title: 'Tài khoản', subtitle: 'Thông tin cá nhân' },
   '/login': { title: 'Đăng nhập' },
 }

@@ -27,7 +27,6 @@ export default function StoreStepFormLayout({
       ) : null}
       {topContent}
 
-      <div className="mx-auto max-w-screen-md space-y-3 px-3 py-3 sm:px-4 sm:py-4">
         {headerContent}
         {steps.length > 0 ? (
           <StoreFormStepIndicator steps={steps} currentStep={currentStep} />
@@ -53,7 +52,6 @@ export default function StoreStepFormLayout({
             </div>
           ) : null}
         </form>
-      </div>
     </div>
   );
 }

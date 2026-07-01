@@ -1,10 +1,5 @@
 import { Label } from '@/components/ui/label'
 import { DISTRICT_SUGGESTIONS, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
-import removeVietnameseTones from '@/helper/removeVietnameseTones'
-
-function isSameVietnameseText(left, right) {
-  return removeVietnameseTones(left || '').toLowerCase() === removeVietnameseTones(right || '').toLowerCase()
-}
 
 export default function StoreDistrictWardPicker({
   district = '',
@@ -19,50 +14,41 @@ export default function StoreDistrictWardPicker({
   const wardOptions = district ? (DISTRICT_WARD_SUGGESTIONS[district] || []) : []
 
   return (
-    <>
+    <div className="grid grid-cols-2 gap-3">
       <div id={districtContainerId || undefined} className="space-y-1.5">
         <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Quận / Huyện</Label>
-        <div className="flex flex-wrap gap-2">
+        <select
+          value={district}
+          onChange={(e) => {
+            onDistrictChange?.(e.target.value)
+          }}
+          className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="">Chọn quận / huyện</option>
           {DISTRICT_SUGGESTIONS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                isSameVietnameseText(district, item)
-                  ? 'border border-blue-600 bg-blue-600 text-white'
-                  : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-              }`}
-              onClick={() => onDistrictChange?.(item)}
-            >
-              {item}
-            </button>
+            <option key={item} value={item}>{item}</option>
           ))}
-        </div>
+        </select>
         {districtError ? <div className="text-xs text-red-600">{districtError}</div> : null}
       </div>
 
-      {district && wardOptions.length > 0 ? (
-        <div id={wardContainerId || undefined} className="space-y-1.5">
-          <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
-          <div className="flex flex-wrap gap-2">
-            {wardOptions.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  isSameVietnameseText(ward, item)
-                    ? 'border border-blue-600 bg-blue-600 text-white'
-                    : 'border border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-800'
-                }`}
-                onClick={() => onWardChange?.(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-          {wardError ? <div className="text-xs text-red-600">{wardError}</div> : null}
-        </div>
-      ) : null}
-    </>
+      <div id={wardContainerId || undefined} className="space-y-1.5">
+        <Label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Xã / Phường</Label>
+        <select
+          value={ward}
+          onChange={(e) => {
+            onWardChange?.(e.target.value)
+          }}
+          className="h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          disabled={!district}
+        >
+          <option value="">{district ? 'Chọn xã / phường' : 'Chọn quận trước'}</option>
+          {wardOptions.map((item) => (
+            <option key={item} value={item}>{item}</option>
+          ))}
+        </select>
+        {wardError ? <div className="text-xs text-red-600">{wardError}</div> : null}
+      </div>
+    </div>
   )
 }
