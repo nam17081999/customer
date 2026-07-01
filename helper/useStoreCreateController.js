@@ -7,8 +7,8 @@ import { appendStoreToCache, getOrRefreshStores } from '@/lib/storeCache'
 import { createStore } from '@/api/stores/store-client'
 import { getBestPosition, clearPositionCache, getGeoErrorMessage, requestCompassHeading } from '@/helper/geolocation'
 import {
-  findNearbySimilarStores,
-  findGlobalExactNameMatches,
+  findNearby50mStores,
+  findNoLocationReversedNameMatches,
   mergeDuplicateCandidates,
 } from '@/helper/duplicateCheck'
 import {
@@ -19,15 +19,14 @@ import {
   validateStoreCreateStep2,
 } from '@/helper/storeCreateFlow'
 import { resolveDistrictWardFromCoordinates } from '@/helper/storeAreaResolver'
-import { useStepEntryEffect } from '@/helper/useStepEntryEffect'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
-import { buildLocationStepResetPatch } from '@/helper/storeLocationStep'
 import {
+  getLocationBootstrapOptions,
   getLocationDuplicateCheckOptions,
   getLocationFallbackSubmitOptions,
   getLocationRefreshOptions,
 } from '@/helper/locationPolicy'
-import { buildStoreFormLocationPatch, getLocationStepEntryBehavior } from '@/helper/locationOrchestration'
+import { buildStoreFormLocationPatch } from '@/helper/locationOrchestration'
 import { getLocationMapsLinkSuccessMessage, getLocationRefreshSuccessMessage } from '@/helper/locationUi'
 
 export function useStoreCreateController() {
@@ -51,22 +50,15 @@ export function useStoreCreateController() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [resolvingAddr, setResolvingAddr] = useState(false)
-  const [currentStep, setCurrentStep] = useState(1)
   const [duplicateCandidates, setDuplicateCandidates] = useState([])
   const [duplicateCheckLoading, setDuplicateCheckLoading] = useState(false)
   const [duplicateCheckError, setDuplicateCheckError] = useState('')
-  const [duplicateCheckDone, setDuplicateCheckDone] = useState(false)
-  const [nameValid, setNameValid] = useState(false)
   const [allowDuplicate, setAllowDuplicate] = useState(false)
-  const [duplicateAllowedName, setDuplicateAllowedName] = useState('')
-  const [duplicateCheckLat, setDuplicateCheckLat] = useState(null)
-  const [duplicateCheckLng, setDuplicateCheckLng] = useState(null)
-  const duplicateCheckSeqRef = useRef(0)
-  const duplicateGeoRequestedRef = useRef(false)
-  const createQueryStepAppliedRef = useRef(false)
-  const createQueryAreaPrefillRequestedRef = useRef(false)
-  const areaPrefilledRef = useRef(false)
+  const bootstrapDoneRef = useRef(false)
+  const userChangedDistrictWardRef = useRef(false)
   const areaPrefillRunningRef = useRef(false)
+  const autoFillTimerRef = useRef(null)
+  const lastAutoFillCoordsRef = useRef(null)
   const [areaAutoFillStatus, setAreaAutoFillStatus] = useState('idle')
   const [areaAutoFillMessage, setAreaAutoFillMessage] = useState('')
 
@@ -135,9 +127,8 @@ export function useStoreCreateController() {
       || note.trim()
       || pickedLat != null
       || pickedLng != null
-      || currentStep !== 1
     )
-  }, [name, storeType, addressDetail, ward, district, phone, phoneSecondary, note, pickedLat, pickedLng, currentStep, loading])
+  }, [name, storeType, addressDetail, ward, district, phone, phoneSecondary, note, pickedLat, pickedLng, loading])
 
   const applyMapsLinkCoords = useCallback((lat, lng) => {
     const patch = buildStoreFormLocationPatch({ lat, lng, userHasEditedMap: true })
@@ -153,24 +144,20 @@ export function useStoreCreateController() {
   }, [showMessage])
 
 
-  const handleLocationChange = useCallback((lat, lng) => {
-    setPickedLat(lat)
-    setPickedLng(lng)
-    if (mapEditable) {
-      setUserHasEditedMap(true)
-    }
-  }, [mapEditable])
-
   const autoFillDistrictWardFromCoordinates = useCallback(async (originLat, originLng) => {
     if (telesaleNoStep3) return
-    if (areaPrefilledRef.current || areaPrefillRunningRef.current) return
-    if (districtRef.current.trim() || wardRef.current.trim()) return
     if (originLat == null || originLng == null) return
+    if (areaPrefillRunningRef.current) return
+    if (userChangedDistrictWardRef.current) return
+
+    const last = lastAutoFillCoordsRef.current
+    if (last && Math.abs(last.lat - originLat) < 0.0001 && Math.abs(last.lng - originLng) < 0.0001) return
 
     areaPrefillRunningRef.current = true
+    lastAutoFillCoordsRef.current = { lat: originLat, lng: originLng }
     try {
       const resolved = await resolveDistrictWardFromCoordinates(originLat, originLng)
-      if (districtRef.current.trim() || wardRef.current.trim()) return
+      if (userChangedDistrictWardRef.current) return
 
       const nextDistrict = String(resolved?.district || '').trim()
       const nextWard = String(resolved?.ward || '').trim()
@@ -187,17 +174,6 @@ export function useStoreCreateController() {
         district: nextDistrict ? '' : prev.district,
         ward: nextWard ? '' : prev.ward,
       }))
-      areaPrefilledRef.current = Boolean(nextDistrict || nextWard)
-
-      if (nextDistrict && nextWard) {
-        setAreaAutoFillStatus('resolved_full')
-        setAreaAutoFillMessage('Đã tự chọn quận/huyện và xã/phường từ vị trí.')
-        showMessage('success', 'Đã tự chọn quận/huyện và xã/phường từ vị trí')
-      } else if (nextDistrict) {
-        setAreaAutoFillStatus('resolved_district_only')
-        setAreaAutoFillMessage('Đã tự chọn quận/huyện từ vị trí, vui lòng chọn thêm xã/phường.')
-        showMessage('info', 'Đã tự chọn quận/huyện từ vị trí, vui lòng chọn thêm xã/phường')
-      }
     } catch (err) {
       setAreaAutoFillStatus('error')
       setAreaAutoFillMessage('Không tự xác định được khu vực từ vị trí. Bạn vẫn có thể chọn tay.')
@@ -205,7 +181,22 @@ export function useStoreCreateController() {
     } finally {
       areaPrefillRunningRef.current = false
     }
-  }, [showMessage, telesaleNoStep3])
+  }, [telesaleNoStep3])
+
+  const handleLocationChange = useCallback((lat, lng) => {
+    setPickedLat(lat)
+    setPickedLng(lng)
+    if (mapEditable) {
+      setUserHasEditedMap(true)
+    }
+    if (!userChangedDistrictWardRef.current) {
+      if (autoFillTimerRef.current) clearTimeout(autoFillTimerRef.current)
+      autoFillTimerRef.current = setTimeout(() => {
+        void autoFillDistrictWardFromCoordinates(lat, lng)
+      }, 600)
+    }
+  }, [mapEditable, autoFillDistrictWardFromCoordinates])
+
   const handleMapsLink = useCallback(async (link) => {
     const trimmed = String(link || '').trim()
     setMapsLink(trimmed)
@@ -276,52 +267,48 @@ export function useStoreCreateController() {
 
   useEffect(() => {
     if (!router.isReady) return
-    const { name: qName, shouldStartAtStep2 } = buildCreatePrefillFromRouteQuery(router.query)
-
+    const { name: qName } = buildCreatePrefillFromRouteQuery(router.query)
     if (qName) {
       setName(toTitleCaseVI(qName))
       setFieldErrors((prev) => ({ ...prev, name: '' }))
     }
-
-    if (shouldStartAtStep2 && !createQueryStepAppliedRef.current) {
-      createQueryStepAppliedRef.current = true
-      setDuplicateCandidates([])
-      setDuplicateCheckError('')
-      setDuplicateCheckDone(true)
-      setNameValid(true)
-      setAllowDuplicate(false)
-      setCurrentStep(2)
-    }
-
-    if (shouldStartAtStep2 && !createQueryAreaPrefillRequestedRef.current) {
-      createQueryAreaPrefillRequestedRef.current = true
-      void (async () => {
-        try {
-          const { coords } = await getBestPosition(getLocationDuplicateCheckOptions())
-          if (!coords) return
-          setDuplicateCheckLat(coords.latitude)
-          setDuplicateCheckLng(coords.longitude)
-          void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
-        } catch (err) {
-          console.error('Step 2 area prefill from current location failed:', err)
-        }
-      })()
-    }
-  }, [autoFillDistrictWardFromCoordinates, router.isReady, router.query])
+  }, [router.isReady, router.query])
 
   useEffect(() => {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { /* noop */ }
   }, [])
 
   useEffect(() => {
-    try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { /* noop */ }
-  }, [currentStep])
+    if (bootstrapDoneRef.current) return
+    if (pickedLat != null && pickedLng != null) return
+    bootstrapDoneRef.current = true
 
-  useEffect(() => {
-    if (currentStep === 1 && nameInputRef.current) {
-      try { nameInputRef.current.focus() } catch { /* noop */ }
-    }
-  }, [currentStep])
+    void (async () => {
+      try {
+        setResolvingAddr(true)
+        const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
+        if (!coords) {
+          setGeoBlocked(true)
+          return
+        }
+        const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
+        setGeoBlocked(patch.geoBlocked)
+        setInitialGPSLat(patch.initialGPSLat)
+        setInitialGPSLng(patch.initialGPSLng)
+        setPickedLat(patch.pickedLat)
+        setPickedLng(patch.pickedLng)
+        setUserHasEditedMap(patch.userHasEditedMap)
+        setStep2Key((value) => value + 1)
+        void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
+      } catch (err) {
+        console.error('Bootstrap location error:', err)
+        setGeoBlocked(true)
+      } finally {
+        setResolvingAddr(false)
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const onBeforeUnload = (event) => {
@@ -341,15 +328,67 @@ export function useStoreCreateController() {
       const ok = window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')
       if (ok) return
       router.events.emit('routeChangeError')
-      // Next.js treats a thrown value as the route-cancel signal here.
-      // Throwing an Error object shows a Turbopack runtime overlay, so use a
-      // non-Error sentinel for an intentional user cancel.
       throw 'storevis-route-change-aborted'
     }
 
     router.events.on('routeChangeStart', onRouteChangeStart)
     return () => router.events.off('routeChangeStart', onRouteChangeStart)
   }, [hasUnsavedChanges, router])
+
+  useEffect(() => {
+    if (!name.trim()) {
+      setDuplicateCandidates([])
+      setDuplicateCheckError('')
+      setDuplicateCheckLoading(false)
+      setAllowDuplicate(false)
+      return
+    }
+
+    setDuplicateCandidates([])
+    setDuplicateCheckError('')
+    setAllowDuplicate(false)
+  }, [name])
+
+  useEffect(() => {
+    setAllowDuplicate(false)
+  }, [name])
+
+  useEffect(() => {
+    if (district && !DISTRICT_WARD_SUGGESTIONS[district]) {
+      setWard('')
+    }
+  }, [district])
+
+  useEffect(() => {
+    setAllowDuplicate(false)
+    if (!name.trim() || pickedLat == null || pickedLng == null) {
+      setDuplicateCandidates([])
+      setDuplicateCheckError('')
+      setDuplicateCheckLoading(false)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setDuplicateCheckLoading(true)
+      setDuplicateCheckError('')
+      try {
+        const [nearby, noLocation] = await Promise.all([
+          findNearby50mStores(pickedLat, pickedLng, name),
+          findNoLocationReversedNameMatches(name),
+        ])
+        const matches = mergeDuplicateCandidates(nearby, noLocation, pickedLat, pickedLng)
+        setDuplicateCandidates(matches)
+      } catch (err) {
+        console.error('Duplicate check error:', err)
+        setDuplicateCandidates([])
+        setDuplicateCheckError('Không kiểm tra được trùng tên.')
+      } finally {
+        setDuplicateCheckLoading(false)
+      }
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [name, pickedLat, pickedLng])
 
   const resetCreateForm = useCallback(() => {
     setName('')
@@ -364,15 +403,6 @@ export function useStoreCreateController() {
     setDuplicateCandidates([])
     setDuplicateCheckError('')
     setDuplicateCheckLoading(false)
-    setDuplicateCheckDone(false)
-    setNameValid(false)
-    setDuplicateAllowedName('')
-    setDuplicateCheckLat(null)
-    setDuplicateCheckLng(null)
-    duplicateGeoRequestedRef.current = false
-    createQueryStepAppliedRef.current = false
-    createQueryAreaPrefillRequestedRef.current = false
-    setCurrentStep(1)
     setPickedLat(null)
     setPickedLng(null)
     setMapEditable(false)
@@ -388,8 +418,9 @@ export function useStoreCreateController() {
     setFieldErrors({})
     setAreaAutoFillStatus('idle')
     setAreaAutoFillMessage('')
-    areaPrefilledRef.current = false
+    userChangedDistrictWardRef.current = false
     areaPrefillRunningRef.current = false
+    lastAutoFillCoordsRef.current = null
 
     if (router.query?.name || router.query?.step) {
       const { name: _discardName, step: _discardStep, ...rest } = router.query
@@ -405,145 +436,13 @@ export function useStoreCreateController() {
     }
   }, [router])
 
-  const bootstrapCreateLocationStep = useCallback(async () => {
-    const entryBehavior = getLocationStepEntryBehavior({ lat: pickedLat, lng: pickedLng })
-    setStep2Key((value) => {
-      const patch = buildLocationStepResetPatch(value, {
-        pickedLat,
-        pickedLng,
-        initialGPSLat,
-        initialGPSLng,
-        userHasEditedMap,
-      })
-      setGeoBlocked(patch.geoBlocked)
-      setMapEditable(patch.mapEditable)
-      setUserHasEditedMap(patch.userHasEditedMap)
-      setPickedLat(patch.pickedLat)
-      setPickedLng(patch.pickedLng)
-      setInitialGPSLat(patch.initialGPSLat)
-      setInitialGPSLng(patch.initialGPSLng)
-      setHeading(patch.heading)
-      return patch.nextStep2Key
-    })
-    if (entryBehavior.shouldAutoAcquire && entryBehavior.reuseRefreshFlow) {
-      await handleGetLocation()
-    }
-  }, [handleGetLocation, initialGPSLat, initialGPSLng, pickedLat, pickedLng, userHasEditedMap])
-
-  useStepEntryEffect(currentStep === 3, bootstrapCreateLocationStep)
-
-  useEffect(() => {
-    if (!name.trim()) {
-      setDuplicateCandidates([])
-      setDuplicateCheckError('')
-      setDuplicateCheckLoading(false)
-      setDuplicateCheckDone(false)
-      setDuplicateCheckLat(null)
-      setDuplicateCheckLng(null)
-      setDuplicateAllowedName('')
-      duplicateGeoRequestedRef.current = false
-      setNameValid(false)
-      return
-    }
-
-    setDuplicateCandidates([])
-    setDuplicateCheckError('')
-    setDuplicateCheckDone(false)
-    setDuplicateAllowedName('')
-    setNameValid(false)
-  }, [name])
-
-  useEffect(() => {
-    setAllowDuplicate(false)
-    setDuplicateAllowedName('')
-    setDuplicateCheckDone(false)
-    setNameValid(false)
-  }, [name])
-
-  useEffect(() => {
-    if (district && !DISTRICT_WARD_SUGGESTIONS[district]) {
-      setWard('')
-    }
-  }, [district])
-
-  const runDuplicateCheckByButton = useCallback(async () => {
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
-      scrollToFirstMatchingTarget(['#name'])
-      return
-    }
-
-    setFieldErrors((prev) => ({ ...prev, name: '' }))
-    let checkLat = duplicateCheckLat
-    let checkLng = duplicateCheckLng
-
-    if (checkLat == null || checkLng == null) {
-      duplicateGeoRequestedRef.current = true
-      try {
-        setDuplicateCheckLoading(true)
-        const { coords, error } = await getBestPosition(getLocationDuplicateCheckOptions())
-        if (!coords) {
-          setDuplicateCheckError(getGeoErrorMessage(error))
-          setDuplicateCheckLoading(false)
-          return
-        }
-        checkLat = coords.latitude
-        checkLng = coords.longitude
-        setDuplicateCheckLat(checkLat)
-        setDuplicateCheckLng(checkLng)
-      } catch (err) {
-        console.error('Get location error:', err)
-        setDuplicateCheckError(getGeoErrorMessage(err))
-        setDuplicateCheckLoading(false)
-        return
-      }
-    }
-
-    void autoFillDistrictWardFromCoordinates(checkLat, checkLng)
-
-    const seq = ++duplicateCheckSeqRef.current
-    setDuplicateCheckLoading(true)
-    setDuplicateCheckError('')
-    try {
-      const [nearMatches, globalMatches] = await Promise.all([
-        findNearbySimilarStores(checkLat, checkLng, trimmed),
-        findGlobalExactNameMatches(trimmed),
-      ])
-      const matches = mergeDuplicateCandidates(nearMatches, globalMatches, checkLat, checkLng)
-      if (seq !== duplicateCheckSeqRef.current) return
-      setDuplicateCandidates(matches)
-      setAllowDuplicate(false)
-      setDuplicateAllowedName('')
-      setDuplicateCheckDone(true)
-      const ok = matches.length === 0
-      setNameValid(ok)
-      if (ok) setCurrentStep(2)
-    } catch (err) {
-      if (seq !== duplicateCheckSeqRef.current) return
-      console.error('Duplicate check error:', err)
-      setDuplicateCandidates([])
-      setDuplicateCheckError('Không kiểm tra được trùng tên (gần đây/toàn hệ thống).')
-      setDuplicateCheckDone(false)
-      setNameValid(false)
-    } finally {
-      if (seq === duplicateCheckSeqRef.current) setDuplicateCheckLoading(false)
-    }
-  }, [name, duplicateCheckLat, duplicateCheckLng, autoFillDistrictWardFromCoordinates])
-
-  const handleStep1Next = useCallback(() => {
-    if (!duplicateCheckDone) {
-      void runDuplicateCheckByButton()
-      return
-    }
-    if (nameValid || allowDuplicate) setCurrentStep(2)
-  }, [duplicateCheckDone, runDuplicateCheckByButton, nameValid, allowDuplicate])
+  const markUserChangedDistrictWard = useCallback(() => {
+    userChangedDistrictWardRef.current = true
+  }, [])
 
   const handleKeepCreateDuplicate = useCallback(() => {
-    setDuplicateAllowedName(toTitleCaseVI(name.trim()))
     setAllowDuplicate(true)
-    setCurrentStep(2)
-  }, [name])
+  }, [])
 
   const validateStep2Fields = useCallback(async ({ requirePhone = false } = {}) => {
     const stores = (phone.trim() || phoneSecondary.trim()) ? await getOrRefreshStores() : []
@@ -577,41 +476,10 @@ export function useStoreCreateController() {
 
     scrollToFirstMatchingTarget(selectors)
   }, [])
-  const validateStep2AndGoNext = useCallback(async () => {
-    const { fieldErrors: nextFieldErrors } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
-    if (Object.keys(nextFieldErrors).length > 0) {
-      showMessage(
-        'error',
-        nextFieldErrors.phone || nextFieldErrors.phone_secondary
-          ? 'Vui lòng kiểm tra lại số điện thoại'
-          : 'Vui lòng nhập đủ quận/huyện và xã/phường'
-      )
-      scrollCreateStep2Error(nextFieldErrors)
-      return false
-    }
-
-    if (telesaleNoStep3) {
-      setConfirmCreate({
-        open: true,
-        type: 'quick-save',
-        payload: {
-          latitude: null,
-          longitude: null,
-          shouldCheckFinalDuplicates: false,
-        },
-      })
-      return true
-    }
-
-    compassOnceRef.current = false
-    void refreshCompassHeading({ requestPermission: true })
-    setCurrentStep(3)
-    return true
-  }, [validateStep2Fields, telesaleNoStep3, showMessage, refreshCompassHeading, scrollCreateStep2Error])
 
   const persistStore = useCallback(async ({ latitude = null, longitude = null, shouldCheckFinalDuplicates = true } = {}) => {
     const normalizedName = toTitleCaseVI(name.trim())
-    const hasConfirmedNameDuplicate = allowDuplicate && duplicateAllowedName === normalizedName
+    const hasConfirmedNameDuplicate = allowDuplicate
     let storesForPhoneDupes = null
 
     const getStoresForPhoneDupes = async () => {
@@ -656,20 +524,20 @@ export function useStoreCreateController() {
 
       if (shouldCheckFinalDuplicates && !hasConfirmedNameDuplicate) {
         let nearDupes = []
-        let globalDupes = []
+        let noLocationDupes = []
         try {
-          ;[nearDupes, globalDupes] = await Promise.all([
-            findNearbySimilarStores(latitude, longitude, normalizedName),
-            findGlobalExactNameMatches(normalizedName),
+          ;[nearDupes, noLocationDupes] = await Promise.all([
+            findNearby50mStores(latitude, longitude, normalizedName),
+            findNoLocationReversedNameMatches(normalizedName),
           ])
         } catch (dupErr) {
           console.error('Duplicate check failed:', dupErr)
-          showMessage('error', 'Không kiểm tra được trùng tên (gần đây/toàn hệ thống). Vui lòng thử lại.')
+          showMessage('error', 'Không kiểm tra được trùng tên. Vui lòng thử lại.')
           setLoading(false)
           return false
         }
 
-        const allDupes = mergeDuplicateCandidates(nearDupes, globalDupes, latitude, longitude)
+        const allDupes = mergeDuplicateCandidates(nearDupes, noLocationDupes, latitude, longitude)
         if (allDupes.length > 0 && !allowDuplicate) {
           setDuplicateCandidates(allDupes)
           showMessage('error', 'Phát hiện cửa hàng trùng/tương tự theo tên (gần đây hoặc toàn hệ thống). Vui lòng xác nhận nếu vẫn muốn tạo.')
@@ -734,7 +602,6 @@ export function useStoreCreateController() {
     addressDetail,
     note,
     allowDuplicate,
-    duplicateAllowedName,
     storeType,
     isAdmin,
     isTelesale,
@@ -756,25 +623,36 @@ export function useStoreCreateController() {
 
   const handleSubmit = useCallback(async (event) => {
     event.preventDefault()
-    if (currentStep !== 3) {
-      if (currentStep === 1) {
-        await runDuplicateCheckByButton()
-      } else if (currentStep === 2) {
-        await validateStep2AndGoNext()
-      }
+
+    if (!name.trim()) {
+      setFieldErrors((prev) => ({ ...prev, name: 'Vui lòng nhập tên cửa hàng' }))
+      scrollToFirstMatchingTarget(['#name'])
       return
     }
-    if (resolvingAddr) {
-      showMessage('info', 'Đang lấy vị trí, vui lòng đợi')
-      return
-    }
-    if (!name || !district || !ward) {
-      showMessage('error', 'Tên, quận/huyện và xã/phường là bắt buộc')
+
+    if (!district || !ward) {
+      showMessage('error', 'Vui lòng chọn quận/huyện và xã/phường')
       scrollToFirstMatchingTarget([
-        !name ? '#name' : null,
         !district ? '#create-district-section' : null,
         !ward ? '#create-ward-section' : null,
       ])
+      return
+    }
+
+    const { fieldErrors: nextFieldErrors } = await validateStep2Fields({ requirePhone: telesaleNoStep3 })
+    if (Object.keys(nextFieldErrors).length > 0) {
+      showMessage(
+        'error',
+        nextFieldErrors.phone || nextFieldErrors.phone_secondary
+          ? 'Vui lòng kiểm tra lại số điện thoại'
+          : 'Vui lòng nhập đủ quận/huyện và xã/phường'
+      )
+      scrollCreateStep2Error(nextFieldErrors)
+      return
+    }
+
+    if (!allowDuplicate && duplicateCandidates.length > 0) {
+      showMessage('error', 'Phát hiện cửa hàng trùng/tương tự. Vui lòng xác nhận nếu vẫn muốn tạo.')
       return
     }
 
@@ -787,6 +665,19 @@ export function useStoreCreateController() {
     })
 
     if (latitude == null || longitude == null) {
+      if (telesaleNoStep3) {
+        setConfirmCreate({
+          open: true,
+          type: 'quick-save',
+          payload: {
+            latitude: null,
+            longitude: null,
+            shouldCheckFinalDuplicates: false,
+          },
+        })
+        return
+      }
+
       try {
         const { coords, error } = await getBestPosition(getLocationFallbackSubmitOptions())
         if (!coords) {
@@ -816,24 +707,24 @@ export function useStoreCreateController() {
       payload: {
         latitude,
         longitude,
-        shouldCheckFinalDuplicates: !createQueryStepAppliedRef.current,
+        shouldCheckFinalDuplicates: true,
       },
     })
   }, [
-    currentStep,
-    createQueryStepAppliedRef,
-    runDuplicateCheckByButton,
-    validateStep2AndGoNext,
-    resolvingAddr,
-    name,
-    district,
-    ward,
+    allowDuplicate,
+    duplicateCandidates,
     userHasEditedMap,
     pickedLat,
     pickedLng,
     initialGPSLat,
     initialGPSLng,
     showMessage,
+    scrollCreateStep2Error,
+    validateStep2Fields,
+    name,
+    district,
+    ward,
+    telesaleNoStep3,
   ])
 
   return {
@@ -863,8 +754,6 @@ export function useStoreCreateController() {
     setFieldErrors,
     loading,
     resolvingAddr,
-    currentStep,
-    setCurrentStep,
     duplicateCandidates,
     duplicateCheckLoading,
     duplicateCheckError,
@@ -890,9 +779,8 @@ export function useStoreCreateController() {
     handleMapsLink,
     handleLocationChange,
     handleGetLocation,
-    handleStep1Next,
-    validateStep2AndGoNext,
     handleKeepCreateDuplicate,
+    markUserChangedDistrictWard,
     handleConfirmCreate,
     handleSubmit,
     resetCreateForm,

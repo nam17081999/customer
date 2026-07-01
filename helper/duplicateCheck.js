@@ -455,3 +455,81 @@ export function mergeDuplicateCandidates(
     return (a.name || '').localeCompare(b.name || '', 'vi')
   })
 }
+
+/**
+ * Clean a store name for duplicate comparison:
+ * normalise → strip IGNORED_NAME_TERMS → remove Vietnamese tones → keep tokens >= 2 chars.
+ */
+export function cleanNameForDuplicateCheck(rawName) {
+  const normalized = normalizeNameForMatch(rawName || '')
+  const stripped = stripIgnoredPhrases(normalized)
+  const ascii = normalizeLooseText(stripped)
+  return ascii.split(' ').filter((w) => w.length >= 2).join(' ')
+}
+
+/**
+ * Check if two names match exactly or in reversed word order
+ * after cleaning (IGNORED_NAME_TERMS stripped + normalised).
+ *
+ * @example isReversedNameMatch('Nga Thỏa', 'Thỏa Nga') → true
+ */
+export function isReversedNameMatch(name1, name2) {
+  const cleaned1 = cleanNameForDuplicateCheck(name1)
+  const cleaned2 = cleanNameForDuplicateCheck(name2)
+  if (!cleaned1 || !cleaned2) return false
+
+  const tokens1 = cleaned1.split(' ')
+  const tokens2 = cleaned2.split(' ')
+  if (tokens1.length !== tokens2.length) return false
+  if (tokens1.join(' ') === tokens2.join(' ')) return true
+  return tokens1.join(' ') === [...tokens2].reverse().join(' ')
+}
+
+/**
+ * Find stores within 50 m whose name shares at least one keyword
+ * with `inputName` after ignoring IGNORED_NAME_TERMS.
+ */
+export async function findNearby50mStores(lat, lng, inputName) {
+  const inputNorm = normalizeNameForMatch(inputName)
+  if (!inputNorm || lat == null || lng == null) return []
+  const inputWords = extractWords(inputNorm)
+  if (inputWords.length === 0) return []
+
+  const allStores = await getOrRefreshStores()
+
+  return allStores
+    .map((s) => {
+      const storeLat = parseCoordinate(s?.latitude)
+      const storeLng = parseCoordinate(s?.longitude)
+      if (!Number.isFinite(storeLat) || !Number.isFinite(storeLng)) return null
+      return {
+        ...s,
+        latitude: storeLat,
+        longitude: storeLng,
+        distance: haversineKm(lat, lng, storeLat, storeLng),
+      }
+    })
+    .filter(Boolean)
+    .filter((s) => s.distance <= 0.05 && isSimilarNameByWords(inputWords, s.name))
+    .sort((a, b) => a.distance - b.distance)
+}
+
+/**
+ * Find stores without valid coordinates whose **cleaned** name matches
+ * `inputName` exactly or in reversed word order.
+ */
+export async function findNoLocationReversedNameMatches(inputName) {
+  const inputNorm = normalizeNameForMatch(inputName)
+  if (!inputNorm) return []
+
+  const allStores = await getOrRefreshStores()
+
+  return allStores
+    .filter((s) => {
+      const storeLat = parseCoordinate(s?.latitude)
+      const storeLng = parseCoordinate(s?.longitude)
+      if (Number.isFinite(storeLat) && Number.isFinite(storeLng)) return false
+      return isReversedNameMatch(inputName, s.name)
+    })
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
+}

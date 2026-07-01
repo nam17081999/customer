@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import {
@@ -8,8 +8,8 @@ import {
   ClipboardList, FileText,
   Package, ClipboardPlus, BarChart3,
   MapIcon, User,
-  CheckCircle, Users, Settings, Shield, Bell,
-  Download, Upload, GitMerge,
+  CheckCircle, Users, Settings, Shield,
+  Download, Upload, GitMerge, ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 
@@ -30,9 +30,23 @@ const ALL_SECTIONS = [
       { href: '/store/create',   label: 'Thêm cửa hàng',      Icon: PlusCircle },
       { href: '/store/reports',  label: 'Báo cáo cửa hàng',   Icon: CheckCircle },
       { href: '/store/verify',   label: 'Duyệt cửa hàng',     Icon: Shield },
-      { href: '/store/import',   label: 'Nhập dữ liệu',       Icon: Download },
-      { href: '/store/export',   label: 'Xuất dữ liệu',       Icon: Upload },
-      { href: '/store/deduplicate', label: 'Gộp trùng lặp',   Icon: GitMerge },
+    ],
+    submenu: {
+      key: 'data-processing',
+      label: 'Xử lý dữ liệu',
+      Icon: Download,
+      items: [
+        { href: '/store/import',   label: 'Nhập dữ liệu',   Icon: Download },
+        { href: '/store/export',   label: 'Xuất dữ liệu',   Icon: Upload },
+        { href: '/store/deduplicate', label: 'Gộp trùng lặp', Icon: GitMerge },
+      ],
+    },
+  },
+  {
+    key: 'map',
+    label: 'Bản đồ',
+    items: [
+      { href: '/map', label: 'Bản đồ', Icon: MapIcon },
     ],
   },
   {
@@ -49,16 +63,8 @@ const ALL_SECTIONS = [
     items: [
       { href: '/inventory/products',      label: 'Hàng hóa',     Icon: Package },
       { href: '/inventory/purchases/new', label: 'Nhập kho',     Icon: ClipboardPlus },
-      { href: '/inventory/stock',         label: 'Tồn kho',      Icon: BarChart3 },
       { href: '/inventory/purchases',     label: 'Phiếu nhập',   Icon: FileText },
       { href: '/inventory/reports',       label: 'Thống kê kho', Icon: BarChart3 },
-    ],
-  },
-  {
-    key: 'map',
-    label: 'Bản đồ',
-    items: [
-      { href: '/map', label: 'Bản đồ', Icon: MapIcon },
     ],
   },
   {
@@ -66,7 +72,6 @@ const ALL_SECTIONS = [
     label: 'Hệ thống',
     items: [
       { href: '/account',          label: 'Tài khoản',         Icon: User },
-      { href: '/notifications',    label: 'Thông báo',         Icon: Bell },
       { href: '/admin/users',      label: 'Quản lý tài khoản', Icon: Users },
       { href: '/admin/operations', label: 'Thao tác hệ thống', Icon: Settings },
     ],
@@ -83,8 +88,24 @@ function isActive(pathname, href) {
 export default function Sidebar({ open, onClose }) {
   const { pathname } = useRouter()
   const { user } = useAuth() || {}
+  const [openSubmenus, setOpenSubmenus] = useState({})
+
+  useEffect(() => {
+    const sectionsToCheck = user ? ALL_SECTIONS : ALL_SECTIONS.filter((s) => s.key === 'stores')
+    setOpenSubmenus((prev) => {
+      const next = { ...prev }
+      for (const s of sectionsToCheck) {
+        if (s.submenu && s.submenu.items.some((i) => isActive(pathname, i.href))) {
+          next[s.submenu.key] = true
+        }
+      }
+      return next
+    })
+  }, [pathname, user])
   const userName = user?.email?.split('@')[0] || 'Khách'
   const userRole = !user ? '' : user.role === 'admin' ? 'Quản lý' : 'Telesale'
+
+  const toggleSubmenu = (key) => setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }))
 
   const sections = useMemo(() => {
     if (user) return ALL_SECTIONS
@@ -141,6 +162,45 @@ export default function Sidebar({ open, onClose }) {
                   </Link>
                 )
               })}
+              {section.submenu && (
+                <div>
+                  <button
+                    onClick={() => toggleSubmenu(section.submenu.key)}
+                    className={`nav-item ${openSubmenus[section.submenu.key] ? 'active' : ''}`}
+                  >
+                    <Download className="size-[18px] shrink-0" strokeWidth={openSubmenus[section.submenu.key] ? 2.2 : 1.8} />
+                    <span>{section.submenu.label}</span>
+                    <ChevronDown
+                      className="shrink-0 transition-transform duration-200"
+                      style={{ width: 14, height: 14, transform: openSubmenus[section.submenu.key] ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                    />
+                  </button>
+                  <div
+                    className="overflow-hidden transition-all duration-200"
+                    style={{
+                      maxHeight: openSubmenus[section.submenu.key] ? `${section.submenu.items.length * 44}px` : '0',
+                    }}
+                  >
+                    <div className="nav-submenu-items">
+                      {section.submenu.items.map((item) => {
+                        const active = isActive(pathname, item.href)
+                        const ItemIcon = item.Icon
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={onClose}
+                            className={`nav-item ${active ? 'active' : ''}`}
+                          >
+                            <ItemIcon className="size-[18px] shrink-0" strokeWidth={active ? 2.2 : 1.8} />
+                            <span>{item.label}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </nav>

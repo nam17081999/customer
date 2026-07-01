@@ -162,21 +162,6 @@ export function buildCreateInsertPayload({
   }
 }
 
-export function buildCreateSteps(telesaleNoStep3) {
-  if (telesaleNoStep3) {
-    return [
-      { num: 1, label: 'Tên' },
-      { num: 2, label: 'Thông tin' },
-    ]
-  }
-
-  return [
-    { num: 1, label: 'Tên' },
-    { num: 2, label: 'Thông tin' },
-    { num: 3, label: 'Vị trí' },
-  ]
-}
-
 export function buildCreatePrefillFromRouteQuery(query = {}) {
   const rawName = Array.isArray(query.name) ? query.name[0] : query.name
   const rawStep = Array.isArray(query.step) ? query.step[0] : query.step
@@ -188,14 +173,4 @@ export function buildCreatePrefillFromRouteQuery(query = {}) {
   }
 }
 
-export function shouldShowCreateMobileActionBar({
-  currentStep,
-  allowDuplicate,
-  duplicateCandidates,
-}) {
-  return (
-    (currentStep === 1 && (allowDuplicate || (duplicateCandidates || []).length === 0))
-    || currentStep === 2
-    || currentStep === 3
-  )
-}
+

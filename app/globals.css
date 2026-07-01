@@ -276,7 +276,8 @@ html {
         gap: 2px;
         overflow-y: auto;
     }
-    a.nav-item {
+    a.nav-item,
+    button.nav-item {
         display: flex;
         align-items: center;
         gap: 10px;
@@ -284,22 +285,29 @@ html {
         border-radius: var(--radius-sm);
         font-size: 14px;
         font-weight: 500;
-        color: var(--muted);
+        color: #e0e0e0;
         text-decoration: none;
         transition: all 0.15s;
         cursor: pointer;
+        border: none;
+        background: none;
+        width: 100%;
     }
-    a.nav-item:hover {
+    a.nav-item:hover,
+    button.nav-item:hover {
         color: var(--fg);
         background: var(--surface);
     }
     a.nav-item.active,
-    a.nav-item.active:hover {
+    a.nav-item.active:hover,
+    button.nav-item.active,
+    button.nav-item.active:hover {
         color: var(--fg);
         background: var(--surface2);
         font-weight: 600;
     }
-    a.nav-item svg {
+    a.nav-item svg,
+    button.nav-item svg {
         width: 18px;
         height: 18px;
         flex-shrink: 0;
@@ -321,6 +329,14 @@ html {
         letter-spacing: 0.1em;
         color: var(--muted);
         opacity: 0.5;
+    }
+    .nav-submenu-items {
+        padding-left: 12px;
+        border-left: 1px solid var(--border);
+        margin-left: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
     .sidebar-footer {
         padding: 12px;
@@ -2081,6 +2097,7 @@ html {
         transition:
             transform 0.3s ease,
             opacity 0.25s;
+        margin-bottom: 0 !important;
     }
     .filter-sheet.open {
         transform: translateY(0);

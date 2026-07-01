@@ -40,4 +40,9 @@ export const IGNORED_NAME_TERMS = [
   'chú',
   'bác',
   'em',
+  "bạn",
+  "bà",
+  "ông",
+  'cửa hàng tiện lợi',
+  'cửa hàng tạp hoá',
 ]

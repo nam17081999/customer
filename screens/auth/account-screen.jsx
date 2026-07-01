@@ -59,7 +59,7 @@ const MENU_SECTIONS = {
         label: "Phiếu nhập",
         icon: ClipboardList,
       },
-      { href: "/inventory/stock", label: "Báo cáo tồn kho", icon: BarChart3 },
+      { href: "/inventory/reports", label: "Báo cáo tồn kho", icon: BarChart3 },
     ],
   },
   stores: {

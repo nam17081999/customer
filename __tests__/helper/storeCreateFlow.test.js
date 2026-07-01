@@ -4,11 +4,9 @@ import {
   buildCreateDuplicatePhoneMessage,
   buildCreateInsertPayload,
   buildCreatePrefillFromRouteQuery,
-  buildCreateSteps,
   extractCoordsFromMapsUrl,
   findNearestDistrictWard,
   getCreateFinalCoordinates,
-  shouldShowCreateMobileActionBar,
   validateStoreCreateStep2,
 } from '@/helper/storeCreateFlow'
 
@@ -214,23 +212,6 @@ describe('buildCreateInsertPayload', () => {
   })
 })
 
-describe('buildCreateSteps', () => {
-  it('trả về 2 bước cho telesale lưu nhanh', () => {
-    expect(buildCreateSteps(true)).toEqual([
-      { num: 1, label: 'Tên' },
-      { num: 2, label: 'Thông tin' },
-    ])
-  })
-
-  it('trả về 3 bước cho flow đầy đủ', () => {
-    expect(buildCreateSteps(false)).toEqual([
-      { num: 1, label: 'Tên' },
-      { num: 2, label: 'Thông tin' },
-      { num: 3, label: 'Vị trí' },
-    ])
-  })
-})
-
 describe('buildCreatePrefillFromRouteQuery', () => {
   it('nhận name + step=2 để mở thẳng bước 2', () => {
     expect(buildCreatePrefillFromRouteQuery({
@@ -264,40 +245,4 @@ describe('buildCreatePrefillFromRouteQuery', () => {
   })
 })
 
-describe('shouldShowCreateMobileActionBar', () => {
-  it('ẩn action bar ở bước 1 khi đang chặn bởi duplicate panel', () => {
-    expect(shouldShowCreateMobileActionBar({
-      currentStep: 1,
-      allowDuplicate: false,
-      duplicateCandidates: [{ id: 1 }],
-    })).toBe(false)
-  })
 
-  it('hiện action bar ở bước 1 khi chưa có duplicate hoặc đã allow', () => {
-    expect(shouldShowCreateMobileActionBar({
-      currentStep: 1,
-      allowDuplicate: false,
-      duplicateCandidates: [],
-    })).toBe(true)
-
-    expect(shouldShowCreateMobileActionBar({
-      currentStep: 1,
-      allowDuplicate: true,
-      duplicateCandidates: [{ id: 1 }],
-    })).toBe(true)
-  })
-
-  it('giữ action bar ở bước 2 và 3', () => {
-    expect(shouldShowCreateMobileActionBar({
-      currentStep: 2,
-      allowDuplicate: false,
-      duplicateCandidates: [],
-    })).toBe(true)
-
-    expect(shouldShowCreateMobileActionBar({
-      currentStep: 3,
-      allowDuplicate: false,
-      duplicateCandidates: [],
-    })).toBe(true)
-  })
-})
