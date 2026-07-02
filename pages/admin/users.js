@@ -296,8 +296,7 @@ export default function AdminUsersPage() {
       </Head>
 
       <div
-        className="flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:max-h-[calc(100vh-3rem)] lg:overflow-hidden lg:p-4 lg:mx-auto lg:w-full"
-        style={{ maxWidth: "1900px" }}
+        className="flex flex-col gap-2 sm:gap-3"
       >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -418,7 +417,7 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <div className="space-y-2 overflow-hidden lg:flex-1 lg:overflow-y-auto lg:space-y-2.5">
+        <div className="space-y-2 lg:flex-1 lg:overflow-y-auto lg:space-y-2.5">
           {users.map((user) => {
             const userId = user.id;
             const isProcessing = Boolean(actionLoading[userId]);

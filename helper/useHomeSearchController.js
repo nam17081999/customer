@@ -394,27 +394,9 @@ export function useHomeSearchController() {
     },
   }), [searchTerm])
 
-  const handleCreateStoreClick = useCallback(async () => {
-    const nextQuery = buildNextSearchRouteQuery({
-      searchTerm,
-      selectedDistrict,
-      selectedWard,
-      selectedStoreTypes,
-      selectedDetailFlags,
-    })
-
-    persistSearchRoute(nextQuery)
-    await router.replace({ pathname: router.pathname, query: nextQuery }, undefined, { shallow: true })
-    await router.push(createStoreHref)
-  }, [
-    createStoreHref,
-    router,
-    searchTerm,
-    selectedDistrict,
-    selectedWard,
-    selectedStoreTypes,
-    selectedDetailFlags,
-  ])
+  const handleCreateStoreClick = useCallback(() => {
+    router.push(createStoreHref)
+  }, [createStoreHref, router])
 
   const showSkeleton = loading || !storesLoaded
 

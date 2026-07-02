@@ -28,8 +28,6 @@ const ALL_SECTIONS = [
     items: [
       { href: '/',              label: 'Danh sách cửa hàng', Icon: Store },
       { href: '/store/create',   label: 'Thêm cửa hàng',      Icon: PlusCircle },
-      { href: '/store/reports',  label: 'Báo cáo cửa hàng',   Icon: CheckCircle },
-      { href: '/store/verify',   label: 'Duyệt cửa hàng',     Icon: Shield },
     ],
     submenu: {
       key: 'data-processing',
@@ -39,6 +37,8 @@ const ALL_SECTIONS = [
         { href: '/store/import',   label: 'Nhập dữ liệu',   Icon: Download },
         { href: '/store/export',   label: 'Xuất dữ liệu',   Icon: Upload },
         { href: '/store/deduplicate', label: 'Gộp trùng lặp', Icon: GitMerge },
+        { href: '/store/reports',  label: 'Báo cáo cửa hàng',   Icon: CheckCircle },
+        { href: '/store/verify',   label: 'Duyệt cửa hàng',     Icon: Shield },
       ],
     },
   },
@@ -128,7 +128,7 @@ export default function Sidebar({ open, onClose }) {
 
       <aside
         className={`
-          fixed lg:sticky top-0 left-0 z-50
+          fixed lg:sticky top-0 left-0 z-51
           w-[240px] h-screen flex flex-col
           bg-[var(--sidebar)]
           border-r border-[var(--border)]
@@ -166,7 +166,7 @@ export default function Sidebar({ open, onClose }) {
                 <div>
                   <button
                     onClick={() => toggleSubmenu(section.submenu.key)}
-                    className={`nav-item ${openSubmenus[section.submenu.key] ? 'active' : ''}`}
+                    className="nav-item"
                   >
                     <Download className="size-[18px] shrink-0" strokeWidth={openSubmenus[section.submenu.key] ? 2.2 : 1.8} />
                     <span>{section.submenu.label}</span>
