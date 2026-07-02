@@ -7,6 +7,7 @@ import StoreDetailModalSimple from '@/components/store/store-detail-modal-simple
 import StoreDetailSheet from '@/components/store/store-detail-sheet'
 import { STORE_TYPE_OPTIONS, DISTRICT_WARD_SUGGESTIONS } from '@/lib/constants'
 import { useHomeSearchController } from '@/helper/useHomeSearchController'
+import { FILTER_FLAG_HAS_PHONE, FILTER_FLAG_POTENTIAL } from '@/helper/homeSearch'
 
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
 const ALL_WARDS = Array.from(new Set(Object.values(DISTRICT_WARD_SUGGESTIONS).flat())).sort((a, b) => a.localeCompare(b, 'vi'))
@@ -48,6 +49,7 @@ export default function HomePage() {
     activeFilterCount,
     hasSearchCriteria,
     clearAllFilters,
+    toggleFilterValue,
     searchResults,
     showCreateStoreCta, handleCreateStoreClick,
     showSkeleton, hasError,
@@ -182,6 +184,27 @@ export default function HomePage() {
             <option value="date">Mới nhất</option>
           </select>
         </div>
+        <div className="filter-group">
+          <label>Chi tiết</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => toggleFilterValue(setSelectedDetailFlags, FILTER_FLAG_HAS_PHONE)}
+              aria-pressed={selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)}
+              className={`filter-chip ${selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE) ? 'active' : ''}`}
+            >
+              Có SĐT
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleFilterValue(setSelectedDetailFlags, FILTER_FLAG_POTENTIAL)}
+              aria-pressed={selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)}
+              className={`filter-chip ${selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL) ? 'active' : ''}`}
+            >
+              Tiềm năng
+            </button>
+          </div>
+        </div>
         <div className="filter-actions">
           <button className="btn btn-outline btn-sm" onClick={handleResetFilters}>
             <X className="size-3" />
@@ -195,7 +218,7 @@ export default function HomePage() {
   const filterSheet = showFilterSheet && (
     <>
       <div className="filter-backdrop open" onClick={closeFilterSheet} />
-      <div className="filter-sheet open">
+      <div className="filter-sheet open flex flex-col gap-2">
         <div className="sheet-handle" />
         <div className="sheet-title">Bộ lọc</div>
         <div className="sheet-group">
@@ -235,7 +258,45 @@ export default function HomePage() {
             <option value="date">Mới nhất</option>
           </select>
         </div>
-        <button className="apply-btn" onClick={closeFilterSheet}>Áp dụng</button>
+        <div className="sheet-group">
+          <label>Chi tiết</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => toggleFilterValue(setSelectedDetailFlags, FILTER_FLAG_HAS_PHONE)}
+              aria-pressed={selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE)}
+              className={`filter-chip flex-1 ${selectedDetailFlags.includes(FILTER_FLAG_HAS_PHONE) ? 'active' : ''}`}
+            >
+              Có SĐT
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleFilterValue(setSelectedDetailFlags, FILTER_FLAG_POTENTIAL)}
+              aria-pressed={selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL)}
+              className={`filter-chip flex-1 ${selectedDetailFlags.includes(FILTER_FLAG_POTENTIAL) ? 'active' : ''}`}
+            >
+              Tiềm năng
+            </button>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button
+            type="button"
+            className="apply-btn"
+            style={{ flex: 1, background: 'var(--border)', color: 'var(--fg)' }}
+            onClick={() => { clearAllFilters(); closeFilterSheet() }}
+          >
+            Đặt lại
+          </button>
+          <button
+            type="button"
+            className="apply-btn"
+            style={{ flex: 3 }}
+            onClick={closeFilterSheet}
+          >
+            Xem kết quả
+          </button>
+        </div>
       </div>
     </>
   )
@@ -363,6 +424,18 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* FAB */}
+      <button
+        type="button"
+        onClick={handleCreateStoreClick}
+        aria-label="Thêm cửa hàng"
+        className="fixed bottom-5 right-5 z-50 size-12 rounded-full border border-gray-600/60 bg-gray-800/80 text-gray-300 shadow-xl shadow-black/40 grid place-items-center hover:bg-gray-700 active:scale-95 backdrop-blur-sm transition"
+      >
+        <svg className="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
 
       {/* Detail Modal / Sheet */}
       {isMobile ? (
