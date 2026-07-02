@@ -654,15 +654,6 @@ export default function OrdersListPage() {
         <style>{`.print-hide { display: none; }`}</style>
       </Head>
 
-      {/* ═══ Page Header ═══ */}
-      <div className="page-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1>Danh sách đơn hàng</h1>
-          <p>Quản lý và theo dõi đơn hàng</p>
-        </div>
-        <Button asChild><Link href="/orders/new"><Plus className="h-4 w-4" /> Lên đơn</Link></Button>
-      </div>
-
       <div className="text-gray-100 print:bg-white print:text-black">
         {msgState ? <Msg type={msgState.type} show={msgState.show}>{msgState.text}</Msg> : null}
 
