@@ -103,12 +103,7 @@ export default function AddStore() {
     return () => { document.body.style.overflow = '' }
   }, [sheetOpen])
 
-  useEffect(() => {
-    if (!sheetOpen) return
-    const handler = (e) => { if (e.key === 'Escape') handleKeepCreateDuplicate() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [sheetOpen, handleKeepCreateDuplicate])
+
 
   useEffect(() => {
     if (nameInputRef.current) {
@@ -130,7 +125,7 @@ export default function AddStore() {
     if (isMobile) {
       return (
         <>
-          <div className="filter-backdrop open" onClick={handleKeepCreateDuplicate} />
+          <div className="filter-backdrop open" />
           <div className="filter-sheet open">
             <div className="sheet-handle" />
             <div className="sheet-title">Phát hiện cửa hàng có thể đã được tạo</div>
@@ -149,7 +144,7 @@ export default function AddStore() {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <button type="button" className="apply-btn !bg-transparent !text-[var(--fg)] border border-[var(--border)]" onClick={resetCreateForm}>
-                Quay lại
+                Không tạo nữa
               </button>
               <button type="button" className="apply-btn" onClick={handleKeepCreateDuplicate}>
                 Vẫn tạo cửa hàng
@@ -161,7 +156,7 @@ export default function AddStore() {
     }
 
     return (
-      <Dialog open onOpenChange={(open) => { if (!open) handleKeepCreateDuplicate() }}>
+      <Dialog open>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-base text-gray-100">
@@ -189,7 +184,7 @@ export default function AddStore() {
                 className="flex-1"
                 onClick={resetCreateForm}
               >
-                Quay lại
+                Không tạo nữa
               </Button>
               <Button
                 type="button"
