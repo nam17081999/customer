@@ -203,33 +203,8 @@ export function validateStoreEditPhones({
       error: 'Số điện thoại 2 không được trùng số điện thoại 1',
     }
   }
-
   if (!normalizedPrimary && !normalizedSecondary) {
     return { normalizedPhone: '', normalizedPhoneSecondary: '', error: '' }
-  }
-
-  const safeStores = Array.isArray(stores) ? stores : []
-
-  if (normalizedPrimary) {
-    const duplicatePhoneStores = findDuplicatePhoneStores(safeStores, normalizedPrimary, { excludeStoreId: storeId })
-    if (duplicatePhoneStores.length > 0) {
-      return {
-        normalizedPhone: '',
-        normalizedPhoneSecondary: normalizedSecondary,
-        error: buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 1'),
-      }
-    }
-  }
-
-  if (normalizedSecondary) {
-    const duplicatePhoneStores = findDuplicatePhoneStores(safeStores, normalizedSecondary, { excludeStoreId: storeId })
-    if (duplicatePhoneStores.length > 0) {
-      return {
-        normalizedPhone: normalizedPrimary,
-        normalizedPhoneSecondary: '',
-        error: buildDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2'),
-      }
-    }
   }
 
   return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: normalizedSecondary, error: '' }

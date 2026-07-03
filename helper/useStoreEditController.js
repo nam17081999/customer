@@ -651,6 +651,7 @@ export function useStoreEditController() {
     msgState,
     confirmAction,
     resolvedWardSuggestions,
+    setFieldErrors,
     canSupplementLocation,
     supplementLocks,
     supplementSteps,

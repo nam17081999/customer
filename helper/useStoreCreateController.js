@@ -168,7 +168,14 @@ export function useStoreCreateController() {
       }
 
       if (nextDistrict) setDistrict(nextDistrict)
-      if (nextWard) setWard(nextWard)
+      if (nextWard) {
+        setWard(nextWard)
+        setAreaAutoFillStatus('resolved')
+        setAreaAutoFillMessage('')
+      } else {
+        setAreaAutoFillStatus('district_only')
+        setAreaAutoFillMessage(`Đã xác định quận/huyện: ${nextDistrict}. Vui lòng chọn xã/phường phía dưới.`)
+      }
       setFieldErrors((prev) => ({
         ...prev,
         district: nextDistrict ? '' : prev.district,
@@ -438,6 +445,8 @@ export function useStoreCreateController() {
 
   const markUserChangedDistrictWard = useCallback(() => {
     userChangedDistrictWardRef.current = true
+    setAreaAutoFillStatus('idle')
+    setAreaAutoFillMessage('')
   }, [])
 
   const handleKeepCreateDuplicate = useCallback(() => {
@@ -445,13 +454,12 @@ export function useStoreCreateController() {
   }, [])
 
   const validateStep2Fields = useCallback(async ({ requirePhone = false } = {}) => {
-    const stores = (phone.trim() || phoneSecondary.trim()) ? await getOrRefreshStores() : []
     const result = validateStoreCreateStep2({
       district,
       ward,
       phone,
       phoneSecondary,
-      stores,
+      stores: [],
       requirePhone,
     })
 
@@ -774,6 +782,7 @@ export function useStoreCreateController() {
     mapsLinkError,
     areaAutoFillStatus,
     areaAutoFillMessage,
+    hasUnsavedChanges,
     confirmCreate,
     dismissConfirmCreate,
     handleMapsLink,

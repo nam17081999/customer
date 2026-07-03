@@ -45,6 +45,7 @@ export default function AddStore() {
   }, [])
 
   const {
+    router,
     isAdmin,
     telesaleNoStep3,
     name,
@@ -58,6 +59,9 @@ export default function AddStore() {
     setWard,
     district,
     setDistrict,
+    areaAutoFillStatus,
+    areaAutoFillMessage,
+    hasUnsavedChanges,
     msgState,
     phone,
     setPhone,
@@ -322,6 +326,15 @@ export default function AddStore() {
                 if (fieldErrors.ward) setFieldErrors((prev) => ({ ...prev, ward: '' }))
               }}
             />
+            {areaAutoFillMessage ? (
+              <div className={`rounded-md border px-3 py-2 text-sm ${
+                areaAutoFillStatus === 'district_only'
+                  ? 'border-yellow-800 bg-yellow-950/30 text-yellow-300'
+                  : 'border-gray-800 bg-gray-900/70 text-gray-300'
+              }`}>
+                {areaAutoFillMessage}
+              </div>
+            ) : null}
 
             {/* Address detail */}
             <div className="space-y-1.5">
@@ -406,11 +419,27 @@ export default function AddStore() {
 
             {/* Submit */}
             <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 px-3 py-3 backdrop-blur-md">
-              <div className="mx-auto max-w-screen-md">
+              <div className="mx-auto max-w-screen-md flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  icon={(
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  )}
+                  onClick={() => {
+                    if (hasUnsavedChanges) {
+                      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')) return
+                    }
+                    router.back()
+                  }}
+                />
                 <Button
                   type="submit"
                   disabled={loading || resolvingAddr}
-                  className="w-full"
+                  className="flex-1"
                   leftIcon={(resolvingAddr || loading) ? (
                     <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />

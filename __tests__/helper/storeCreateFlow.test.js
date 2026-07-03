@@ -113,21 +113,6 @@ describe('validateStoreCreateStep2', () => {
     }).fieldErrors.phone_secondary).toBe('Số điện thoại 2 không được trùng số điện thoại 1')
   })
 
-  it('báo lỗi khi số điện thoại trùng store đã có', () => {
-    const result = validateStoreCreateStep2({
-      district: 'Hoài Đức',
-      ward: 'An Khánh',
-      phone: '0901234567',
-      phoneSecondary: '',
-      stores: [
-        { id: 2, name: 'Tạp hóa Minh Anh', phone: '0901234567' },
-      ],
-      requirePhone: false,
-    })
-
-    expect(result.fieldErrors.phone).toBe('Số điện thoại 1 đã tồn tại ở Tạp hóa Minh Anh')
-  })
-
   it('normalize thành công 2 số hợp lệ', () => {
     const result = validateStoreCreateStep2({
       district: 'Hoài Đức',

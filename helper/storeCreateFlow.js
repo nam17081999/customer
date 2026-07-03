@@ -97,22 +97,7 @@ export function validateStoreCreateStep2({
     fieldErrors.phone_secondary = 'Số điện thoại 2 không được trùng số điện thoại 1'
   }
 
-  const safeStores = Array.isArray(stores) ? stores : []
-  if (!fieldErrors.phone && !fieldErrors.phone_secondary && (normalizedPhone || normalizedPhoneSecondary)) {
-    if (normalizedPhone) {
-      const duplicatePhoneStores = findDuplicatePhoneStores(safeStores, normalizedPhone)
-      if (duplicatePhoneStores.length > 0) {
-        fieldErrors.phone = buildCreateDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 1')
-      }
-    }
 
-    if (!fieldErrors.phone_secondary && normalizedPhoneSecondary) {
-      const duplicatePhoneStores = findDuplicatePhoneStores(safeStores, normalizedPhoneSecondary)
-      if (duplicatePhoneStores.length > 0) {
-        fieldErrors.phone_secondary = buildCreateDuplicatePhoneMessage(duplicatePhoneStores, 'Số điện thoại 2')
-      }
-    }
-  }
 
   return {
     fieldErrors,

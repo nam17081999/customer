@@ -64,7 +64,13 @@ const ALL_SECTIONS = [
       { href: '/inventory/products',      label: 'Hàng hóa',     Icon: Package },
       { href: '/inventory/purchases/new', label: 'Nhập kho',     Icon: ClipboardPlus },
       { href: '/inventory/purchases',     label: 'Phiếu nhập',   Icon: FileText },
-      { href: '/inventory/reports',       label: 'Thống kê kho', Icon: BarChart3 },
+    ],
+  },
+  {
+    key: 'stats',
+    label: 'Thống kê',
+    items: [
+      { href: '/inventory/reports', label: 'Thống kê kho', Icon: BarChart3 },
     ],
   },
   {
