@@ -23,6 +23,7 @@ const PAGE_TITLES = {
   '/store/create': { title: 'Thêm cửa hàng', subtitle: 'Nhập thông tin cửa hàng mới' },
   '/store/import': { title: 'Nhập dữ liệu', subtitle: 'Import cửa hàng từ CSV' },
   '/store/export': { title: 'Xuất dữ liệu', subtitle: 'Export danh sách cửa hàng' },
+  '/store/edit/[id]': { title: 'Sửa cửa hàng', subtitle: 'Chỉnh sửa thông tin cửa hàng' },
   '/store/verify': { title: 'Duyệt cửa hàng', subtitle: 'Xác nhận cửa hàng mới' },
   '/store/reports': { title: 'Duyệt báo cáo', subtitle: 'Báo cáo từ người dùng' },
   '/store/deduplicate': { title: 'Gộp trùng lặp', subtitle: 'Xử lý cửa hàng trùng' },

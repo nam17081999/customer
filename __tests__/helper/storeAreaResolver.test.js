@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest'
+﻿import { describe, expect, it, vi } from 'vitest'
 import {
   collectAddressCandidates,
   findBestDistrict,
@@ -58,11 +58,11 @@ describe('storeAreaResolver', () => {
   })
 
   it('resolves old district and ward from internal seed data for supported coordinates', async () => {
-    const result = await resolveDistrictWardFromCoordinates(21.07744026184082, 105.69537353515625)
+    const result = await resolveDistrictWardFromCoordinates(21.0682, 105.70945)
 
     expect(result).toMatchObject({
       district: 'Hoài Đức',
-      ward: 'Đức Thượng',
+      ward: 'Trạm Trôi',
       source: 'boundary_lookup',
     })
   })
@@ -101,8 +101,53 @@ describe('storeAreaResolver', () => {
     }
   })
 
-  it('returns unresolved when coordinates are outside supported seed areas', async () => {
-    const result = await resolveDistrictWardFromCoordinates(10.762622, 106.660172)
+  it('falls back to reverse geocoding when boundary lookup is unresolved and API succeeds', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        provider: 'geoapify',
+        address: {
+          city_district: 'Cầu Giấy',
+          suburb: 'Nghĩa Tân',
+          city: 'Hà Nội',
+        },
+        formattedAddress: 'Nghĩa Tân, Cầu Giấy, Hà Nội, Việt Nam',
+      }),
+    })
+
+    const result = await resolveDistrictWardFromCoordinates(21.0285, 105.8542, mockFetch)
+
+    expect(result).toMatchObject({
+      district: 'Cầu Giấy',
+      ward: 'Nghĩa Tân',
+      source: 'reverse_geocode',
+    })
+    expect(mockFetch).toHaveBeenCalledWith('/api/reverse-geocode-area', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: 21.0285, lng: 105.8542 }),
+    })
+  })
+
+  it('returns unresolved when boundary lookup fails and reverse geocoding API also fails', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('NETWORK_ERROR'))
+
+    const result = await resolveDistrictWardFromCoordinates(10.762622, 106.660172, mockFetch)
+
+    expect(result).toMatchObject({
+      district: '',
+      ward: '',
+      source: 'boundary_unresolved',
+    })
+  })
+
+  it('returns unresolved when boundary lookup fails and reverse geocoding returns HTTP error', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    })
+
+    const result = await resolveDistrictWardFromCoordinates(10.762622, 106.660172, mockFetch)
 
     expect(result).toMatchObject({
       district: '',
