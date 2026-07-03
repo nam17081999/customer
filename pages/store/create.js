@@ -35,6 +35,7 @@ const SearchStoreCard = dynamic(() => import('@/components/search-store-card'), 
 export default function AddStore() {
   const createFormId = 'store-create-form'
   const [isMobile, setIsMobile] = useState(false)
+  const [confirmationShown, setConfirmationShown] = useState(() => false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -430,8 +431,11 @@ export default function AddStore() {
                     </svg>
                   )}
                   onClick={() => {
-                    if (hasUnsavedChanges) {
-                      if (!window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')) return
+                    if (hasUnsavedChanges && !confirmationShown) {
+                      setConfirmationShown(true)
+                      const confirmed = window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')
+                      setConfirmationShown(false)
+                      if (!confirmed) return
                     }
                     router.back()
                   }}

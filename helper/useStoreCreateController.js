@@ -285,62 +285,44 @@ export function useStoreCreateController() {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { /* noop */ }
   }, [])
 
+  // Delay geolocation bootstrap to next tick to avoid initial render blocking
   useEffect(() => {
     if (bootstrapDoneRef.current) return
     if (pickedLat != null && pickedLng != null) return
     bootstrapDoneRef.current = true
 
-    void (async () => {
-      try {
-        setResolvingAddr(true)
-        const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
-        if (!coords) {
+    const timeout = setTimeout(() => {
+      void (async () => {
+        try {
+          setResolvingAddr(true)
+          const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
+          if (!coords) {
+            setGeoBlocked(true)
+            return
+          }
+          const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
+          setGeoBlocked(patch.geoBlocked)
+          setInitialGPSLat(patch.initialGPSLat)
+          setInitialGPSLng(patch.initialGPSLng)
+          setPickedLat(patch.pickedLat)
+          setPickedLng(patch.pickedLng)
+          setUserHasEditedMap(patch.userHasEditedMap)
+          setStep2Key((value) => value + 1)
+          void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
+        } catch (err) {
+          console.error('Bootstrap location error:', err)
           setGeoBlocked(true)
-          return
+        } finally {
+          setResolvingAddr(false)
         }
-        const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
-        setGeoBlocked(patch.geoBlocked)
-        setInitialGPSLat(patch.initialGPSLat)
-        setInitialGPSLng(patch.initialGPSLng)
-        setPickedLat(patch.pickedLat)
-        setPickedLng(patch.pickedLng)
-        setUserHasEditedMap(patch.userHasEditedMap)
-        setStep2Key((value) => value + 1)
-        void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
-      } catch (err) {
-        console.error('Bootstrap location error:', err)
-        setGeoBlocked(true)
-      } finally {
-        setResolvingAddr(false)
-      }
-    })()
+      })()
+    }, 100)
+
+    return () => clearTimeout(timeout)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    const onBeforeUnload = (event) => {
-      if (!hasUnsavedChanges) return
-      event.preventDefault()
-      event.returnValue = ''
-    }
 
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [hasUnsavedChanges])
-
-  useEffect(() => {
-    const onRouteChangeStart = (nextUrl) => {
-      if (!hasUnsavedChanges) return
-      if (nextUrl === router.asPath) return
-      const ok = window.confirm('Bạn có thay đổi chưa lưu. Bạn có chắc muốn rời trang?')
-      if (ok) return
-      router.events.emit('routeChangeError')
-      throw 'storevis-route-change-aborted'
-    }
-
-    router.events.on('routeChangeStart', onRouteChangeStart)
-    return () => router.events.off('routeChangeStart', onRouteChangeStart)
-  }, [hasUnsavedChanges, router])
 
   useEffect(() => {
     if (!name.trim()) {
