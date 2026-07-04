@@ -285,19 +285,12 @@ export function useStoreCreateController() {
     try { window.scrollTo({ top: 0, behavior: 'auto' }) } catch { /* noop */ }
   }, [])
 
-  // Delay geolocation bootstrap to next tick to avoid initial render blocking
+  // Delay geolocation bootstrap to next tick to avoid initial render blocking.
+  // Compass heading is handled by the map's continuous deviceorientation listener.
   useEffect(() => {
     if (bootstrapDoneRef.current) return
     if (pickedLat != null && pickedLng != null) return
     bootstrapDoneRef.current = true
-
-    // Request compass heading in parallel, suppress error — will retry on user gesture
-    void requestCompassHeading({ requestPermission: true }).then((result) => {
-      if (result.heading != null) {
-        compassOnceRef.current = true
-        setHeading((prev) => (prev === result.heading ? result.heading + 0.000001 : result.heading))
-      }
-    }).catch(() => {})
 
     const timeout = setTimeout(async () => {
       try {

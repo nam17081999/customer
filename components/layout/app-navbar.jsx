@@ -16,6 +16,7 @@ import {
 } from '@/components/icons/navigation-icons'
 import { initNotificationSound, playNotificationSound } from '@/lib/notification-sound'
 import { loadFeed, markFeedRead, markAllFeedRead, getCachedFeed, refreshUnreadCount } from '@/lib/notification-store'
+import { preRequestCompassPermission } from '@/helper/geolocation'
 
 // ─── Menu structure ─────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ function DropdownGroup({ group, currentPath }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={item.href === '/store/create' ? preRequestCompassPermission : undefined}
                 className={`flex items-center gap-3 px-3.5 py-2 text-sm transition-colors ${
                   itemActive
                     ? 'font-semibold text-[color:var(--primary)]'
@@ -546,6 +548,7 @@ export default function AppNavbar() {
             <Link
               key={href}
               href={href}
+              onClick={href === '/store/create' ? preRequestCompassPermission : undefined}
               aria-current={active ? 'page' : undefined}
               className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 transition-colors ${
                 active ? 'text-[color:var(--primary)]' : 'text-gray-500 active:text-gray-200'
