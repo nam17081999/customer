@@ -113,7 +113,8 @@ export default function Header({ title, subtitle, onMenuClick }) {
   }
 
   return (
-      <header className="flex items-center gap-3 px-6 py-4 border-b border-[var(--border)] bg-[var(--surface)] flex-shrink-0 fixed top-0 left-0 right-0 z-[50] lg:left-[240px]">
+      <header className="flex items-center px-6 py-4 border-b border-[var(--border)] bg-[var(--surface)] flex-shrink-0 fixed top-0 left-0 right-0 z-[50] lg:left-[240px]">
+        <div className="max-w-[1630px] mx-auto w-full flex items-center gap-3">
       <button
         onClick={onMenuClick}
         className="hamburger-header"
@@ -213,6 +214,7 @@ export default function Header({ title, subtitle, onMenuClick }) {
         >
           {initial}
         </button>
+      </div>
       </div>
     </header>
   )

@@ -13,21 +13,39 @@ const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.locale
 const ALL_WARDS = Array.from(new Set(Object.values(DISTRICT_WARD_SUGGESTIONS).flat())).sort((a, b) => a.localeCompare(b, 'vi'))
 const BATCH_SIZE = 20
 
-function SkeletonGrid() {
+function SkeletonGrid({ isMobile }) {
+  const count = isMobile ? 6 : 12
   return (
     <div className="store-grid">
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="bg-[var(--surface)] border border-[var(--border)] rounded-[var(--radius)] p-4 animate-pulse">
-          <div className="flex gap-3 items-start mb-3">
-            <div className="w-9 h-9 rounded bg-[var(--surface2)] shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-4 w-2/3 rounded bg-[var(--surface2)]" />
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="store-card animate-pulse pointer-events-none">
+          <div className="store-card-top">
+            <div className="flex-1 min-w-0">
+              <div className="store-card-name">
+                <div className="w-5 h-5 rounded bg-[var(--surface2)] shrink-0" />
+                <div className="h-4 w-2/3 rounded bg-[var(--surface2)]" />
+              </div>
+              <div className="store-card-meta">
+                <div className="h-5 w-14 rounded bg-[var(--surface2)]" />
+                <div className="h-5 w-20 rounded bg-[var(--surface2)]" />
+                <div className="h-5 w-16 rounded bg-[var(--surface2)]" />
+              </div>
+            </div>
+          </div>
+          <div className="store-card-body space-y-2">
+            <div className="store-card-row">
+              <div className="w-3.5 h-3.5 rounded bg-[var(--surface2)] shrink-0" />
+              <div className="h-3 w-full rounded bg-[var(--surface2)]" />
+            </div>
+            <div className="store-card-row">
+              <div className="w-3.5 h-3.5 rounded bg-[var(--surface2)] shrink-0" />
               <div className="h-3 w-1/3 rounded bg-[var(--surface2)]" />
             </div>
           </div>
-          <div className="space-y-2">
-            <div className="h-3 w-full rounded bg-[var(--surface2)]" />
-            <div className="h-3 w-1/2 rounded bg-[var(--surface2)]" />
+          <div className="store-card-actions">
+            <div className="h-8 w-16 rounded-md bg-[var(--surface2)]" />
+            <div className="h-8 w-16 rounded-md bg-[var(--surface2)]" />
+            <div className="h-8 w-16 rounded-md bg-[var(--surface2)]" />
           </div>
         </div>
       ))}
@@ -367,8 +385,10 @@ export default function HomePage() {
       {filterSheet}
 
       {/* Results info */}
-      <div className="flex items-center gap-2 flex-wrap mb-3 shrink-0">
-        {!showSkeleton && searchResults.length > 0 && (
+      <div className="flex items-center gap-2 flex-wrap mb-3 shrink-0" style={{ minHeight: '1.25rem' }}>
+        {showSkeleton ? (
+          <div className="h-[13px] w-[260px] rounded bg-[var(--surface2)] animate-pulse" />
+        ) : searchResults.length > 0 ? (
           <p className="text-[13px] text-[var(--muted)]">
             {hasSearchCriteria ? (
               <>Tìm thấy <span className="font-semibold text-[var(--fg)]">{searchResults.length}</span> cửa hàng</>
@@ -376,7 +396,7 @@ export default function HomePage() {
               <>Đang hiển thị <span className="font-semibold text-[var(--fg)]">{searchResults.length}</span> cửa hàng</>
             )}
           </p>
-        )}
+        ) : null}
       </div>
 
       {/* Content */}
@@ -392,7 +412,7 @@ export default function HomePage() {
             <button type="button" onClick={retryLoadStores} className="btn btn-primary">Thử lại</button>
           </div>
         ) : showSkeleton ? (
-          <SkeletonGrid />
+          <SkeletonGrid isMobile={isMobile} />
         ) : searchResults.length === 0 ? (
           <EmptyState
             icon={<Search className="size-10 mx-auto mb-3 opacity-30" />}

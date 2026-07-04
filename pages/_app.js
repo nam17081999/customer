@@ -10,10 +10,10 @@ import { useAuth } from '@/lib/AuthContext'
 // ── Route → Page title mapping ──
 const PAGE_TITLES = {
   '/overview': { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động' },
-  '/': { title: 'Cửa hàng', subtitle: 'Danh sách cửa hàng kinh doanh' },
+  '/': { title: 'Danh sách cửa hàng', subtitle: 'Danh sách cửa hàng kinh doanh' },
   '/map': null, // fullscreen
   '/login': null, // no chrome
-  '/inventory/products': { title: 'Hàng hóa' },
+  '/inventory/products': { title: 'Dnah sách hàng hóa' },
   '/inventory/purchases/new': { title: 'Nhập hàng', subtitle: 'Tạo phiếu nhập kho' },
   '/inventory/purchases': { title: 'Phiếu nhập', subtitle: 'Danh sách phiếu nhập kho' },
   '/inventory/reports': { title: 'Báo cáo', subtitle: 'Thống kê kinh doanh' },
@@ -21,8 +21,8 @@ const PAGE_TITLES = {
   '/orders': { title: 'Đơn hàng', subtitle: 'Danh sách đơn hàng' },
   '/telesale/overview': { title: 'Telesale', subtitle: 'Danh sách gọi' },
   '/store/create': { title: 'Thêm cửa hàng', subtitle: 'Nhập thông tin cửa hàng mới' },
-  '/store/import': { title: 'Nhập dữ liệu', subtitle: 'Import cửa hàng từ CSV' },
-  '/store/export': { title: 'Xuất dữ liệu', subtitle: 'Export danh sách cửa hàng' },
+  '/store/import': { title: 'Nhập dữ liệu', subtitle: 'Import hàng hóa từ CSV' },
+  '/store/export': { title: 'Xuất dữ liệu', subtitle: 'Export danh sách hàng hóa' },
   '/store/edit/[id]': { title: 'Sửa cửa hàng', subtitle: 'Chỉnh sửa thông tin cửa hàng' },
   '/store/verify': { title: 'Duyệt cửa hàng', subtitle: 'Xác nhận cửa hàng mới' },
   '/store/reports': { title: 'Duyệt báo cáo', subtitle: 'Báo cáo từ người dùng' },

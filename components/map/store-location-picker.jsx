@@ -107,63 +107,55 @@ export default function StoreLocationPicker({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Control buttons - top right inside map */}
-      {showControls && (
-        <div className="absolute top-3 right-2 z-20 flex flex-col gap-1.5 items-end">
-          {/* Get location button */}
-          {onGetLocation && (
-            <button
-              type="button"
-              onClick={onGetLocation}
-              disabled={resolvingAddr}
-              className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium text-gray-200 hover:bg-gray-700 disabled:opacity-50"
-              title="Lấy lại vị trí hiện tại"
-            >
-              <svg
-                className={`w-3.5 h-3.5 ${resolvingAddr ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              {resolvingAddr ? 'Đang lấy...' : 'Lấy lại vị trí'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Lock/Unlock button - top center inside map */}
+      {/* Lock/Unlock button - top-left */}
       {showControls && onToggleEditable && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+        <div className="absolute top-3 left-3 z-20">
           <button
             type="button"
             onClick={onToggleEditable}
-            className={`border rounded-lg px-3 py-1.5 shadow-lg flex items-center gap-1.5 text-xs font-medium ${
-              editable 
-                ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600' 
-                : 'bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700'
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 shadow-lg text-xs font-medium border transition-colors ${
+              editable
+                ? 'bg-orange-500/90 border-orange-400 text-white hover:bg-orange-500'
+                : 'bg-gray-900/80 border-gray-600/60 text-gray-300 hover:bg-gray-800'
             }`}
             title={editable ? 'Khóa bản đồ' : 'Mở khóa để chỉnh vị trí'}
           >
             {editable ? (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                Khóa
-              </>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeWidth="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeWidth="2" />
+              </svg>
             ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                </svg>
-                Mở khóa
-              </>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeWidth="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeWidth="2" />
+                <circle cx="12" cy="16" r="1" fill="currentColor" />
+              </svg>
             )}
+            {editable ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}
           </button>
         </div>
+      )}
+
+      {/* Get location button - bottom-right FAB */}
+      {showControls && onGetLocation && (
+        <button
+          type="button"
+          onClick={onGetLocation}
+          disabled={resolvingAddr}
+          className="absolute bottom-4 right-4 z-20 flex items-center justify-center w-11 h-11 rounded-full bg-gray-900/90 border border-gray-600/60 shadow-lg text-gray-200 hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          title="Lấy lại vị trí hiện tại"
+        >
+          <svg
+            className={`w-5 h-5 ${resolvingAddr ? 'animate-spin' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="12" cy="12" r="3" strokeWidth="2" />
+            <path d="M12 2v4m0 12v4M2 12h4m12 0h4" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
       )}
 
       {/* Lock status badge - top right (only show if no controls) */}
@@ -200,9 +192,9 @@ export default function StoreLocationPicker({
           dark={dark}
         />
 
-        {/* Compass error - bottom right to avoid control buttons */}
+        {/* Compass error - bottom left */}
         {compassError && (
-          <div className="absolute bottom-3 right-2 z-20 max-w-[200px] rounded-md border border-orange-900 bg-orange-950/30 px-2 py-1.5 text-[10px] text-orange-400">
+          <div className="absolute bottom-4 left-4 z-20 max-w-[200px] rounded-md border border-orange-900 bg-orange-950/30 px-2 py-1.5 text-[10px] text-orange-400">
             {compassError}
           </div>
         )}
