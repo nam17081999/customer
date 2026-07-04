@@ -291,6 +291,14 @@ export function useStoreCreateController() {
     if (pickedLat != null && pickedLng != null) return
     bootstrapDoneRef.current = true
 
+    // Request compass heading in parallel, suppress error — will retry on user gesture
+    void requestCompassHeading({ requestPermission: true }).then((result) => {
+      if (result.heading != null) {
+        compassOnceRef.current = true
+        setHeading((prev) => (prev === result.heading ? result.heading + 0.000001 : result.heading))
+      }
+    }).catch(() => {})
+
     const timeout = setTimeout(async () => {
       try {
         setResolvingAddr(true)
@@ -307,7 +315,6 @@ export function useStoreCreateController() {
         setPickedLng(patch.pickedLng)
         setUserHasEditedMap(patch.userHasEditedMap)
         setStep2Key((value) => value + 1)
-        await refreshCompassHeading({ requestPermission: true })
         await autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
       } catch (err) {
         console.error('Bootstrap location error:', err)
