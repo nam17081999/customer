@@ -517,6 +517,33 @@ function useLocationPickerController({
     }
   }, [heading])
 
+  // Continuously listen for deviceorientation to update map bearing.
+  // This catches heading from pre-navigation permission grant without React re-render.
+  useEffect(() => {
+    let framePending = false
+    const handler = (event) => {
+      let h = null
+      if (typeof event.webkitCompassHeading === 'number') {
+        h = event.webkitCompassHeading
+      } else if (typeof event.alpha === 'number') {
+        h = (360 - event.alpha) % 360
+      }
+      if (typeof h !== 'number' || !isFinite(h)) return
+      if (Math.abs(h - lastBearingRef.current) < 0.5) return
+      if (framePending) return
+      framePending = true
+      requestAnimationFrame(() => {
+        framePending = false
+        const map = mapRef.current
+        if (!map) return
+        lastBearingRef.current = h
+        map.setBearing(h)
+      })
+    }
+    window.addEventListener('deviceorientation', handler, true)
+    return () => window.removeEventListener('deviceorientation', handler, true)
+  }, [])
+
   return { mapContainerRef }
 }
 

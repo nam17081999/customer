@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/AuthContext'
 const PAGE_TITLES = {
   '/overview': { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động' },
   '/': { title: 'Danh sách cửa hàng', subtitle: 'Danh sách cửa hàng kinh doanh' },
-  '/map': null, // fullscreen
+  '/map': { title: 'Bản đồ', subtitle: 'Bản đồ cửa hàng' },
   '/login': null, // no chrome
   '/inventory/products': { title: 'Dnah sách hàng hóa' },
   '/inventory/purchases/new': { title: 'Nhập hàng', subtitle: 'Tạo phiếu nhập kho' },

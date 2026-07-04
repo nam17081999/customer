@@ -21,6 +21,7 @@ import {
   scheduleSearchRouteSync,
   shouldSyncSearchRoute,
 } from '@/helper/homeSearchRouteSync'
+import { preRequestCompassPermission } from '@/helper/geolocation'
 
 const DISTRICTS = Object.keys(DISTRICT_WARD_SUGGESTIONS).sort((a, b) => a.localeCompare(b, 'vi'))
 const ALL_WARDS = Array.from(
@@ -395,6 +396,7 @@ export function useHomeSearchController() {
   }), [searchTerm])
 
   const handleCreateStoreClick = useCallback(() => {
+    preRequestCompassPermission()
     router.push(createStoreHref)
   }, [createStoreHref, router])
 

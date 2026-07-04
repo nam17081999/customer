@@ -12,6 +12,7 @@ import {
   Download, Upload, GitMerge, ChevronDown,
 } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
+import { preRequestCompassPermission } from '@/helper/geolocation'
 
 /* ─── Nav structure — tất cả pages, không role filter ────── */
 const ALL_SECTIONS = [
@@ -160,7 +161,10 @@ export default function Sidebar({ open, onClose }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={onClose}
+                    onClick={() => {
+                      if (item.href === '/store/create') preRequestCompassPermission()
+                      onClose()
+                    }}
                     className={`nav-item ${active ? 'active' : ''}`}
                   >
                     <ItemIcon className="size-[18px] shrink-0" strokeWidth={active ? 2.2 : 1.8} />

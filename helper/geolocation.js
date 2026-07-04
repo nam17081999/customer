@@ -221,6 +221,18 @@ export function getGeoErrorMessage(err) {
   return base
 }
 
+// Lightweight — MUST be called from a user gesture (click/touch handler).
+// On iOS Safari, DeviceOrientationEvent.requestPermission() requires a user gesture;
+// call this before navigating to a page that needs compass heading.
+export function preRequestCompassPermission() {
+  if (typeof window === 'undefined') return
+  if (!('DeviceOrientationEvent' in window)) return
+  if (typeof DeviceOrientationEvent.requestPermission !== 'function') return
+  try {
+    DeviceOrientationEvent.requestPermission().catch(() => {})
+  } catch {}
+}
+
 export async function requestCompassHeading(options = {}) {
   const { requestPermission = false } = options
   const e2eGeolocation = getE2EGeolocationOverride()
