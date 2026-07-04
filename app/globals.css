@@ -121,6 +121,9 @@ body {
     outline: 2px solid var(--accent-glow);
     outline-offset: 2px;
 }
+.search-box input:focus-visible {
+    outline: none;
+}
 
 input,
 select,
@@ -2332,6 +2335,18 @@ html {
     }
     .search-box input::placeholder {
         color: var(--muted);
+    }
+    .search-box input::-webkit-contacts-auto-fill-button,
+    .search-box input::-webkit-credentials-auto-fill-button {
+        display: none !important;
+        visibility: hidden;
+        pointer-events: none;
+    }
+    .search-box input:-webkit-autofill,
+    .search-box input:-webkit-autofill:hover,
+    .search-box input:-webkit-autofill:focus {
+        -webkit-box-shadow: 0 0 0 30px var(--surface2) inset !important;
+        box-shadow: 0 0 0 30px var(--surface2) inset !important;
     }
 
     /* ── Filter group ── */

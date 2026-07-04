@@ -540,7 +540,7 @@ export default function NewSalesOrderPage() {
           onConfirm={handleConfirmSubmit}
         />
         <form
-          className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-[1900px] flex-col px-3 py-3 sm:px-4"
+          className="mx-auto flex min-h-[calc(100dvh-3rem)] w-full max-w-[1900px] flex-col"
           onSubmit={handleSubmit}
         >
           <div className="sticky top-0 z-40 rounded-md border border-gray-800 bg-gray-950 shadow-lg shadow-black/20">
