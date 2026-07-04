@@ -517,11 +517,12 @@ function useLocationPickerController({
     }
   }, [heading])
 
-  // Continuously listen for deviceorientation to update map bearing.
-  // This catches heading from pre-navigation permission grant without React re-render.
+  // Capture the first heading event once and set map bearing — no React re-render.
+  // This works regardless of when iOS permission dialog resolves.
   useEffect(() => {
-    let framePending = false
+    let captured = false
     const handler = (event) => {
+      if (captured) return
       let h = null
       if (typeof event.webkitCompassHeading === 'number') {
         h = event.webkitCompassHeading
@@ -529,19 +530,20 @@ function useLocationPickerController({
         h = (360 - event.alpha) % 360
       }
       if (typeof h !== 'number' || !isFinite(h)) return
-      if (Math.abs(h - lastBearingRef.current) < 0.5) return
-      if (framePending) return
-      framePending = true
-      requestAnimationFrame(() => {
-        framePending = false
-        const map = mapRef.current
-        if (!map) return
-        lastBearingRef.current = h
-        map.setBearing(h)
-      })
+      captured = true
+      window.removeEventListener('deviceorientation', handler, true)
+      const map = mapRef.current
+      if (!map) return
+      lastBearingRef.current = h
+      map.setBearing(h)
     }
     window.addEventListener('deviceorientation', handler, true)
-    return () => window.removeEventListener('deviceorientation', handler, true)
+    return () => {
+      // If not captured yet, remove listener to avoid leak
+      if (!captured) {
+        window.removeEventListener('deviceorientation', handler, true)
+      }
+    }
   }, [])
 
   return { mapContainerRef }
