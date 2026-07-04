@@ -291,31 +291,30 @@ export function useStoreCreateController() {
     if (pickedLat != null && pickedLng != null) return
     bootstrapDoneRef.current = true
 
-    const timeout = setTimeout(() => {
-      void (async () => {
-        try {
-          setResolvingAddr(true)
-          const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
-          if (!coords) {
-            setGeoBlocked(true)
-            return
-          }
-          const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
-          setGeoBlocked(patch.geoBlocked)
-          setInitialGPSLat(patch.initialGPSLat)
-          setInitialGPSLng(patch.initialGPSLng)
-          setPickedLat(patch.pickedLat)
-          setPickedLng(patch.pickedLng)
-          setUserHasEditedMap(patch.userHasEditedMap)
-          setStep2Key((value) => value + 1)
-          void autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
-        } catch (err) {
-          console.error('Bootstrap location error:', err)
+    const timeout = setTimeout(async () => {
+      try {
+        setResolvingAddr(true)
+        const { coords, error } = await getBestPosition(getLocationBootstrapOptions())
+        if (!coords) {
           setGeoBlocked(true)
-        } finally {
-          setResolvingAddr(false)
+          return
         }
-      })()
+        const patch = buildStoreFormLocationPatch({ lat: coords.latitude, lng: coords.longitude, userHasEditedMap: false })
+        setGeoBlocked(patch.geoBlocked)
+        setInitialGPSLat(patch.initialGPSLat)
+        setInitialGPSLng(patch.initialGPSLng)
+        setPickedLat(patch.pickedLat)
+        setPickedLng(patch.pickedLng)
+        setUserHasEditedMap(patch.userHasEditedMap)
+        setStep2Key((value) => value + 1)
+        await refreshCompassHeading({ requestPermission: true })
+        await autoFillDistrictWardFromCoordinates(coords.latitude, coords.longitude)
+      } catch (err) {
+        console.error('Bootstrap location error:', err)
+        setGeoBlocked(true)
+      } finally {
+        setResolvingAddr(false)
+      }
     }, 100)
 
     return () => clearTimeout(timeout)

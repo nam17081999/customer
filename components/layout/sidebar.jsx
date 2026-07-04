@@ -61,25 +61,25 @@ const ALL_SECTIONS = [
     key: 'inventory',
     label: 'Kho hàng',
     items: [
-      { href: '/inventory/products',      label: 'Hàng hóa',     Icon: Package },
-      { href: '/inventory/purchases/new', label: 'Nhập kho',     Icon: ClipboardPlus },
-      { href: '/inventory/purchases',     label: 'Phiếu nhập',   Icon: FileText },
+      { href: '/inventory/products',      label: 'Danh sách hàng hóa',     Icon: Package },
+      { href: '/inventory/purchases/new', label: 'Tạo phiếu nhập',     Icon: ClipboardPlus },
+      { href: '/inventory/purchases',     label: 'Danh sách phiếu nhập',   Icon: FileText },
     ],
   },
   {
     key: 'stats',
     label: 'Thống kê',
     items: [
-      { href: '/inventory/reports', label: 'Thống kê kho', Icon: BarChart3 },
+      { href: '/inventory/reports', label: 'Thống kê kho hàng', Icon: BarChart3 },
     ],
   },
   {
     key: 'system',
     label: 'Hệ thống',
     items: [
-      { href: '/account',          label: 'Tài khoản',         Icon: User },
-      { href: '/admin/users',      label: 'Quản lý tài khoản', Icon: Users },
       { href: '/admin/operations', label: 'Thao tác hệ thống', Icon: Settings },
+      { href: '/admin/users',      label: 'Quản lý tài khoản', Icon: Users },
+      { href: '/account',          label: 'Tài khoản',         Icon: User },
     ],
   },
 ]
