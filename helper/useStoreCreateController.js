@@ -286,7 +286,7 @@ export function useStoreCreateController() {
   }, [])
 
   // Delay geolocation bootstrap to next tick to avoid initial render blocking.
-  // Compass heading is handled by the map's continuous deviceorientation listener.
+  // Heading is captured by the map's one-shot deviceorientation listener.
   useEffect(() => {
     if (bootstrapDoneRef.current) return
     if (pickedLat != null && pickedLng != null) return

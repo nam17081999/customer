@@ -1,44 +1,30 @@
 # Current Work
 
 ## Goal
-Fix compass heading to rotate the map on the store creation page — permission is now requested before navigation, but map didn't re-render with heading because the event listener was never set up.
+Heading captured ONCE when entering create page — map rotates to that heading and stays fixed (no real-time updates).
 
 ## Task Type
 Bugfix
 
 ## In Scope
-- Fix bootstrap compass flow: don't re-request permission (pre-navigation already did it), just listen for events with retry
-- Pre-request compass permission at all navigation entry points to `/store/create`
-
-## Out of Scope
-- GPS flow (already works without gesture)
-- Other pages (edit, report, etc.)
-
-## Must Preserve
-- No persistent compass errors displayed on map
-- "Get location" button retry still works
-- GPS bootstrap timing (100ms delay)
+- One-shot `deviceorientation` listener in map component — captures first heading event, sets bearing, ignores subsequent events
+- Bootstrap handles only GPS (heading is offloaded to map listener)
 
 ---
 
 ## Done
-✅ `helper/geolocation.js:224-234` — new `preRequestCompassPermission()` utility: fires `DeviceOrientationEvent.requestPermission()` within user gesture (lightweight, safe no-op on Android/desktop)
+✅ `components/map/location-picker.jsx:520-545` — one-shot `deviceorientation` listener:
+- Captures the FIRST heading event only (ignores subsequent ones)
+- Sets map bearing directly — no React re-render
+- Self-removes listener after capture (no leak)
+- Works regardless of when iOS permission dialog resolves (even after GPS)
 
-✅ `components/layout/app-navbar.jsx` — added `onClick` to desktop dropdown and mobile tab bar `<Link>` for `/store/create`
-
-✅ `components/layout/sidebar.jsx` — combined `preRequestCompassPermission()` with existing `onClose` onClick for `/store/create` link
-
-✅ `helper/useHomeSearchController.js` — calls `preRequestCompassPermission()` before `router.push()` in `handleCreateStoreClick`
-
-✅ `helper/useStoreCreateController.js:295-316` — changed bootstrap compass call:
-- `requestPermission: false` instead of `true` — pre-navigation already handles iOS permission request
-- Added retry after 2.5s in case iOS permission dialog is still showing on first attempt
-- Proper cleanup of retry timer in `useEffect` return
+✅ `helper/useStoreCreateController.js:288-322` — bootstrap simplified to GPS only; heading capture removed (handled by map listener)
 
 ## Verification
 - `npm run lint` — 0 errors
 - `npx next build` — successful
 
-## Risks / Next
-- 2.5s retry delay is a reasonable heuristic; if user delays responding to the permission dialog beyond ~3.5s total (first 1200ms + retry 2500ms after), heading won't be available on this retry. The "Get location" button still works as a manual fallback.
-- Direct URL entry bypasses pre-navigation request; heading falls back to original behavior (try on mount, may fail on iOS, "Get location" retry works).
+## Two heading paths coexist
+1. **Automatic (one-shot listener)**: Map mounts → listens for first `deviceorientation` event → sets bearing → done. No React re-render.
+2. **"Get location" button**: `refreshCompassHeading()` → `setHeading()` → `useEffect([heading])` → `map.setBearing()`. Triggers React re-render (user-initiated, acceptable).
