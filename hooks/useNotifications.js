@@ -127,6 +127,8 @@ export function useNotifications(isAdmin) {
         { event: 'INSERT', schema: 'public', table: 'stores' },
         async (payload) => {
           try {
+            // Admin tạo cửa hàng với active=true -> không cần duyệt
+            if (payload.new?.active) return
             const storeName = payload.new?.name || 'Cửa hàng mới'
             const id = feedId('sv', payload.new.id)
             await insertBatch([{

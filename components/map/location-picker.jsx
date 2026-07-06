@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { getOrRefreshStores } from '@/lib/storeCache'
-import { parseCoordinate } from '@/helper/coordinate'
+import { toLatLng } from '@/helper/mapHelpers'
 import { buildNearbyStoresSignature, NEARBY_STORES_LIMIT, selectNearestStores } from '@/helper/nearbyStores'
 
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
@@ -128,22 +128,6 @@ function createSelectedLocationMarkerElement() {
   `
 
   return wrapper
-}
-
-function toLatLng(store) {
-  let lat = parseCoordinate(store?.latitude)
-  let lng = parseCoordinate(store?.longitude)
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-
-  if ((lat < -90 || lat > 90) && lng >= -90 && lng <= 90 && lat >= -180 && lat <= 180) {
-    const temp = lat
-    lat = lng
-    lng = temp
-  }
-
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
-  return { lat, lng }
 }
 
 function useLocationPickerController({

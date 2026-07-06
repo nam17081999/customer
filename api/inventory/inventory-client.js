@@ -506,6 +506,18 @@ export async function getSalesOrderDetail(orderId) {
   }
 }
 
+export async function getRecentStoreOrders(storeId, limitCount = 5) {
+  const { data: orders, error } = await db
+    .from('sales_orders')
+    .select('id, code, created_at, total_amount, status')
+    .eq('customer_store_id', storeId)
+    .order('created_at', { ascending: false })
+    .limit(limitCount)
+
+  if (error) throw error
+  return orders || []
+}
+
 export async function listSalesReportRows({ from, to, limit = 1000 } = {}) {
   let orderQuery = db
     .from('sales_orders')

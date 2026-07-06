@@ -49,6 +49,7 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
   const mapRef = useRef(null)
   const activeMarkerImageIdsRef = useRef(new Set())
   const popupRef = useRef(null)
+  const storeNameMapRef = useRef(new Map())
   const [mapReadyVersion, markMapReady] = useReducer((version) => version + 1, 0)
   const [nearbyStores, dispatchNearbyStores] = useReducer((_, nextStores) => nextStores, [])
 
@@ -226,6 +227,17 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
           },
         })
 
+        map.on('styleimagemissing', (e) => {
+          if (!e.id) return
+          const id = e.id
+          if (!id.startsWith('sm-') && !id.startsWith('smh-')) return
+          const highlighted = id.startsWith('smh-')
+          const storeId = highlighted ? id.slice(4) : id.slice(3)
+          const name = storeNameMapRef.current.get(storeId)
+          if (!name) return
+          ensureStoreMarkerImage(map, { storeId, text: name, highlighted })
+        })
+
         popupRef.current = new maplibregl.Popup({
           closeButton: false,
           closeOnClick: false,
@@ -288,10 +300,12 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
       features: mapFeatures,
     })
 
+    const nameMap = new Map()
     const desiredImageIds = new Set()
     for (const feature of mapFeatures) {
       const storeId = feature.properties.storeId
       const name = feature.properties.name || 'Cửa hàng'
+      nameMap.set(storeId, name)
       const highlighted = feature.properties.highlighted === 'yes'
       const baseImageId = getBaseMarkerImageId(storeId)
       desiredImageIds.add(baseImageId)
@@ -307,6 +321,8 @@ export default function StoreDetailMiniMap({ store, open, fill = false }) {
         }
       }
     }
+
+    storeNameMapRef.current = nameMap
 
     const staleImageIds = Array.from(activeMarkerImageIdsRef.current).filter((imageId) => !desiredImageIds.has(imageId))
     if (staleImageIds.length > 0) {

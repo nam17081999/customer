@@ -262,7 +262,7 @@ customer/
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+# GOOGLE_MAPS_API_KEY — không còn dùng, đã chuyển sang MapLibre GL
 ```
 
 ---

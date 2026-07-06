@@ -13,6 +13,10 @@ export async function signInWithEmailPassword(email, password) {
   return supabase.auth.signInWithPassword({ email, password })
 }
 
+export async function signInWithOtp(email) {
+  return supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
+}
+
 export async function getAccessToken() {
   const { data: sessionData } = await supabase.auth.getSession()
   return sessionData?.session?.access_token || null

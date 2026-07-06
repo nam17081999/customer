@@ -7,7 +7,16 @@ import { useAuth } from '@/lib/AuthContext'
 import removeVietnameseTones from '@/helper/removeVietnameseTones'
 import { STORE_TYPE_OPTIONS, DISTRICT_SUGGESTIONS } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SearchBox } from '@/components/ui/search-box'
+import {
+  FilterToggle,
+  FilterDesktopPanel,
+  FilterMobileSheet,
+  FilterGroup,
+  MobileFilterGroup,
+  DESKTOP_SELECT,
+  MOBILE_SELECT,
+} from '@/components/ui/filter-layout'
 import { FullPageLoading } from '@/components/ui/full-page-loading'
 import { Msg } from '@/components/ui/msg'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -647,90 +656,78 @@ export default function OrdersListPage() {
 
             {/* ═══ Toolbar ═══ */}
             <div className="toolbar">
-              {/* Search */}
-              <div className="search-box" style={{ width: 260 }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input type="text" placeholder="Mã đơn hoặc tên cửa hàng..." value={query} onChange={(e) => setQuery(e.target.value)} />
-              </div>
+              <SearchBox
+                value={query}
+                onChange={setQuery}
+                placeholder="Mã đơn hoặc tên cửa hàng..."
+                className="w-[260px] max-[600px]:flex-1 max-[600px]:min-w-[120px]"
+              />
 
-              {/* Filter toggle */}
               {(() => {
                 const activeCount = [filterStoreType, filterDistrict, filterCreator].filter(Boolean).length + (datePreset !== 'all' ? 1 : 0)
                 return (
-                  <button type="button" className="filter-toggle" onClick={() => {
+                  <FilterToggle activeCount={activeCount} onClick={() => {
                     if (window.innerWidth <= 600) { setFilterSheetOpen(true) } else { setFilterPanelOpen((prev) => !prev) }
-                  }} aria-label="Bộ lọc">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="20" y2="12" /><line x1="12" y1="18" x2="20" y2="18" />
-                    </svg>
-                    <span>Bộ lọc</span>
-                    {activeCount > 0 && <span className="filter-badge show">{activeCount}</span>}
-                  </button>
+                  }} />
                 )
               })()}
             </div>
 
             {/* ═══ Filter panel desktop ═══ */}
-            <div className={'filter-panel' + (filterPanelOpen ? ' open' : '')}>
-              <div className="filter-inner">
-                <div className="filter-group">
-                  <label>Trạng thái</label>
-                  <select value={advStatus} onChange={(e) => setAdvStatus(e.target.value)}>
-                    <option value="">Tất cả</option>
-                    <option value="pending">Chờ xác nhận</option>
-                    <option value="confirmed">Đã xác nhận</option>
-                    <option value="cancelled">Đã hủy</option>
-                  </select>
+            <FilterDesktopPanel open={filterPanelOpen} onClear={resetAdvancedFilter}>
+              <FilterGroup label="Trạng thái">
+                <select className={DESKTOP_SELECT} value={advStatus} onChange={(e) => setAdvStatus(e.target.value)}>
+                  <option value="">Tất cả</option>
+                  <option value="pending">Chờ xác nhận</option>
+                  <option value="confirmed">Đã xác nhận</option>
+                  <option value="cancelled">Đã hủy</option>
+                </select>
+              </FilterGroup>
+              <FilterGroup label="Loại cửa hàng">
+                <select className={DESKTOP_SELECT} value={advStoreType} onChange={(e) => setAdvStoreType(e.target.value)}>
+                  <option value="">Tất cả</option>
+                  {STORE_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </FilterGroup>
+              <FilterGroup label="Quận/Huyện">
+                <select className={DESKTOP_SELECT} value={advDistrict} onChange={(e) => setAdvDistrict(e.target.value)}>
+                  <option value="">Tất cả</option>
+                  {DISTRICT_SUGGESTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </FilterGroup>
+              <FilterGroup label="Người tạo">
+                <select className={DESKTOP_SELECT} value={advCreator} onChange={(e) => setAdvCreator(e.target.value)}>
+                  <option value="">Tất cả</option>
+                  <option value={user?.id || ''}>{user?.email || 'Tôi'}</option>
+                </select>
+              </FilterGroup>
+              <FilterGroup label="Khoảng ngày">
+                <div className="date-chips">
+                  {DATE_PRESETS.map((dp) => (
+                    <span key={dp.value} className={'date-chip' + (advDatePreset === dp.value ? ' active' : '')}
+                      onClick={() => { setAdvDatePreset(dp.value); if (dp.value !== 'custom') { setAdvDateFrom(''); setAdvDateTo('') } }}>
+                      {dp.label}
+                    </span>
+                  ))}
                 </div>
-                <div className="filter-group">
-                  <label>Loại cửa hàng</label>
-                  <select value={advStoreType} onChange={(e) => setAdvStoreType(e.target.value)}>
-                    <option value="">Tất cả</option>
-                    {STORE_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Quận/Huyện</label>
-                  <select value={advDistrict} onChange={(e) => setAdvDistrict(e.target.value)}>
-                    <option value="">Tất cả</option>
-                    {DISTRICT_SUGGESTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Người tạo</label>
-                  <select value={advCreator} onChange={(e) => setAdvCreator(e.target.value)}>
-                    <option value="">Tất cả</option>
-                    <option value={user?.id || ''}>{user?.email || 'Tôi'}</option>
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Khoảng ngày</label>
-                  <div className="date-chips">
-                    {DATE_PRESETS.map((dp) => (
-                      <span key={dp.value} className={'date-chip' + (advDatePreset === dp.value ? ' active' : '')}
-                        onClick={() => { setAdvDatePreset(dp.value); if (dp.value !== 'custom') { setAdvDateFrom(''); setAdvDateTo('') } }}>
-                        {dp.label}
-                      </span>
-                    ))}
+                {advDatePreset === 'custom' && (
+                  <div className="flex gap-2 mt-1">
+                    <input type="date" value={advDateFrom} onChange={(e) => setAdvDateFrom(e.target.value)}
+                      className="h-8 bg-[color:var(--bg)] border border-[color:var(--border)] rounded-sm text-[color:var(--fg)] text-[13px] px-2.5 outline-none flex-1" />
+                    <span className="text-[color:var(--muted)] text-[13px] self-center">→</span>
+                    <input type="date" value={advDateTo} onChange={(e) => setAdvDateTo(e.target.value)}
+                      className="h-8 bg-[color:var(--bg)] border border-[color:var(--border)] rounded-sm text-[color:var(--fg)] text-[13px] px-2.5 outline-none flex-1" />
                   </div>
-                  {advDatePreset === 'custom' && (
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                      <input type="date" value={advDateFrom} onChange={(e) => setAdvDateFrom(e.target.value)}
-                        style={{ height: 32, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--fg)', padding: '0 10px', fontSize: 13, outline: 'none', flex: 1 }} />
-                      <span style={{ color: 'var(--muted)', fontSize: 13, alignSelf: 'center' }}>→</span>
-                      <input type="date" value={advDateTo} onChange={(e) => setAdvDateTo(e.target.value)}
-                        style={{ height: 32, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--fg)', padding: '0 10px', fontSize: 13, outline: 'none', flex: 1 }} />
-                    </div>
-                  )}
-                </div>
-                <div className="filter-actions" style={{ justifyContent: 'flex-end', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                  <button className="btn btn-outline btn-sm" onClick={resetAdvancedFilter}>Đặt lại</button>
-                  <button className="btn btn-primary btn-sm" onClick={applyAdvancedFilter}>Áp dụng</button>
-                </div>
+                )}
+              </FilterGroup>
+              <div className="flex items-end gap-2 pb-px">
+                <button type="button"
+                  onClick={applyAdvancedFilter}
+                  className="h-8 px-4 rounded-sm bg-[color:var(--accent)] text-white text-[13px] font-semibold cursor-pointer border-none whitespace-nowrap">
+                  Áp dụng
+                </button>
               </div>
-            </div>
+            </FilterDesktopPanel>
 
             {/* Error */}
             {error && <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-red-200">{error}</div>}
@@ -914,47 +911,44 @@ export default function OrdersListPage() {
       <div className="print-hide">{consolidationData.length > 0 && <ConsolidationPrintContent ref={consolidationPrintRef} selectedOrders={selectedOrders} consolidationData={consolidationData} dateFrom={dateFrom} dateTo={dateTo} userEmail={user?.email} />}</div>
 
       {/* ═══ Mobile filter sheet ═══ */}
-      <div className={'filter-sheet flex flex-col gap-2' + (filterSheetOpen ? ' open' : '')}>
-        <div className="sheet-handle"></div>
-        <div className="sheet-title">Bộ lọc</div>
-
-        <div className="sheet-group">
-          <label>Trạng thái</label>
-          <select value={advStatus} onChange={(e) => setAdvStatus(e.target.value)}>
+      <FilterMobileSheet
+        open={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        onClear={resetAdvancedFilter}
+        onApply={applyAdvancedFilter}
+      >
+        <MobileFilterGroup label="Trạng thái">
+          <select className={MOBILE_SELECT} value={advStatus} onChange={(e) => setAdvStatus(e.target.value)}>
             <option value="">Tất cả</option>
             <option value="pending">Chờ xác nhận</option>
             <option value="confirmed">Đã xác nhận</option>
             <option value="cancelled">Đã hủy</option>
           </select>
-        </div>
+        </MobileFilterGroup>
 
-        <div className="sheet-group">
-          <label>Loại cửa hàng</label>
-          <select value={advStoreType} onChange={(e) => setAdvStoreType(e.target.value)}>
+        <MobileFilterGroup label="Loại cửa hàng">
+          <select className={MOBILE_SELECT} value={advStoreType} onChange={(e) => setAdvStoreType(e.target.value)}>
             <option value="">Tất cả</option>
             {STORE_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-        </div>
+        </MobileFilterGroup>
 
-        <div className="sheet-group">
-          <label>Quận/Huyện</label>
-          <select value={advDistrict} onChange={(e) => setAdvDistrict(e.target.value)}>
+        <MobileFilterGroup label="Quận/Huyện">
+          <select className={MOBILE_SELECT} value={advDistrict} onChange={(e) => setAdvDistrict(e.target.value)}>
             <option value="">Tất cả</option>
             {DISTRICT_SUGGESTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
-        </div>
+        </MobileFilterGroup>
 
-        <div className="sheet-group">
-          <label>Người tạo</label>
-          <select value={advCreator} onChange={(e) => setAdvCreator(e.target.value)}>
+        <MobileFilterGroup label="Người tạo">
+          <select className={MOBILE_SELECT} value={advCreator} onChange={(e) => setAdvCreator(e.target.value)}>
             <option value="">Tất cả</option>
             <option value={user?.id || ''}>{user?.email || 'Tôi'}</option>
           </select>
-        </div>
+        </MobileFilterGroup>
 
-        <div className="sheet-group">
-          <label>Khoảng ngày</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        <MobileFilterGroup label="Khoảng ngày">
+          <div className="flex flex-wrap gap-1.5 mb-2">
             {DATE_PRESETS.map((dp) => (
               <span key={dp.value} className={'date-chip' + (advDatePreset === dp.value ? ' active' : '')}
                 onClick={() => { setAdvDatePreset(dp.value); if (dp.value !== 'custom') { setAdvDateFrom(''); setAdvDateTo('') } }}>
@@ -963,20 +957,16 @@ export default function OrdersListPage() {
             ))}
           </div>
           {advDatePreset === 'custom' && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="date" value={advDateFrom} onChange={(e) => setAdvDateFrom(e.target.value)} />
-              <span style={{ color: 'var(--muted)', fontSize: 13, alignSelf: 'center' }}>→</span>
-              <input type="date" value={advDateTo} onChange={(e) => setAdvDateTo(e.target.value)} />
+            <div className="flex gap-2">
+              <input type="date" value={advDateFrom} onChange={(e) => setAdvDateFrom(e.target.value)}
+                className="flex-1 h-10 bg-[color:var(--bg)] border border-[color:var(--border)] rounded-sm text-[color:var(--fg)] text-[14px] px-2.5 outline-none" />
+              <span className="text-[color:var(--muted)] text-[13px] self-center">→</span>
+              <input type="date" value={advDateTo} onChange={(e) => setAdvDateTo(e.target.value)}
+                className="flex-1 h-10 bg-[color:var(--bg)] border border-[color:var(--border)] rounded-sm text-[color:var(--fg)] text-[14px] px-2.5 outline-none" />
             </div>
           )}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button className="apply-btn" style={{ flex: 1, background: 'var(--border)', color: 'var(--fg)' }} onClick={resetAdvancedFilter}>Đặt lại</button>
-          <button className="apply-btn" style={{ flex: 3 }} onClick={applyAdvancedFilter}>Xem kết quả</button>
-        </div>
-      </div>
-      <div className={'filter-backdrop' + (filterSheetOpen ? ' open' : '')} onClick={() => setFilterSheetOpen(false)}></div>
+        </MobileFilterGroup>
+      </FilterMobileSheet>
     </>
   )
 }

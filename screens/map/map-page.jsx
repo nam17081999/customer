@@ -2,7 +2,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import dynamic from 'next/dynamic'
-import { Input } from '@/components/ui/input'
+import { SearchBox } from '@/components/ui/search-box'
 import { Button } from '@/components/ui/button'
 import { getOrRefreshStores } from '@/lib/storeCache'
 import { DISTRICT_WARD_SUGGESTIONS, STORE_TYPE_OPTIONS } from '@/lib/constants'
@@ -340,6 +340,39 @@ export default function MapPage() {
           paint: {
             'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
           },
+        })
+
+        map.on('styleimagemissing', (e) => {
+          if (!e.id) return
+          const id = e.id
+          let highlighted = false
+          let routeOrder = ''
+          let storeId = ''
+
+          if (id.startsWith('smrh-')) {
+            highlighted = true
+            const rest = id.slice(5)
+            const match = rest.match(/^(.+)-(\d+)$/)
+            if (match) { storeId = match[1]; routeOrder = match[2] }
+            else { storeId = rest }
+          } else if (id.startsWith('smr-')) {
+            const rest = id.slice(4)
+            const match = rest.match(/^(.+)-(\d+)$/)
+            if (match) { storeId = match[1]; routeOrder = match[2] }
+            else { storeId = rest }
+          } else if (id.startsWith('smh-')) {
+            highlighted = true
+            storeId = id.slice(4)
+          } else if (id.startsWith('sm-')) {
+            storeId = id.slice(3)
+          } else {
+            return
+          }
+
+          const store = storeMapRef.current.get(storeId)
+          if (!store) return
+          const name = store.name || 'Cửa hàng'
+          ensureStoreMarkerImage(map, { storeId, text: name, routeOrder, highlighted })
         })
 
         map.addLayer({
@@ -816,6 +849,7 @@ export default function MapPage() {
 
         {!showNavigationInfoPanel && (
           <MapSearchBar
+            suggestionsRef={suggestionsRef}
             searchTerm={searchTerm}
             inputRef={inputRef}
             searchWrapperRef={searchWrapperRef}
@@ -975,6 +1009,7 @@ export default function MapPage() {
 /* ─── Sub-components ─── */
 
 function MapSearchBar({
+  suggestionsRef,
   searchTerm,
   inputRef,
   searchWrapperRef,
@@ -996,35 +1031,32 @@ function MapSearchBar({
   return (
     <div className="pointer-events-none absolute inset-x-0 top-2 z-20 px-2 sm:top-3 sm:px-3">
       <div ref={searchWrapperRef} className="pointer-events-auto mx-auto w-full max-w-md md:mx-0 md:mr-auto">
-        <div className="grid grid-cols-[1fr_auto] items-center">
-          <Input
-            ref={inputRef}
-            placeholder="Tìm cửa hàng..."
-            value={searchTerm}
-            onChange={(e) => handleSearchInputChange(e.target.value)}
-            onFocus={handleSearchFocus}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowDown') {
-                e.preventDefault()
-                moveActiveSuggestion('down', suggestions.length)
-              } else if (e.key === 'ArrowUp') {
-                e.preventDefault()
-                moveActiveSuggestion('up', suggestions.length)
-              } else if (e.key === 'Enter') {
-                e.preventDefault()
-                if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
-                  flyToStore(suggestions[activeSuggestion])
-                } else {
-                  handleSearch()
-                }
-              } else if (e.key === 'Escape') {
-                closeSuggestions()
-                inputRef.current?.blur()
+        <SearchBox
+          value={searchTerm}
+          onChange={handleSearchInputChange}
+          placeholder="Tìm cửa hàng..."
+          inputRef={inputRef}
+          onFocus={handleSearchFocus}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault()
+              moveActiveSuggestion('down', suggestions.length)
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault()
+              moveActiveSuggestion('up', suggestions.length)
+            } else if (e.key === 'Enter') {
+              e.preventDefault()
+              if (activeSuggestion >= 0 && suggestions[activeSuggestion]) {
+                flyToStore(suggestions[activeSuggestion])
+              } else {
+                handleSearch()
               }
-            }}
-            className="h-11 rounded-lg border-gray-700 bg-gray-950 px-3 text-base text-gray-100 placeholder:text-gray-400"
-          />
-        </div>
+            } else if (e.key === 'Escape') {
+              closeSuggestions()
+              inputRef.current?.blur()
+            }
+          }}
+        />
 
         {/* Suggestions dropdown */}
         {showSuggestions && suggestions.length > 0 && (
