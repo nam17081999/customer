@@ -7,10 +7,17 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import MagicLinkForm from '@/components/auth/magic-link-form'
+
+const LOGIN_TABS = [
+  { key: 'password', label: 'Mật khẩu' },
+  { key: 'magic-link', label: 'Email' },
+]
 
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, signOut, isAuthenticated, isSignedIn, loading: authLoading } = useAuth()
+  const [tab, setTab] = useState('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -92,55 +99,76 @@ export default function LoginPage() {
           <p className="text-sm text-gray-400">Dành cho tài khoản telesale hoặc admin</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="login-email">Email</Label>
-            <Input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              placeholder="admin@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              disabled={loading || authLoading}
-            />
-          </div>
+        <div className="flex rounded-lg border border-gray-700 mb-6 overflow-hidden">
+          {LOGIN_TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => { setTab(t.key); setError('') }}
+              className={`flex-1 py-2.5 text-sm font-medium cursor-pointer transition ${
+                tab === t.key
+                  ? 'bg-gray-800 text-gray-100'
+                  : 'bg-transparent text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="login-password">Mật khẩu</Label>
-            <div className="relative">
-              <input
-                id="login-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+        {tab === 'password' ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="login-email">Email</Label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 required
                 disabled={loading || authLoading}
-                className="flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 pr-10 text-base text-gray-100 placeholder:text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 cursor-pointer"
-                tabIndex={-1}
-                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-              >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
-          </div>
 
-          {error && (
-            <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>
-          )}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-password">Mật khẩu</Label>
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  disabled={loading || authLoading}
+                  className="flex h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 pr-10 text-base text-gray-100 placeholder:text-gray-500 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 cursor-pointer"
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
 
-          <Button type="submit" className="w-full" disabled={loading || authLoading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </Button>
-        </form>
+            {error && (
+              <div className="rounded-md border border-red-900 bg-red-950/30 px-4 py-3 text-sm text-red-200">{error}</div>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading || authLoading}>
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            </Button>
+          </form>
+        ) : (
+          <MagicLinkForm />
+        )}
       </div>
     </div>
   )

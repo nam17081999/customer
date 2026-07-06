@@ -19,9 +19,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
 ## Optional (nếu cần)
 
 ```bash
-# Google Maps API Key (cho location picker trong form tạo/sửa store)
-NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-key
-
 # Server-side API keys (không prefix NEXT_PUBLIC_ — không leak ra browser)
 GEOAPIFY_API_KEY=
 OPENMAP_API_KEY=

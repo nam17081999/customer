@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import AppLayout from "@/components/layout/app-layout";
 import { NotificationToaster } from "@/components/layout/notification-toaster";
 import { useNotifications } from "@/hooks/useNotifications";
+import ToastContainer from "@/components/ui/toast-container";
 
 import { useAuth } from '@/lib/AuthContext'
 
@@ -55,6 +56,7 @@ export default function App({ Component, pageProps }) {
   const content = (
     <>
       <NotificationRoot />
+      <ToastContainer />
       <Component {...pageProps} />
     </>
   )

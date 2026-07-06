@@ -8,47 +8,16 @@ import { FullPageLoading } from "@/components/ui/full-page-loading";
 import { getCachedStores, getOrRefreshStores } from "@/lib/storeCache";
 import { formatDateTime } from "@/helper/validation";
 import { fetchEditHistory } from "@/api/stores/store-client";
+import {
+  ACTION_LABELS,
+  FIELD_LABELS,
+  formatFieldValue,
+  getAvailableActionTypes,
+  getAvailableFields,
+  filterEditHistoryItems,
+} from "@/helper/storeEditHistoryUI";
 
 const PAGE_SIZE = 50;
-
-const ACTION_LABELS = {
-  edit: "Chỉnh sửa",
-  supplement: "Bổ sung",
-  verify: "Xác thực",
-  report_apply: "Duyệt báo cáo",
-  delete_soft: "Xóa mềm",
-  telesale_potential_toggle: "Đổi trạng thái tiềm năng",
-};
-
-const FIELD_LABELS = {
-  name: "Tên",
-  store_type: "Loại cửa hàng",
-  address_detail: "Địa chỉ chi tiết",
-  ward: "Xã/Phường",
-  district: "Quận/Huyện",
-  phone: "Số điện thoại",
-  phone_secondary: "Số điện thoại 2",
-  note: "Ghi chú",
-  latitude: "Vĩ độ",
-  longitude: "Kinh độ",
-  active: "Xác thực",
-  deleted_at: "Xóa mềm",
-  is_potential: "Tiềm năng",
-  last_call_result: "Kết quả gọi",
-  sales_note: "Ghi chú telesale",
-};
-
-function formatFieldValue(key, value) {
-  if (value === null || value === undefined || value === "") return "—";
-  if (key === "latitude" || key === "longitude") {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return "—";
-    return num.toFixed(6);
-  }
-  if (key === "active") return value ? "Có" : "Không";
-  if (key === "deleted_at") return value ? "Có" : "Không";
-  return String(value);
-}
 
 export default function StoreEditHistoryPage() {
   const router = useRouter();
@@ -149,55 +118,15 @@ export default function StoreEditHistoryPage() {
     void loadPage(0, { append: false }).finally(() => setLoading(false));
   }, [pageReady, storeId, resolveStoreName, loadPage]);
 
-  const availableActionTypes = useMemo(() => {
-    return Array.from(
-      new Set(
-        items.map((row) => String(row?.action_type || "")).filter(Boolean),
-      ),
-    ).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items]);
-
-  const availableFields = useMemo(() => {
-    const keys = new Set();
-    for (const row of items) {
-      const changes =
-        row?.changes && typeof row.changes === "object" ? row.changes : {};
-      Object.keys(changes).forEach((key) => keys.add(key));
-    }
-    return Array.from(keys).sort((a, b) => a.localeCompare(b, "vi"));
-  }, [items]);
-
-  const filteredItems = useMemo(() => {
-    const q = String(searchTerm || "")
-      .trim()
-      .toLowerCase();
-    return items.filter((row) => {
-      if (
-        actionFilter !== "all" &&
-        String(row?.action_type || "") !== actionFilter
-      )
-        return false;
-
-      const changes =
-        row?.changes && typeof row.changes === "object" ? row.changes : {};
-      const keys = Object.keys(changes);
-      if (fieldFilter !== "all" && !keys.includes(fieldFilter)) return false;
-
-      if (!q) return true;
-      const actionLabel =
-        ACTION_LABELS[row.action_type] || String(row.action_type || "");
-      const actorRole = String(row.actor_role || "");
-      const joinedKeys = keys.join(" ");
-      return (
-        actionLabel.toLowerCase().includes(q) ||
-        String(row.action_type || "")
-          .toLowerCase()
-          .includes(q) ||
-        actorRole.toLowerCase().includes(q) ||
-        joinedKeys.toLowerCase().includes(q)
-      );
-    });
-  }, [items, actionFilter, fieldFilter, searchTerm]);
+  const availableActionTypes = getAvailableActionTypes(items);
+  const availableFields = getAvailableFields(items);
+  const filteredItems = filterEditHistoryItems({
+    items,
+    actionFilter,
+    fieldFilter,
+    searchTerm,
+    actionLabels: ACTION_LABELS,
+  });
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;

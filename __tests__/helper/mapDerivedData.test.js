@@ -8,7 +8,37 @@ import {
   buildStoreLookupMap,
   buildVisibleMapStores,
   createMapFeatureBaseCache,
+  getFirstMeaningfulWord,
 } from '@/helper/mapDerivedData'
+
+describe('getFirstMeaningfulWord', () => {
+  it('trả về chữ đầu tiên nếu không có ignored term', () => {
+    expect(getFirstMeaningfulWord('Minh Anh')).toBe('Minh')
+  })
+
+  it('bỏ qua ignored term ở đầu', () => {
+    expect(getFirstMeaningfulWord('Cửa Hàng Minh Anh')).toBe('Minh')
+    expect(getFirstMeaningfulWord('Tạp Hoá Hoa Lan')).toBe('Hoa')
+    expect(getFirstMeaningfulWord('quán ăn ngon')).toBe('ngon')
+  })
+
+  it('cắt tối đa 12 ký tự', () => {
+    expect(getFirstMeaningfulWord('Trần Văn A')).toBe('Trần')
+    expect(getFirstMeaningfulWord('')).toBe('?')
+  })
+
+  it('xử lý nhiều ignored term liên tiếp', () => {
+    expect(getFirstMeaningfulWord('cửa hàng tạp hoá nhà hàng ABC')).toBe('ABC')
+    expect(getFirstMeaningfulWord('cửa hàng Cửa Hàng Minh')).toBe('Minh')
+  })
+
+  it('trả về fallback khi name rỗng', () => {
+    expect(getFirstMeaningfulWord('')).toBe('?')
+    expect(getFirstMeaningfulWord('   ')).toBe('?')
+    expect(getFirstMeaningfulWord(null)).toBe('null')
+    expect(getFirstMeaningfulWord(undefined)).toBe('?')
+  })
+})
 
 function makeStore(overrides = {}) {
   return {

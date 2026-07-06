@@ -9,14 +9,14 @@ import { formatDistance } from '@/helper/validation'
 
 export function getStoreTypeClass(storeType) {
   const map = {
-    tap_hoa: 'store-type-tap-hoa',
-    quan_an: 'store-type-quan-an',
-    kho: 'store-type-kho',
-    karaoke: 'store-type-karaoke',
-    khach_san: 'store-type-khach-san',
-    game: 'store-type-game',
+    tap_hoa: 'text-emerald-500 bg-emerald-500/10',
+    quan_an: 'text-orange-500 bg-orange-500/10',
+    kho: 'text-blue-500 bg-blue-500/10',
+    karaoke: 'text-purple-500 bg-purple-500/10',
+    khach_san: 'text-red-500 bg-red-500/10',
+    game: 'text-amber-500 bg-amber-500/10',
   }
-  return map[storeType] || 'store-type-tap-hoa'
+  return map[storeType] || 'text-emerald-500 bg-emerald-500/10'
 }
 
 const PinIcon = () => (
@@ -45,11 +45,10 @@ const EditIcon = () => (
   </svg>
 )
 
-const MapIcon_sm = () => (
+const NavigateIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-    <line x1="8" y1="2" x2="8" y2="18" />
-    <line x1="16" y1="6" x2="16" y2="22" />
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+    <circle cx="12" cy="10" r="3" />
   </svg>
 )
 
@@ -69,27 +68,27 @@ function StoreCard({ store, distance, onOpenDetail }) {
 
   return (
     <div
-      className="store-card"
+      className="flex flex-col bg-[color:var(--surface)] border border-[color:var(--border)] rounded p-4 cursor-pointer outline-none touch-manipulation"
       tabIndex={0}
       role="button"
       onClick={() => onOpenDetail(store)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenDetail(store) } }}
     >
-      <div className="store-card-top">
+      <div className="flex justify-between items-start gap-2 mb-2.5">
         <div className="flex-1 min-w-0">
-          <div className="store-card-name">
-            <span className="store-type-icon shrink-0">{typeMeta.icon}</span>
+          <div className="flex items-center gap-3 min-w-0 overflow-hidden text-[18px] font-semibold">
+            <span className="shrink-0">{typeMeta.icon}</span>
             <span className="truncate">{store.name}</span>
           </div>
-          <div className="store-card-meta">
-            <span className={`store-card-type ${getStoreTypeClass(store.store_type)}`}>
+          <div className="flex gap-1.5 items-center mt-1.5 flex-wrap">
+            <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${getStoreTypeClass(store.store_type)}`}>
               {typeLabel}
             </span>
-            <span className={`store-card-type ${store.active ? 'store-type-tap-hoa' : 'store-type-kho'}`}>
+            <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-medium ${store.active ? 'text-emerald-500 bg-emerald-500/10' : 'text-blue-500 bg-blue-500/10'}`}>
               {store.active ? 'Đã xác thực' : 'Chưa xác thực'}
             </span>
             {distVal != null && (
-              <span className="dist-badge">
+              <span className="inline-flex items-center gap-1 text-[11px] text-[color:var(--accent)] whitespace-nowrap bg-[color:var(--accent-glow)] px-2 py-0.5 rounded-full shrink-0">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                   <circle cx="12" cy="10" r="3" />
@@ -100,39 +99,34 @@ function StoreCard({ store, distance, onOpenDetail }) {
           </div>
         </div>
       </div>
-      <div className="store-card-body">
+      <div className="flex flex-col gap-2 mb-3 flex-1">
         {addressText && (
-          <div className="store-card-row">
-            <PinIcon />
+          <div className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
+            <span className="shrink-0"><PinIcon /></span>
             <span className="truncate">{addressText}</span>
           </div>
         )}
-        <div className="store-card-row">
-          <PhoneIcon />
+        <div className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
+          <span className="shrink-0"><PhoneIcon /></span>
           <span>{phone || 'Chưa có số'}</span>
         </div>
       </div>
-      <div className="store-card-actions" onClick={(e) => e.stopPropagation()}>
-        <a href={phone ? `tel:${phone}` : undefined} className={`btn btn-outline btn-sm${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
+      <div className="flex gap-1.5 mt-auto pt-3 border-t border-[color:var(--border)] flex-wrap" onClick={(e) => e.stopPropagation()}>
+        <a href={phone ? `tel:${phone}` : undefined} className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
           <CallIcon /> Gọi
         </a>
-        {user && (
-          <Link href={`/store/edit/${store.id}`} className="btn btn-outline btn-sm">
-            <EditIcon /> Sửa
-          </Link>
-        )}
         <a
           href={store.latitude && store.longitude ? `https://www.google.com/maps?q=${store.latitude},${store.longitude}` : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          className={`btn btn-outline btn-sm${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
+          className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
           tabIndex={store.latitude && store.longitude ? undefined : -1}
           aria-disabled={!store.latitude || !store.longitude}
         >
-          <MapIcon_sm /> Map
+          <NavigateIcon /> Dẫn đường
         </a>
         {user && (isAdmin || user.role === 'telesale') && (
-          <Link href={`/orders/new?storeId=${store.id}`} className="btn btn-outline btn-sm">
+          <Link href={`/orders/new?storeId=${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -143,7 +137,7 @@ function StoreCard({ store, distance, onOpenDetail }) {
           </Link>
         )}
         {!isAdmin && (
-          <Link href={`/store/report/${store.id}`} className="btn btn-outline btn-sm ml-auto">
+          <Link href={`/store/report/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
             <ReportIcon /> Báo cáo
           </Link>
         )}

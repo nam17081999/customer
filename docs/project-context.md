@@ -85,7 +85,7 @@ Trang chủ (/) → Tìm kiếm theo tên + bộ lọc chi tiết
 | Service | Dùng cho | Biến env |
 |---|---|---|
 | Supabase | Database + Auth | `NEXT_PUBLIC_SUPABASE_URL`, `ANON_KEY` |
-| Google Maps API | Location picker (create/edit form) | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` |
+| MapLibre GL (trong form) | Location picker (create/edit form) — dùng chung với `/map` | không cần key |
 | OpenStreetMap | Tile bản đồ (/map) | Không cần key |
 
 ---
