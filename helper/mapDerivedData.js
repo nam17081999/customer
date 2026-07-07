@@ -72,22 +72,27 @@ export function buildVisibleMapStores({
 
 export function buildMapStoreFeatures({
   visibleMapStores,
+  searchHighlightIds,
   highlightedStoreId,
   completedRouteStopIdSet,
   routeStopOrderById,
   featureBaseCache,
 }) {
+  const hasSearch = searchHighlightIds && searchHighlightIds.size > 0
   const highlightedId = highlightedStoreId ? String(highlightedStoreId) : ''
   const features = visibleMapStores.map((store) => {
+    const storeId = String(store.id)
     const baseFeature = getOrCreateBaseMapFeature(featureBaseCache, store)
+    const isSearchMatch = hasSearch && searchHighlightIds.has(storeId)
     return {
       ...baseFeature,
       geometry: baseFeature.geometry,
       properties: {
         ...baseFeature.properties,
-        routeOrder: routeStopOrderById.get(String(store.id)) || '',
-        passed: completedRouteStopIdSet.has(String(store.id)) ? 'yes' : 'no',
-        highlighted: String(store.id) === highlightedId ? 'yes' : 'no',
+        routeOrder: routeStopOrderById.get(storeId) || '',
+        passed: completedRouteStopIdSet.has(storeId) ? 'yes' : 'no',
+        highlighted: storeId === highlightedId ? 'yes' : 'no',
+        searchMatch: isSearchMatch ? 'yes' : 'no',
       },
     }
   })
