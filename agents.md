@@ -23,8 +23,8 @@ Build and maintain NPP Hà Công safely, with high correctness for:
 8. `docs/ai-task-types.md`
 9. `docs/current-work.md`
 10. `docs/regression-checklist.md`
-11. `docs/skills/storevis-project-execution.SKILL.md`
-12. `docs/skills/storevis-ai-collaboration.SKILL.md`
+11. `docs/skills/grilling.SKILL.md`
+12. `docs/skills/tdd.SKILL.md`
 
 ## 2b. Daily Working Memory (mandatory)
 
@@ -58,9 +58,15 @@ Build and maintain NPP Hà Công safely, with high correctness for:
 
 ## 3. Default Skill Stack
 
-For all technical tasks, combine:
-- `$storevis-project-execution`
-- `$storevis-ai-collaboration`
+For all technical tasks:
+1. Start with `$grilling` to align on requirements
+2. Implement with `$tdd` (red-green-refactor)
+
+Add when needed:
+- `$diagnosing-bugs` — when fixing hard bugs
+- `$code-review` — before committing changes
+- `$improve-codebase-architecture` — for architecture improvement
+- `$handoff` — when switching context/agent
 
 Add when text/data can break Vietnamese output:
 - `$lean-vietnamese-dev-flow`
