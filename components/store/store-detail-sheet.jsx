@@ -259,15 +259,15 @@ export default function StoreDetailSheet({ store, open, onOpenChange }) {
 
         {/* action buttons */}
         <div className="px-4 pb-5 flex gap-1.5 flex-wrap">
-          <a href={phone ? `tel:${phone}` : undefined} className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
+          <a href={phone ? `tel:${phone}` : undefined} className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
             <CallSvg /> Gọi
           </a>
           {isAdmin ? (
-            <Link href={`/store/edit/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+            <Link href={`/store/edit/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
               <EditSvg /> Sửa
             </Link>
           ) : (
-            <Link href={`/store/edit/${store.id}?mode=supplement`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+            <Link href={`/store/edit/${store.id}?mode=supplement`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
               <EditSvg /> Bổ sung
             </Link>
           )}
@@ -275,27 +275,27 @@ export default function StoreDetailSheet({ store, open, onOpenChange }) {
             href={store.latitude && store.longitude ? `https://www.google.com/maps?q=${store.latitude},${store.longitude}` : undefined}
             target="_blank"
             rel="noopener noreferrer"
-            className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
+            className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
             tabIndex={store.latitude && store.longitude ? undefined : -1}
             aria-disabled={!store.latitude || !store.longitude}
           >
             <NavigateSvg /> Dẫn đường
           </a>
-          <Link href={`/orders/new?storeId=${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+          <Link href={`/orders/new?storeId=${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
             <OrderSvg /> Lên đơn
           </Link>
           {appMapHref && (
-            <Link href={appMapHref} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+            <Link href={appMapHref} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
               <MapSvg /> Xem bản đồ
             </Link>
           )}
           {!isAdmin && (
-            <Link href={`/store/report/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+            <Link href={`/store/report/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
               <ReportSvg /> Báo cáo
             </Link>
           )}
           {isAdmin && (
-            <Link href={`/store/history/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+            <Link href={`/store/history/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
               <HistorySvg /> Lịch sử
             </Link>
           )}

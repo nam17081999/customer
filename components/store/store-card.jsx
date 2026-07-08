@@ -112,21 +112,21 @@ function StoreCard({ store, distance, onOpenDetail }) {
         </div>
       </div>
       <div className="flex gap-1.5 mt-auto pt-3 border-t border-[color:var(--border)] flex-wrap" onClick={(e) => e.stopPropagation()}>
-        <a href={phone ? `tel:${phone}` : undefined} className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
+            <a href={phone ? `tel:${phone}` : undefined} className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!phone ? ' opacity-40 pointer-events-none' : ''}`} tabIndex={phone ? undefined : -1} aria-disabled={!phone}>
           <CallIcon /> Gọi
         </a>
         <a
           href={store.latitude && store.longitude ? `https://www.google.com/maps?q=${store.latitude},${store.longitude}` : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
+          className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]${!store.latitude || !store.longitude ? ' opacity-30 pointer-events-none' : ''}`}
           tabIndex={store.latitude && store.longitude ? undefined : -1}
           aria-disabled={!store.latitude || !store.longitude}
         >
           <NavigateIcon /> Dẫn đường
         </a>
         {user && (isAdmin || user.role === 'telesale') && (
-          <Link href={`/orders/new?storeId=${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+          <Link href={`/orders/new?storeId=${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -137,7 +137,7 @@ function StoreCard({ store, distance, onOpenDetail }) {
           </Link>
         )}
         {!isAdmin && (
-          <Link href={`/store/report/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
+          <Link href={`/store/report/${store.id}`} className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)]">
             <ReportIcon /> Báo cáo
           </Link>
         )}

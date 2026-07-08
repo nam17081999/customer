@@ -116,12 +116,9 @@ body {
     background: color-mix(in srgb, var(--border) 70%, var(--fg));
 }
 
-/* Focus visible */
-*:focus-visible {
-    outline: 2px solid var(--accent-glow);
-    outline-offset: 2px;
-}
-.search-box input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
     outline: none;
 }
 

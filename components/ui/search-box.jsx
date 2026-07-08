@@ -5,7 +5,7 @@ import { Search, X } from 'lucide-react'
 export function SearchBox({ value, onChange, placeholder = 'Tìm kiếm...', width, className = '', inputRef, onKeyDown, onFocus, onBlur }) {
   return (
     <div
-      className={`flex items-center gap-2 bg-[color:var(--surface2)] border border-[color:var(--border)] rounded-sm px-3 h-9 transition-[border-color] duration-150 focus-within:border-[color:var(--accent)] ${className}`}
+      className={`flex items-center gap-2 bg-[color:var(--surface2)] border border-[color:var(--border)] rounded-sm px-3 h-11 transition-[border-color] duration-150 focus-within:border-[color:var(--accent)] ${className}`}
       style={width ? { width } : undefined}
     >
       <Search className="size-[14px] shrink-0 text-[color:var(--muted)]" />
