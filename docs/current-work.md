@@ -68,3 +68,30 @@ Refactor
 ## Risks / Next
 - **improve-codebase-architecture** references `/codebase-design` vocabulary; essential terms (module, interface, depth, seam, adapter, leverage, locality) are inlined, but the skill also references `DEEPENING.md` and `DESIGN-IT-TWICE.md` — can be fetched on demand if needed.
 - **Opencode không dùng skill mới tự động.** Các .SKILL.md này được reference trong AGENTS.md nhưng opencode chỉ load skill qua tool `skill()` khi được gọi tên trong `<available_skills>`. Hiện tại system prompt chỉ có `customize-opencode` — muốn opencode nhận diện thì cần config `.opencode/` directory hoặc `opencode.json`.
+
+---
+
+## Task 2: Xoá audit snapshot docs + cập nhật analysis-report.md
+
+### Goal
+Dọn dẹp 3 file audit snapshot đã lạc hậu, cập nhật analysis-report.md với số liệu hiện tại.
+
+### Task Type
+Refactor (dọn docs)
+
+### Done
+- ✅ **Xoá** `form-msg-audit.md` — snapshot audit hết hạn, không tracking
+- ✅ **Xoá** `ui-states-audit.md` — snapshot audit hết hạn, không tracking
+- ✅ **Xoá** `audit-log-analysis.md` — snapshot audit hết hạn, không tracking
+- ✅ **Cập nhật** `analysis-report.md`:
+  - Ngày + ghi chú "Cập nhật: 2026-07-08"
+  - Test stats: 48→60 files, 482→665 tests, 5→2 failures
+  - Migrations: 13→15
+  - Commits: 324→350
+  - Phân tích test fail: cập nhật danh sách 2 file còn fail + ghi chú 3 file đã fix
+  - Critical risks: strikethrough 4 mục đã fix
+  - Priority 1: gộp còn 1 mục (fix 2 test failures), bỏ mục homeSearch đã fix
+
+### Verification
+- ✅ 3 file audit đã xoá khỏi `docs/`
+- ✅ `analysis-report.md` số liệu khớp với codebase hiện tại
