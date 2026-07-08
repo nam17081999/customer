@@ -1,6 +1,6 @@
 # Báo Cáo Phân Tích Tổng Quan — NPP Hà Công
 
-> Tạo ngày: 2026-06-12
+> Tạo ngày: 2026-06-12 · Cập nhật: 2026-07-08
 > Phân tích dựa trên codebase tại `~/Desktop/customer`
 
 ---
@@ -63,7 +63,7 @@ services/        → 1 file (inventory page service)
 features/        → 1 file (auth utils)
 data/            → 1 file (old admin area boundaries — legacy)
 docs/            → 12 core docs + ~20 skill/SQL/plan files
-supabase/        → 13 migrations + seed.sql
+supabase/        → 15 migrations + seed.sql
 __tests__/       → 48 test files (unit)
 e2e/             → 9 Playwright specs
 scripts/         → Git hooks + mojibake checker
@@ -91,10 +91,10 @@ getOrRefreshStores()
 | JS/JSX source files | 218 |
 | CSS files | 1 (`app/globals.css`) |
 | SQL files | 20 |
-| Test files (unit) | 48 |
+| Test files (unit) | 60 |
 | Test files (E2E) | 9 |
-| Supabase migrations | 13 |
-| Git commits | 324 |
+| Supabase migrations | 15 |
+| Git commits | 350 |
 
 ### Lines of Code (core source)
 
@@ -105,9 +105,9 @@ getOrRefreshStores()
 ### Test Coverage
 
 ```
-Test Files  43 passed | 5 failed (48 total)
-Tests       475 passed | 4 failed | 3 skipped (482 total)
-Duration    ~1.6s
+Test Files  58 passed | 2 failed (60 total)
+Tests       660 passed | 2 failed | 3 skipped (665 total)
+Duration    ~2.1s
 ```
 
 **Coverage report:** chưa chạy được (failed tests block full suite). Cần fix test trước.
@@ -125,15 +125,14 @@ Duration    ~1.6s
 - 2 react-hooks/exhaustive-deps
 ```
 
-### Phân tích 5 Test Files Bị Fail
+### Phân tích 2 Test Files Bị Fail (cập nhật 2026-07-08)
 
 | File | Tests Fail | Root Cause |
 |---|---|---|
-| `__tests__/helper/homeSearch.test.js` | Module load fail | `supabaseUrl is required` — test không có `.env`; import chain →`storeCache`→`supabaseClient` cần env |
-| `__tests__/helper/homeSearchRouteSync.test.js` | Module load fail | Same root cause |
-| `__tests__/helper/adminUserManagement.test.js` | 2 assertion failures | Code trong `adminUserManagement.js` có thể đã thay đổi sau khi test viết; mismatch normalized values |
-| `__tests__/api/inventoryClient.test.js` | 1 assertion failure | Mock supabase chain không cover `.order()` — `listPurchaseOrders` gọi `.order()` nhưng mock chỉ `.select().in()` |
-| `__tests__/services/inventory/inventoryPageService.test.js` | 1 assertion failure | Expected response shape mismatch (thiếu fields) |
+| `__tests__/helper/storeEditFlow.test.js` | 1 assertion failure | `validateStoreEditPhones` — expected error message không khớp (trùng store khác trong cache) |
+| `__tests__/helper/storeEditController.test.js` | 1 assertion failure | `validateStoreEditPhones` — expected error message mismatch |
+
+> 3 test files đã được fix từ bản phân tích gốc: `homeSearch`, `adminUserManagement`, `inventoryClient`.
 
 ---
 
@@ -170,12 +169,12 @@ Duration    ~1.6s
 
 ### ⚠️ Lỗi & Rủi Ro Tiềm Ẩn
 
-#### Critical
-1. **5 test files failing** — chỉ ra code/tests đã lệch pha; có thể có regression không được phát hiện.
-2. **homeSearch tests không chạy thiếu .env** — test isolation yếu; `storeCache` import `supabaseClient` trực tiếp chứ không mock ở module level.
-3. **adminUserManagement tests fail** — hoặc code thay đổi hoặc test expectation sai; cần rà soát `helper/adminUserManagement.js`.
-4. **inventoryClient `listPurchaseOrders` thiếu `.order()`** — sẽ lỗi runtime khi paginate purchase orders (trong test mock cũng thiếu).
-5. **inventoryPageService test mismatch** — response shape kỳ vọng khác thực tế; có thể do refactor gần đây.
+#### Critical (cập nhật 2026-07-08)
+1. **2 test files vẫn fail** — `storeEditFlow.test.js` + `storeEditController.test.js` (cả 2 lỗi phone validation message). Giảm từ 5 xuống 2, nhưng test suite vẫn chưa hoàn toàn xanh.
+2. ~~homeSearch tests không chạy thiếu .env~~ — ✅ **Đã fix** (test isolation đã được cải thiện).
+3. ~~adminUserManagement tests fail~~ — ✅ **Đã fix**.
+4. ~~inventoryClient `listPurchaseOrders` thiếu `.order()`~~ — ✅ **Đã fix**.
+5. ~~inventoryPageService test mismatch~~ — ✅ **Đã fix**.
 
 #### Performance
 6. **Không có DB indexes** trên `stores` (đã ghi trong docs khuyến nghị) → query Supabase sẽ chậm khi >10K stores.
@@ -207,8 +206,7 @@ Duration    ~1.6s
 
 | Task | Lý do | File ảnh hưởng |
 |---|---|---|
-| **Fix 4 test failures** | Test đang fail → không tin tưởng được test suite. Ưu tiên cao nhất. | `adminUserManagement.js`, `inventory-client.js`, `inventoryPageService.js`, test files |
-| **Fix homeSearch test env isolation** | Mock supabaseClient ở module level để test không phụ thuộc .env | `vitest.config.js`, `storeCache.js` test setup |
+| **Fix 2 test failures** | Test đang fail → không tin tưởng được test suite. Ưu tiên cao nhất. | `storeEditFlow.test.js`, `storeEditController.test.js` |
 | **Áp DB indexes** | Performance sẽ degrade khi data lớn | Supabase migration mới |
 
 ### Priority 2: 🟡 Ổn Định Inventory/Orders MVP (3-5 ngày)
@@ -259,8 +257,8 @@ Impact
 
 ## Tóm Tắt Cho User
 
-1. **Dự án đang active phát triển** — 324 commits, module inventory/orders MVP vừa hoàn thành (13 migrations trong tháng 5-6/2026).
-2. **Cần fix test ngay** — 5 test files fail (4 actual assertion failures + 1 env config). Không thể tin test suite.
+1. **Dự án đang active phát triển** — 350 commits, module inventory/orders MVP vừa hoàn thành (15 migrations trong tháng 5-6/2026).
+2. **Cần fix test ngay** — 2 test files fail (cả 2 lỗi phone validation message). Giảm từ 5 xuống 2, nhưng test suite chưa hoàn toàn xanh.
 3. **Inventory/Orders module mới** nhưng thiếu E2E tests và có mock không cover hết API calls (`listPurchaseOrders` thiếu `.order()`).
 4. **Nên làm tiếp theo:**
    - **Ngay:** Fix tests → apply DB indexes → thêm E2E cho inventory

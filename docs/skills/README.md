@@ -1,28 +1,36 @@
 # NPP Hà Công Skill Pack
 
-Bộ skill nội bộ cho NPP Hà Công gồm 2 phần:
+Bộ skill nội bộ cho NPP Hà Công (chuyển đổi từ mattpocock/skills).
 
-- `storevis-project-execution.SKILL.md`: Luật code và guardrails theo đúng architecture/business/design/database của NPP Hà Công.
-- `storevis-ai-collaboration.SKILL.md`: Khung cộng tác với AI để giao việc rõ, báo cáo rõ, verify rõ.
+## Engineering skills
 
-## OpenAI skills đã thêm
+- `grilling.SKILL.md`: Phỏng vấn user để làm rõ yêu cầu/thiết kế trước khi code.
+- `tdd.SKILL.md`: Test-driven development — red-green-refactor loop.
+- `code-review.SKILL.md`: Review code theo 2 trục Standards + Spec, chạy song song.
+- `diagnosing-bugs.SKILL.md`: 6-phase debug loop cho bug cứng đầu và performance regression.
+- `improve-codebase-architecture.SKILL.md`: Scan codebase, tạo HTML report, đề xuất deepening opportunities.
+- `handoff.SKILL.md`: Bàn giao context giữa các session.
+
+## OpenAI skills
 
 Các skill từ `openai/skills` được lưu trong `docs/skills/openai/`:
 
-- `openai/playwright`: Tự động hóa browser thật cho navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging.
-- `openai/playwright-interactive`: Debug UI/browser/Electron tương tác nhanh qua phiên browser bền vững.
-- `openai/screenshot`: Chụp màn hình desktop/app/window/region khi cần kiểm tra visual hoặc khi browser-specific capture không đủ.
+- `openai/playwright`: Tự động hóa browser — navigation, form filling, snapshots, data extraction.
+- `openai/playwright-interactive`: Debug UI/browser tương tác qua phiên browser bền vững.
+- `openai/screenshot`: Chụp màn hình desktop/app/window/region.
 
 ## Cách dùng khuyến nghị
 
-Dùng đồng thời hai skill StoreVis trong mọi task kỹ thuật:
+`Dùng $grilling + $tdd cho task này.`
 
-`Dùng $storevis-project-execution + $storevis-ai-collaboration cho task này.`
+Thêm khi cần:
 
-Nếu task có text tiếng Việt nhiều hoặc flow dễ lỗi encoding, bổ sung:
+`+ $diagnosing-bugs + $code-review + $improve-codebase-architecture + $handoff`
+
+Nếu task có text tiếng Việt nhiều:
 
 `+ $lean-vietnamese-dev-flow`
 
-Nếu task liên quan UI/thiết kế/regression visual, bổ sung một hoặc nhiều skill OpenAI:
+Nếu task liên quan UI/visual regression, bổ sung OpenAI skills:
 
 `+ $playwright + $playwright-interactive + $screenshot`

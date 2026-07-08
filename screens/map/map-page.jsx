@@ -14,6 +14,7 @@ import {
   formatShortAddress,
 } from '@/helper/mapRoute'
 import {
+  buildFeatureCollection,
   buildMapMarkerImagePlan,
   buildMapStoreFeatures,
   buildMarkerSourceCollections,
@@ -210,18 +211,24 @@ export default function MapPage() {
   })
 
   const visibleMapStores = useMemo(() => buildVisibleMapStores({
-    filteredStores,
+    filteredStores: storesAfterAreaFilters,
     hideUnselectedStores,
     routeStopIds,
-  }), [filteredStores, hideUnselectedStores, routeStopIds])
+  }), [storesAfterAreaFilters, hideUnselectedStores, routeStopIds])
+
+  const searchHighlightStoreIds = useMemo(() => {
+    if (!searchTerm.trim()) return new Set()
+    return new Set(filteredStores.map((s) => String(s.id)))
+  }, [filteredStores, searchTerm])
 
   const storeFeatures = useMemo(() => buildMapStoreFeatures({
     visibleMapStores,
+    searchHighlightIds: searchHighlightStoreIds,
     highlightedStoreId,
     completedRouteStopIdSet,
     routeStopOrderById,
     featureBaseCache: featureBaseCacheRef.current,
-  }), [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores])
+  }), [completedRouteStopIdSet, highlightedStoreId, routeStopOrderById, visibleMapStores, searchHighlightStoreIds])
 
   const storeMapRef = useRef(new Map()) // storeId -> store data for quick lookup
 
@@ -321,6 +328,24 @@ export default function MapPage() {
             'icon-opacity': ['case', ['==', ['get', 'passed'], 'yes'], 0.45, 1],
           },
         })
+
+        map.addSource('stores-search-highlight', {
+          type: 'geojson',
+          data: EMPTY_FEATURE_COLLECTION,
+        })
+
+        map.addLayer({
+          id: 'store-marker-search-highlight',
+          type: 'circle',
+          source: 'stores-search-highlight',
+          paint: {
+            'circle-radius': 16,
+            'circle-color': 'rgba(34, 197, 94, 0.12)',
+            'circle-stroke-color': '#22c55e',
+            'circle-stroke-width': 2.5,
+            'circle-opacity': 0.9,
+          },
+        }, 'store-marker-base')
 
         map.addLayer({
           id: 'store-marker-highlighted',
@@ -649,11 +674,21 @@ export default function MapPage() {
 
     const source = map.getSource('stores')
     const highlightedSource = map.getSource('stores-highlighted')
-    if (!source || !highlightedSource) return
+    const searchHighlightSource = map.getSource('stores-search-highlight')
+    if (!source || !highlightedSource || !searchHighlightSource) return
 
     const { baseCollection, highlightedCollection } = buildMarkerSourceCollections(storeFeatures)
     source.setData(baseCollection)
     highlightedSource.setData(highlightedCollection)
+
+    const searchMatchFeatures = storeFeatures
+      .filter((f) => f.properties.searchMatch === 'yes')
+      .map((f) => ({
+        ...f,
+        geometry: f.geometry,
+        properties: { storeId: f.properties.storeId },
+      }))
+    searchHighlightSource.setData(buildFeatureCollection(searchMatchFeatures))
 
     const { desiredImageIds, pendingImages } = buildMapMarkerImagePlan({
       storeFeatures,
@@ -815,7 +850,7 @@ export default function MapPage() {
   }, [suggestions, syncSuggestionScrollHint])
 
   return (
-    <div className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden bg-gray-950 text-gray-100 flex">
+    <div className="bg-gray-950 text-gray-100 flex h-full w-full">
       {/* Map area */}
       <div className="relative flex-1 h-full">
         <div ref={mapContainerRef} className="absolute inset-0" />
@@ -1036,6 +1071,7 @@ function MapSearchBar({
           onChange={handleSearchInputChange}
           placeholder="Tìm cửa hàng..."
           inputRef={inputRef}
+          className="h-12 text-base"
           onFocus={handleSearchFocus}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {

@@ -116,12 +116,9 @@ body {
     background: color-mix(in srgb, var(--border) 70%, var(--fg));
 }
 
-/* Focus visible */
-*:focus-visible {
-    outline: 2px solid var(--accent-glow);
-    outline-offset: 2px;
-}
-.search-box input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
     outline: none;
 }
 
@@ -440,15 +437,11 @@ html {
     /* ── Content area ── */
     .content {
         margin-top: 68.25px;
-        padding: 24px;
-        padding-bottom: 0 !important;
-        min-height: 0;
         overscroll-behavior: contain;
     }
     @media (max-width: 1100px) {
         .content {
             margin-top: 55px;
-            padding: 12px;
         }
     }
 

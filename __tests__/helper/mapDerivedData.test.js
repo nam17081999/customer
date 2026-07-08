@@ -108,6 +108,7 @@ describe('buildMapStoreFeatures', () => {
         routeOrder: '1',
         passed: 'yes',
         highlighted: 'no',
+        searchMatch: 'no',
       },
     })
   })
@@ -155,6 +156,36 @@ describe('buildMapStoreFeatures', () => {
     })
 
     expect(featureBaseCache.get('7')).toBe(cachedBase)
+  })
+
+  it('searchMatch là "no" cho tất cả khi không có searchHighlightIds', () => {
+    const features = buildMapStoreFeatures({
+      visibleMapStores: [
+        makeStore({ id: 1, name: 'A' }),
+        makeStore({ id: 2, name: 'B' }),
+      ],
+      highlightedStoreId: '',
+      completedRouteStopIdSet: new Set(),
+      routeStopOrderById: new Map(),
+    })
+
+    expect(features.map((f) => f.properties.searchMatch)).toEqual(['no', 'no'])
+  })
+
+  it('searchMatch là "yes" chỉ cho store nằm trong searchHighlightIds', () => {
+    const features = buildMapStoreFeatures({
+      visibleMapStores: [
+        makeStore({ id: 1, name: 'A' }),
+        makeStore({ id: 2, name: 'B' }),
+        makeStore({ id: 3, name: 'C' }),
+      ],
+      searchHighlightIds: new Set(['1', '3']),
+      highlightedStoreId: '',
+      completedRouteStopIdSet: new Set(),
+      routeStopOrderById: new Map(),
+    })
+
+    expect(features.map((f) => f.properties.searchMatch)).toEqual(['yes', 'no', 'yes'])
   })
 
   it('đẩy feature của highlighted store xuống cuối danh sách như hiện tại', () => {

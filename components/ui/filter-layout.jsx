@@ -35,7 +35,7 @@ export function FilterToggle({ activeCount = 0, onClick, className = '' }) {
   return (
     <button
       type="button"
-      className={`inline-flex items-center gap-1 px-3 rounded-sm text-[13px] font-medium cursor-pointer border border-[color:var(--border)] bg-[color:var(--surface2)] text-[color:var(--muted)] h-9 relative transition-all duration-150 whitespace-nowrap hover:bg-[color:var(--surface)] hover:text-[color:var(--fg)] ${className}`}
+      className={`inline-flex items-center gap-1 px-3 rounded-sm text-[13px] font-medium cursor-pointer border border-[color:var(--border)] bg-[color:var(--surface2)] text-[color:var(--muted)] h-11 relative transition-all duration-150 whitespace-nowrap hover:bg-[color:var(--surface)] hover:text-[color:var(--fg)] ${className}`}
       onClick={onClick}
       aria-label="Bộ lọc"
     >
@@ -55,7 +55,7 @@ export function FilterClearBtn({ onClick, className = '' }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-sm text-[12px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)] ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-transparent border border-[color:var(--border)] text-[color:var(--muted)] hover:border-[color:var(--accent)] hover:text-[color:var(--fg)] ${className}`}
     >
       <X className="size-3" />
       Xóa lọc
