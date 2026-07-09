@@ -57,6 +57,7 @@ export function useStoreCreateController() {
   const bootstrapDoneRef = useRef(false)
   const userChangedDistrictWardRef = useRef(false)
   const areaPrefillRunningRef = useRef(false)
+  const acknowledgedDuplicateIdsRef = useRef(new Set())
   const autoFillTimerRef = useRef(null)
   const lastAutoFillCoordsRef = useRef(null)
   const [areaAutoFillStatus, setAreaAutoFillStatus] = useState('idle')
@@ -324,6 +325,7 @@ export function useStoreCreateController() {
 
 
   useEffect(() => {
+    acknowledgedDuplicateIdsRef.current = new Set()
     if (!name.trim()) {
       setDuplicateCandidates([])
       setDuplicateCheckError('')
@@ -348,7 +350,6 @@ export function useStoreCreateController() {
   }, [district])
 
   useEffect(() => {
-    setAllowDuplicate(false)
     if (!name.trim() || pickedLat == null || pickedLng == null) {
       setDuplicateCandidates([])
       setDuplicateCheckError('')
@@ -365,7 +366,19 @@ export function useStoreCreateController() {
           findNoLocationReversedNameMatches(name),
         ])
         const matches = mergeDuplicateCandidates(nearby, noLocation, pickedLat, pickedLng)
-        setDuplicateCandidates(matches)
+
+        const acknowledged = acknowledgedDuplicateIdsRef.current
+        if (acknowledged.size > 0) {
+          const unseen = matches.filter((s) => !acknowledged.has(s.id))
+          if (unseen.length > 0) {
+            setDuplicateCandidates(unseen)
+            setAllowDuplicate(false)
+          } else {
+            setDuplicateCandidates([])
+          }
+        } else {
+          setDuplicateCandidates(matches)
+        }
       } catch (err) {
         console.error('Duplicate check error:', err)
         setDuplicateCandidates([])
@@ -407,6 +420,7 @@ export function useStoreCreateController() {
     setAreaAutoFillStatus('idle')
     setAreaAutoFillMessage('')
     userChangedDistrictWardRef.current = false
+    acknowledgedDuplicateIdsRef.current = new Set()
     areaPrefillRunningRef.current = false
     lastAutoFillCoordsRef.current = null
 
@@ -431,8 +445,9 @@ export function useStoreCreateController() {
   }, [])
 
   const handleKeepCreateDuplicate = useCallback(() => {
+    duplicateCandidates.forEach((s) => acknowledgedDuplicateIdsRef.current.add(s.id))
     setAllowDuplicate(true)
-  }, [])
+  }, [duplicateCandidates])
 
   const validateStep2Fields = useCallback(async ({ requirePhone = false } = {}) => {
     const result = validateStoreCreateStep2({

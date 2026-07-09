@@ -95,3 +95,74 @@ Refactor (dọn docs)
 ### Verification
 - ✅ 3 file audit đã xoá khỏi `docs/`
 - ✅ `analysis-report.md` số liệu khớp với codebase hiện tại
+
+---
+
+## Task 3: Fix duplicate re-warning khi di chuyển bản đồ sau khi đã xác nhận "Vẫn tạo"
+
+### Goal
+Khi tạo cửa hàng, nếu người dùng đã bấm "Vẫn tạo cửa hàng" (allowDuplicate=true) để xác nhận store A bị trùng, việc di chuyển vị trí trên bản đồ không được báo lại store A nữa. Nhưng nếu vị trí mới có store B có thể trùng, vẫn phải hiển thị store B.
+
+### Task Type
+Bugfix (behavior change)
+
+### Root Cause
+Effect lắng nghe `[name, pickedLat, pickedLng]` (line 352-395) reset `allowDuplicate = false` mỗi khi pickedLat/pickedLng thay đổi, khiến duplicate panel hiện lại.
+
+### Fix
+- Thêm `acknowledgedDuplicateIdsRef` (Set) lưu ID các store đã được user xác nhận.
+- `handleKeepCreateDuplicate` thêm các store hiện tại vào Set, rồi set `allowDuplicate = true`.
+- Effect duplicate check:
+  - Bỏ `setAllowDuplicate(false)` đầu effect.
+  - Sau khi merge candidates, filter bỏ các store đã acknowledged.
+  - Nếu còn unseen store → set làm candidate + reset `allowDuplicate = false`.
+  - Nếu tất cả đều acknowledged → clear candidates, giữ `allowDuplicate = true`.
+- Reset Set khi name thay đổi hoặc form được reset.
+
+### Done
+- ✅ **Sửa** `helper/useStoreCreateController.js`:
+  - Thêm `acknowledgedDuplicateIdsRef` (line 60)
+  - Name-change effect: reset ref (line 328)
+  - Coordinate effect: bỏ `setAllowDuplicate(false)`, thêm filter acknowledged (lines 352-395)
+  - `handleKeepCreateDuplicate`: populate ref với current candidates (lines 447-450)
+  - `resetCreateForm`: reset ref (line 423)
+
+### Verification
+- ✅ `npm run lint` — 0 errors, 0 warnings
+- ✅ `pnpm test` — 660 passed, 2 failed (pre-existing: storeEditFlow phone dupes), 3 skipped
+
+### Risks / Next
+- Khi user confirm "Vẫn tạo" rồi đổi **tên** cửa hàng, `allowDuplicate` và ref đều được reset — behavior đúng.
+- Nếu user confirm store A, kéo map tới vị trí có store A + store B: chỉ store B hiện. Confirm store B → cả A và B đều trong acknowledged set.
+- Nếu kéo map tới vị trí chỉ có store A (đã acknowledged) → không hiện gì, `allowDuplicate` giữ nguyên.
+
+---
+
+## Task 4: Admin edit "Thêm vị trí" button khi store chưa có tọa độ
+
+### Goal
+Admin edit cửa hàng: nếu cửa hàng chưa có vị trí, hiện button "Thêm vị trí" trên khu vực bản đồ. Nếu user không bấm, lưu chỉ sửa các trường khác (không thêm vị trí).
+
+### Task Type
+Bugfix / UX behavior change
+
+### Root Cause
+`renderMapSection()` chỉ hiển thị bản đồ khi `editLocationView.shouldRenderMap === true`. Với store chưa có tọa độ, `shouldRenderMap` là `false` → hiện dashed placeholder, không có cơ hội thêm vị trí.
+
+### Fix
+- Thêm `showLocationEditor` state + `handleAddLocation` callback.
+- `renderMapSection()`: nếu admin edit + store không có tọa độ + editor chưa active → hiện "Thêm vị trí" button.
+- Khi click "Thêm vị trí": set `showLocationEditor = true`, `mapEditable = true`, remount map.
+- Map render dùng `StoreLocationPicker` với `initialLat=null, initialLng=null` → center mặc định Hanoi.
+- Submit không yêu cầu location → nếu không tương tác với map, tọa độ giữ nguyên null.
+
+### Done
+- ✅ **Sửa** `pages/store/edit/[id].js`:
+  - Thêm `import { useState, useCallback } from 'react'`
+  - Thêm `showLocationEditor` state + `handleAddLocation` callback
+  - `renderMapSection()`: thêm case cho "Thêm vị trí" button khi admin edit + chưa có coords
+  - Map render khi editor active dùng `StoreLocationPicker` với `initialLat/Lng` null
+
+### Verification
+- ✅ `npm run lint` — 0 errors, 0 warnings
+- ✅ `pnpm test` — 660 passed, 2 failed (pre-existing, không thay đổi)

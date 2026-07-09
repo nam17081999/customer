@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -74,6 +75,14 @@ export default function EditStore() {
     handleSaveEdit,
   } = useStoreEditController()
 
+  const [showLocationEditor, setShowLocationEditor] = useState(false)
+
+  const handleAddLocation = useCallback(() => {
+    setShowLocationEditor(true)
+    setMapEditable(true)
+    setStep2Key((v) => v + 1)
+  }, [setMapEditable])
+
   if (authLoading || !pageReady) return <FullPageLoading />
 
   if (fetchError) {
@@ -92,6 +101,7 @@ export default function EditStore() {
   }
 
   const safeLocks = supplementLocks || {}
+  const storeHasCoords = pickedLat != null && pickedLng != null
   const editLocationView = getLocationStepView({
     resolving: resolvingAddr,
     lat: pickedLat,
@@ -111,6 +121,19 @@ export default function EditStore() {
   }
 
   function renderMapSection() {
+    if (!isSupplementMode && !storeHasCoords && !showLocationEditor) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
+            Cửa hàng hiện chưa có vị trí. Nếu bạn muốn thêm vị trí, hãy bấm <strong>Thêm vị trí</strong>.
+          </div>
+          <Button type="button" className="w-full" onClick={handleAddLocation}>
+            Thêm vị trí
+          </Button>
+        </div>
+      )
+    }
+
     if (!editLocationView.shouldRenderMap) {
       return (
         <div
