@@ -419,17 +419,12 @@ export default function AddStore() {
             {renderDuplicatePanel()}
 
             {/* Submit */}
-            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 px-3 py-3 backdrop-blur-md">
-              <div className="mx-auto max-w-screen-md flex gap-2">
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 py-3 backdrop-blur-md lg:left-[240px] overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
+              <div className="mx-auto flex w-full max-w-[1700px] items-center gap-2 px-3 sm:px-6 lg:px-8">
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon"
-                  icon={(
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  )}
+                  className="shrink-0 px-2 sm:px-4"
                   onClick={() => {
                     if (hasUnsavedChanges && !confirmationShown) {
                       setConfirmationShown(true)
@@ -439,7 +434,14 @@ export default function AddStore() {
                     }
                     router.back()
                   }}
-                />
+                  leftIcon={(
+                    <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  )}
+                >
+                  <span className="hidden sm:inline">Quay trở lại</span>
+                </Button>
                 <Button
                   type="submit"
                   disabled={loading || resolvingAddr}

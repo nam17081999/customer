@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -74,6 +75,14 @@ export default function EditStore() {
     handleSaveEdit,
   } = useStoreEditController()
 
+  const [showLocationEditor, setShowLocationEditor] = useState(false)
+
+  const handleAddLocation = useCallback(() => {
+    setShowLocationEditor(true)
+    setMapEditable(true)
+    setStep2Key((v) => v + 1)
+  }, [setMapEditable])
+
   if (authLoading || !pageReady) return <FullPageLoading />
 
   if (fetchError) {
@@ -91,7 +100,8 @@ export default function EditStore() {
     return <FullPageLoading />
   }
 
-  const safeLocks = supplementLocks || {}
+  const safeLocks = isSupplementMode ? (supplementLocks || {}) : {}
+  const storeHasCoords = pickedLat != null && pickedLng != null
   const editLocationView = getLocationStepView({
     resolving: resolvingAddr,
     lat: pickedLat,
@@ -111,6 +121,19 @@ export default function EditStore() {
   }
 
   function renderMapSection() {
+    if (!isSupplementMode && !storeHasCoords && !showLocationEditor) {
+      return (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-gray-700 bg-gray-900 p-3 text-sm text-gray-300">
+            Cửa hàng hiện chưa có vị trí. Nếu bạn muốn thêm vị trí, hãy bấm <strong>Thêm vị trí</strong>.
+          </div>
+          <Button type="button" className="w-full" onClick={handleAddLocation}>
+            Thêm vị trí
+          </Button>
+        </div>
+      )
+    }
+
     if (!editLocationView.shouldRenderMap) {
       return (
         <div
@@ -323,17 +346,12 @@ export default function EditStore() {
           </div>
 
           {/* Submit */}
-          <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 px-3 py-3 backdrop-blur-md">
-            <div className="mx-auto max-w-screen-md flex gap-2">
+          <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-800 bg-gray-950/95 py-3 backdrop-blur-md lg:left-[240px] overflow-hidden" style={{ scrollbarGutter: 'stable' }}>
+            <div className="mx-auto flex w-full max-w-[1700px] items-center gap-2 px-3 sm:px-6 lg:px-8">
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
-                icon={(
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                )}
+                className="shrink-0 px-2 sm:px-4"
                 onClick={() => {
                   if (
                     name !== store?.name
@@ -349,7 +367,14 @@ export default function EditStore() {
                   }
                   router.back()
                 }}
-              />
+                leftIcon={(
+                  <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                )}
+              >
+                <span className="hidden sm:inline">Quay trở lại</span>
+              </Button>
               <Button
                 type="submit"
                 disabled={saving || resolvingAddr}
