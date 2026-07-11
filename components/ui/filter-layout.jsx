@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useRef } from 'react'
 import { SlidersHorizontal, X } from 'lucide-react'
 
 const selectBase = 'bg-[color:var(--bg)] border border-[color:var(--border)] text-[color:var(--fg)] outline-none cursor-pointer appearance-none focus:border-[color:var(--accent)]'
@@ -78,28 +79,56 @@ export function FilterDesktopPanel({ open, onClear, children }) {
 }
 
 export function FilterMobileSheet({ open, onClose, onClear, onApply, children }) {
-  if (!open) return null
+  const [mounted, setMounted] = useState(false)
+  const [entered, setEntered] = useState(false)
+  const leaveTimer = useRef(null)
+
+  useEffect(() => {
+    if (open) {
+      if (leaveTimer.current) {
+        clearTimeout(leaveTimer.current)
+        leaveTimer.current = null
+      }
+      setMounted(true)
+      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setEntered(true)))
+      return () => cancelAnimationFrame(raf)
+    } else {
+      setEntered(false)
+      leaveTimer.current = setTimeout(() => setMounted(false), 300)
+      return () => {
+        if (leaveTimer.current) {
+          clearTimeout(leaveTimer.current)
+          leaveTimer.current = null
+        }
+      }
+    }
+  }, [open])
+
+  if (!mounted) return null
+
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-[55] transition-opacity duration-250"
-        onClick={onClose}
+        className={`fixed inset-0 bg-black/50 z-[55] transition-opacity duration-300 ${entered ? 'opacity-100' : 'opacity-0'}`}
+        onClick={() => { setEntered(false); onClose?.() }}
       />
-      <div className="fixed bottom-0 left-0 right-0 bg-[color:var(--surface)] rounded-t-lg z-60 max-h-[85vh] overflow-y-auto p-5 pb-0 max-sm:p-4">
+      <div
+        className={`fixed bottom-0 left-0 right-0 bg-[color:var(--surface)] rounded-t-lg z-60 max-h-[85vh] overflow-y-auto p-5 pb-0 max-sm:p-4 transition-all duration-300 ease-out ${entered ? 'translate-y-0' : 'translate-y-full'}`}
+      >
         <div className="w-9 h-1 bg-[color:var(--border)] rounded-sm mx-auto mb-4 shrink-0" />
         <div className="text-[16px] font-bold mb-4">Bộ lọc</div>
         {children}
         <div className="flex gap-2 mt-2">
           <button
             type="button"
-            onClick={() => { onClear?.(); onClose?.() }}
+            onClick={() => { onClear?.(); setEntered(false); onClose?.() }}
             className="flex-1 py-3 bg-[color:var(--border)] text-[color:var(--fg)] rounded-sm text-[15px] font-semibold cursor-pointer border-none"
           >
             Đặt lại
           </button>
           <button
             type="button"
-            onClick={() => { onApply?.(); onClose?.() }}
+            onClick={() => { onApply?.(); setEntered(false); onClose?.() }}
             className="flex-[3] py-3 bg-[color:var(--accent)] text-white rounded-sm text-[15px] font-semibold cursor-pointer border-none"
           >
             Xem kết quả

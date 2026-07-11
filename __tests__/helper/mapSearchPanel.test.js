@@ -32,7 +32,7 @@ describe('buildMapAvailableWards', () => {
   it('trả về danh sách xã/phường theo đúng các quận đã chọn', () => {
     const wards = buildMapAvailableWards(['Hoài Đức', 'Quốc Oai'])
     expect(wards).toContain('An Khánh')
-    expect(wards).toContain('Yên Sơn')
+    expect(wards).toContain('Đông Yên')
   })
 
   it('trả về [] khi chưa chọn quận/huyện', () => {

@@ -32,7 +32,7 @@ export default function HomePage() {
     clearAllFilters,
     toggleFilterValue,
     searchResults,
-    showCreateStoreCta, handleCreateStoreClick,
+    handleCreateStoreClick,
     showSkeleton, hasError,
     retryLoadStores,
   } = useHomeSearchController()
@@ -253,11 +253,6 @@ export default function HomePage() {
           <FilterClearBtn onClick={handleResetFilters} />
         )}
 
-        {showCreateStoreCta && (
-          <button type="button" onClick={handleCreateStoreClick} className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-sm text-[13px] font-semibold cursor-pointer transition-all duration-150 whitespace-nowrap no-underline bg-[color:var(--accent)] text-white hover:brightness-110 sm:inline-flex hidden">
-            + Thêm CH
-          </button>
-        )}
       </div>
 
       <FilterDesktopPanel open={showFilterPanel} onClear={handleResetFilters}>

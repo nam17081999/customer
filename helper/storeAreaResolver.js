@@ -66,7 +66,7 @@ function lookupOldAdminAreaFromBoundaries(lat, lng) {
 
 export function normalizeAreaText(value) {
   return removeVietnameseTones(String(value || ''))
-    .replace(/\b(thanh pho|tp\.?|tinh|quan|huyen|thi xa|thi tran|phuong|xa)\b/g, ' ')
+    .replace(/^(thanh pho|tp\.?|tinh|quan|huyen|thi xa|thi tran|phuong|xa)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -234,14 +234,43 @@ export function resolveDistrictWardFromPayload(payload) {
   }
 }
 
-export async function resolveDistrictWardFromCoordinates(lat, lng) {
+export async function resolveDistrictWardFromCoordinates(lat, lng, customFetch) {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return { district: '', ward: '', source: 'invalid' }
   }
 
-  return {
-    ...lookupOldAdminAreaFromBoundaries(lat, lng),
-    rawAddress: null,
-    rawComponents: [],
+  const boundaryResult = lookupOldAdminAreaFromBoundaries(lat, lng)
+  if (boundaryResult.source !== 'boundary_unresolved') {
+    return {
+      ...boundaryResult,
+      rawAddress: null,
+      rawComponents: [],
+    }
+  }
+
+  try {
+    const fetchFn = customFetch || globalThis.fetch
+    const response = await fetchFn('/api/reverse-geocode-area', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+    })
+
+    if (!response.ok) {
+      return { ...boundaryResult, rawAddress: null, rawComponents: [] }
+    }
+
+    const payload = await response.json()
+    const resolved = resolveDistrictWardFromPayload(payload)
+
+    return {
+      district: resolved.district,
+      ward: resolved.ward,
+      source: 'reverse_geocode',
+      rawAddress: payload?.address || null,
+      rawComponents: payload?.components || [],
+    }
+  } catch {
+    return { ...boundaryResult, rawAddress: null, rawComponents: [] }
   }
 }
