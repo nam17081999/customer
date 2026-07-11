@@ -69,14 +69,14 @@ describe('storeAreaResolver', () => {
 
   it('supports Cầu Giấy district and ward suggestions', () => {
     expect(DISTRICT_WARD_SUGGESTIONS['Cầu Giấy']).toEqual([
-      'Dịch Vọng',
-      'Dịch Vọng Hậu',
-      'Mai Dịch',
       'Nghĩa Đô',
       'Nghĩa Tân',
+      'Mai Dịch',
+      'Dịch Vọng',
+      'Dịch Vọng Hậu',
       'Quan Hoa',
-      'Trung Hòa',
       'Yên Hòa',
+      'Trung Hòa',
     ])
   })
 
