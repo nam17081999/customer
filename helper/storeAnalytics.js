@@ -1,3 +1,5 @@
+import { hasValidCoordinates as hasValidCoords } from '@/helper/coordinate'
+
 export function formatDateTime(value) {
   if (!value) return 'Chưa có dữ liệu'
   const date = new Date(value)
@@ -38,7 +40,8 @@ export function formatOrderTime(value) {
 }
 
 export function hasValidCoordinates(store) {
-  const lat = Number(store?.latitude)
-  const lng = Number(store?.longitude)
-  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+  const lat = store?.latitude
+  const lng = store?.longitude
+  if (lat == null || lng == null) return false
+  return hasValidCoords(Number(lat), Number(lng))
 }

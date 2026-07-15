@@ -170,20 +170,6 @@ export function getStorePhoneNumbers(store) {
 }
 
 /**
- * Validate coordinates
- */
-export function isValidCoordinates(lat, lng) {
-  return (
-    typeof lat === 'number' &&
-    typeof lng === 'number' &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180
-  )
-}
-
-/**
  * Validate URL
  */
 export function isValidUrl(url) {

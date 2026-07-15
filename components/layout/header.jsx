@@ -209,7 +209,7 @@ export default function Header({ title, subtitle, onMenuClick }) {
 
         <button
           onClick={() => window.location.href = '/account'}
-          className="avatar-sm"
+          className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold shrink-0 hover:opacity-80"
           title={userName}
         >
           {initial}

@@ -40,7 +40,7 @@ export function KpiCard({ label, value, sub, accentColor, change, changeDir, chi
       )}
 
       {change && (
-        <div className={`kpi-change ${changeDir === 'down' ? 'down' : 'up'}`}>
+        <div className={`text-xs font-semibold mt-0.5 ${changeDir === 'down' ? 'text-red-500' : 'text-green-500'}`}>
           {changeDir === 'down' ? '↓' : '↑'} {change}
         </div>
       )}
@@ -52,7 +52,7 @@ export function KpiCard({ label, value, sub, accentColor, change, changeDir, chi
 
 export function KpiGrid({ items }) {
   return (
-    <div className="kpi-grid">
+    <div className="grid grid-cols-4 gap-3.5 mb-6">
       {items.map((item, i) => (
         <KpiCard
           key={i}

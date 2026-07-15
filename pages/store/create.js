@@ -1,5 +1,5 @@
 import dynamic from 'next/dynamic'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -130,10 +130,10 @@ export default function AddStore() {
     if (isMobile) {
       return (
         <>
-          <div className="filter-backdrop open" />
-          <div className="filter-sheet open">
-            <div className="sheet-handle" />
-            <div className="sheet-title">Phát hiện cửa hàng có thể đã được tạo</div>
+          <div className="fixed inset-0 z-50 bg-black/50" />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 rounded-t-xl max-h-[85vh] overflow-y-auto p-5 pb-0 translate-y-0 transition-transform duration-300">
+            <div className="w-9 h-1 bg-gray-700 rounded-full mx-auto mb-4 shrink-0" />
+            <div className="text-base font-bold text-foreground mb-4">Phát hiện cửa hàng có thể đã được tạo</div>
             <div className="space-y-2">
               {duplicateCandidates.map((store) => (
                 <SearchStoreCard
@@ -148,10 +148,10 @@ export default function AddStore() {
               Vui lòng xác nhận “Vẫn tạo cửa hàng” để tiếp tục.
             </div>
             <div className="mt-3 flex items-center gap-2">
-              <button type="button" className="apply-btn !bg-transparent !text-[var(--fg)] border border-[var(--border)]" onClick={resetCreateForm}>
+              <button type="button" className="flex-1 py-3 rounded-md text-[15px] font-semibold cursor-pointer bg-transparent text-foreground border border-gray-700" onClick={resetCreateForm}>
                 Không tạo nữa
               </button>
-              <button type="button" className="apply-btn" onClick={handleKeepCreateDuplicate}>
+              <button type="button" className="flex-1 py-3 rounded-md text-[15px] font-semibold cursor-pointer bg-accent text-white border-none" onClick={handleKeepCreateDuplicate}>
                 Vẫn tạo cửa hàng
               </button>
             </div>

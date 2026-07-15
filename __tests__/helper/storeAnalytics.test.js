@@ -41,8 +41,8 @@ describe('hasValidCoordinates', () => {
     expect(hasValidCoordinates({ latitude: 21.028511, longitude: 105.804817 })).toBe(true)
   })
 
-  it('trả về true khi lat/lng là null (Number(null) thành 0, nằm trong range)', () => {
-    expect(hasValidCoordinates({ latitude: null, longitude: null })).toBe(true)
+  it('trả về false khi lat/lng là null', () => {
+    expect(hasValidCoordinates({ latitude: null, longitude: null })).toBe(false)
   })
 
   it('trả về false khi lat/lng là undefined', () => {

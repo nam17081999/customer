@@ -250,7 +250,7 @@ export default function InventoryProductsPage() {
       <div className="flex items-center justify-end gap-2 mb-3">
         <button
           type="button"
-          className="btn btn-outline btn-sm"
+          className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground"
           onClick={() => { setProductPage(1); loadProducts(1) }}
           disabled={loading}
         >
@@ -258,7 +258,7 @@ export default function InventoryProductsPage() {
         </button>
         <button
           type="button"
-          className="btn btn-primary btn-sm"
+          className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none"
           onClick={openAddModal}
         >
           <Plus className="h-3.5 w-3.5" /> Thêm SP
@@ -276,19 +276,20 @@ export default function InventoryProductsPage() {
       />
 
       {/* Toolbar */}
-      <div className="toolbar">
-        <div className="search-box">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative flex items-center gap-2 h-9 rounded border border-gray-700 bg-background px-3 flex-1 min-w-[200px] max-w-[320px]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-muted"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
           <input
             type="text"
             placeholder="Tên hoặc mã SP..."
             value={query}
             onChange={(e) => { setQuery(e.target.value); setProductPage(1) }}
             onKeyDown={(e) => e.key === 'Enter' && loadProducts(1)}
+            className="flex-1 bg-transparent border-none text-sm text-foreground outline-none placeholder:text-muted"
           />
         </div>
 
-        <div className="filter-chips">
+        <div className="flex gap-1.5 flex-wrap">
           {[
             ['all', 'Tất cả', 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z'],
             ['active', 'Đang KD', 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z'],
@@ -298,7 +299,7 @@ export default function InventoryProductsPage() {
             <button
               key={value}
               type="button"
-              className={`chip${stockFilter === value ? ' active' : ''}`}
+              className={`h-8 px-3 rounded-full text-[13px] font-medium cursor-pointer border transition-all duration-150 inline-flex items-center gap-1.5 ${stockFilter === value ? 'bg-accent text-white border-accent' : 'bg-transparent border-gray-700 text-muted hover:bg-gray-800 hover:text-foreground'}`}
               onClick={() => { setStockFilter(value); setProductPage(1) }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d={svgPath} /></svg>
@@ -309,23 +310,23 @@ export default function InventoryProductsPage() {
 
         <button
           type="button"
-          className="filter-toggle"
+          className="flex items-center gap-1.5 h-9 px-3 rounded text-[13px] font-medium cursor-pointer border border-gray-700 bg-transparent text-muted hover:border-accent hover:text-foreground sm:hidden"
           onClick={() => setFilterSheetOpen(true)}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="20" y2="12" /><line x1="12" y1="18" x2="20" y2="18" /></svg>
           Bộ lọc
         </button>
 
-        <div className="toolbar-extra">
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            className="btn btn-outline btn-sm"
+            className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground"
             onClick={() => setFilterPanelOpen(!filterPanelOpen)}
           >
             <Filter className="h-3.5 w-3.5" />
             Lọc nâng cao
           </button>
-          <button type="button" className="btn btn-outline btn-sm">
+          <button type="button" className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground">
             <Download className="h-3.5 w-3.5" />
             Xuất Excel
           </button>
@@ -334,32 +335,36 @@ export default function InventoryProductsPage() {
 
       {/* Filter Panel (desktop) */}
       {filterPanelOpen && (
-        <div className="filter-panel open">
-          <div className="filter-grid">
-            <div className="filter-group">
-              <label>Danh mục</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <div className="block mb-3 p-3 px-4 bg-gray-900 border border-gray-700 rounded-sm">
+          <div className="grid grid-cols-4 gap-3 mb-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted">Danh mục</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="h-8 rounded border border-gray-700 bg-background text-foreground text-[13px] px-2 outline-none cursor-pointer focus:border-accent">
                 <option value="">Tất cả</option>
                 {categories.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
-            <div className="filter-group">
-              <label>Trạng thái</label>
-              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted">Trạng thái</label>
+              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}
+                className="h-8 rounded border border-gray-700 bg-background text-foreground text-[13px] px-2 outline-none cursor-pointer focus:border-accent">
                 <option value="all">Tất cả</option>
                 <option value="active">Đang KD</option>
                 <option value="inactive">Ngừng KD</option>
               </select>
             </div>
-            <div className="filter-group">
-              <label>Tồn kho ≤</label>
-              <input type="number" min="0" placeholder="VD: 5" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted">Tồn kho ≤</label>
+              <input type="number" min="0" placeholder="VD: 5"
+                className="h-8 rounded border border-gray-700 bg-background text-foreground text-[13px] px-2 outline-none focus:border-accent" />
             </div>
-            <div className="filter-group">
-              <label>ĐVT</label>
-              <select>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-muted">ĐVT</label>
+              <select
+                className="h-8 rounded border border-gray-700 bg-background text-foreground text-[13px] px-2 outline-none cursor-pointer focus:border-accent">
                 <option value="">Tất cả</option>
                 <option>Thùng</option>
                 <option>Chai</option>
@@ -368,17 +373,17 @@ export default function InventoryProductsPage() {
               </select>
             </div>
           </div>
-          <div className="filter-actions">
+          <div className="flex gap-2 justify-end">
             <button
               type="button"
-              className="btn btn-outline btn-sm"
+              className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground"
               onClick={() => { setCategory(''); setStockFilter('all'); setQuery('') }}
             >
               Đặt lại
             </button>
             <button
               type="button"
-              className="btn btn-primary btn-sm"
+              className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none"
               onClick={() => setFilterPanelOpen(false)}
             >
               Áp dụng
@@ -388,17 +393,17 @@ export default function InventoryProductsPage() {
       )}
 
       {/* Table */}
-      <div className="table-wrap">
-        <table className="p-table">
+      <div className="overflow-x-auto border border-gray-700 rounded">
+        <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
               <th>Mã SP</th>
               <th>Tên sản phẩm</th>
-              <th className="p-unit">ĐVT</th>
+              <th className="w-[80px]">ĐVT</th>
               <th style={{ textAlign: 'right' }}>Giá bán</th>
               <th style={{ textAlign: 'center' }}>Tồn kho</th>
               <th style={{ textAlign: 'center' }}>Trạng thái</th>
-              <th className="p-actions">Thao tác</th>
+              <th className="w-[100px] text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody id="productBody">
@@ -429,19 +434,19 @@ export default function InventoryProductsPage() {
               const remainder = largestConv > 0 ? qty - largestCount * largestConv : qty
               return (
                 <tr key={product.id} onClick={() => openDetailModal(product)}>
-                  <td className="p-code">{product.sku || '---'}</td>
+                  <td className="font-mono text-xs">{product.sku || '---'}</td>
                   <td>
-                    <div className="p-name">{product.name}</div>
+                    <div className="text-sm font-medium text-foreground">{product.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>{product.category || 'Chưa phân nhóm'}</div>
                   </td>
-                  <td className="p-unit" style={{ color: 'var(--muted)', fontSize: 12 }}>
+                  <td className="w-[80px] text-muted text-xs">
                     {largestUnit ? (
                       <>1 {largestUnit.unit_name} = {formatInventoryQuantity(largestConv)} {product.base_unit_name}</>
                     ) : (
                       product.base_unit_name || '---'
                     )}
                   </td>
-                  <td className="p-price">{formatMoney(product.retail_price || 0)}</td>
+                  <td className="text-right font-semibold">{formatMoney(product.retail_price || 0)}</td>
                   <td className={`p-stock ${statusInfo.status === 'warning' || statusInfo.status === 'danger' ? 'low' : ''}`}>
                     {largestUnit ? (
                       <>{formatInventoryQuantity(largestCount)} {largestUnit.unit_name}{remainder > 0 ? ` + ${formatInventoryQuantity(remainder)} ${product.base_unit_name}` : ''}</>
@@ -450,13 +455,13 @@ export default function InventoryProductsPage() {
                     )}
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>Tối thiểu {formatInventoryQuantity(product.min_stock_base_qty || 0)}</div>
                   </td>
-                  <td className="p-status">
+                  <td className="text-center">
                     <StatusBadge status={statusInfo.status} label={statusInfo.label} />
                   </td>
-                  <td className="p-actions">
+                  <td className="w-[100px] text-center">
                     <button
                       type="button"
-                      className="btn btn-outline btn-sm"
+                      className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground"
                       onClick={(e) => { e.stopPropagation(); openEditModal(product) }}
                       title="Sửa"
                     >
@@ -464,8 +469,7 @@ export default function InventoryProductsPage() {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-sm"
-                      style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--red)', padding: '5px 8px', borderRadius: 'var(--radius-sm)', fontSize: 12, cursor: 'pointer', marginLeft: 4 }}
+                      className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-red-500 hover:bg-red-950/30 ml-1"
                       onClick={(e) => { e.stopPropagation(); handleDeactivate(product) }}
                       title="Ngừng KD"
                     >
@@ -491,34 +495,38 @@ export default function InventoryProductsPage() {
       {/* Mobile Filter Sheet */}
       {filterSheetOpen && (
         <>
-          <div className="filter-backdrop open" onClick={() => setFilterSheetOpen(false)} />
-          <div className="filter-sheet open">
-            <div className="sheet-handle" />
-            <div className="sheet-title">Bộ lọc</div>
-            <div className="sheet-group">
-              <label>Danh mục</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setFilterSheetOpen(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 rounded-t-lg max-h-[85vh] overflow-y-auto p-5 pb-0">
+            <div className="w-9 h-1 bg-gray-700 rounded-full mx-auto mb-4 shrink-0" />
+            <div className="text-base font-bold mb-4 text-foreground">Bộ lọc</div>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-muted mb-1.5">Danh mục</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)}
+                className="w-full h-10 rounded border border-gray-700 bg-background text-foreground text-sm px-3 outline-none cursor-pointer focus:border-accent">
                 <option value="">Tất cả</option>
                 {categories.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </div>
-            <div className="sheet-group">
-              <label>Trạng thái</label>
-              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-muted mb-1.5">Trạng thái</label>
+              <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value)}
+                className="w-full h-10 rounded border border-gray-700 bg-background text-foreground text-sm px-3 outline-none cursor-pointer focus:border-accent">
                 <option value="all">Tất cả</option>
                 <option value="active">Đang KD</option>
                 <option value="inactive">Ngừng KD</option>
               </select>
             </div>
-            <div className="sheet-group">
-              <label>Tồn kho ≤</label>
-              <input type="number" min="0" placeholder="VD: 5" />
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-muted mb-1.5">Tồn kho ≤</label>
+              <input type="number" min="0" placeholder="VD: 5"
+                className="w-full h-10 rounded border border-gray-700 bg-background text-foreground text-sm px-3 outline-none focus:border-accent" />
             </div>
-            <div className="sheet-group">
-              <label>ĐVT</label>
-              <select>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-muted mb-1.5">ĐVT</label>
+              <select
+                className="w-full h-10 rounded border border-gray-700 bg-background text-foreground text-sm px-3 outline-none cursor-pointer focus:border-accent">
                 <option value="">Tất cả</option>
                 <option>Thùng</option>
                 <option>Chai</option>
@@ -526,19 +534,17 @@ export default function InventoryProductsPage() {
                 <option>Két</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div className="flex gap-2 mt-2 pb-5">
               <button
                 type="button"
-                className="apply-btn"
-                style={{ flex: 1, background: 'var(--border)', color: 'var(--fg)' }}
+                className="flex-1 py-3 rounded text-sm font-semibold cursor-pointer bg-gray-700 text-foreground border-none"
                 onClick={() => { setCategory(''); setStockFilter('all'); setQuery('') }}
               >
                 Đặt lại
               </button>
               <button
                 type="button"
-                className="apply-btn"
-                style={{ flex: 3 }}
+                className="flex-[3] py-3 rounded text-sm font-semibold cursor-pointer bg-accent text-white border-none"
                 onClick={() => setFilterSheetOpen(false)}
               >
                 Xem kết quả
@@ -550,81 +556,81 @@ export default function InventoryProductsPage() {
 
       {/* Add/Edit Modal */}
       {showModal === 'add' && (
-        <div className="modal-overlay open" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
-          <div className="modal">
-            <div className="modal-head">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-[10px] w-full max-w-[540px] max-h-[85vh] overflow-y-auto shadow-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
               <h3>Thêm sản phẩm</h3>
-              <button type="button" className="modal-close" onClick={closeModal}>✕</button>
+              <button type="button" className="w-8 h-8 rounded bg-transparent border-none text-muted cursor-pointer text-lg flex items-center justify-center hover:text-foreground hover:bg-gray-800" onClick={closeModal}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="modal-body">
-                <div className="field-group">
-                  <label>Tên sản phẩm <span className="opt">(bắt buộc)</span></label>
-                  <input className="f-input" value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="VD: Bia Heniken 330ml" maxLength={120} />
+              <div className="p-5 space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label>Tên sản phẩm <span className="text-muted text-[11px] font-normal">(bắt buộc)</span></label>
+                  <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="VD: Bia Heniken 330ml" maxLength={120} />
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
                     <label>Mã SKU</label>
-                    <input className="f-input" value={form.sku} onChange={(e) => updateForm('sku', e.target.value)} placeholder="Tự động sinh" />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.sku} onChange={(e) => updateForm('sku', e.target.value)} placeholder="Tự động sinh" />
                   </div>
-                  <div className="field-group">
+                  <div className="flex flex-col gap-1.5">
                     <label>Danh mục</label>
-                    <input className="f-input" value={form.category} onChange={(e) => updateForm('category', e.target.value)} placeholder="VD: Bia, Nước ngọt" />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.category} onChange={(e) => updateForm('category', e.target.value)} placeholder="VD: Bia, Nước ngọt" />
                   </div>
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
                     <label>Đơn vị gốc</label>
-                    <input className="f-input" value={form.baseUnitName} onChange={(e) => updateForm('baseUnitName', e.target.value)} />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.baseUnitName} onChange={(e) => updateForm('baseUnitName', e.target.value)} />
                   </div>
-                  <div className="field-group">
+                  <div className="flex flex-col gap-1.5">
                     <label>Tồn tối thiểu</label>
-                    <input className="f-input" type="number" min="0" value={form.minStockBaseQty} onChange={(e) => updateForm('minStockBaseQty', e.target.value)} />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.minStockBaseQty} onChange={(e) => updateForm('minStockBaseQty', e.target.value)} />
                   </div>
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
-                    <label>Giá bán lẻ <span className="opt">(VNĐ)</span></label>
-                    <input className="f-input" type="number" min="0" value={form.defaultSalePrice} onChange={(e) => updateForm('defaultSalePrice', e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label>Giá bán lẻ <span className="text-muted text-[11px] font-normal">(VNĐ)</span></label>
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.defaultSalePrice} onChange={(e) => updateForm('defaultSalePrice', e.target.value)} />
                   </div>
-                  <div className="field-group">
-                    <label>Giá nhập <span className="opt">(VNĐ)</span></label>
-                    <input className="f-input" type="number" min="0" value={form.defaultPurchasePrice} onChange={(e) => updateForm('defaultPurchasePrice', e.target.value)} />
+                  <div className="flex flex-col gap-1.5">
+                    <label>Giá nhập <span className="text-muted text-[11px] font-normal">(VNĐ)</span></label>
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.defaultPurchasePrice} onChange={(e) => updateForm('defaultPurchasePrice', e.target.value)} />
                   </div>
                 </div>
 
                 <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Đơn vị thùng mặc định</p>
-                  <div className="form-row-2">
-                    <div className="field-group">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
                       <label>Tên</label>
-                      <input className="f-input" value={form.caseUnitName} onChange={(e) => updateForm('caseUnitName', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.caseUnitName} onChange={(e) => updateForm('caseUnitName', e.target.value)} />
                     </div>
-                    <div className="field-group">
+                    <div className="flex flex-col gap-1.5">
                       <label>Quy đổi</label>
-                      <input className="f-input" type="number" min="2" value={form.caseConversion} onChange={(e) => updateForm('caseConversion', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="2" value={form.caseConversion} onChange={(e) => updateForm('caseConversion', e.target.value)} />
                     </div>
                   </div>
-                  <div className="form-row-2" style={{ marginTop: 12 }}>
-                    <div className="field-group">
+                  <div className="grid grid-cols-2 gap-3" style={{ marginTop: 12 }}>
+                    <div className="flex flex-col gap-1.5">
                       <label>Giá bán/thùng</label>
-                      <input className="f-input" type="number" min="0" value={form.caseSalePrice} onChange={(e) => updateForm('caseSalePrice', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.caseSalePrice} onChange={(e) => updateForm('caseSalePrice', e.target.value)} />
                     </div>
-                    <div className="field-group">
+                    <div className="flex flex-col gap-1.5">
                       <label>Giá nhập/thùng</label>
-                      <input className="f-input" type="number" min="0" value={form.casePurchasePrice} onChange={(e) => updateForm('casePurchasePrice', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.casePurchasePrice} onChange={(e) => updateForm('casePurchasePrice', e.target.value)} />
                     </div>
                   </div>
                 </div>
 
-                <div className="field-group">
+                <div className="flex flex-col gap-1.5">
                   <label>Ghi chú</label>
-                  <textarea className="f-input" value={form.note} onChange={(e) => updateForm('note', e.target.value)} placeholder="VD: Sản phẩm mới về, giá tốt"></textarea>
+                  <textarea className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.note} onChange={(e) => updateForm('note', e.target.value)} placeholder="VD: Sản phẩm mới về, giá tốt"></textarea>
                 </div>
               </div>
-              <div className="modal-foot">
-                <button type="button" className="btn btn-outline" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
+              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-700">
+                <button type="button" className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={closeModal}>Hủy</button>
+                <button type="submit" className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none disabled:opacity-50 disabled:cursor-not-allowed" disabled={submitting}>
                   {submitting ? 'Đang lưu...' : 'Thêm sản phẩm'}
                 </button>
               </div>
@@ -634,81 +640,81 @@ export default function InventoryProductsPage() {
       )}
 
       {showModal === 'edit' && (
-        <div className="modal-overlay open" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
-          <div className="modal">
-            <div className="modal-head">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-[10px] w-full max-w-[540px] max-h-[85vh] overflow-y-auto shadow-lg">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
               <h3>Sửa sản phẩm</h3>
-              <button type="button" className="modal-close" onClick={closeModal}>✕</button>
+              <button type="button" className="w-8 h-8 rounded bg-transparent border-none text-muted cursor-pointer text-lg flex items-center justify-center hover:text-foreground hover:bg-gray-800" onClick={closeModal}>✕</button>
             </div>
             <form onSubmit={handleEdit}>
-              <div className="modal-body">
-                <div className="field-group">
-                  <label>Tên sản phẩm <span className="opt">(bắt buộc)</span></label>
-                  <input className="f-input" value={form.name} onChange={(e) => updateForm('name', e.target.value)} maxLength={120} />
+              <div className="p-5 space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label>Tên sản phẩm <span className="text-muted text-[11px] font-normal">(bắt buộc)</span></label>
+                  <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.name} onChange={(e) => updateForm('name', e.target.value)} maxLength={120} />
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
                     <label>Mã SKU</label>
-                    <input className="f-input" value={form.sku} onChange={(e) => updateForm('sku', e.target.value)} readOnly />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.sku} onChange={(e) => updateForm('sku', e.target.value)} readOnly />
                   </div>
-                  <div className="field-group">
+                  <div className="flex flex-col gap-1.5">
                     <label>Danh mục</label>
-                    <input className="f-input" value={form.category} onChange={(e) => updateForm('category', e.target.value)} />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.category} onChange={(e) => updateForm('category', e.target.value)} />
                   </div>
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
                     <label>Đơn vị gốc</label>
-                    <input className="f-input" value={form.baseUnitName} onChange={(e) => updateForm('baseUnitName', e.target.value)} />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.baseUnitName} onChange={(e) => updateForm('baseUnitName', e.target.value)} />
                   </div>
-                  <div className="field-group">
+                  <div className="flex flex-col gap-1.5">
                     <label>Tồn tối thiểu</label>
-                    <input className="f-input" type="number" min="0" value={form.minStockBaseQty} onChange={(e) => updateForm('minStockBaseQty', e.target.value)} />
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.minStockBaseQty} onChange={(e) => updateForm('minStockBaseQty', e.target.value)} />
                   </div>
                 </div>
-                <div className="form-row-2">
-                  <div className="field-group">
-                    <label>Giá bán lẻ <span className="opt">(VNĐ)</span></label>
-                    <input className="f-input" type="number" min="0" value={form.defaultSalePrice} onChange={(e) => updateForm('defaultSalePrice', e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label>Giá bán lẻ <span className="text-muted text-[11px] font-normal">(VNĐ)</span></label>
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.defaultSalePrice} onChange={(e) => updateForm('defaultSalePrice', e.target.value)} />
                   </div>
-                  <div className="field-group">
-                    <label>Giá nhập <span className="opt">(VNĐ)</span></label>
-                    <input className="f-input" type="number" min="0" value={form.defaultPurchasePrice} onChange={(e) => updateForm('defaultPurchasePrice', e.target.value)} />
+                  <div className="flex flex-col gap-1.5">
+                    <label>Giá nhập <span className="text-muted text-[11px] font-normal">(VNĐ)</span></label>
+                    <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.defaultPurchasePrice} onChange={(e) => updateForm('defaultPurchasePrice', e.target.value)} />
                   </div>
                 </div>
 
                 <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: 16 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Đơn vị thùng mặc định</p>
-                  <div className="form-row-2">
-                    <div className="field-group">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
                       <label>Tên</label>
-                      <input className="f-input" value={form.caseUnitName} onChange={(e) => updateForm('caseUnitName', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.caseUnitName} onChange={(e) => updateForm('caseUnitName', e.target.value)} />
                     </div>
-                    <div className="field-group">
+                    <div className="flex flex-col gap-1.5">
                       <label>Quy đổi</label>
-                      <input className="f-input" type="number" min="2" value={form.caseConversion} onChange={(e) => updateForm('caseConversion', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="2" value={form.caseConversion} onChange={(e) => updateForm('caseConversion', e.target.value)} />
                     </div>
                   </div>
-                  <div className="form-row-2" style={{ marginTop: 12 }}>
-                    <div className="field-group">
+                  <div className="grid grid-cols-2 gap-3" style={{ marginTop: 12 }}>
+                    <div className="flex flex-col gap-1.5">
                       <label>Giá bán/thùng</label>
-                      <input className="f-input" type="number" min="0" value={form.caseSalePrice} onChange={(e) => updateForm('caseSalePrice', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.caseSalePrice} onChange={(e) => updateForm('caseSalePrice', e.target.value)} />
                     </div>
-                    <div className="field-group">
+                    <div className="flex flex-col gap-1.5">
                       <label>Giá nhập/thùng</label>
-                      <input className="f-input" type="number" min="0" value={form.casePurchasePrice} onChange={(e) => updateForm('casePurchasePrice', e.target.value)} />
+                      <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" type="number" min="0" value={form.casePurchasePrice} onChange={(e) => updateForm('casePurchasePrice', e.target.value)} />
                     </div>
                   </div>
                 </div>
 
-                <div className="field-group">
+                <div className="flex flex-col gap-1.5">
                   <label>Ghi chú</label>
-                  <textarea className="f-input" value={form.note} onChange={(e) => updateForm('note', e.target.value)}></textarea>
+                  <textarea className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent w-full" value={form.note} onChange={(e) => updateForm('note', e.target.value)}></textarea>
                 </div>
               </div>
-              <div className="modal-foot">
-                <button type="button" className="btn btn-outline" onClick={closeModal}>Hủy</button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
+              <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-700">
+                <button type="button" className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={closeModal}>Hủy</button>
+                <button type="submit" className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none disabled:opacity-50 disabled:cursor-not-allowed" disabled={submitting}>
                   {submitting ? 'Đang lưu...' : 'Lưu thay đổi'}
                 </button>
               </div>
@@ -719,73 +725,73 @@ export default function InventoryProductsPage() {
 
       {/* Detail Modal */}
       {showModal === 'detail' && editProduct && (
-        <div className="modal-overlay open" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
-          <div className="modal" style={{ maxWidth: 620 }}>
-            <div className="modal-head">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-[10px] w-full max-w-[540px] max-h-[85vh] overflow-y-auto shadow-lg" style={{ maxWidth: 620 }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
               <h3>Chi tiết sản phẩm</h3>
-              <button type="button" className="modal-close" onClick={closeModal}>✕</button>
+              <button type="button" className="w-8 h-8 rounded bg-transparent border-none text-muted cursor-pointer text-lg flex items-center justify-center hover:text-foreground hover:bg-gray-800" onClick={closeModal}>✕</button>
             </div>
-            <div className="modal-body">
-              <div className="info-card">
-                <div className="ic-icon">
+            <div className="p-5 space-y-4">
+              <div className="flex items-center gap-3 p-3 bg-background rounded">
+                <div className="w-10 h-10 rounded-lg bg-gray-800 flex items-center justify-center shrink-0 text-muted">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                 </div>
                 <div>
-                  <div className="ic-name">{editProduct.name}</div>
-                  <div className="ic-code">{editProduct.sku || '---'}</div>
-                  <div className="ic-tags">
+                  <div className="text-[15px] font-semibold text-foreground">{editProduct.name}</div>
+                  <div className="text-xs text-muted mb-1">{editProduct.sku || '---'}</div>
+                  <div className="flex gap-1.5 flex-wrap">
                     <StatusBadge status="info" label={editProduct.category || 'Chưa phân nhóm'} />
                     <StatusBadge status="default" label={editProduct.base_unit_name || '---'} />
                   </div>
                 </div>
               </div>
 
-              <div className="detail-grid">
-                <div className="detail-row">
-                  <span className="label">Giá nhập</span>
-                  <div className="value" style={{ color: 'var(--muted)' }}>{formatMoney(editProduct.default_purchase_price || 0)}</div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Giá nhập</span>
+                  <div className="text-sm font-semibold text-muted">{formatMoney(editProduct.default_purchase_price || 0)}</div>
                 </div>
-                <div className="detail-row">
-                  <span className="label">Giá bán</span>
-                  <div className="value" style={{ color: 'var(--accent)' }}>{formatMoney(editProduct.retail_price || 0)}</div>
+                <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Giá bán</span>
+                  <div className="text-sm font-semibold text-accent">{formatMoney(editProduct.retail_price || 0)}</div>
                 </div>
-                <div className="detail-row">
-                  <span className="label">Tồn kho</span>
-                  <div className="value">{formatProductStock(editProduct)}</div>
+                <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Tồn kho</span>
+                  <div className="text-sm font-semibold text-foreground">{formatProductStock(editProduct)}</div>
                 </div>
-                <div className="detail-row">
-                  <span className="label">Trạng thái</span>
-                  <div className="value"><StatusBadge status={getStatusInfo(editProduct).status} label={getStatusInfo(editProduct).label} /></div>
+                <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Trạng thái</span>
+                  <div className="text-sm font-semibold text-foreground"><StatusBadge status={getStatusInfo(editProduct).status} label={getStatusInfo(editProduct).label} /></div>
                 </div>
               </div>
 
               {editProduct.note && (
-                <div style={{ padding: '8px 12px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', fontSize: 13, color: 'var(--muted)' }}>
+                <div className="p-2 bg-background rounded text-[13px] text-muted">
                   <strong>Ghi chú:</strong> {editProduct.note}
                 </div>
               )}
 
-              <div className="detail-section">
-                <h4>Đơn vị quy đổi</h4>
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-foreground mb-2">Đơn vị quy đổi</h4>
                 {(editProduct.units || []).length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>Chưa có đơn vị quy đổi</div>
+                  <div className="text-[13px] text-muted py-2">Chưa có đơn vị quy đổi</div>
                 ) : (
-                  <table className="detail-table">
+                  <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th>Đơn vị</th>
-                        <th className="dt-qty">Quy đổi</th>
-                        <th className="dt-price">Giá nhập</th>
-                        <th className="dt-price">Giá bán</th>
+                        <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700">Đơn vị</th>
+                        <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[140px]">Quy đổi</th>
+                        <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[100px] text-right">Giá nhập</th>
+                        <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[100px] text-right">Giá bán</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(editProduct.units || []).map((unit) => (
                         <tr key={unit.id || unit.unit_name}>
-                          <td>{unit.unit_name}</td>
-                          <td className="dt-qty">1 = {formatInventoryQuantity(unit.conversion_to_base_qty)} {editProduct.base_unit_name}</td>
-                          <td className="dt-price">{formatMoney(unit.default_purchase_price || 0)}</td>
-                          <td className="dt-price">{formatMoney(unit.default_sale_price || 0)}</td>
+                          <td className="px-2 py-2 border-b border-gray-700">{unit.unit_name}</td>
+                          <td className="px-2 py-2 border-b border-gray-700 w-[140px]">1 = {formatInventoryQuantity(unit.conversion_to_base_qty)} {editProduct.base_unit_name}</td>
+                          <td className="px-2 py-2 border-b border-gray-700 w-[100px] text-right font-semibold">{formatMoney(unit.default_purchase_price || 0)}</td>
+                          <td className="px-2 py-2 border-b border-gray-700 w-[100px] text-right font-semibold">{formatMoney(unit.default_sale_price || 0)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -793,19 +799,19 @@ export default function InventoryProductsPage() {
                 )}
               </div>
 
-              <div className="detail-section">
-                <h4>Thông tin khác</h4>
-                <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              <div className="mt-4">
+                <h4 className="text-sm font-semibold text-foreground mb-2">Thông tin khác</h4>
+                <div className="text-[13px] text-muted">
                   Giá vốn TB: {formatMoney(editProduct.avgCostPerBaseUnit || 0)} / {editProduct.base_unit_name}
                   &nbsp;·&nbsp; Ngày tạo: {editProduct.created_at ? new Date(editProduct.created_at).toLocaleDateString('vi-VN') : '---'}
                 </div>
               </div>
             </div>
-            <div className="modal-foot">
-              <button type="button" className="btn btn-outline" onClick={closeModal}>Đóng</button>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-700">
+              <button type="button" className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={closeModal}>Đóng</button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none"
                 onClick={() => { const p = editProduct; closeModal(); setTimeout(() => openEditModal(p), 50) }}
               >
                 Sửa

@@ -178,7 +178,7 @@ export default function VerifyStorePage() {
     setConfirmVerify({ open: false, ids: [] });
   };
 
-  const verifyStores = async (ids) => {
+  const handleVerifyStores = async (ids) => {
     if (!ids || ids.length === 0) return;
     setSubmitting(true);
     setError("");
@@ -497,7 +497,7 @@ export default function VerifyStorePage() {
                 onClick={() => {
                   const ids = confirmVerify.ids;
                   closeVerifyConfirm();
-                  verifyStores(ids);
+                  handleVerifyStores(ids);
                 }}
               >
                 Xác thực

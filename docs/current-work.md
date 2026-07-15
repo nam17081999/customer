@@ -234,3 +234,313 @@ Feature (thêm dữ liệu mới)
 - 1 test failure pre-existing (không do data change):
   - `storeEditFlow.test.js`: phone duplicate detection cache mock issue
 - Reverse geocode fallback dùng `globalThis.fetch` khi không có `customFetch` — cần đảm bảo môi trường Node/Next có fetch support
+
+---
+
+## Task 6: Thêm role NHÂN VIÊN + Quản lý xe
+
+### Goal
+Thêm role `staff` (nhân viên) với quyền xem/tạo/bổ sung cửa hàng. Thêm tính năng quản lý xe giao hàng (admin CRUD + staff ghi nhận xăng).
+
+### Task Type
+Feature
+
+### In Scope
+- Thêm role `staff` vào `lib/authz.js` + `lib/authStore.js`
+- Staff thấy navbar "Cửa hàng" (Tổng quan, Thêm cửa hàng) + "Xe" (Ghi nhận xăng)
+- Staff thấy menu tương ứng trong account screen
+- Staff được tạo store (full flow, có map step)
+- Tạo bảng `vehicles` + `vehicle_fuel_logs` (migration)
+- API admin CRUD cho vehicles
+- API ghi nhận xăng cho authenticated users
+- Admin page: `/vehicles` — quản lý danh sách xe
+- Staff page: `/vehicles/record-fuel` — chọn xe + ghi số xăng
+- Navbar + account screen links cho vehicle
+
+### Done
+- ✅ **`lib/authz.js`**: + `STAFF: 'staff'`, aliases, `isStaffRole()`, update `isAuthenticatedRole()`
+- ✅ **`lib/authStore.js`**: + `isStaff` state + derived
+- ✅ **`components/layout/app-navbar.jsx`**: + `isStaff` resolveRole, + stores group for staff, + vehicles group (admin Quản lý xe / staff Ghi nhận xăng)
+- ✅ **`screens/auth/account-screen.jsx`**: staff menu (Cửa hàng filtered + Xe section), role labels
+- ✅ **`helper/useStoreCreateController.js`**: destructure + return `isStaff`, staff tạo store được
+- ✅ **`supabase/migrations/20260714000000_add_vehicles.sql`**: bảng `vehicles` + `vehicle_fuel_logs` + RLS
+- ✅ **`api/vehicles/client.js`**: `fetchActiveVehicles()`, `createFuelLog()`
+- ✅ **`pages/api/admin/vehicles/index.js`**: GET (list) + POST (create) — admin only
+- ✅ **`pages/api/admin/vehicles/[id].js`**: GET + PUT + DELETE — admin only
+- ✅ **`pages/api/fuel-logs.js`**: POST (create log) + GET (admin list) — authenticated
+- ✅ **`pages/vehicles/index.js`**: admin manage vehicles (table + add/edit form)
+- ✅ **`pages/vehicles/record-fuel.js`**: staff select vehicle + enter fuel amount
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `pnpm test` — 661 passed, 1 failed (pre-existing: storeEditFlow phone dupes), 3 skipped
+
+### Risks / Next
+- `vehicles` + `vehicle_fuel_logs` tables chỉ tồn tại trong migration SQL — cần chạy migration trên Supabase để có effect
+- Staff fuel recording dùng client-side `db.from('vehicle_fuel_logs').insert()` — phụ thuộc vào RLS policies đã được áp dụng
+- 1 test failure pre-existing: `storeEditFlow.test.js` phone duplicate detection cache mock issue
+
+---
+
+## Phase 1: Restructure `helper/`
+
+### Goal
+Deduplicate, consolidate, and tidy up `helper/` — fix triplicated coordinate validation, dead imports, and duplicated phone pair validation.
+
+### Task Type
+Refactor
+
+### In Scope
+- Consolidate `hasValidCoordinates` — 3 definitions → 1 in `coordinate.js`, remove from `validation.js` + `storeAnalytics.js`
+- Fix dead import: `findDuplicatePhoneStores` in `storeEditFlow.js` imported but never called
+- Deduplicate phone pair validation: extract `validatePhonePair()` in `validation.js`, reuse in `storeCreateFlow.js` + `storeEditFlow.js`
+
+### Out of Scope
+- Moving hooks to `hooks/` (too many import changes)
+- Renaming files
+- Splitting `orderInventoryFlow.js` (852-line monolith)
+- Splitting `validation.js` into sub-files
+
+### Must Preserve
+- All existing exports from `helper/` files (no breaking changes)
+- All test coverage (update test assertions if needed)
+- Vietnamese phone validation logic exactly
+
+### Required Verification
+- `npm run lint` — 0 errors
+- `pnpm test` — no new failures
+- Build — all pages compile
+
+### Plan
+1.1 Consolidate `hasValidCoordinates` — `coordinate.js` canonical, remove from `validation.js` and `storeAnalytics.js`
+1.2 Remove dead `findDuplicatePhoneStores` import from `storeEditFlow.js`
+1.3 Extract `validatePhonePair()` in `validation.js`, update both flow files
+Verify: lint + test + build
+
+### Done
+1.1 ✅ `isValidCoordinates` removed from `validation.js` — 0 callers, consolidated to `coordinate.js`
+1.1 ✅ `storeAnalytics.js` `hasValidCoordinates` now delegates to `coordinate.js` + null safety guard (was buggy: `Number(null)` → 0 → passed)
+1.2 ✅ Dead `findDuplicatePhoneStores` import removed from `storeEditFlow.js` — imported but never called
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `pnpm test` — 661 passed, 1 failed (pre-existing), 3 skipped — no regressions
+- ✅ `npm run build` — 38/38 pages compiled
+
+### Risks / Next
+- 1 test failure pre-existing: `storeEditFlow.test.js` phone duplicate detection cache mock issue
+- `storeAnalytics.js` null-coords test changed: was `true` (buggy), now `false` (correct) — no production caller relies on the old behavior
+
+---
+
+## Phase 2: UI & Code Quality
+
+### Goal
+Fix stale comments, Vietnamese typos, unused imports, and two runtime bugs (shadowed function + missing setter return).
+
+### Task Type
+Refactor
+
+### In Scope
+- Fix typo "Dnah" → "Danh" in `pages/_app.js`
+- Fix duplicate `/login` key in PAGE_TITLES (remove stale null entry)
+- Remove unused imports: `useRef` in `store/create.js`, `useCallback` in `app-navbar.jsx`, `getLocationDuplicateCheckOptions` in `useStoreCreateController.js`
+- Remove unused `isStaff` from `useStoreCreateController` (destructure + return)
+- Remove stale TODO comment in `error-boundary.jsx`
+- Fix missing `setStep2Key` in `useStoreEditController` return (runtime bug — component calls `setStep2Key` but it was never exposed)
+- Fix infinite recursion in `store/verify.js`: local `verifyStores` function shadowed imported `verifyStores` API function, calling itself instead of the API
+
+### Out of Scope
+- CSV header diacritics (ASCII headers are common for compatibility)
+- `locationUi` naming (internally consistent)
+
+### Must Preserve
+- All behavioral semantics (typo fix is display-only)
+- All test coverage
+
+### Plan
+2.1 Fix typo in PAGE_TITLES
+2.2 Remove duplicate `/login` key (stale null entry)
+2.3 Remove 3 unused imports across files
+2.4 Remove unused `isStaff` variable
+2.5 Remove stale TODO
+2.6 Add `setStep2Key` to controller return
+2.7 Rename local `verifyStores` → `handleVerifyStores` to fix shadowing
+
+### Done
+2.1 ✅ `Dnah` → `Danh` in `pages/_app.js:17`
+2.2 ✅ Removed duplicate `/login: null` entry (was overwritten by `{ title: 'Đăng nhập' }` anyway)
+2.3 ✅ Removed `useRef` from `pages/store/create.js`, `getLocationDuplicateCheckOptions` from `helper/useStoreCreateController.js`, `useCallback` from `components/layout/app-navbar.jsx`
+2.4 ✅ Removed `isStaff` from destructure and return in `helper/useStoreCreateController.js`
+2.5 ✅ Stale TODO → concise comment in `components/error-boundary.jsx`
+2.6 ✅ Added `setStep2Key` to `helper/useStoreEditController.js` return object
+2.7 ✅ Renamed local `verifyStores` → `handleVerifyStores` in `pages/store/verify.js` to avoid shadowing recursive call
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `pnpm test` — 661 passed, 1 pre-existing fail, 3 skipped — no regressions
+- ✅ `npm run build` — 38/38 pages
+
+### Risks / Next
+- No new risks introduced. Two runtime bugs fixed that could have caused crashes.
+- Pre-existing `storeEditFlow.test.js` failure unchanged.
+
+---
+
+## Phase 3: Fix pre-existing test failure
+
+### Goal
+Fix the one remaining pre-existing test failure in `storeEditFlow.test.js` — `validateStoreEditPhones` was missing duplicate phone detection against the stores cache.
+
+### Task Type
+Bugfix
+
+### In Scope
+- Add duplicate phone check to `validateStoreEditPhones` using existing `findDuplicatePhoneStores` utility
+- Both primary and secondary phone checks
+
+### Out of Scope
+- Full test coverage audit
+- Adding new tests
+
+### Must Preserve
+- All existing test assertions pass
+- No behavioral change for non-duplicate cases
+
+### Plan
+1. Import `findDuplicatePhoneStores` in `storeEditFlow.js`
+2. After primary phone normalization, check `stores` for duplicates via `findDuplicatePhoneStores(stores, rawPrimary, { excludeStoreId: storeId })`
+3. Same for secondary phone
+4. Return error via `buildDuplicatePhoneMessage`
+
+### Done
+- ✅ Added `findDuplicatePhoneStores` import to `helper/storeEditFlow.js`
+- ✅ Added duplicate check for primary phone after normalization
+- ✅ Added duplicate check for secondary phone after normalization
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `pnpm test` — **662 passed, 0 failed**, 3 skipped — **all tests green for the first time!**
+- ✅ `npm run build` — 38/38 pages
+
+### Risks / Next
+- No remaining test failures in the codebase
+
+---
+
+## Phase 4: Docs Cleanup
+
+### Goal
+Fix stale docs — tech stack, env vars, routes, test stats, duplicate files.
+
+### Task Type
+Docs
+
+### In Scope
+- Fix README.md: Leaflet → MapLibre GL, remove boilerplate (Next.js Learn, Vercel Deploy), update project structure with all dirs
+- Delete `docs/env.example.md` (duplicate of root `.env.example`)
+- Fix SETUP.md: remove stale `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- Fix docs/ai-rules.md: `Cửa hàng` → `Tạp hóa`
+- Fix docs/architecture.md: add all missing page routes + API endpoints
+- Fix docs/database.md: index section (was "chưa có" → now references actual `indexes.sql`)
+- Fix docs/business-analysis.md: all "5 test fail" → "0 failures" (updated for Phase 3 result)
+
+### Out of Scope
+- `docs/project-context.md` full rewrite (dated "Recent Updates" from April)
+- `docs/location-flow-matrix.md` full review
+- `docs/superpowers/` plan checkbox updates
+
+### Done
+- ✅ README: tech stack fixed, boilerplate removed, structure updated
+- ✅ `docs/env.example.md` deleted
+- ✅ SETUP.md: stale env var removed
+- ✅ docs/ai-rules.md: comment fixed
+- ✅ docs/architecture.md: 20+ missing routes + 10 API endpoints added
+- ✅ docs/database.md: index section updated (chưa có → has)
+- ✅ docs/business-analysis.md: 4 stale "5 test fail" references updated to "0 failures"
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `pnpm test` — 662 passed, 0 failed, 3 skipped
+- ✅ No dead links or broken references
+
+### Risks / Next
+- `docs/project-context.md`, `docs/location-flow-matrix.md`, and `docs/superpowers/` plans are still partially stale but lower priority
+
+---
+
+## Phase 5: CSS Migration — Replace legacy classes with inline Tailwind v4
+
+### Goal
+Replace all legacy component classes from `styles/globals.css` with inline Tailwind v4 utility classes across every page/component, then remove the unused CSS.
+
+### Task Type
+Refactor
+
+### In Scope
+- Phase B: Replace `.btn-*` classes with inline Tailwind in `confirm-dialog.jsx`, `reports.js`, `account.js`, `products.js`, `orders-list-page.jsx`
+- Phase C: Replace `.card`, `.card-header`, `.card-body`, `.modal-*`, `.f-input`, `.form-*`, `.field-*` in `overview.js`, `district-chart.jsx`, `recent-orders.jsx`, `products.js`, `account.js`, `orders-list-page.jsx`
+- Phase D: Replace KPI, table, filter, timeline, toggle, chip, avatar-sm, user-card, page-title, toolbar, filter-sheet, profile, toast, confirm classes in all remaining files
+- Phase E: Remove 45+ unused component class blocks from globals.css (reduced from 2722 lines to ~820 lines)
+- Phase F: Verify with lint + build
+
+### Out of Scope
+- `<style jsx>` scoped styles in `pages/inventory/reports.js` (independent of globals.css)
+- `@theme` tokens, `:root` design tokens, base/reset styles (keep as-is)
+- Sidebar, header, status-badge, pagination, district chart, QA grid, badge classes (still in use)
+
+### Must Preserve
+- All visual appearance (colors, spacing, sizing) — inline Tailwind classes match original CSS values
+- Vietnamese phone validation, store search, map behavior, Supabase + cache consistency
+- Build compiles all 38 pages with 0 errors
+
+### Plan
+1. Replace btn classes → inline Tailwind (Phase B)
+2. Replace card, modal, form classes → inline Tailwind (Phase C)
+3. Replace KPI, table, filter, timeline, toggle, chip, avatar, toolbar, profile, toast, confirm classes → inline Tailwind (Phase D)
+4. Remove unused component CSS from globals.css (Phase E)
+5. Run lint + build (Phase F)
+
+### Done
+- ✅ **Phase B** — All `.btn-*`, `.btn-icon`, `.btn-center` replaced with inline Tailwind in 5 files:
+  - `components/ui/confirm-dialog.jsx`
+  - `pages/inventory/reports.js`
+  - `pages/account.js`
+  - `pages/inventory/products.js`
+  - `screens/orders/orders-list-page.jsx`
+- ✅ **Phase C** — Card, modal, form classes replaced:
+  - `.card`, `.card-header`, `.card-body` → `overview.js`, `district-chart.jsx`, `recent-orders.jsx`
+  - `.settings-card`, `.card-title` → `account.js`
+  - `.modal-overlay`, `.modal`, `.modal-head`, `.modal-close`, `.modal-body`, `.modal-foot` → `products.js` (3 modals), `orders-list-page.jsx` (1 modal)
+  - `.f-input`, `.field-group`, `.form-row-2`, `.form-row`, `.form-group`, `.form-label`, `.form-input` → `products.js`, `account.js`
+- ✅ **Phase D** — Remaining component classes replaced:
+  - Filter panel (desktop + mobile sheet) → `products.js`
+  - `.kpi-grid`, `.kpi-card`, `.kpi-label`, `.kpi-value`, `.kpi-sub`, `.kpi-change` → `kpi-grid.jsx`, `kpi-card.jsx`
+  - `.p-table`, `.p-code`, `.o-*`, `.p-*` → `products.js`, `orders-list-page.jsx`
+  - `.order-table`, `.order-table-wrap`, `.multi-bar`, `.store-info-card`, `.empty-state` → `orders-list-page.jsx`
+  - `.orders-table`, `.order-store`, `.order-amount`, `.order-time` → `recent-orders.jsx`
+  - `.timeline`, `.tl-item`, `.tl-label`, `.tl-time` → `orders-list-page.jsx`
+  - `.toggle-switch`, `.toggle-slider` → `toggle.jsx`
+  - `.chip` → `chip.jsx`
+  - `.avatar-sm` → `header.jsx`
+  - `.user-card` → `sidebar.jsx`
+  - `.page-title`, `.toolbar`, `.search-box`, `.filter-chips`, `.filter-toggle`, `.toolbar-extra` → `overview.js`, `reports.js`, `orders-list-page.jsx`, `products.js`
+  - `.filter-backdrop`, `.filter-sheet`, `.sheet-handle`, `.sheet-title`, `.apply-btn` → `store/create.js`
+  - `.profile-head`, `.profile-avatar`, `.profile-head-info`, `.info-line`, `.il-label`, `.il-value` → `account.js`
+  - `.toast-container`, `.toast`, `.confirm-overlay`, `.confirm-box`, `.confirm-actions` → wherever present
+  - `.toggle-row`, `.toggle-label` → `account.js`
+  - Fixed `<span className="opt">` replaceAll bug (missing `>` in `products.js` — 6 occurrences)
+- ✅ **Phase E** — Removed unused CSS from globals.css:
+  - Removed: btn, card, modal (×2), detail grid/section/table/info-card, KPI, ops-grid, orders-table, order-table/o-*, timeline, toggle, settings-card/form/profile, toast/confirm, filter-panel/filter-inner, multi-bar, filter-grid/filter-actions, filter-sheet, data-table/sort-icon, search-clear, page-title/search-box, p-table, table-wrap, generic table, `html{scrollbar-gutter}` duplicate
+  - Kept: `@theme`, `:root`, base/reset, sidebar, header, `.content`, `.h-screen`, toolbar, QA grid, cols-2, district chart, status-badge, th-sort/sort-arrow, page-ellipsis, filter-row/date-chip, filter-chip, filter-group, badge/chip, pagination, store-type badges, store-name-marquee, all responsive @media blocks referencing kept classes
+  - CSS file: 2722 lines → ~820 lines, 23.5 kB → 19.4 kB (-17%)
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm run build` — 38/38 pages compiled, 0 errors
+- ✅ No visual regressions expected (Tailwind values match original CSS values)
+
+### Risks / Next
+- Minor: the `replaceAll` for `<span className="opt">` accidentally removed `>` — caught by lint and fixed before build
+- Low risk: some kept CSS classes (`.filter-chip`, `.search-box`, etc.) have 0 JSX references but are retained as fallback; can be removed in a future pass
+- No remaining global CSS component classes to migrate — future component styling should use inline Tailwind only

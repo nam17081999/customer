@@ -47,13 +47,15 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, message, confir
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[var(--border)]">
           <button
-            className="btn btn-outline"
+            className="inline-flex items-center justify-center h-9 px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground transition-colors"
             onClick={onClose}
           >
             {cancelLabel}
           </button>
           <button
-            className={`btn ${danger ? 'btn-danger' : 'btn-primary'}`}
+            className={danger
+              ? "inline-flex items-center justify-center h-9 px-4 rounded-lg text-xs font-semibold cursor-pointer bg-red-600 text-white hover:bg-red-500 border-none transition-colors"
+              : "inline-flex items-center justify-center h-9 px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none transition-colors"}
             onClick={onConfirm}
           >
             {confirmLabel}

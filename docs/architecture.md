@@ -176,15 +176,47 @@ customer/
 | `/store/reports` | Duyệt báo cáo cửa hàng | Admin |
 | `/store/edit/[id]` | Chỉnh sửa / bổ sung | Admin, public trong `mode=supplement` |
 | `/account` | Dashboard tài khoản | Telesale/Admin |
+| `/store/report/[id]` | Báo cáo cửa hàng | Telesale/Admin |
+| `/store/report/[id]/edit` | Chỉnh sửa báo cáo | Admin |
+| `/store/history/[id]` | Lịch sử chỉnh sửa | Admin |
+| `/store/deduplicate` | Gộp cửa hàng trùng | Admin |
+| `/store/export` | Xuất danh sách cửa hàng | Admin |
+| `/store/export-contacts` | Xuất contact VCF | Admin |
+| `/store/export-data` | Xuất dữ liệu thô | Admin |
+| `/inventory/products` | Danh sách hàng hóa | Admin |
+| `/inventory/products/[id]` | Chi tiết hàng hóa | Admin |
+| `/inventory/products/import` | Import hàng hóa từ CSV | Admin |
+| `/inventory/purchases` | Phiếu nhập kho | Admin |
+| `/inventory/purchases/new` | Tạo phiếu nhập | Admin |
+| `/inventory/purchases/[id]` | Chi tiết phiếu nhập | Admin |
+| `/inventory/reports` | Báo cáo tồn kho | Admin |
+| `/orders` | Danh sách đơn hàng | Admin |
+| `/orders/new` | Lên đơn hàng | Admin |
+| `/orders/[id]` | Chi tiết đơn hàng | Admin |
+| `/admin/users` | Quản lý tài khoản | Admin |
+| `/admin/operations` | Thao tác hệ thống | Admin |
+| `/admin/area-map` | Bản đồ khu vực | Admin |
+| `/vehicles` | Quản lý xe | Admin |
+| `/vehicles/record-fuel` | Ghi nhận xăng | Staff |
+| `/account` | Dashboard tài khoản | Telesale/Admin |
 | `/login` | Đăng nhập | Public |
 
 ---
 
 ## API Routes
 
-| Endpoint | Method | Chức n?"?'ng |
+| Endpoint | Method | Chức năng |
 |---|---|---|
 | `/api/expand-maps-link` | POST | Mở rộng Google Maps short URL |
+| `/api/reverse-geocode-area` | POST | Reverse geocode (Geoapify → OpenMap → Goong → Nominatim) |
+| `/api/route` | POST | Tính tuyến đường |
+| `/api/fuel-logs` | GET/POST | Ghi nhận xăng |
+| `/api/admin/users` | GET/POST | Quản lý tài khoản |
+| `/api/admin/users/[id]/password` | PUT | Đổi mật khẩu |
+| `/api/admin/users/[id]/profile` | PUT | Cập nhật profile |
+| `/api/admin/users/[id]/role` | PUT | Đổi role |
+| `/api/admin/vehicles` | GET/POST | Quản lý xe |
+| `/api/admin/vehicles/[id]` | GET/PUT/DELETE | Chi tiết xe |
 
 ---
 

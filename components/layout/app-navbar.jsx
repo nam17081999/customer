@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Bell } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
 import { getOperatorShortcutHref } from '@/helper/operatorWorkflow'
-import { ChevronDown, Package, Shield } from 'lucide-react'
+import { ChevronDown, Fuel, Package, Shield } from 'lucide-react'
 import {
   AccountIcon,
   MapIcon,
@@ -47,7 +47,7 @@ const GROUPS = [
     key: 'stores',
     label: 'Cửa hàng',
     Icon: MapIcon,
-    roles: ['admin', 'telesale', 'guest'],
+    roles: ['admin', 'telesale', 'staff', 'guest'],
     items: [
       { href: '/map', label: 'Bản đồ' },
       { href: '/overview', label: 'Tổng quan', roles: ['admin'] },
@@ -55,6 +55,16 @@ const GROUPS = [
       { href: '/store/import', label: 'Nhập dữ liệu', roles: ['admin'] },
       { href: '/store/export', label: 'Xuất dữ liệu', roles: ['admin'] },
       { href: '/store/deduplicate', label: 'Gộp trùng lặp', roles: ['admin'] },
+    ],
+  },
+  {
+    key: 'vehicles',
+    label: 'Xe',
+    Icon: Fuel,
+    roles: ['admin', 'staff'],
+    items: [
+      { href: '/vehicles', label: 'Quản lý xe', roles: ['admin'] },
+      { href: '/vehicles/record-fuel', label: 'Ghi nhận xăng', roles: ['staff'] },
     ],
   },
   {
@@ -71,9 +81,10 @@ const GROUPS = [
   },
 ]
 
-function resolveRole(isAdmin, isTelesale) {
+function resolveRole(isAdmin, isTelesale, isStaff) {
   if (isAdmin) return 'admin'
   if (isTelesale) return 'telesale'
+  if (isStaff) return 'staff'
   return 'guest'
 }
 
@@ -359,11 +370,11 @@ function formatTimestamp(ts) {
 
 export default function AppNavbar() {
   const pathname = usePathname()
-  const { isAdmin, isTelesale } = useAuth() || {}
+  const { isAdmin, isTelesale, isStaff } = useAuth() || {}
   const [searchHref, setSearchHref] = useState('/')
   const currentPath = pathname || ''
 
-  const role = resolveRole(isAdmin, isTelesale)
+  const role = resolveRole(isAdmin, isTelesale, isStaff)
   const groups = getFilteredGroups(role)
 
   const [badgeCount, setBadgeCount] = useState(0)
@@ -421,8 +432,8 @@ export default function AppNavbar() {
     return () => document.removeEventListener('keydown', handler)
   }, [notifOpen])
 
-  const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : 'Người dùng'
-  const accountMobileLabel = isAdmin ? 'Admin' : isTelesale ? 'Tele' : 'ND'
+  const accountLabel = isAdmin ? 'Admin' : isTelesale ? 'Telesale' : isStaff ? 'Nhân viên' : 'Người dùng'
+  const accountMobileLabel = isAdmin ? 'Admin' : isTelesale ? 'Tele' : isStaff ? 'NV' : 'ND'
 
   // Mobile tab
   const mobileLinks = [

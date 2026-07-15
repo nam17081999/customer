@@ -641,6 +641,7 @@ export function useStoreEditController() {
     geoBlocked,
     resolvingAddr,
     step2Key,
+    setStep2Key,
     mapsLink,
     setMapsLink,
     mapsLinkLoading,

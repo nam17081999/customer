@@ -134,96 +134,96 @@ function OrderDetailModal({ order, storesById, onClose, onCancel }) {
   const timelineItems = order.timeline || []
 
   return (
-    <div className="modal-overlay open" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal">
-        <div className="modal-head">
-          <h3>Chi tiết đơn<span className="o-code-big">{order.code}</span></h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-gray-900 border border-gray-700 rounded-[10px] w-full max-w-[540px] max-h-[85vh] overflow-y-auto shadow-lg">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+          <h3 className="text-base font-bold text-foreground">Chi tiết đơn<span className="text-sm text-muted ml-2">{order.code}</span></h3>
+          <button className="w-8 h-8 rounded bg-transparent border-none text-muted cursor-pointer text-lg flex items-center justify-center hover:text-foreground hover:bg-gray-800" onClick={onClose}>✕</button>
         </div>
-        <div className="modal-body">
+        <div className="p-5 space-y-4">
           {/* Store card */}
-          <div className="store-info-card">
+          <div className="bg-background border border-gray-700 rounded p-3 flex items-center gap-3">
             <div>
               <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                 <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
             <div>
-              <div className="si-name">{customerName}</div>
-              <div className="si-addr">{[phone, district, storeType].filter(Boolean).join(' · ')}</div>
+              <div className="text-sm font-semibold text-foreground">{customerName}</div>
+              <div className="text-xs text-muted">{[phone, district, storeType].filter(Boolean).join(' · ')}</div>
             </div>
           </div>
 
           {/* Info grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="detail-row">
-              <span className="label">Trạng thái</span>
-              <div className="value"><StatusBadge status={order.status} /></div>
+            <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Trạng thái</span>
+              <div className="text-sm font-semibold text-foreground"><StatusBadge status={order.status} /></div>
             </div>
-            <div className="detail-row">
-              <span className="label">Tổng tiền</span>
-              <div className="value" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtVND(total)}</div>
+            <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Tổng tiền</span>
+              <div className="text-sm font-semibold text-foreground" style={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtVND(total)}</div>
             </div>
-            <div className="detail-row">
-              <span className="label">Ngày tạo</span>
-              <div className="value">{formatDateOnly(order.created_at)}</div>
+            <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Ngày tạo</span>
+              <div className="text-sm font-semibold text-foreground">{formatDateOnly(order.created_at)}</div>
             </div>
-            <div className="detail-row">
-              <span className="label">Người tạo</span>
-              <div className="value" style={{ fontSize: 12 }}>{getCreatorLabel(order, null)}</div>
+            <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Người tạo</span>
+              <div className="text-sm font-semibold text-foreground" style={{ fontSize: 12 }}>{getCreatorLabel(order, null)}</div>
             </div>
             {discount > 0 && (
-              <div className="detail-row">
-                <span className="label">Giảm giá</span>
-                <div className="value" style={{ color: 'var(--green)' }}>-{fmtVND(discount)}</div>
+              <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Giảm giá</span>
+                <div className="text-sm font-semibold text-green-500">-{fmtVND(discount)}</div>
               </div>
             )}
             {shipping > 0 && (
-              <div className="detail-row">
-                <span className="label">Phí ship</span>
-                <div className="value">{fmtVND(shipping)}</div>
+              <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Phí ship</span>
+                <div className="text-sm font-semibold text-foreground">{fmtVND(shipping)}</div>
               </div>
             )}
             {order.note && (
-              <div className="detail-row" style={{ gridColumn: '1/-1' }}>
-                <span className="label">Ghi chú</span>
-                <div className="value" style={{ textAlign: 'left' }}>{order.note}</div>
+              <div className="flex flex-col gap-0.5 p-2.5 bg-background rounded" style={{ gridColumn: '1/-1' }}>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted">Ghi chú</span>
+                <div className="text-sm text-foreground" style={{ textAlign: 'left' }}>{order.note}</div>
               </div>
             )}
           </div>
 
           {/* Items */}
-          <div className="detail-section">
-            <h4>Sản phẩm</h4>
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-foreground mb-2">Sản phẩm</h4>
             {items.length === 0 ? (
               <div style={{ padding: '12px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Không có sản phẩm</div>
             ) : (
               <>
-                <table className="detail-items-table">
+                <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 140 }}>Tên</th>
-                      <th className="item-qty">SL</th>
-                      <th className="item-price">Đơn giá</th>
-                      <th className="item-total">Thành tiền</th>
+                      <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700" style={{ minWidth: 140 }}>Tên</th>
+                      <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[60px] text-center">SL</th>
+                      <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[120px] text-right">Đơn giá</th>
+                      <th className="text-left px-2 py-1.5 text-[11px] uppercase tracking-[0.03em] text-muted font-semibold border-b border-gray-700 w-[120px] text-right font-semibold">Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((it, i) => (
                       <tr key={i}>
-                        <td>{it.product_name || it.name}</td>
-                        <td className="item-qty">{it.quantity || it.qty}</td>
-                        <td className="item-price">{fmtVND(it.unit_price ?? it.price)}</td>
-                        <td className="item-total">{fmtVND((it.unit_price ?? it.price) * (it.quantity || it.qty))}</td>
+                        <td className="px-2 py-1.5 border-b border-gray-700">{it.product_name || it.name}</td>
+                        <td className="px-2 py-1.5 border-b border-gray-700 w-[60px] text-center">{it.quantity || it.qty}</td>
+                        <td className="px-2 py-1.5 border-b border-gray-700 w-[120px] text-right">{fmtVND(it.unit_price ?? it.price)}</td>
+                        <td className="px-2 py-1.5 border-b border-gray-700 w-[120px] text-right font-semibold">{fmtVND((it.unit_price ?? it.price) * (it.quantity || it.qty))}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div className="detail-summary">
-                  <div className="sum-row"><span>Tạm tính</span><span>{fmtVND(subtotal)}</span></div>
-                  {discount > 0 && <div className="sum-row" style={{ color: 'var(--green)' }}><span>Giảm giá</span><span>-{fmtVND(discount)}</span></div>}
-                  {shipping > 0 && <div className="sum-row"><span>Phí vận chuyển</span><span>{fmtVND(shipping)}</span></div>}
-                  <div className="sum-row total"><span>Tổng cộng</span><span>{fmtVND(total)}</span></div>
+                <div className="mt-2 border-t border-gray-700 pt-2 space-y-0.5">
+                  <div className="flex justify-between text-sm py-0.5"><span className="text-muted">Tạm tính</span><span className="text-foreground">{fmtVND(subtotal)}</span></div>
+                  {discount > 0 && <div className="flex justify-between text-sm py-0.5 text-green-500"><span>Giảm giá</span><span>-{fmtVND(discount)}</span></div>}
+                  {shipping > 0 && <div className="flex justify-between text-sm py-0.5"><span className="text-muted">Phí vận chuyển</span><span className="text-foreground">{fmtVND(shipping)}</span></div>}
+                  <div className="flex justify-between text-[15px] font-bold pt-1.5 mt-1 border-t border-gray-700"><span className="text-foreground">Tổng cộng</span><span className="text-foreground">{fmtVND(total)}</span></div>
                 </div>
               </>
             )}
@@ -231,25 +231,29 @@ function OrderDetailModal({ order, storesById, onClose, onCancel }) {
 
           {/* Timeline */}
           {timelineItems.length > 0 && (
-            <div className="detail-section">
-              <h4>Lịch sử đơn</h4>
-              <div className="timeline">
-                {timelineItems.map((tl, i) => (
-                  <div key={i} className={'tl-item ' + (tl.current ? 'current' : tl.done ? 'done' : '')}>
-                    <span className="tl-label">{tl.label}</span>
-                    <span className="tl-time">{new Date(tl.time).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</span>
-                  </div>
-                ))}
+            <div className="mt-4">
+              <h4 className="text-sm font-semibold text-foreground mb-2">Lịch sử đơn</h4>
+              <div className="relative pl-4">
+                {timelineItems.map((tl, i) => {
+                  const isLast = i === timelineItems.length - 1
+                  const borderColor = tl.current ? 'border-accent' : tl.done ? 'border-green-500' : 'border-gray-700'
+                  return (
+                    <div key={i} className={`relative pl-4 pb-4 border-l-2 ${borderColor} ${isLast ? 'border-transparent pb-0' : ''}`}>
+                      <span className="text-[13px] text-foreground">{tl.label}</span>
+                      <span className="text-[11px] text-muted block mt-0.5">{new Date(tl.time).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
         </div>
-        <div className="modal-foot">
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-700">
           {order.status === 'active' && (
-            <button className="btn btn-outline" style={{ color: 'var(--red)', borderColor: 'transparent', background: 'oklch(60% 0.16 28 / 0.1)' }} onClick={() => { if (window.confirm('Hủy đơn ' + order.code + '?')) onCancel(order) }}>Hủy đơn</button>
+            <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent text-red-400 hover:bg-red-950/30 border-none" onClick={() => { if (window.confirm('Hủy đơn ' + order.code + '?')) onCancel(order) }}>Hủy đơn</button>
           )}
           <div style={{ flex: 1 }}></div>
-          <button className="btn btn-outline" onClick={onClose}>Đóng</button>
+          <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={onClose}>Đóng</button>
         </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 160 }}>
@@ -655,7 +659,7 @@ export default function OrdersListPage() {
         <div className="orders-list-screen-only flex h-full min-h-0 flex-col gap-3">
 
             {/* ═══ Toolbar ═══ */}
-            <div className="toolbar">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
               <SearchBox
                 value={query}
                 onChange={setQuery}
@@ -734,25 +738,25 @@ export default function OrdersListPage() {
 
             {/* ═══ Multi-action bar (above table) ═══ */}
             {selectedOrders.length > 0 && (
-              <div className="multi-bar">
-                <div className="multi-bar-left">
+              <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-900 border border-gray-700 rounded mb-3">
+                <div className="flex items-center gap-2 text-sm text-muted">
                   <ListChecks className="h-4 w-4" />
                   <span>Đã chọn <strong>{selectedOrders.length}</strong> đơn</span>
                 </div>
-                <div className="multi-bar-right">
-                  <button className="btn btn-outline btn-sm" onClick={() => setSelectedOrdersModalOpen(true)}>
+                <div className="flex items-center gap-1.5">
+                  <button className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={() => setSelectedOrdersModalOpen(true)}>
                     <ListChecks className="h-3.5 w-3.5" /> Xem
                   </button>
-                  <button className="btn btn-outline btn-sm" onClick={handleShowConsolidation} disabled={consolidating}>
+                  <button className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleShowConsolidation} disabled={consolidating}>
                     <Table2 className="h-3.5 w-3.5" /> {consolidating ? 'Đang tổng hợp...' : 'Tổng hợp'}
                   </button>
-                  <button className="btn btn-outline btn-sm" onClick={handlePrintSelectedOrders} disabled={printing}>
+                  <button className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed" onClick={handlePrintSelectedOrders} disabled={printing}>
                     <Printer className="h-3.5 w-3.5" /> {printing ? 'Đang chuẩn bị...' : 'In đơn'}
                   </button>
-                  <button className="btn btn-outline btn-sm">
+                  <button className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground">
                     <Download className="h-3.5 w-3.5" /> Xuất Excel
                   </button>
-                  <button className="btn btn-outline btn-sm" onClick={() => setSelectedOrderIds([])}>
+                  <button className="inline-flex items-center justify-center gap-1 h-7 px-[10px] rounded-lg text-[11px] font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={() => setSelectedOrderIds([])}>
                     <X className="h-3.5 w-3.5" /> Bỏ chọn
                   </button>
                 </div>
@@ -760,8 +764,8 @@ export default function OrdersListPage() {
             )}
 
             {/* ═══ Order Table ═══ */}
-            <div className="order-table-wrap" style={{ flex: '1 1 0%', minHeight: 0, overflow: 'auto' }}>
-              <table className="order-table">
+            <div style={{ flex: '1 1 0%', minHeight: 0, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+              <table className="w-full border-collapse">
                 <thead>
                   <tr>
                     <th style={{ width: 36, padding: '10px 8px' }}>
@@ -771,7 +775,7 @@ export default function OrdersListPage() {
                     <th className="th-sort">Cửa hàng<span className="sort-arrow">⇅</span></th>
                     <th className="th-sort">Trạng thái<span className="sort-arrow">⇅</span></th>
                     <th className="th-sort" style={{ textAlign: 'right' }}>Giá trị<span className="sort-arrow">⇅</span></th>
-                    <th className="o-items">Mặt hàng</th>
+                    <th className="text-xs text-muted font-semibold px-2 py-2.5">Mặt hàng</th>
                     <th className="th-sort" style={{ textAlign: 'right' }}>Thời gian<span className="sort-arrow">⇅</span></th>
                     <th style={{ width: 40 }}></th>
                   </tr>
@@ -785,7 +789,7 @@ export default function OrdersListPage() {
                         <td><Skeleton className="h-3.5 w-36" /></td>
                         <td><Skeleton className="h-3.5 w-20" /></td>
                         <td><Skeleton className="ml-auto h-3.5 w-24" /></td>
-                        <td className="o-items"><Skeleton className="h-3.5 w-28" /></td>
+                        <td className="text-xs text-muted"><Skeleton className="h-3.5 w-28" /></td>
                         <td><Skeleton className="ml-auto h-3.5 w-28" /></td>
                         <td></td>
                       </tr>
@@ -793,12 +797,12 @@ export default function OrdersListPage() {
                   ) : filteredOrders.length === 0 ? (
                     <tr>
                       <td colSpan={8} style={{ padding: 0 }}>
-                        <div className="empty-state">
-                          <svg fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                        <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+                          <svg className="w-12 h-12 opacity-30" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                           </svg>
-                          <h3>Không tìm thấy đơn hàng</h3>
-                          <p>Thử thay đổi bộ lọc hoặc tìm kiếm khác</p>
+                          <h3 className="text-base font-semibold text-foreground">Không tìm thấy đơn hàng</h3>
+                          <p className="text-sm text-muted">Thử thay đổi bộ lọc hoặc tìm kiếm khác</p>
                         </div>
                       </td>
                     </tr>
@@ -807,19 +811,19 @@ export default function OrdersListPage() {
                       <td style={{ padding: '10px 8px' }} onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={selectedOrderIds.includes(String(order.id))} onChange={() => toggleOrderSelection(order.id)} aria-label={'Chọn ' + order.code} className="h-3.5 w-3.5 accent-gray-100" />
                       </td>
-                      <td className="o-code">{order.code}</td>
+                      <td className="font-mono text-xs font-semibold">{order.code}</td>
                       <td>
-                        <div className="o-store">
+                        <div className="flex flex-col gap-0.5">
                           {getCustomerName(order, storesById)}
-                          {getStorePhone(order, storesById) && <span className="o-phone">{getStorePhone(order, storesById)}</span>}
+                          {getStorePhone(order, storesById) && <span className="text-[11px] text-muted">{getStorePhone(order, storesById)}</span>}
                         </div>
                       </td>
                       <td><StatusBadge status={order.status} /></td>
-                      <td className="o-amount" style={{ color: order.status === 'cancelled' ? 'var(--muted)' : 'var(--fg)' }}>{fmtVND(order.total_amount)}</td>
-                      <td className="o-items">{order.itemCount || 0} loại</td>
-                      <td className="o-time">{formatDateOnly(order.created_at)}</td>
-                      <td className="o-actions">
-                        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); handleOpenDetail(order) }} title="Chi tiết">⋯</button>
+                      <td className="font-semibold text-right whitespace-nowrap" style={{ color: order.status === 'cancelled' ? 'var(--muted)' : 'var(--fg)' }}>{fmtVND(order.total_amount)}</td>
+                      <td className="text-xs text-muted">{order.itemCount || 0} loại</td>
+                      <td className="text-xs text-muted text-right whitespace-nowrap">{formatDateOnly(order.created_at)}</td>
+                      <td className="text-center">
+                        <button className="inline-flex items-center justify-center w-7 h-7 rounded border border-gray-700 bg-transparent text-muted hover:text-foreground hover:bg-gray-800 cursor-pointer text-sm" onClick={(e) => { e.stopPropagation(); handleOpenDetail(order) }} title="Chi tiết">⋯</button>
                       </td>
                     </tr>
                   ))}

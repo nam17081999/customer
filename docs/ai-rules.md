@@ -141,7 +141,7 @@ const existingStores = await getOrRefreshStores()
 ```js
 await supabase.from('stores').insert([{
   name: toTitleCaseVI(name.trim()),   // ← Title Case bắt buộc
-  store_type: selectedStoreType || 'Tạp hóa', // ← mặc định Cửa hàng
+  store_type: selectedStoreType || 'Tạp hóa', // ← mặc định Tạp hóa
   address_detail, ward, district,      // ← cũng Title Case
   active: Boolean(isAdmin),
   note, phone,

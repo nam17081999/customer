@@ -89,6 +89,18 @@ const MENU_SECTIONS = {
       },
     ],
   },
+  vehicles_admin: {
+    label: "Xe",
+    items: [
+      { href: "/vehicles", label: "Quản lý xe", icon: Truck },
+    ],
+  },
+  vehicles_staff: {
+    label: "Xe",
+    items: [
+      { href: "/vehicles/record-fuel", label: "Ghi nhận xăng", icon: Truck },
+    ],
+  },
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -234,7 +246,9 @@ function DesktopSidebar({
     ? "Admin"
     : role === "telesale"
       ? "Telesale"
-      : "Khách";
+      : role === "staff"
+        ? "Nhân viên"
+        : "Khách";
 
   return (
     <aside className="hidden sm:block sm:w-[280px] xl:w-[320px] shrink-0">
@@ -341,7 +355,9 @@ function MobileProfileHeader({
     ? "Admin"
     : role === "telesale"
       ? "Telesale"
-      : "Khách";
+      : role === "staff"
+        ? "Nhân viên"
+        : "Khách";
 
   return (
     <Card className="overflow-hidden border-gray-800 bg-gray-950 rounded-2xl sm:hidden">
@@ -477,6 +493,7 @@ export default function AccountScreen() {
     user,
     role,
     isAdmin,
+    isStaff,
     isTelesale,
     isAuthenticated,
     loading: authLoading,
@@ -555,17 +572,29 @@ export default function AccountScreen() {
 
             {/* ── Main content ── */}
             <main className="flex-1 min-w-0 space-y-4">
-              {(isAdmin || isTelesale) && (
+              {(isAdmin || isStaff || isTelesale) && (
                 <>
                   {isAdmin && (
                     <>
                       <MenuCard section={MENU_SECTIONS.sales} />
                       <MenuCard section={MENU_SECTIONS.stores} />
+                      <MenuCard section={MENU_SECTIONS.vehicles_admin} />
                       <MenuCard section={MENU_SECTIONS.admin} />
                     </>
                   )}
                   {isTelesale && !isAdmin && (
                     <MenuCard section={MENU_SECTIONS.telesale} />
+                  )}
+                  {isStaff && !isAdmin && (
+                    <>
+                      <MenuCard
+                        section={MENU_SECTIONS.stores}
+                        filterFn={(item) =>
+                          ['/overview', '/store/create'].includes(item.href)
+                        }
+                      />
+                      <MenuCard section={MENU_SECTIONS.vehicles_staff} />
+                    </>
                   )}
                 </>
               )}
@@ -584,7 +613,17 @@ export default function AccountScreen() {
                 </Card>
               )}
 
-              {!isAdmin && !isTelesale && (
+              {isStaff && !isAdmin && (
+                <Card className="w-full border-gray-800 bg-gray-950 rounded-2xl">
+                  <CardContent className="p-4 sm:p-5">
+                    <p className="text-base text-gray-400">
+                      Nhân viên có thể xem, thêm và bổ sung thông tin cửa hàng.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {!isAdmin && !isStaff && !isTelesale && (
                 <Card className="w-full border-gray-800 bg-gray-950 rounded-2xl">
                   <CardContent className="p-5 text-center">
                     <User className="mx-auto h-8 w-8 text-gray-600 mb-2" />
