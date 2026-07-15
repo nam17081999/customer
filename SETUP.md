@@ -20,7 +20,7 @@ Tạo `.env.local` từ `.env.example` và điền ít nhất các biến cần 
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- (tuỳ chọn) `GEOAPIFY_API_KEY`, `OPENMAP_API_KEY`, `GOONG_API_KEY` — xem `.env.example`
 
 ## Chạy local
 

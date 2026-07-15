@@ -122,7 +122,6 @@ on conflict (user_id, type) do nothing;
 -- Also seed for users who never got a notification but exist in auth.users
 -- (only runs if auth.users accessible, which depends on supabase setup)
 -- done via RPC instead to be safe
-end $$;
 
 -- ════════════════════════════════════════════════
 -- HELPER RPC: insert into feed (for server-side calls)

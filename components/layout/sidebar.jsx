@@ -10,8 +10,10 @@ import {
   MapIcon, User,
   CheckCircle, Users, Settings, Shield,
   Download, Upload, GitMerge, ChevronDown,
+  Truck, Fuel,
 } from 'lucide-react'
 import { useAuth } from '@/lib/AuthContext'
+import { USER_ROLES } from '@/lib/authz'
 import { preRequestCompassPermission } from '@/helper/geolocation'
 
 /* ─── Nav structure — tất cả pages, không role filter ────── */
@@ -75,6 +77,15 @@ const ALL_SECTIONS = [
     ],
   },
   {
+    key: 'vehicles',
+    label: 'Xe',
+    roles: [USER_ROLES.ADMIN, USER_ROLES.STAFF],
+    items: [
+      { href: '/vehicles',              label: 'Quản lý xe',    Icon: Truck },
+      { href: '/vehicles/record-fuel',   label: 'Ghi nhận xăng', Icon: Fuel },
+    ],
+  },
+  {
     key: 'system',
     label: 'Hệ thống',
     items: [
@@ -94,7 +105,7 @@ function isActive(pathname, href) {
 /* ─── Component ────────────────────────────────────────────── */
 export default function Sidebar({ open, onClose }) {
   const { pathname } = useRouter()
-  const { user } = useAuth() || {}
+  const { user, role, isAdmin, isStaff } = useAuth() || {}
   const [openSubmenus, setOpenSubmenus] = useState({})
 
   useEffect(() => {
@@ -110,19 +121,27 @@ export default function Sidebar({ open, onClose }) {
     })
   }, [pathname, user])
   const userName = user?.email?.split('@')[0] || 'Khách'
-  const userRole = !user ? '' : user.role === 'admin' ? 'Quản lý' : 'Telesale'
+  const userRole = !user ? '' : isAdmin ? 'Quản lý' : isStaff ? 'Nhân viên' : 'Telesale'
 
   const toggleSubmenu = (key) => setOpenSubmenus((prev) => ({ ...prev, [key]: !prev[key] }))
 
   const sections = useMemo(() => {
-    if (user) return ALL_SECTIONS
-    return ALL_SECTIONS
-      .filter((s) => s.key === 'stores')
-      .map((s) => ({
-        ...s,
-        items: s.items.filter((i) => i.href === '/' || i.href === '/store/create'),
-      }))
-  }, [user])
+    if (!user) {
+      return ALL_SECTIONS
+        .filter((s) => s.key === 'stores')
+        .map((s) => ({
+          ...s,
+          items: s.items.filter((i) => i.href === '/' || i.href === '/store/create'),
+        }))
+    }
+
+    const currentRole = isAdmin ? USER_ROLES.ADMIN : isStaff ? USER_ROLES.STAFF : USER_ROLES.TELESALE
+
+    return ALL_SECTIONS.filter((s) => {
+      if (!s.roles) return true
+      return s.roles.includes(currentRole)
+    })
+  }, [user, isAdmin, isStaff])
 
   return (
     <>

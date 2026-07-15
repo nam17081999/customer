@@ -20,8 +20,7 @@ class ErrorBoundary extends React.Component {
       errorInfo,
     })
 
-    // TODO: Send error to logging service (Sentry, LogRocket, etc.)
-    // Example: logErrorToService(error, errorInfo)
+    // Error logged to console in development above
   }
 
   handleReset = () => {

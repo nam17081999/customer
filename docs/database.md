@@ -254,9 +254,9 @@ Các trigger trong migration tự:
 
 ---
 
-## ⚠️ Index Khuyến Nghị
+## Indexes
 
-Hiện tại chưa có index tùy chỉnh. Khi data lớn cần:
+Các indexes đã định nghĩa trong `supabase/indexes.sql`:
 ```sql
 CREATE INDEX idx_stores_active ON stores(active) WHERE deleted_at IS NULL;
 CREATE INDEX idx_stores_district ON stores(district) WHERE deleted_at IS NULL;
@@ -264,7 +264,9 @@ CREATE INDEX idx_stores_store_type ON stores(store_type) WHERE deleted_at IS NUL
 CREATE INDEX idx_stores_deleted_at ON stores(deleted_at);
 CREATE INDEX idx_store_reports_status ON store_reports(status);
 CREATE INDEX idx_store_reports_store_id ON store_reports(store_id);
+CREATE INDEX idx_store_edit_history_store_id ON store_edit_history(store_id);
 ```
+Các index này cần được chạy migration trên Supabase để có hiệu lực.
 
 ---
 

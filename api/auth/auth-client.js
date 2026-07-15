@@ -28,7 +28,11 @@ export async function verifyUserToken(token) {
 }
 
 function getSupabaseStorageKeys() {
-  const keys = new Set(['supabase.auth.token'])
+  const keys = new Set([
+    'supabase.auth.token',
+    'supabase.auth.token-code-verifier',
+    'supabase.auth.token-user',
+  ])
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     if (!supabaseUrl) return Array.from(keys)
@@ -37,6 +41,7 @@ function getSupabaseStorageKeys() {
     if (projectRef) {
       keys.add(`sb-${projectRef}-auth-token`)
       keys.add(`sb-${projectRef}-auth-token-code-verifier`)
+      keys.add(`sb-${projectRef}-auth-token-user`)
     }
   } catch {
     // ignore malformed env
@@ -78,32 +83,23 @@ function clearAuthStorageFallback() {
 }
 
 export async function signOutCurrentUser() {
-  // Prefer clearing local session first to guarantee app logout.
-  const localResult = await supabase.auth.signOut({ scope: 'local' })
-  if (!localResult?.error) return localResult
-
-  // If session is already missing after local sign-out attempt,
-  // treat it as success to avoid false negative UI errors.
-  const { data: localSessionData, error: localSessionError } = await supabase.auth.getSession()
-  if (!localSessionError && !localSessionData?.session) {
-    return { error: null, data: null }
-  }
-
-  // Best-effort global revoke for remaining cases.
-  const globalResult = await supabase.auth.signOut()
-  if (!globalResult?.error) return globalResult
-
-  const { data: globalSessionData, error: globalSessionError } = await supabase.auth.getSession()
-  if (!globalSessionError && !globalSessionData?.session) {
-    return { error: null, data: null }
-  }
-
-  // Last fallback: force clear persisted auth tokens in browser storage.
+  // 1. Blast storage FIRST — guarantees tokens are gone even if the
+  //    signOut API call hangs or the tab crashes mid-request.
   clearAuthStorageFallback()
-  const { data: forcedSessionData, error: forcedSessionError } = await supabase.auth.getSession()
-  if (!forcedSessionError && !forcedSessionData?.session) {
-    return { error: null, data: null }
+
+  // 2. Best-effort server-side revoke.  This calls POST /logout which
+  //    @supabase/auth-js may throw/error on for non-AuthError failures
+  //    (network timeout, DNS, TypeError).  We catch everything — the
+  //    local session is already gone.
+  try {
+    await supabase.auth.signOut({ scope: 'local' })
+  } catch {
+    // Ignore — storage already cleared above.
   }
 
-  return globalResult?.error ? globalResult : localResult
+  // 3. Blast storage AGAIN to catch any edge-case where the SDK
+  //    re-hydrated a session during the signOut handshake.
+  clearAuthStorageFallback()
+
+  return { error: null }
 }

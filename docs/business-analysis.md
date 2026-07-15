@@ -15,7 +15,7 @@
 | Map | MapLibre + OSM + Google Maps picker | ✅ 3 nguồn dự phòng |
 | Cache | 3-layer (memory → IDB → Supabase) | ✅ Tối ưu cho mobile |
 | Auth | Supabase Auth | ✅ Role-based (admin/telesale/guest) |
-| Testing | Vitest (48 unit) + Playwright (9 E2E) | ⚠️ Có nhưng 5 test fail |
+| Testing | Vitest (60 unit, 662 tests) + Playwright (9 E2E) | ✅ Tất cả test xanh |
 | Type Safety | JavaScript (không TypeScript) | ❌ Rủi ro refactor |
 
 ### Modules Đã Có
@@ -124,7 +124,7 @@
 | 1 | **Không có quản lý công nợ** — không thể biết khách nợ bao nhiêu, quá hạn bao lâu | ❌ KHÔNG THỂ vận hành; NPP bán chịu là chính | **Critical** |
 | 2 | **Không có bảng giá / khuyến mãi** — mỗi khách hàng có thể có giá riêng | Không linh hoạt trong định giá; mất cạnh tranh | **High** |
 | 3 | **Không có quản lý giao hàng** — không track được đơn đã giao chưa | ❌ KHÔNG THỂ vận hành logistics | **Critical** |
-| 4 | **5 tests failing** — test suite không đáng tin cậy | Rủi ro regression khi thêm tính năng | **High** |
+| 4 | **(Đã fix) 0 tests failing** — test suite đã xanh hoàn toàn | Đã sửa: `validateStoreEditPhones` thiếu duplicate detection | ✅ Fixed |
 | 5 | **Không TypeScript** — codebase 218 files JS thuần | Refactor khó, bug runtime dễ xảy ra | **Medium** |
 | 6 | **Client-side search không scale** — tải toàn bộ stores về client | Khi >5K stores sẽ chậm | **Medium** |
 | 7 | **Thiếu DB indexes** — chưa apply `indexes.sql` | Query Supabase chậm khi data lớn | **Medium** |
@@ -176,7 +176,7 @@ Báo giá → Đặt hàng → Xác nhận → Giao hàng → Xác nhận giao �
 
 | Task | Rationale | Effort |
 |---|---|---|
-| **Fix 5 test failures** | Không thể tin tưởng codebase khi test đỏ | 1 ngày |
+| **Fix test failures** | ~~5 failures~~ → **0 failures** (đã hoàn thành trong Phase 3) | ✅ Done |
 | **Apply DB indexes** (`supabase/indexes.sql`) | Query sẽ chậm khi data > vài nghìn | 0.5 ngày |
 | **Add E2E cho inventory/orders flows** | Module mới nhất, rủi ro cao nhất, không E2E | 2-3 ngày |
 | **Fix inventoryClient `listPurchaseOrders` mock** | ⚠️ Code thiếu `.order()` → sẽ lỗi runtime | 0.5 ngày |
@@ -261,7 +261,7 @@ Báo giá → Đặt hàng → Xác nhận → Giao hàng → Xác nhận giao �
 1. ❌ KHÔNG CÓ CÔNG NỢ — không thể bán chịu, không thể quản lý dòng tiền
 2. ❌ KHÔNG CÓ GIAO HÀNG — không track đơn đi đâu, đã giao chưa
 3. ❌ KHÔNG CÓ BẢNG GIÁ — mỗi khách mỗi giá, phải nhập tay
-4. ⚠️ TEST SUITE KHÔNG XANH — 5 test fail, module mới không E2E
+4. ~~⚠️ TEST SUITE KHÔNG XANH~~ → ✅ Tất cả 662 tests pass
 5. ⚠️ KHÔNG CI/CD — deploy thủ công, dễ miss regression
 ```
 

@@ -1,4 +1,4 @@
-import "../app/globals.css";
+import "../styles/globals.css";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import AppLayout from "@/components/layout/app-layout";
@@ -13,8 +13,7 @@ const PAGE_TITLES = {
   '/overview': { title: 'Bảng điều khiển', subtitle: 'Tổng quan hoạt động' },
   '/': { title: 'Danh sách cửa hàng', subtitle: 'Danh sách cửa hàng kinh doanh' },
   '/map': { title: 'Bản đồ', subtitle: 'Bản đồ cửa hàng' },
-  '/login': null, // no chrome
-  '/inventory/products': { title: 'Dnah sách hàng hóa' },
+  '/inventory/products': { title: 'Danh sách hàng hóa' },
   '/inventory/purchases/new': { title: 'Nhập hàng', subtitle: 'Tạo phiếu nhập kho' },
   '/inventory/purchases': { title: 'Phiếu nhập', subtitle: 'Danh sách phiếu nhập kho' },
   '/inventory/reports': { title: 'Báo cáo', subtitle: 'Thống kê kinh doanh' },
@@ -30,11 +29,11 @@ const PAGE_TITLES = {
   '/store/deduplicate': { title: 'Gộp trùng lặp', subtitle: 'Xử lý cửa hàng trùng' },
   '/admin/users': { title: 'Quản lý tài khoản', subtitle: 'Người dùng hệ thống' },
   '/admin/operations': { title: 'Thao tác', subtitle: 'Quản trị hệ thống' },
+  '/vehicles': { title: 'Quản lý xe', subtitle: 'Danh sách xe giao hàng' },
+  '/vehicles/record-fuel': { title: 'Ghi nhận xăng', subtitle: 'Nhập số lít xăng đã đổ' },
   '/account': { title: 'Tài khoản', subtitle: 'Thông tin cá nhân' },
-  '/login': { title: 'Đăng nhập' },
+  '/login': { title: 'Đăng nhập', subtitle: '' },
 }
-
-const NO_CHROME = []
 
 // ── Activates notification subscriptions globally ──
 function NotificationRoot() {
@@ -49,7 +48,6 @@ import { ThemeProvider } from "@/lib/ThemeContext";
 
 export default function App({ Component, pageProps }) {
   const { pathname } = useRouter()
-  const hideChrome = NO_CHROME.includes(pathname)
   const pageMeta = PAGE_TITLES[pathname] || null
 
   // Content wrapper
@@ -73,13 +71,9 @@ export default function App({ Component, pageProps }) {
       <ThemeProvider>
         <AuthProvider>
           <ErrorBoundary>
-            {hideChrome ? (
-              content
-            ) : (
-              <AppLayout title={pageMeta?.title} subtitle={pageMeta?.subtitle}>
-                {content}
-              </AppLayout>
-            )}
+            <AppLayout title={pageMeta?.title} subtitle={pageMeta?.subtitle}>
+              {content}
+            </AppLayout>
           </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>

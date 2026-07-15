@@ -182,6 +182,12 @@ export function validateStoreEditPhones({
       return { normalizedPhone: '', normalizedPhoneSecondary: '', error: validation.message }
     }
     normalizedPrimary = validation.normalized
+    if (stores) {
+      const dupMatches = findDuplicatePhoneStores(stores, rawPrimary, { excludeStoreId: storeId })
+      if (dupMatches.length > 0) {
+        return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: '', error: buildDuplicatePhoneMessage(dupMatches, 'Số điện thoại 1') }
+      }
+    }
   }
 
   if (!normalizedPrimary && rawSecondary) {
@@ -194,6 +200,12 @@ export function validateStoreEditPhones({
       return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: '', error: validation.message }
     }
     normalizedSecondary = validation.normalized
+    if (stores) {
+      const dupMatches = findDuplicatePhoneStores(stores, rawSecondary, { excludeStoreId: storeId })
+      if (dupMatches.length > 0) {
+        return { normalizedPhone: normalizedPrimary, normalizedPhoneSecondary: normalizedSecondary, error: buildDuplicatePhoneMessage(dupMatches, 'Số điện thoại 2') }
+      }
+    }
   }
 
   if (normalizedPrimary && normalizedSecondary && normalizedPrimary === normalizedSecondary) {

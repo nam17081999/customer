@@ -22,7 +22,6 @@ import { resolveDistrictWardFromCoordinates } from '@/helper/storeAreaResolver'
 import { scrollToFirstMatchingTarget } from '@/helper/formViewport'
 import {
   getLocationBootstrapOptions,
-  getLocationDuplicateCheckOptions,
   getLocationFallbackSubmitOptions,
   getLocationRefreshOptions,
 } from '@/helper/locationPolicy'

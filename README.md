@@ -35,17 +35,12 @@ Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 
 - **Framework**: Next.js 15 + React 19
 - **Database**: Supabase (PostgreSQL)
-- **Maps**: Leaflet + React-Leaflet
+- **Maps**: MapLibre GL + OpenStreetMap
 - **Styling**: TailwindCSS 4
 - **UI Components**: Radix UI
 - **Auth**: Supabase Auth
 
-## 📱 Screenshots
 
-<!-- TODO: Add screenshots here -->
-```
-[Trang tìm kiếm]  [Thêm cửa hàng]  [Danh sách thăm]
-```
 
 ## 🏗️ Project Structure
 
@@ -53,9 +48,19 @@ Mở [http://localhost:3000](http://localhost:3000) để xem kết quả.
 customer/
 ├── pages/          # Next.js pages (Pages Router)
 ├── components/     # React components
-├── lib/           # Libraries & utilities
-├── helper/        # Helper functions
-└── public/        # Static files
+├── lib/            # Libraries & utilities
+├── helper/         # Helper functions
+├── api/            # API client wrappers
+├── services/       # Page & domain services
+├── hooks/          # React hooks
+├── features/       # Feature modules
+├── screens/        # Screen-level components
+├── data/           # Static data (VN admin areas)
+├── supabase/       # Migrations, indexes, seed
+├── __tests__/      # Unit & integration tests
+├── e2e/            # Playwright E2E tests
+├── scripts/        # Dev tooling
+└── public/         # Static files
 ```
 
 ## 🔧 Available Scripts
@@ -116,19 +121,3 @@ Internal project - Not for public distribution
 ## 🙋 Support
 
 Liên hệ team lead nếu cần hỗ trợ.
-
----
-
-## Learn More about Next.js
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Learn Next.js](https://nextjs.org/learn)
-- [Next.js GitHub](https://github.com/vercel/next.js)
-
-## Deploy on Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
-
-Check out [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
