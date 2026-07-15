@@ -237,11 +237,11 @@ export default function Sidebar({ open, onClose }) {
         {/* ── Footer — user card only when logged in ── */}
         {user && (
           <div className="sidebar-footer">
-            <div className="user-card">
-              <div className="avatar-sm">{userName.charAt(0).toUpperCase()}</div>
-              <div className="user-info">
-                <div className="name truncate">{userName}</div>
-                <div className="role">{userRole}</div>
+            <div className="p-4 border-t border-gray-700 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">{userName.charAt(0).toUpperCase()}</div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground truncate">{userName}</div>
+                <div className="text-xs text-muted">{userRole}</div>
               </div>
             </div>
           </div>

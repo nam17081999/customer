@@ -201,9 +201,9 @@ export default function InventoryReportsPage() {
         <title>Thống kê - NPP Hà Công</title>
       </Head>
 
-      <div className="page-title" style={{ marginBottom: 24 }}>
-        <h1>Thống kê</h1>
-        <p>Báo cáo doanh số, hàng hóa và khách hàng</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Thống kê</h1>
+        <p className="text-sm text-muted mt-1">Báo cáo doanh số, hàng hóa và khách hàng</p>
       </div>
 
       {/* Export alert */}
@@ -212,7 +212,7 @@ export default function InventoryReportsPage() {
           <div className="alert-box">
             <h3>✅ Xuất Excel</h3>
             <p>Báo cáo thống kê đang được xuất. Vui lòng kiểm tra file <strong>baocao_thongke.xlsx</strong> trong thư mục tải về.</p>
-            <button className="btn btn-primary" onClick={() => setExportAlert(false)}>Đã hiểu</button>
+            <button className="inline-flex items-center justify-center h-9 px-4 rounded text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => setExportAlert(false)}>Đã hiểu</button>
           </div>
         </div>
       )}
@@ -232,7 +232,7 @@ export default function InventoryReportsPage() {
           <label>Đến:</label>
           <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
         </div>
-        <button className="btn btn-primary" onClick={() => setExportAlert(true)} disabled={loading}>
+        <button className="inline-flex items-center justify-center h-9 px-4 rounded text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => setExportAlert(true)} disabled={loading}>
           <Download className="h-4 w-4" /> Xuất Excel
         </button>
       </div>
@@ -441,15 +441,6 @@ export default function InventoryReportsPage() {
           padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
           background: var(--surface); color: var(--fg); font-size: 13px;
         }
-        .btn {
-          padding: 7px 18px; border-radius: var(--radius-sm); border: none;
-          font-size: 13px; font-weight: 600; cursor: pointer;
-          transition: all .15s; display: inline-flex; align-items: center; gap: 6px;
-        }
-        .btn-primary { background: var(--accent); color: #fff; }
-        .btn-primary:hover { filter: brightness(1.15); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
         .kpi-grid {
           display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;
         }

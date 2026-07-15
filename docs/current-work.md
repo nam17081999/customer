@@ -466,3 +466,81 @@ Docs
 
 ### Risks / Next
 - `docs/project-context.md`, `docs/location-flow-matrix.md`, and `docs/superpowers/` plans are still partially stale but lower priority
+
+---
+
+## Phase 5: CSS Migration — Replace legacy classes with inline Tailwind v4
+
+### Goal
+Replace all legacy component classes from `styles/globals.css` with inline Tailwind v4 utility classes across every page/component, then remove the unused CSS.
+
+### Task Type
+Refactor
+
+### In Scope
+- Phase B: Replace `.btn-*` classes with inline Tailwind in `confirm-dialog.jsx`, `reports.js`, `account.js`, `products.js`, `orders-list-page.jsx`
+- Phase C: Replace `.card`, `.card-header`, `.card-body`, `.modal-*`, `.f-input`, `.form-*`, `.field-*` in `overview.js`, `district-chart.jsx`, `recent-orders.jsx`, `products.js`, `account.js`, `orders-list-page.jsx`
+- Phase D: Replace KPI, table, filter, timeline, toggle, chip, avatar-sm, user-card, page-title, toolbar, filter-sheet, profile, toast, confirm classes in all remaining files
+- Phase E: Remove 45+ unused component class blocks from globals.css (reduced from 2722 lines to ~820 lines)
+- Phase F: Verify with lint + build
+
+### Out of Scope
+- `<style jsx>` scoped styles in `pages/inventory/reports.js` (independent of globals.css)
+- `@theme` tokens, `:root` design tokens, base/reset styles (keep as-is)
+- Sidebar, header, status-badge, pagination, district chart, QA grid, badge classes (still in use)
+
+### Must Preserve
+- All visual appearance (colors, spacing, sizing) — inline Tailwind classes match original CSS values
+- Vietnamese phone validation, store search, map behavior, Supabase + cache consistency
+- Build compiles all 38 pages with 0 errors
+
+### Plan
+1. Replace btn classes → inline Tailwind (Phase B)
+2. Replace card, modal, form classes → inline Tailwind (Phase C)
+3. Replace KPI, table, filter, timeline, toggle, chip, avatar, toolbar, profile, toast, confirm classes → inline Tailwind (Phase D)
+4. Remove unused component CSS from globals.css (Phase E)
+5. Run lint + build (Phase F)
+
+### Done
+- ✅ **Phase B** — All `.btn-*`, `.btn-icon`, `.btn-center` replaced with inline Tailwind in 5 files:
+  - `components/ui/confirm-dialog.jsx`
+  - `pages/inventory/reports.js`
+  - `pages/account.js`
+  - `pages/inventory/products.js`
+  - `screens/orders/orders-list-page.jsx`
+- ✅ **Phase C** — Card, modal, form classes replaced:
+  - `.card`, `.card-header`, `.card-body` → `overview.js`, `district-chart.jsx`, `recent-orders.jsx`
+  - `.settings-card`, `.card-title` → `account.js`
+  - `.modal-overlay`, `.modal`, `.modal-head`, `.modal-close`, `.modal-body`, `.modal-foot` → `products.js` (3 modals), `orders-list-page.jsx` (1 modal)
+  - `.f-input`, `.field-group`, `.form-row-2`, `.form-row`, `.form-group`, `.form-label`, `.form-input` → `products.js`, `account.js`
+- ✅ **Phase D** — Remaining component classes replaced:
+  - Filter panel (desktop + mobile sheet) → `products.js`
+  - `.kpi-grid`, `.kpi-card`, `.kpi-label`, `.kpi-value`, `.kpi-sub`, `.kpi-change` → `kpi-grid.jsx`, `kpi-card.jsx`
+  - `.p-table`, `.p-code`, `.o-*`, `.p-*` → `products.js`, `orders-list-page.jsx`
+  - `.order-table`, `.order-table-wrap`, `.multi-bar`, `.store-info-card`, `.empty-state` → `orders-list-page.jsx`
+  - `.orders-table`, `.order-store`, `.order-amount`, `.order-time` → `recent-orders.jsx`
+  - `.timeline`, `.tl-item`, `.tl-label`, `.tl-time` → `orders-list-page.jsx`
+  - `.toggle-switch`, `.toggle-slider` → `toggle.jsx`
+  - `.chip` → `chip.jsx`
+  - `.avatar-sm` → `header.jsx`
+  - `.user-card` → `sidebar.jsx`
+  - `.page-title`, `.toolbar`, `.search-box`, `.filter-chips`, `.filter-toggle`, `.toolbar-extra` → `overview.js`, `reports.js`, `orders-list-page.jsx`, `products.js`
+  - `.filter-backdrop`, `.filter-sheet`, `.sheet-handle`, `.sheet-title`, `.apply-btn` → `store/create.js`
+  - `.profile-head`, `.profile-avatar`, `.profile-head-info`, `.info-line`, `.il-label`, `.il-value` → `account.js`
+  - `.toast-container`, `.toast`, `.confirm-overlay`, `.confirm-box`, `.confirm-actions` → wherever present
+  - `.toggle-row`, `.toggle-label` → `account.js`
+  - Fixed `<span className="opt">` replaceAll bug (missing `>` in `products.js` — 6 occurrences)
+- ✅ **Phase E** — Removed unused CSS from globals.css:
+  - Removed: btn, card, modal (×2), detail grid/section/table/info-card, KPI, ops-grid, orders-table, order-table/o-*, timeline, toggle, settings-card/form/profile, toast/confirm, filter-panel/filter-inner, multi-bar, filter-grid/filter-actions, filter-sheet, data-table/sort-icon, search-clear, page-title/search-box, p-table, table-wrap, generic table, `html{scrollbar-gutter}` duplicate
+  - Kept: `@theme`, `:root`, base/reset, sidebar, header, `.content`, `.h-screen`, toolbar, QA grid, cols-2, district chart, status-badge, th-sort/sort-arrow, page-ellipsis, filter-row/date-chip, filter-chip, filter-group, badge/chip, pagination, store-type badges, store-name-marquee, all responsive @media blocks referencing kept classes
+  - CSS file: 2722 lines → ~820 lines, 23.5 kB → 19.4 kB (-17%)
+
+### Verification
+- ✅ `npm run lint` — 0 errors
+- ✅ `npm run build` — 38/38 pages compiled, 0 errors
+- ✅ No visual regressions expected (Tailwind values match original CSS values)
+
+### Risks / Next
+- Minor: the `replaceAll` for `<span className="opt">` accidentally removed `>` — caught by lint and fixed before build
+- Low risk: some kept CSS classes (`.filter-chip`, `.search-box`, etc.) have 0 JSX references but are retained as fallback; can be removed in a future pass
+- No remaining global CSS component classes to migrate — future component styling should use inline Tailwind only

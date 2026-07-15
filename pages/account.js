@@ -74,21 +74,21 @@ export default function AccountPage() {
         <title>Tài khoản - NPP Hà Công</title>
       </Head>
 
-      <div className="page-title">
-        <h1>Tài khoản</h1>
-        <p>Quản lý thông tin cá nhân và cài đặt hệ thống</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Tài khoản</h1>
+        <p className="text-sm text-muted mt-1">Quản lý thông tin cá nhân và cài đặt hệ thống</p>
       </div>
 
       {/* Toast container */}
-      <div className="toast-container" id="toastContainer">
+      <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none" id="toastContainer">
         {toasts.map(t => (
-          <div key={t.id} className={`toast show ${t.type}`}>{t.message}</div>
+          <div key={t.id} className={`px-4 py-3 rounded-lg text-sm font-medium shadow-lg pointer-events-auto animate-in slide-in-from-right ${t.type === 'error' ? 'bg-red-600 text-white' : 'bg-gray-800 text-foreground border border-gray-700'}`}>{t.message}</div>
         ))}
       </div>
 
       {/* ═══════ 1. THÔNG TIN CÁ NHÂN ═══════ */}
-      <div className="settings-card" id="personalCard">
-        <div className="card-title">
+      <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-5" id="personalCard">
+        <div className="text-[15px] font-bold mb-4 flex items-center gap-2 text-foreground">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
@@ -101,8 +101,8 @@ export default function AccountPage() {
       </div>
 
       {/* ═══════ 2. ĐỔI MẬT KHẨU ═══════ */}
-      <div className="settings-card">
-        <div className="card-title">
+      <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-5">
+        <div className="text-[15px] font-bold mb-4 flex items-center gap-2 text-foreground">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -113,8 +113,8 @@ export default function AccountPage() {
       </div>
 
       {/* ═══════ 3. CÀI ĐẶT THÔNG BÁO ═══════ */}
-      <div className="settings-card">
-        <div className="card-title">
+      <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-5">
+        <div className="text-[15px] font-bold mb-4 flex items-center gap-2 text-foreground">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
@@ -125,8 +125,8 @@ export default function AccountPage() {
       </div>
 
       {/* ═══════ 4. THÔNG TIN ỨNG DỤNG ═══════ */}
-      <div className="settings-card muted">
-        <div className="card-title" style={{ color: 'var(--muted)' }}>
+      <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-5">
+        <div className="text-[15px] font-bold mb-4 flex items-center gap-2 text-muted">
           <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="16" x2="12" y2="12" />
@@ -135,27 +135,27 @@ export default function AccountPage() {
           Thông tin ứng dụng
         </div>
 
-        <div className="info-line">
-          <span className="il-label">Phiên bản</span>
-          <span className="il-value">2.1.0</span>
+        <div className="flex items-center justify-between py-2 border-b border-gray-800 text-sm">
+          <span className="text-muted font-medium">Phiên bản</span>
+          <span className="text-foreground">2.1.0</span>
         </div>
-        <div className="info-line">
-          <span className="il-label">Cơ sở dữ liệu</span>
-          <span className="il-value">Supabase</span>
+        <div className="flex items-center justify-between py-2 border-b border-gray-800 text-sm">
+          <span className="text-muted font-medium">Cơ sở dữ liệu</span>
+          <span className="text-foreground">Supabase</span>
         </div>
-        <div className="info-line">
-          <span className="il-label">Lần đồng bộ cuối</span>
-          <span className="il-value">15/06/2026 14:30</span>
+        <div className="flex items-center justify-between py-2 border-b border-gray-800 text-sm">
+          <span className="text-muted font-medium">Lần đồng bộ cuối</span>
+          <span className="text-foreground">15/06/2026 14:30</span>
         </div>
 
-        <div className="btn-center">
-          <button className="btn btn-red" style={{ width: 200 }} onClick={() => openConfirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', handleSignOut)} disabled={signingOut}>
+        <div className="flex justify-center mt-4">
+          <button className="inline-flex items-center justify-center h-[34px] w-[200px] rounded-lg text-xs font-semibold cursor-pointer bg-red-600 text-white hover:bg-red-500 border-none disabled:opacity-50" onClick={() => openConfirm('Đăng xuất', 'Bạn có chắc chắn muốn đăng xuất?', handleSignOut)} disabled={signingOut}>
             <LogOut className="h-4 w-4" />
             {signingOut ? 'Đang xuất...' : 'Đăng xuất'}
           </button>
         </div>
-        <div className="btn-center">
-          <button className="btn btn-red-outline" style={{ width: 200 }} onClick={() => openConfirm('Xoá tài khoản', 'Bạn có chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.', handleDeleteAccount)} disabled={deleting}>
+        <div className="flex justify-center mt-3">
+          <button className="inline-flex items-center justify-center h-[34px] w-[200px] rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-red-700 text-red-400 hover:bg-red-950/50 disabled:opacity-50" onClick={() => openConfirm('Xoá tài khoản', 'Bạn có chắc chắn muốn xoá tài khoản? Hành động này không thể hoàn tác.', handleDeleteAccount)} disabled={deleting}>
             {deleting ? 'Đang xoá...' : 'Xoá tài khoản'}
           </button>
         </div>
@@ -163,13 +163,13 @@ export default function AccountPage() {
 
       {/* Confirm dialog */}
       {confirm && (
-        <div className="confirm-overlay open" onClick={(e) => { if (e.target === e.currentTarget) closeConfirm() }}>
-          <div className="confirm-box">
-            <h3>{confirm.title}</h3>
-            <p>{confirm.message}</p>
-            <div className="confirm-actions">
-              <button className="btn btn-outline" onClick={closeConfirm}>Huỷ</button>
-              <button className="btn btn-primary" onClick={confirm.onOk}>Xác nhận</button>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/55" onClick={(e) => { if (e.target === e.currentTarget) closeConfirm() }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-[10px] p-6 max-w-[400px] w-full shadow-lg text-center">
+            <h3 className="text-lg font-bold text-foreground mb-2">{confirm.title}</h3>
+            <p className="text-sm text-muted mb-5">{confirm.message}</p>
+            <div className="flex justify-center gap-3">
+              <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={closeConfirm}>Huỷ</button>
+              <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none" onClick={confirm.onOk}>Xác nhận</button>
             </div>
           </div>
         </div>
@@ -180,11 +180,11 @@ export default function AccountPage() {
 
 function ProfileSection({ user, roleLabel }) {
   return (
-    <div className="profile-head">
-      <div className="profile-avatar">{getInitials(user?.email)}</div>
-      <div className="profile-head-info">
-        <h2>{user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Người dùng'}</h2>
-        <p>{roleLabel}</p>
+    <div className="flex items-center gap-4 mb-5">
+      <div className="w-[60px] h-[60px] rounded-full bg-accent text-white flex items-center justify-center text-[22px] font-bold">{getInitials(user?.email)}</div>
+      <div>
+        <h2 className="text-lg font-bold text-foreground">{user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Người dùng'}</h2>
+        <p className="text-sm text-muted">{roleLabel}</p>
       </div>
     </div>
   )
@@ -224,37 +224,37 @@ function ProfileForm({ user, roleLabel, showToast }) {
 
   return (
     <>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Họ tên</label>
-          <input className={'form-input' + (editing ? ' editable' : '')} type="text" value={name} disabled={!editing}
+      <div className="grid grid-cols-2 gap-3 mb-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Họ tên</label>
+          <input className={'h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent' + (editing ? ' border-accent' : '')} type="text" value={name} disabled={!editing}
             onChange={e => setName(e.target.value)} />
         </div>
-        <div className="form-group">
-          <label className="form-label">Email</label>
-          <input className={'form-input' + (editing ? ' editable' : '')} type="email" value={email} disabled={!editing}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Email</label>
+          <input className={'h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent' + (editing ? ' border-accent' : '')} type="email" value={email} disabled={!editing}
             onChange={e => setEmail(e.target.value)} />
         </div>
       </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">SĐT</label>
-          <input className={'form-input' + (editing ? ' editable' : '')} type="tel" value={phone} disabled={!editing}
+      <div className="grid grid-cols-2 gap-3 mb-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">SĐT</label>
+          <input className={'h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent' + (editing ? ' border-accent' : '')} type="tel" value={phone} disabled={!editing}
             onChange={e => setPhone(e.target.value)} />
         </div>
-        <div className="form-group">
-          <label className="form-label">Vai trò</label>
-          <input className="form-input" type="text" value={roleLabel} disabled />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Vai trò</label>
+          <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent" type="text" value={roleLabel} disabled />
         </div>
       </div>
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
         {editing ? (
           <>
-            <button className="btn btn-outline" onClick={cancelEdit}>Huỷ</button>
-            <button className="btn btn-primary" onClick={saveEdit}>Lưu</button>
+            <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-transparent border border-gray-700 text-muted hover:border-accent hover:text-foreground" onClick={cancelEdit}>Huỷ</button>
+            <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none" onClick={saveEdit}>Lưu</button>
           </>
         ) : (
-          <button className="btn btn-primary" onClick={startEdit}>Chỉnh sửa</button>
+          <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none" onClick={startEdit}>Chỉnh sửa</button>
         )}
       </div>
     </>
@@ -277,27 +277,27 @@ function PasswordChangeForm({ showToast }) {
 
   return (
     <>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Mật khẩu hiện tại</label>
-          <input className="form-input" type="password" placeholder="••••••••"
+      <div className="grid grid-cols-2 gap-3 mb-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Mật khẩu hiện tại</label>
+          <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent" type="password" placeholder="••••••••"
             value={currentPw} onChange={e => setCurrentPw(e.target.value)} />
         </div>
       </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Mật khẩu mới</label>
-          <input className="form-input" type="password" placeholder="Tối thiểu 6 ký tự"
+      <div className="grid grid-cols-2 gap-3 mb-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Mật khẩu mới</label>
+          <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent" type="password" placeholder="Tối thiểu 6 ký tự"
             value={newPw} onChange={e => setNewPw(e.target.value)} />
         </div>
-        <div className="form-group">
-          <label className="form-label">Xác nhận mật khẩu mới</label>
-          <input className="form-input" type="password" placeholder="Nhập lại mật khẩu mới"
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[13px] font-semibold text-muted">Xác nhận mật khẩu mới</label>
+          <input className="h-9 rounded border border-gray-700 px-3 bg-background text-foreground text-sm outline-none focus:border-accent" type="password" placeholder="Nhập lại mật khẩu mới"
             value={confirmPw} onChange={e => setConfirmPw(e.target.value)} />
         </div>
       </div>
       <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-        <button className="btn btn-primary" onClick={handleChange}>Lưu mật khẩu</button>
+        <button className="inline-flex items-center justify-center h-[34px] px-4 rounded-lg text-xs font-semibold cursor-pointer bg-accent text-white hover:opacity-90 border-none" onClick={handleChange}>Lưu mật khẩu</button>
       </div>
     </>
   )
@@ -325,20 +325,20 @@ function NotificationToggles({ showToast }) {
   }, [prefs, showToast])
 
   return (
-    <div id="toggleList">
-      {NOTIF_TOGGLES.map(({ key, label }) => {
-        const enabled = prefs[key] !== false
-        return (
-          <div key={key} className="toggle-row">
-            <span className="toggle-label">{label}</span>
-            <label className="toggle-switch">
-              <input type="checkbox" checked={enabled} disabled={!loaded}
-                onChange={() => toggle(key)} />
-              <span className="toggle-slider"></span>
-            </label>
-          </div>
-        )
-      })}
-    </div>
+      <div className="space-y-3">
+        {NOTIF_TOGGLES.map(({ key, label }) => {
+          const enabled = prefs[key] !== false
+          return (
+            <div key={key} className="flex items-center justify-between py-2">
+              <span className="text-sm text-foreground">{label}</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" checked={enabled} disabled={!loaded}
+                  onChange={() => toggle(key)} />
+                <span className="w-10 h-5.5 bg-gray-700 rounded-full peer-checked:bg-accent after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-[18px]"></span>
+              </label>
+            </div>
+          )
+        })}
+      </div>
   )
 }

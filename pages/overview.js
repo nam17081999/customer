@@ -49,9 +49,9 @@ export default function OverviewPage() {
     <div className="content-inner">
 
       {/* ── Page Title ── */}
-      <div className="page-title">
-        <h1>Tổng quan</h1>
-        <p>Theo dõi hoạt động kinh doanh và cửa hàng trên toàn hệ thống</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Tổng quan</h1>
+        <p className="text-sm text-muted mt-1">Theo dõi hoạt động kinh doanh và cửa hàng trên toàn hệ thống</p>
       </div>
 
       <KpiGrid loading={loading} error={error} summary={summary} health={health} />
@@ -60,12 +60,12 @@ export default function OverviewPage() {
         <>
           <div className="cols-2">
             {/* Quick Actions */}
-            <div className="card">
-              <div className="card-header">
-                <h3>Thao tác nhanh</h3>
-                <Link href="/orders">Xem tất cả</Link>
+            <div className="bg-gray-900 border border-gray-700 rounded p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[15px] font-semibold text-foreground">Thao tác nhanh</h3>
+                <Link className="text-sm text-accent hover:underline" href="/orders">Xem tất cả</Link>
               </div>
-              <div className="card-body">
+              <div>
                 <div className="qa-grid">
                   {OPERATOR_QUICK_ACTIONS.map((action, idx) => {
                     const IconComponent = QA_ICONS[idx]

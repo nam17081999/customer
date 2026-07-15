@@ -6,14 +6,14 @@ import { formatOrderTime } from '@/helper/storeAnalytics'
 export function RecentOrders({ orders, stores }) {
   if (orders.length === 0) {
     return (
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-header" style={{ padding: '16px 20px 0' }}>
-          <h3>Đơn hàng gần đây</h3>
-          <Link href="/orders">Xem tất cả</Link>
+      <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-6">
+        <div className="flex items-center justify-between mb-4" style={{ padding: '0' }}>
+          <h3 className="text-[15px] font-semibold text-foreground">Đơn hàng gần đây</h3>
+          <Link className="text-sm text-accent hover:underline" href="/orders">Xem tất cả</Link>
         </div>
-        <div className="card-body" style={{ paddingTop: 8 }}>
-          <div className="empty-state" style={{ padding: '24px 0' }}>
-            <p>Chưa có đơn hàng nào.</p>
+        <div style={{ paddingTop: 0 }}>
+          <div className="flex flex-col items-center justify-center py-6 text-center gap-2">
+            <p className="text-sm text-muted">Chưa có đơn hàng nào.</p>
           </div>
         </div>
       </div>
@@ -21,14 +21,14 @@ export function RecentOrders({ orders, stores }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 24 }}>
-      <div className="card-header" style={{ padding: '16px 20px 0' }}>
-        <h3>Đơn hàng gần đây</h3>
-        <Link href="/orders">Xem tất cả</Link>
+    <div className="bg-gray-900 border border-gray-700 rounded p-5 mb-6">
+      <div className="flex items-center justify-between mb-4" style={{ padding: '0' }}>
+        <h3 className="text-[15px] font-semibold text-foreground">Đơn hàng gần đây</h3>
+        <Link className="text-sm text-accent hover:underline" href="/orders">Xem tất cả</Link>
       </div>
-      <div className="card-body" style={{ paddingTop: 8 }}>
+      <div style={{ paddingTop: 0 }}>
         <div style={{ overflowX: 'auto' }}>
-          <table className="orders-table">
+          <table className="w-full border-collapse">
             <thead>
               <tr>
                 <th>Mã đơn</th>
@@ -46,7 +46,7 @@ export function RecentOrders({ orders, stores }) {
                       {order.code || `#${String(order.id).slice(0, 8)}`}
                     </span>
                   </td>
-                  <td className="order-store">
+                  <td className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
                     {(() => {
                       const s = stores.find(st => String(st.id) === String(order.customer_store_id))
                       return s?.name || order.customer_store_name || order.store_name || '—'
@@ -55,10 +55,10 @@ export function RecentOrders({ orders, stores }) {
                   <td>
                     <StatusBadge status={order.status} />
                   </td>
-                  <td className="order-amount" style={{ textAlign: 'right' }}>
+                  <td className="font-semibold text-right">
                     {formatMoney(order.total_amount)}
                   </td>
-                  <td className="order-time" style={{ textAlign: 'right' }}>
+                  <td className="text-xs text-muted whitespace-nowrap text-right">
                     {formatOrderTime(order.created_at)}
                   </td>
                 </tr>
