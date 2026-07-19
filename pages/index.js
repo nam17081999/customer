@@ -59,9 +59,10 @@ export default function HomePage() {
     return () => obs.disconnect()
   }, [searchResults.length, displayCount])
 
-  /* ── Reset display count when filters/search change ── */
+  /* ── Reset display count + scroll to top when filters/search change ── */
   useEffect(() => {
     setDisplayCount(BATCH_SIZE)
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [searchTerm, selectedDistrict, selectedWard, selectedStoreTypes, selectedDetailFlags, sortBy, activeStatus])
 
   /* ── Mobile detection ── */
@@ -284,7 +285,7 @@ export default function HomePage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto" ref={scrollRef} style={{ overscrollBehavior: 'contain' }}>
+      <div className="flex-1 min-h-0 overflow-y-auto scroll-smooth" ref={scrollRef} style={{ overscrollBehavior: 'contain', overflowAnchor: 'none' }}>
         {hasError ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-14 h-14 rounded-full bg-[color:var(--red)]/10 flex items-center justify-center mb-4">

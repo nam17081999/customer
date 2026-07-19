@@ -101,12 +101,12 @@ function StoreCard({ store, distance, onOpenDetail }) {
       </div>
       <div className="flex flex-col gap-2 mb-3 flex-1">
         {addressText && (
-          <div className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
+          <div className="flex items-center gap-1.5 text-[13px] text-gray-300">
             <span className="shrink-0"><PinIcon /></span>
             <span className="truncate">{addressText}</span>
           </div>
         )}
-        <div className="flex items-center gap-1.5 text-[13px] text-[color:var(--muted)]">
+        <div className="flex items-center gap-1.5 text-[13px] text-gray-300">
           <span className="shrink-0"><PhoneIcon /></span>
           <span>{phone || 'Chưa có số'}</span>
         </div>
