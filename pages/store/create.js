@@ -130,8 +130,8 @@ export default function AddStore() {
     if (isMobile) {
       return (
         <>
-          <div className="fixed inset-0 z-50 bg-black/50" />
-          <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900 rounded-t-xl max-h-[85vh] overflow-y-auto p-5 pb-0 translate-y-0 transition-transform duration-300">
+          <div className="fixed inset-0 z-[60] bg-black/50" />
+          <div className="fixed bottom-0 left-0 right-0 mb-0 z-[60] bg-gray-900 rounded-t-xl max-h-[85vh] overflow-y-auto p-5 translate-y-0 transition-transform duration-300">
             <div className="w-9 h-1 bg-gray-700 rounded-full mx-auto mb-4 shrink-0" />
             <div className="text-base font-bold text-foreground mb-4">Phát hiện cửa hàng có thể đã được tạo</div>
             <div className="space-y-2">
